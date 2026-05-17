@@ -1,7 +1,12 @@
-import { useLayoutEffect, useRef, useState } from "react";
-import type { Dispatch, ReactElement, SetStateAction } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import type { ReactElement } from "react";
 import { Button } from "@/components/ui/button";
 import type { AgentTimelineItem } from "@/agent/types";
+import {
+  agentChatBrowserAdapter,
+  COPIED_FEEDBACK_DURATION_MS,
+  STREAMING_ASSISTANT_COPY_ID,
+} from "@/components/agent/agentChatBrowserAdapter";
 import { AgentMarkdown } from "@/components/agent/AgentMarkdown";
 import { Check, Copy, RotateCw } from "lucide-react";
 
@@ -12,34 +17,58 @@ export type AgentChatTranscriptProps = {
   readonly onRegenerateAssistant: () => void;
 };
 
-async function writeClipboard(text: string): Promise<boolean> {
-  try {
-    await navigator.clipboard.writeText(text);
-    return true;
-  } catch {
-    try {
-      const ta = document.createElement("textarea");
-      ta.value = text;
-      ta.style.position = "fixed";
-      ta.style.left = "-9999px";
-      document.body.append(ta);
-      ta.select();
-      const ok = document.execCommand("copy");
-      ta.remove();
-      return ok;
-    } catch {
-      return false;
-    }
-  }
-}
+type CopyControl = {
+  readonly isCopied: boolean;
+  readonly isCopyDisabled: boolean;
+  readonly onCopy: () => void;
+};
 
 export function AgentChatTranscript(props: AgentChatTranscriptProps): ReactElement {
   const anchorRef = useRef<HTMLDivElement>(null);
-  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const resetCopiedStatusRef = useRef<(() => void) | null>(null);
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
 
   useLayoutEffect(() => {
     anchorRef.current?.scrollIntoView({ block: "end", behavior: "auto" });
   }, [props.timeline, props.assistantStream]);
+
+  useEffect(() => {
+    return () => {
+      resetCopiedStatusRef.current?.();
+    };
+  }, []);
+
+  const resetCopiedStatusLater = useCallback((copyId: string) => {
+    resetCopiedStatusRef.current?.();
+    resetCopiedStatusRef.current = agentChatBrowserAdapter.schedule(() => {
+      resetCopiedStatusRef.current = null;
+      setCopiedMessageId((currentCopyId) => (currentCopyId === copyId ? null : currentCopyId));
+    }, COPIED_FEEDBACK_DURATION_MS);
+  }, []);
+
+  const copyResponse = useCallback(
+    async (copyId: string, text: string) => {
+      if (text.trim().length === 0) return;
+
+      const copied = await agentChatBrowserAdapter.writeClipboardText(text);
+      if (!copied) return;
+
+      setCopiedMessageId(copyId);
+      resetCopiedStatusLater(copyId);
+    },
+    [resetCopiedStatusLater],
+  );
+
+  const createCopyControl = useCallback(
+    (copyId: string, text: string): CopyControl => ({
+      isCopied: copiedMessageId === copyId,
+      isCopyDisabled: text.trim().length === 0,
+      onCopy: () => {
+        void copyResponse(copyId, text);
+      },
+    }),
+    [copiedMessageId, copyResponse],
+  );
 
   const last = props.timeline.length > 0 ? props.timeline[props.timeline.length - 1] : undefined;
 
@@ -55,14 +84,13 @@ export function AgentChatTranscript(props: AgentChatTranscriptProps): ReactEleme
         ) : (
           <AssistantBlock
             key={item.id}
-            id={item.id}
+            copyControl={createCopyControl(item.id, item.text)}
             markdown={item.text}
-            copiedId={copiedId}
-            setCopiedId={setCopiedId}
-            canRegenerate={
+            onRegenerate={
               props.canRegenerateAssistant && last?.kind === "assistant" && last.id === item.id
+                ? props.onRegenerateAssistant
+                : undefined
             }
-            onRegenerate={props.onRegenerateAssistant}
           />
         ),
       )}
@@ -70,8 +98,7 @@ export function AgentChatTranscript(props: AgentChatTranscriptProps): ReactEleme
       {props.assistantStream.trim() !== "" && (
         <div className="max-w-xl">
           <StreamingAssistantBlock
-            copiedId={copiedId}
-            setCopiedId={setCopiedId}
+            copyControl={createCopyControl(STREAMING_ASSISTANT_COPY_ID, props.assistantStream)}
             text={props.assistantStream}
           />
         </div>
@@ -83,62 +110,37 @@ export function AgentChatTranscript(props: AgentChatTranscriptProps): ReactEleme
 }
 
 function AssistantBlock(props: {
-  readonly id: string;
   readonly markdown: string;
-  readonly copiedId: string | null;
-  readonly setCopiedId: Dispatch<SetStateAction<string | null>>;
-  readonly canRegenerate: boolean;
-  readonly onRegenerate: () => void;
+  readonly copyControl: CopyControl;
+  readonly onRegenerate?: () => void;
 }): ReactElement {
   return (
     <div className="max-w-xl space-y-2">
       <div className="text-[15px] leading-[1.62] break-words text-[#a1a1aa]">
         <AgentMarkdown markdown={props.markdown} />
       </div>
-      <AssistantToolbar
-        copiedId={props.copiedId}
-        copiedKey={props.id}
-        canRegenerate={props.canRegenerate}
-        onRegenerate={props.onRegenerate}
-        setCopiedId={props.setCopiedId}
-        showRegenerate={true}
-        text={props.markdown}
-      />
+      <AssistantToolbar copyControl={props.copyControl} onRegenerate={props.onRegenerate} />
     </div>
   );
 }
 
 function StreamingAssistantBlock(props: {
   readonly text: string;
-  readonly copiedId: string | null;
-  readonly setCopiedId: Dispatch<SetStateAction<string | null>>;
+  readonly copyControl: CopyControl;
 }): ReactElement {
   return (
     <div className="space-y-2">
       <div className="text-[15px] leading-[1.62] break-words text-[#a1a1aa]">
         <AgentMarkdown markdown={props.text} />
       </div>
-      <AssistantToolbar
-        copiedId={props.copiedId}
-        copiedKey="streaming"
-        canRegenerate={false}
-        onRegenerate={() => {}}
-        setCopiedId={props.setCopiedId}
-        showRegenerate={false}
-        text={props.text}
-      />
+      <AssistantToolbar copyControl={props.copyControl} />
     </div>
   );
 }
 
 function AssistantToolbar(props: {
-  readonly text: string;
-  readonly copiedKey: string;
-  readonly copiedId: string | null;
-  readonly setCopiedId: Dispatch<SetStateAction<string | null>>;
-  readonly showRegenerate: boolean;
-  readonly canRegenerate: boolean;
-  readonly onRegenerate: () => void;
+  readonly copyControl: CopyControl;
+  readonly onRegenerate?: () => void;
 }): ReactElement {
   return (
     <div className="flex items-center gap-0.5 opacity-55 transition-opacity hover:opacity-95">
@@ -147,36 +149,23 @@ function AssistantToolbar(props: {
         variant="ghost"
         size="icon-sm"
         className="size-8 text-neutral-500 hover:bg-white/10 hover:text-neutral-300"
-        aria-label={props.copiedId === props.copiedKey ? "Copied" : "Copy response"}
-        disabled={props.text.trim().length === 0}
-        onClick={() =>
-          void (async () => {
-            const ok = await writeClipboard(props.text);
-            if (!ok) return;
-            props.setCopiedId(props.copiedKey);
-            window.setTimeout(() => {
-              props.setCopiedId((prev: string | null) => (prev === props.copiedKey ? null : prev));
-            }, 2200);
-          })()
-        }
+        aria-label={props.copyControl.isCopied ? "Copied" : "Copy response"}
+        disabled={props.copyControl.isCopyDisabled}
+        onClick={props.copyControl.onCopy}
       >
-        {props.copiedId === props.copiedKey ? (
+        {props.copyControl.isCopied ? (
           <Check className="size-3.5 text-emerald-400" strokeWidth={2} />
         ) : (
           <Copy className="size-3.5" strokeWidth={2} />
         )}
       </Button>
-      {props.showRegenerate && (
+      {props.onRegenerate && (
         <Button
           type="button"
           variant="ghost"
           size="icon-sm"
-          disabled={!props.canRegenerate}
-          className="size-8 text-neutral-500 hover:bg-white/10 hover:text-neutral-300 disabled:pointer-events-none disabled:opacity-30"
+          className="size-8 text-neutral-500 hover:bg-white/10 hover:text-neutral-300"
           aria-label="Regenerate response"
-          title={
-            props.canRegenerate ? undefined : "Wait until the assistant has finished responding"
-          }
           onClick={props.onRegenerate}
         >
           <RotateCw className="size-3.5" strokeWidth={2} />
