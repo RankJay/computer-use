@@ -29,7 +29,7 @@ import { Separator } from "@/components/ui/separator";
 import { PERMISSION_MODE_LABELS } from "@/agent/toolContract";
 import { BROWSER_SAMPLE_WORKSPACE_ROOT } from "@/agent/browserWorkspace";
 import { SECRET_ANTHROPIC_API_KEY } from "@/agent/secrets";
-import type { PermissionMode } from "@/agent/types";
+import { parsePermissionMode } from "@/agent/types";
 import { isTauriRuntime } from "@/agent/nativeBridge";
 import { useLogSettingsCommands, useSecretKeySettings } from "@/hooks/useSettingsCommands";
 import { useSettings } from "@/providers/settings-provider";
@@ -38,17 +38,6 @@ import { Settings2 } from "lucide-react";
 type SettingsSheetProps = {
   onResetSession: () => void;
 };
-
-function parsePermissionMode(value: string): PermissionMode {
-  switch (value) {
-    case "ask_risky":
-    case "ask_all":
-    case "session_low_risk":
-      return value;
-    default:
-      return "ask_risky";
-  }
-}
 
 export function SettingsSheet(props: SettingsSheetProps) {
   const { settings, setPermissionMode, permissionMode, updateSettings, revokePersistedApprovals } =

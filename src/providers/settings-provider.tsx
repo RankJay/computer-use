@@ -7,7 +7,7 @@ import {
   settingsOrDefault,
 } from "@/agent/settingsPersistence";
 import type { AppSettingsPayload } from "@/agent/tauriIpc";
-import type { PermissionMode } from "@/agent/types";
+import { parsePermissionMode, type PermissionMode } from "@/agent/types";
 import {
   createContext,
   useCallback,
@@ -30,17 +30,6 @@ type SettingsContextValue = {
 };
 
 const SettingsContext = createContext<SettingsContextValue | null>(null);
-
-function parsePermissionMode(raw: string): PermissionMode {
-  switch (raw) {
-    case "ask_risky":
-    case "ask_all":
-    case "session_low_risk":
-      return raw;
-    default:
-      return "ask_risky";
-  }
-}
 
 export function SettingsProvider(props: { children: ReactNode }) {
   const [ready, setReady] = useState(false);

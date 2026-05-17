@@ -1,5 +1,4 @@
-﻿import { useQuery } from "@tanstack/react-query";
-import { Button } from "@/components/ui/button";
+﻿import { Button } from "@/components/ui/button";
 import { CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useAgentSession } from "@/hooks/useAgentSession";
@@ -34,17 +33,6 @@ export function ControlCenter() {
       ? ""
       : "Use workspace.inspect on the workspace root, then read preset/actuate-sample.txt and summarize it in a few sentences.",
   );
-
-  useQuery({
-    queryKey: ["settings", "bootstrap"],
-    queryFn: async () => {
-      await new Promise((resolve) => window.setTimeout(resolve, 120));
-      return {
-        app: "Actuate",
-        savedAt: new Date().toISOString(),
-      };
-    },
-  });
 
   const canStart = agent.capabilities.canStartRun && draft.trim().length > 0;
 

@@ -6,6 +6,17 @@ export type PermissionMode = "ask_risky" | "ask_all" | "session_low_risk";
 
 export type PermissionChoice = "allow_once" | "allow_session" | "allow_always" | "deny";
 
+export function parsePermissionMode(value: string): PermissionMode {
+  switch (value) {
+    case "ask_risky":
+    case "ask_all":
+    case "session_low_risk":
+      return value;
+    default:
+      return "ask_risky";
+  }
+}
+
 export type AgentPendingPermission = {
   readonly permissionId: string;
   readonly toolName?: string;
