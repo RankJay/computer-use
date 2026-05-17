@@ -5,7 +5,7 @@ import remarkGfm from "remark-gfm";
 
 const markdownComponents: Components = {
   p: ({ children }) => (
-    <p className="mb-3 text-[inherit] last:mb-0 break-words [&:has(+blockquote)]:mb-2">
+    <p className="mb-3 text-inherit last:mb-0 wrap-break-word [&:has(+blockquote)]:mb-2">
       {children}
     </p>
   ),
@@ -20,22 +20,22 @@ const markdownComponents: Components = {
   ),
   ul: ({ children }) => <ul className="my-3 list-disc space-y-1 pl-6 last:my-2">{children}</ul>,
   ol: ({ children }) => <ol className="my-3 list-decimal space-y-1 pl-6 last:my-2">{children}</ol>,
-  li: ({ children }) => <li className="text-[inherit] leading-relaxed">{children}</li>,
+  li: ({ children }) => <li className="text-inherit leading-relaxed">{children}</li>,
   blockquote: ({ children }) => (
     <blockquote className="border-l-2 border-neutral-600 py-1 pl-4 italic text-neutral-400">
       {children}
     </blockquote>
   ),
   h1: ({ children }) => (
-    <h1 className="mt-6 mb-2 text-xl font-semibold text-[inherit] first:mt-0">{children}</h1>
+    <h1 className="mt-6 mb-2 text-xl font-semibold text-inherit first:mt-0">{children}</h1>
   ),
   h2: ({ children }) => (
-    <h2 className="mt-5 mb-2 border-b border-white/10 pb-1 text-lg font-semibold text-[inherit] first:mt-0">
+    <h2 className="mt-5 mb-2 border-b border-white/10 pb-1 text-lg font-semibold text-inherit first:mt-0">
       {children}
     </h2>
   ),
   h3: ({ children }) => (
-    <h3 className="mt-4 mb-2 text-[15px] font-semibold text-[inherit] first:mt-0">{children}</h3>
+    <h3 className="mt-4 mb-2 text-[15px] font-semibold text-inherit first:mt-0">{children}</h3>
   ),
   hr: () => <hr className="my-6 border-neutral-700" />,
   table: ({ children }) => (
@@ -74,6 +74,8 @@ const markdownComponents: Components = {
   },
 };
 
+const remarkPlugins = [remarkGfm];
+
 type AgentMarkdownProps = {
   readonly markdown: string;
 };
@@ -82,7 +84,7 @@ export function AgentMarkdown({ markdown }: AgentMarkdownProps): ReactElement | 
   if (markdown.trim() === "") return null;
 
   return (
-    <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+    <ReactMarkdown remarkPlugins={remarkPlugins} components={markdownComponents}>
       {markdown}
     </ReactMarkdown>
   );

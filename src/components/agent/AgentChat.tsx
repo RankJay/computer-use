@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { ReactElement } from "react";
 import { Button } from "@/components/ui/button";
 import type { AgentTimelineItem } from "@/agent/types";
@@ -7,8 +7,12 @@ import {
   COPIED_FEEDBACK_DURATION_MS,
   STREAMING_ASSISTANT_COPY_ID,
 } from "@/components/agent/agentChatBrowserAdapter";
-import { AgentMarkdown } from "@/components/agent/AgentMarkdown";
 import { Check, Copy, RotateCw } from "lucide-react";
+
+const AgentMarkdown = lazy(async () => {
+  const module = await import("@/components/agent/AgentMarkdown");
+  return { default: module.AgentMarkdown };
+});
 
 export type AgentChatTranscriptProps = {
   readonly timeline: readonly AgentTimelineItem[];
@@ -116,8 +120,8 @@ function AssistantBlock(props: {
 }): ReactElement {
   return (
     <div className="max-w-xl space-y-2">
-      <div className="text-[15px] leading-[1.62] break-words text-[#a1a1aa]">
-        <AgentMarkdown markdown={props.markdown} />
+      <div className="text-[15px] leading-[1.62] wrap-break-word text-[#a1a1aa]">
+        <AssistantMarkdown markdown={props.markdown} />
       </div>
       <AssistantToolbar copyControl={props.copyControl} onRegenerate={props.onRegenerate} />
     </div>
@@ -130,8 +134,8 @@ function StreamingAssistantBlock(props: {
 }): ReactElement {
   return (
     <div className="space-y-2">
-      <div className="text-[15px] leading-[1.62] break-words text-[#a1a1aa]">
-        <AgentMarkdown markdown={props.text} />
+      <div className="text-[15px] leading-[1.62] wrap-break-word text-[#a1a1aa]">
+        <AssistantMarkdown markdown={props.text} />
       </div>
       <AssistantToolbar copyControl={props.copyControl} />
     </div>
@@ -172,5 +176,13 @@ function AssistantToolbar(props: {
         </Button>
       )}
     </div>
+  );
+}
+
+function AssistantMarkdown(props: { readonly markdown: string }): ReactElement {
+  return (
+    <Suspense fallback={null}>
+      <AgentMarkdown markdown={props.markdown} />
+    </Suspense>
   );
 }

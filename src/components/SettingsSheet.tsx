@@ -44,6 +44,7 @@ export function SettingsSheet(props: SettingsSheetProps) {
     useSettings();
   const secretKey = useSecretKeySettings(SECRET_ANTHROPIC_API_KEY);
   const logs = useLogSettingsCommands();
+  const isDesktop = isTauriRuntime();
 
   return (
     <Sheet>
@@ -62,7 +63,7 @@ export function SettingsSheet(props: SettingsSheetProps) {
           <SheetTitle>Settings</SheetTitle>
           <SheetDescription>
             BYOK, workspace, logs, and supervision.{" "}
-            {isTauriRuntime()
+            {isDesktop
               ? "Desktop: secrets use the OS credential store."
               : "Web: settings and keys stay in this browser only (localStorage), not on a server."}
           </SheetDescription>
@@ -97,7 +98,7 @@ export function SettingsSheet(props: SettingsSheetProps) {
 
           <div className="space-y-2">
             <Label htmlFor="api-key">
-              Anthropic API key ({isTauriRuntime() ? "OS keychain" : "browser localStorage"})
+              Anthropic API key ({isDesktop ? "OS keychain" : "browser localStorage"})
             </Label>
             <Input
               id="api-key"
@@ -133,11 +134,11 @@ export function SettingsSheet(props: SettingsSheetProps) {
                     e.currentTarget.value.trim() === "" ? null : e.currentTarget.value.trim(),
                 })
               }
-              placeholder={isTauriRuntime() ? "Path to repository" : BROWSER_SAMPLE_WORKSPACE_ROOT}
+              placeholder={isDesktop ? "Path to repository" : BROWSER_SAMPLE_WORKSPACE_ROOT}
               autoComplete="off"
             />
             <p className="text-sm text-muted-foreground">
-              {isTauriRuntime() ? (
+              {isDesktop ? (
                 <>
                   Absolute folder path for file tools and default shell cwd. Example:{" "}
                   <code className="text-xs">D:\Projects\actuate</code>.

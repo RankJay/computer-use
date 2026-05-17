@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useRef, useState } from "react";
+﻿import { useCallback, useRef, useState } from "react";
 import {
   applyAgentEvent,
   beginAgentRun,
@@ -8,7 +8,7 @@ import {
   trimLastAssistantTurn,
 } from "@/agent/sessionProjection";
 import { createEventId } from "@/agent/types";
-import type { AgentEvent, PermissionChoice, PermissionMode } from "@/agent/types";
+import type { AgentEvent, PermissionChoice } from "@/agent/types";
 import { PermissionResolverLifecycle } from "@/agent/permissionOrchestrator";
 import {
   createAgentSessionRunnerHost,
@@ -23,13 +23,8 @@ export function useAgentSession() {
 
   const [projection, setProjection] = useState(createInitialAgentProjection);
   const permissionLifecycleRef = useRef(new PermissionResolverLifecycle());
-  const permissionModeRef = useRef<PermissionMode>("ask_risky");
   const activeTaskRef = useRef<string | null>(null);
   const runBusyRef = useRef(false);
-
-  useEffect(() => {
-    permissionModeRef.current = permissionMode;
-  }, [permissionMode]);
 
   const waitForPermissionChoice = useCallback((permissionId: string) => {
     return permissionLifecycleRef.current.waitForChoice(permissionId);
@@ -74,7 +69,7 @@ export function useAgentSession() {
             prompt,
             settings,
             workspaceRoot,
-            permissionMode: permissionModeRef.current,
+            permissionMode,
             native: host.native,
             emit: (event) => {
               if (activeTaskRef.current !== taskId) return;
@@ -92,7 +87,7 @@ export function useAgentSession() {
         }
       }
     },
-    [ingestEvent, persistToolApproval, settings, waitForPermissionChoice],
+    [ingestEvent, permissionMode, persistToolApproval, settings, waitForPermissionChoice],
   );
 
   const regenerateLastAssistant = useCallback(() => {

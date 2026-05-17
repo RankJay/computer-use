@@ -1,6 +1,5 @@
 import { BROWSER_SAMPLE_WORKSPACE_ROOT } from "@/agent/browserWorkspace";
 import type { LiveAgentSessionOptions } from "@/agent/liveAgentSession";
-import { runLiveAgentSession } from "@/agent/liveAgentSession";
 import { runDemoAgentSession } from "@/agent/mockRuntime";
 import type { AgentNativeBridge } from "@/agent/nativeBridge";
 import { createNativeBridge, isTauriRuntime } from "@/agent/nativeBridge";
@@ -38,6 +37,13 @@ export type AgentSessionRunners = {
   readonly live: AgentSessionRunner;
 };
 
+type LiveAgentSessionRunner = (options: LiveAgentSessionOptions) => Promise<void>;
+
+async function runLiveAgentSessionFromChunk(options: LiveAgentSessionOptions): Promise<void> {
+  const module = await import("@/agent/liveAgentSession");
+  await module.runLiveAgentSession(options);
+}
+
 export function createAgentSessionRunnerHost(): AgentSessionRunnerHost {
   return {
     native: createNativeBridge(),
@@ -65,7 +71,7 @@ export function resolveAgentWorkspaceRoot(
 
 export function createLiveAgentSessionRunner(
   host: AgentSessionRunnerHost,
-  liveRunner: (options: LiveAgentSessionOptions) => Promise<void> = runLiveAgentSession,
+  liveRunner: LiveAgentSessionRunner = runLiveAgentSessionFromChunk,
 ): AgentSessionRunner {
   return async (options) => {
     let apiKey: string;

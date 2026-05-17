@@ -2,7 +2,8 @@
 import { CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useAgentSession } from "@/hooks/useAgentSession";
-import { useState } from "react";
+import { useCallback, useState } from "react";
+import type { FormEvent } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { ArrowUp, Minus } from "lucide-react";
 import { SettingsSheet } from "@/components/SettingsSheet";
@@ -14,6 +15,10 @@ import {
   TaskFailureBanner,
 } from "@/components/agent/AgentSessionPanels";
 import { isTauriRuntime } from "@/agent/nativeBridge";
+import type { PermissionChoice } from "@/agent/types";
+
+const BROWSER_SAMPLE_PROMPT =
+  "Use workspace.inspect on the workspace root, then read preset/actuate-sample.txt and summarize it in a few sentences.";
 
 async function minimizeActuateWindow(): Promise<void> {
   if (!isTauriRuntime()) return;
@@ -28,19 +33,36 @@ function onWindowDragMouseDown(e: React.MouseEvent): void {
 
 export function ControlCenter() {
   const agent = useAgentSession();
-  const [draft, setDraft] = useState(() =>
-    isTauriRuntime()
-      ? ""
-      : "Use workspace.inspect on the workspace root, then read preset/actuate-sample.txt and summarize it in a few sentences.",
-  );
+  const { pendingPermission, resolvePermission, startRun } = agent;
+  const [draft, setDraft] = useState(() => (isTauriRuntime() ? "" : BROWSER_SAMPLE_PROMPT));
 
   const canStart = agent.capabilities.canStartRun && draft.trim().length > 0;
 
-  function submitTask(): void {
+  const submitTask = useCallback((): void => {
     if (!canStart) return;
-    void agent.startRun(draft.trim(), null);
+    void startRun(draft.trim(), null);
     setDraft("");
-  }
+  }, [canStart, draft, startRun]);
+
+  const handleSubmit = useCallback(
+    (e: FormEvent<HTMLFormElement>): void => {
+      e.preventDefault();
+      submitTask();
+    },
+    [submitTask],
+  );
+
+  const handlePermissionResolve = useCallback(
+    (choice: PermissionChoice): void => {
+      if (pendingPermission === null) return;
+      resolvePermission(pendingPermission.permissionId, choice);
+    },
+    [pendingPermission, resolvePermission],
+  );
+
+  const handleMinimizeClick = useCallback((): void => {
+    void minimizeActuateWindow();
+  }, []);
 
   return (
     <div className="box-border flex h-full min-h-dvh w-full flex-col gap-0 overflow-hidden rounded-none border-0 bg-[#0E0E0E] p-4 shadow-none ring-0">
@@ -62,7 +84,7 @@ export function ControlCenter() {
             className="size-8 bg-stone-900 shrink-0"
             aria-label="Minimize to taskbar"
             title="Minimize (app keeps running; use the tray menu to exit)"
-            onClick={() => void minimizeActuateWindow()}
+            onClick={handleMinimizeClick}
           >
             <Minus className="size-4" color="#CDCDCD" strokeWidth={2} />
           </Button>
@@ -103,19 +125,12 @@ export function ControlCenter() {
         {agent.pendingPermission !== null && (
           <PermissionPrompt
             pending={agent.pendingPermission}
-            onResolve={(choice) => {
-              const p = agent.pendingPermission;
-              if (p === null) return;
-              agent.resolvePermission(p.permissionId, choice);
-            }}
+            onResolve={handlePermissionResolve}
           />
         )}
         <form
           className="flex w-full items-center gap-1 rounded-[9999px] border-0 bg-[#121212] p-1.5 shadow-[inset_0_1px_#ffffff08,inset_0_0_0_1px_#ffffff08,0_0_0_1px_#0000001a,0_2px_2px_#0000001a,0_4px_4px_#0000001a,0_8px_8px_#0000001a]"
-          onSubmit={(e) => {
-            e.preventDefault();
-            submitTask();
-          }}
+          onSubmit={handleSubmit}
         >
           <Input
             value={draft}
