@@ -1,0 +1,7 @@
+Actuate browser sample workspace
+
+This file ships with the web build so you can smoke-test the live agent (BYOK) without the desktop app.
+
+Facts for summarization checks:
+- This preset folder lists two files in manifest.json.
+- The agent should use workspace.inspect to list names, then file.read to load content.

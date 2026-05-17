@@ -1,0 +1,39 @@
+# Least-privilege allowlist for application #[tauri::command] handlers (S3).
+# Each block documents why IPC exposure exists; pair with src/agent/tauriIpc.ts on the frontend.
+
+[[permission]]
+identifier = "allow-capture-primary-display"
+description = """
+Enables capture_primary_display_png_base64: samples the primary display into PNG (base64) for vision / timeline keyframes.
+Does not write files or run subprocesses; on macOS the OS may require Screen Recording permission.
+"""
+commands.allow = ["capture_primary_display_png_base64"]
+
+[[permission]]
+identifier = "allow-run-command"
+description = """
+Enables run_command: spawns a subprocess with the given program, argv, and optional cwd.
+High impact — arbitrary local execution. User consent must precede invocation via the permission model.
+"""
+commands.allow = ["run_command"]
+
+[[permission]]
+identifier = "allow-pointer-move-to"
+description = """
+Enables pointer_move_to: moves the OS mouse cursor to absolute screen coordinates (UI automation).
+"""
+commands.allow = ["pointer_move_to"]
+
+[[permission]]
+identifier = "allow-pointer-click"
+description = """
+Enables pointer_click: synthesizes a mouse button click at the current cursor position (UI automation).
+"""
+commands.allow = ["pointer_click"]
+
+[[permission]]
+identifier = "allow-type-text"
+description = """
+Enables type_text: synthesizes keyboard input to the focused application (UI automation).
+"""
+commands.allow = ["type_text"]

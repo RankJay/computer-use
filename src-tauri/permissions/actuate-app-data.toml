@@ -1,0 +1,61 @@
+# Settings, secrets, session logs, workspace-scoped filesystem (S5/S6/A1).
+
+[[permission]]
+identifier = "allow-load-settings"
+description = "Read persisted app settings (workspace, permission mode, retention, model id) from local app data."
+commands.allow = ["load_settings"]
+
+[[permission]]
+identifier = "allow-save-settings"
+description = "Write app settings JSON to local app data."
+commands.allow = ["save_settings"]
+
+[[permission]]
+identifier = "allow-load-secret"
+description = "Read a secret from the OS credential store (e.g. BYOK API key)."
+commands.allow = ["load_secret"]
+
+[[permission]]
+identifier = "allow-store-secret"
+description = "Store a secret in the OS credential store."
+commands.allow = ["store_secret"]
+
+[[permission]]
+identifier = "allow-delete-secret"
+description = "Delete a secret from the OS credential store."
+commands.allow = ["delete_secret"]
+
+[[permission]]
+identifier = "allow-append-session-log"
+description = "Append one JSON line to the on-disk session log under app data."
+commands.allow = ["append_session_log"]
+
+[[permission]]
+identifier = "allow-write-session-keyframe"
+description = "Persist a PNG keyframe for a session (base64 decoded on the Rust side)."
+commands.allow = ["write_session_keyframe"]
+
+[[permission]]
+identifier = "allow-clear-all-logs"
+description = "Remove all session logs and keyframes from local app data."
+commands.allow = ["clear_all_logs"]
+
+[[permission]]
+identifier = "allow-open-logs-folder"
+description = "Reveal the logs directory in the OS file manager."
+commands.allow = ["open_logs_folder"]
+
+[[permission]]
+identifier = "allow-read-workspace-file"
+description = "Read a UTF-8 file path relative to the approved workspace root."
+commands.allow = ["read_workspace_file"]
+
+[[permission]]
+identifier = "allow-list-workspace-dir"
+description = "List immediate children of a directory path relative to the approved workspace root (read-only)."
+commands.allow = ["list_workspace_dir"]
+
+[[permission]]
+identifier = "allow-write-workspace-file"
+description = "Create or overwrite a UTF-8 file relative to the approved workspace root."
+commands.allow = ["write_workspace_file"]
