@@ -4,6 +4,7 @@ import type {
   AgentRunStatus,
   AgentTimelineItem,
 } from "@/agent/types";
+import { applyAssistantStreamEvent, trimLastAssistantMessage } from "@/agent/streamingAssembly";
 
 export type AgentEventLogRow = {
   readonly id: string;
@@ -137,23 +138,14 @@ export function applyAgentEvent(
         pendingPermission: null,
       });
     case "assistant.text.delta":
-      return completeProjection({
-        ...prev,
-        events,
-        status: "running",
-        assistantStream: prev.assistantStream + event.text,
-      });
     case "assistant.text.done": {
-      const text = prev.assistantStream.trim();
+      const assembly = applyAssistantStreamEvent(prev, event);
       return completeProjection({
         ...prev,
         events,
         status: "running",
-        assistantStream: "",
-        timeline:
-          text.length === 0
-            ? prev.timeline
-            : [...prev.timeline, { id: event.id, at: event.at, kind: "assistant", text }],
+        timeline: assembly.timeline,
+        assistantStream: assembly.assistantStream,
       });
     }
     case "task.completed":
@@ -184,16 +176,11 @@ export function resetAgentProjection(): AgentSessionProjection {
 }
 
 export function trimLastAssistantTurn(prev: AgentSessionProjection): AgentSessionProjection {
-  const timeline = [...prev.timeline];
-
-  while (timeline.length > 0 && timeline[timeline.length - 1]?.kind === "assistant") {
-    timeline.pop();
-  }
-
+  const assembly = trimLastAssistantMessage(prev);
   return completeProjection({
     ...prev,
-    timeline,
-    assistantStream: "",
+    timeline: assembly.timeline,
+    assistantStream: assembly.assistantStream,
   });
 }
 

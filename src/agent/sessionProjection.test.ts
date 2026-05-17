@@ -117,6 +117,24 @@ describe("sessionProjection", () => {
     expect(projection.failureMessage).toBe("Latest failure");
   });
 
+  test("task.failed preserves the active assistant stream for post-failure visibility", () => {
+    let projection = createInitialAgentProjection();
+
+    projection = applyAgentEvent(projection, {
+      ...baseEvent("delta-1"),
+      type: "assistant.text.delta",
+      text: "Partial answer",
+    });
+    projection = applyAgentEvent(projection, {
+      ...baseEvent("failed-1"),
+      type: "task.failed",
+      message: "Network failure",
+    });
+
+    expect(projection.status).toBe("failed");
+    expect(projection.assistantStream).toBe("Partial answer");
+  });
+
   test("permission request and resolution update pending permission state", () => {
     let projection = applyAgentEvent(createInitialAgentProjection(), permissionRequestEvent());
 
