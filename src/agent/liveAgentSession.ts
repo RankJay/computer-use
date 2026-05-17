@@ -4,23 +4,14 @@ import { stepCountIs, streamText } from "ai";
 import type { LiveAgentToolContext } from "@/agent/agentSessionContext";
 import { createActuateTools } from "@/agent/aiTools";
 import { describeRuntimeCapabilities, getHostOsKind } from "@/agent/hostEnvironment";
-import { createNativeBridge, isTauriRuntime } from "@/agent/nativeBridge";
+import type { AgentSessionRunnerOptions } from "@/agent/sessionRunner";
 import { appendSessionLogLine, persistKeyframePng } from "@/agent/settingsApi";
-import type { AppSettingsPayload } from "@/agent/tauriIpc";
 import { createEventId } from "@/agent/types";
-import type { AgentEvent, PermissionChoice, PermissionMode } from "@/agent/types";
-import type { AgentToolName, ConsequenceRiskClass } from "@/agent/toolContract";
+import type { AgentEvent } from "@/agent/types";
+import type { ConsequenceRiskClass } from "@/agent/toolContract";
 
-export type LiveAgentSessionOptions = {
-  taskId: string;
-  prompt: string;
-  apiKey: string;
-  settings: AppSettingsPayload;
-  workspaceRoot: string | null;
-  permissionMode: PermissionMode;
-  emit: (event: AgentEvent) => void;
-  waitForPermissionChoice: (permissionId: string) => Promise<PermissionChoice>;
-  persistAlwaysAllow: (toolName: AgentToolName) => Promise<void>;
+export type LiveAgentSessionOptions = AgentSessionRunnerOptions & {
+  readonly apiKey: string;
 };
 
 async function appendStructuredLog(taskId: string, event: AgentEvent): Promise<void> {
@@ -39,12 +30,12 @@ export async function runLiveAgentSession(options: LiveAgentSessionOptions): Pro
     settings,
     workspaceRoot,
     permissionMode,
+    native,
     emit,
     waitForPermissionChoice,
     persistAlwaysAllow,
   } = options;
 
-  const native = createNativeBridge();
   const hostOs = getHostOsKind();
   const persisted = new Set(settings.persistedApprovals);
   const sessionRiskApproved = new Set<ConsequenceRiskClass>();
@@ -71,7 +62,7 @@ export async function runLiveAgentSession(options: LiveAgentSessionOptions): Pro
     headers: {
       "anthropic-dangerous-direct-browser-access": "true",
     },
-    ...(isTauriRuntime() ? { fetch: tauriHttpFetch } : {}),
+    ...(native !== null ? { fetch: tauriHttpFetch } : {}),
   });
 
   const taskEvent: AgentEvent = {

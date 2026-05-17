@@ -1,20 +1,10 @@
 ﻿import type { AgentNativeBridge } from "@/agent/nativeBridge";
 import { requestToolPermission } from "@/agent/permissionOrchestrator";
+import type { AgentSessionRunnerOptions, EmitFn } from "@/agent/sessionRunner";
 import { AGENT_TOOL_NAMES } from "@/agent/toolContract";
-import type { AgentEvent, PermissionChoice, PermissionMode } from "@/agent/types";
 import { createEventId } from "@/agent/types";
 
-export type EmitFn = (event: AgentEvent) => void;
-
-export type DemoAgentSessionOptions = {
-  taskId: string;
-  prompt: string;
-  emit: EmitFn;
-  waitForPermissionChoice: (permissionId: string) => Promise<PermissionChoice>;
-  permissionMode: PermissionMode;
-  workspaceRoot: string | null;
-  native: AgentNativeBridge | null;
-};
+export type DemoAgentSessionOptions = AgentSessionRunnerOptions;
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => {

@@ -9,13 +9,13 @@ import {
 } from "@/agent/sessionProjection";
 import { createEventId } from "@/agent/types";
 import type { AgentEvent, PermissionChoice, PermissionMode } from "@/agent/types";
-import { BROWSER_SAMPLE_WORKSPACE_ROOT } from "@/agent/browserWorkspace";
-import { createNativeBridge, isTauriRuntime } from "@/agent/nativeBridge";
 import { PermissionResolverLifecycle } from "@/agent/permissionOrchestrator";
-import { runDemoAgentSession } from "@/agent/mockRuntime";
-import { runLiveAgentSession } from "@/agent/liveAgentSession";
-import { loadSecretKey } from "@/agent/settingsApi";
-import { SECRET_ANTHROPIC_API_KEY } from "@/agent/secrets";
+import {
+  createAgentSessionRunnerHost,
+  createAgentSessionRunners,
+  resolveAgentWorkspaceRoot,
+  runSelectedAgentSession,
+} from "@/agent/sessionRunner";
 import { useSettings } from "@/providers/settings-provider";
 
 export function useAgentSession() {
@@ -54,7 +54,7 @@ export function useAgentSession() {
 
       const taskId = createEventId();
       activeTaskRef.current = taskId;
-      const native = createNativeBridge();
+      const host = createAgentSessionRunnerHost();
 
       const echoUser = opts?.echoUserPrompt !== false;
       setProjection((prev) =>
@@ -65,74 +65,26 @@ export function useAgentSession() {
         }),
       );
 
-      let workspaceRoot: string | null =
-        workspaceOverride && workspaceOverride.trim().length > 0
-          ? workspaceOverride.trim()
-          : settings.workspaceRoot?.trim() || null;
-
-      if (!workspaceRoot && !isTauriRuntime()) {
-        workspaceRoot = BROWSER_SAMPLE_WORKSPACE_ROOT;
-      }
+      const workspaceRoot = resolveAgentWorkspaceRoot(workspaceOverride, settings, host);
 
       try {
-        const isDemo = settings.agentMode === "demo";
-        if (isDemo) {
-          await runDemoAgentSession({
+        await runSelectedAgentSession(
+          {
             taskId,
             prompt,
-            native,
-            workspaceRoot,
-            emit: (event) => {
-              if (activeTaskRef.current !== taskId) return;
-              ingestEvent(event);
-            },
-            waitForPermissionChoice,
-            permissionMode: permissionModeRef.current,
-          });
-        } else {
-          let apiKey: string;
-          try {
-            apiKey = (await loadSecretKey(SECRET_ANTHROPIC_API_KEY))?.trim() ?? "";
-          } catch (err) {
-            const message = err instanceof Error ? err.message : String(err);
-            ingestEvent({
-              id: createEventId(),
-              at: Date.now(),
-              taskId,
-              type: "task.failed",
-              message: isTauriRuntime()
-                ? `Could not read API key from OS credential store: ${message}`
-                : `Could not read API key from browser storage: ${message}`,
-            });
-            return;
-          }
-          if (!apiKey) {
-            ingestEvent({
-              id: createEventId(),
-              at: Date.now(),
-              taskId,
-              type: "task.failed",
-              message: isTauriRuntime()
-                ? "No Anthropic API key found in the OS store. Open Settings, save your key again, then retry."
-                : "No Anthropic API key in browser storage. Open Settings → Save API key, then retry.",
-            });
-            return;
-          }
-          await runLiveAgentSession({
-            taskId,
-            prompt,
-            apiKey,
             settings,
             workspaceRoot,
             permissionMode: permissionModeRef.current,
+            native: host.native,
             emit: (event) => {
               if (activeTaskRef.current !== taskId) return;
               ingestEvent(event);
             },
             waitForPermissionChoice,
             persistAlwaysAllow: persistToolApproval,
-          });
-        }
+          },
+          createAgentSessionRunners(host),
+        );
       } finally {
         runBusyRef.current = false;
         if (activeTaskRef.current === taskId) {
