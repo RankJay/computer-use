@@ -28,19 +28,12 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { PERMISSION_MODE_LABELS } from "@/agent/toolContract";
 import { BROWSER_SAMPLE_WORKSPACE_ROOT } from "@/agent/browserWorkspace";
-import {
-  clearAllLogs,
-  deleteSecretKey,
-  loadSecretKey,
-  openLogsFolder,
-  storeSecretKey,
-} from "@/agent/settingsApi";
 import { SECRET_ANTHROPIC_API_KEY } from "@/agent/secrets";
 import type { PermissionMode } from "@/agent/types";
 import { isTauriRuntime } from "@/agent/nativeBridge";
+import { useLogSettingsCommands, useSecretKeySettings } from "@/hooks/useSettingsCommands";
 import { useSettings } from "@/providers/settings-provider";
 import { Settings2 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
 
 type SettingsSheetProps = {
   onResetSession: () => void;
@@ -60,31 +53,8 @@ function parsePermissionMode(value: string): PermissionMode {
 export function SettingsSheet(props: SettingsSheetProps) {
   const { settings, setPermissionMode, permissionMode, updateSettings, revokePersistedApprovals } =
     useSettings();
-
-  const [apiKeyDraft, setApiKeyDraft] = useState("");
-  const [hasStoredKey, setHasStoredKey] = useState(false);
-  const [apiKeyError, setApiKeyError] = useState<string | null>(null);
-  const [confirmClearLogsOpen, setConfirmClearLogsOpen] = useState(false);
-
-  const refreshKeyState = useCallback(async () => {
-    try {
-      const v = await loadSecretKey(SECRET_ANTHROPIC_API_KEY);
-      setHasStoredKey(!!v && v.length > 0);
-      setApiKeyError(null);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setApiKeyError(
-        isTauriRuntime()
-          ? `Could not read key from OS store: ${msg}`
-          : `Could not read key from browser storage: ${msg}`,
-      );
-      setHasStoredKey(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void refreshKeyState();
-  }, [refreshKeyState]);
+  const secretKey = useSecretKeySettings(SECRET_ANTHROPIC_API_KEY);
+  const logs = useLogSettingsCommands();
 
   return (
     <Sheet>
@@ -143,45 +113,19 @@ export function SettingsSheet(props: SettingsSheetProps) {
             <Input
               id="api-key"
               type="password"
-              value={apiKeyDraft}
-              onChange={(e) => setApiKeyDraft(e.currentTarget.value)}
-              placeholder={hasStoredKey ? "Key on file — paste to replace" : "sk-ant-…"}
+              value={secretKey.apiKeyDraft}
+              onChange={(e) => secretKey.setApiKeyDraft(e.currentTarget.value)}
+              placeholder={secretKey.hasStoredKey ? "Key on file — paste to replace" : "sk-ant-…"}
               autoComplete="off"
             />
-            {apiKeyError ? <p className="text-sm text-destructive">{apiKeyError}</p> : null}
+            {secretKey.apiKeyError ? (
+              <p className="text-sm text-destructive">{secretKey.apiKeyError}</p>
+            ) : null}
             <div className="flex flex-wrap gap-2">
-              <Button
-                size="sm"
-                onClick={async () => {
-                  const v = apiKeyDraft.trim();
-                  if (!v) return;
-                  setApiKeyError(null);
-                  try {
-                    await storeSecretKey(SECRET_ANTHROPIC_API_KEY, v);
-                    setApiKeyDraft("");
-                    await refreshKeyState();
-                  } catch (e) {
-                    const msg = e instanceof Error ? e.message : String(e);
-                    setApiKeyError(`Save failed: ${msg}`);
-                  }
-                }}
-              >
+              <Button size="sm" onClick={() => void secretKey.saveSecret()}>
                 Save API key
               </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={async () => {
-                  setApiKeyError(null);
-                  try {
-                    await deleteSecretKey(SECRET_ANTHROPIC_API_KEY);
-                    await refreshKeyState();
-                  } catch (e) {
-                    const msg = e instanceof Error ? e.message : String(e);
-                    setApiKeyError(`Remove failed: ${msg}`);
-                  }
-                }}
-              >
+              <Button size="sm" variant="outline" onClick={() => void secretKey.removeSecret()}>
                 Remove key
               </Button>
             </div>
@@ -287,14 +231,14 @@ export function SettingsSheet(props: SettingsSheetProps) {
           <div className="space-y-2">
             <div className="text-sm font-medium">Local logs</div>
             <div className="flex flex-wrap gap-2">
-              <Button variant="outline" onClick={() => void openLogsFolder()}>
+              <Button variant="outline" onClick={() => void logs.openLogsFolder()}>
                 Open logs folder
               </Button>
-              <Button variant="destructive" onClick={() => setConfirmClearLogsOpen(true)}>
+              <Button variant="destructive" onClick={() => logs.setConfirmClearLogsOpen(true)}>
                 Clear all logs
               </Button>
             </div>
-            <Dialog open={confirmClearLogsOpen} onOpenChange={setConfirmClearLogsOpen}>
+            <Dialog open={logs.confirmClearLogsOpen} onOpenChange={logs.setConfirmClearLogsOpen}>
               <DialogContent>
                 <DialogHeader>
                   <DialogTitle>Clear all local logs?</DialogTitle>
@@ -306,13 +250,7 @@ export function SettingsSheet(props: SettingsSheetProps) {
                   <DialogClose asChild>
                     <Button variant="outline">Cancel</Button>
                   </DialogClose>
-                  <Button
-                    variant="destructive"
-                    onClick={() => {
-                      setConfirmClearLogsOpen(false);
-                      void clearAllLogs();
-                    }}
-                  >
+                  <Button variant="destructive" onClick={logs.clearLogs}>
                     Clear logs
                   </Button>
                 </DialogFooter>

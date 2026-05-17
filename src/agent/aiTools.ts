@@ -3,9 +3,13 @@ import { z } from "zod";
 import type { LiveAgentToolContext } from "@/agent/agentSessionContext";
 import { terminalRunGuidanceForOs } from "@/agent/hostEnvironment";
 import { requestToolPermission } from "@/agent/permissionOrchestrator";
-import { readWorkspaceFile, listWorkspaceDirectory, writeWorkspaceFile } from "@/agent/settingsApi";
 import { AGENT_TOOL_NAMES, type AgentToolName } from "@/agent/toolContract";
 import { createEventId } from "@/agent/types";
+import {
+  readWorkspaceFile,
+  listWorkspaceDirectory,
+  writeWorkspaceFile,
+} from "@/agent/workspaceAdapter";
 
 function trimText(text: string, max = 400): string {
   const t = text.trim();

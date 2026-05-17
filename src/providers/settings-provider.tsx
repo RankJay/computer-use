@@ -1,7 +1,11 @@
 import type { AgentToolName } from "@/agent/toolContract";
-import { BROWSER_SAMPLE_WORKSPACE_ROOT } from "@/agent/browserWorkspace";
 import { isTauriRuntime } from "@/agent/nativeBridge";
-import { loadAppSettings, saveAppSettings, settingsOrDefault } from "@/agent/settingsApi";
+import {
+  loadAppSettings,
+  saveAppSettings,
+  settingsForRuntime,
+  settingsOrDefault,
+} from "@/agent/settingsPersistence";
 import type { AppSettingsPayload } from "@/agent/tauriIpc";
 import type { PermissionMode } from "@/agent/types";
 import {
@@ -43,19 +47,8 @@ export function SettingsProvider(props: { children: ReactNode }) {
   const [settings, setSettingsState] = useState<AppSettingsPayload>(() => settingsOrDefault(null));
 
   const refresh = useCallback(async () => {
-    if (!isTauriRuntime()) {
-      const loaded = await loadAppSettings();
-      const base = settingsOrDefault(loaded);
-      const next =
-        !base.workspaceRoot || base.workspaceRoot.trim() === ""
-          ? { ...base, workspaceRoot: BROWSER_SAMPLE_WORKSPACE_ROOT }
-          : base;
-      setSettingsState(next);
-      setReady(true);
-      return;
-    }
     const loaded = await loadAppSettings();
-    setSettingsState(settingsOrDefault(loaded));
+    setSettingsState(settingsForRuntime(loaded, isTauriRuntime()));
     setReady(true);
   }, []);
 

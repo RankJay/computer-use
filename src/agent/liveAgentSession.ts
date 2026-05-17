@@ -5,7 +5,7 @@ import type { LiveAgentToolContext } from "@/agent/agentSessionContext";
 import { createActuateTools } from "@/agent/aiTools";
 import { describeRuntimeCapabilities, getHostOsKind } from "@/agent/hostEnvironment";
 import type { AgentSessionRunnerOptions } from "@/agent/sessionRunner";
-import { appendSessionLogLine, persistKeyframePng } from "@/agent/settingsApi";
+import { appendSessionLogLine, persistKeyframePng } from "@/agent/sessionLogs";
 import { createEventId } from "@/agent/types";
 import type { AgentEvent } from "@/agent/types";
 import type { ConsequenceRiskClass } from "@/agent/toolContract";

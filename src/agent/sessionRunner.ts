@@ -5,7 +5,7 @@ import { runDemoAgentSession } from "@/agent/mockRuntime";
 import type { AgentNativeBridge } from "@/agent/nativeBridge";
 import { createNativeBridge, isTauriRuntime } from "@/agent/nativeBridge";
 import { SECRET_ANTHROPIC_API_KEY } from "@/agent/secrets";
-import { loadSecretKey } from "@/agent/settingsApi";
+import { loadSecretKey } from "@/agent/secretPersistence";
 import type { AppSettingsPayload } from "@/agent/tauriIpc";
 import type { AgentToolName } from "@/agent/toolContract";
 import type { AgentEvent, PermissionChoice, PermissionMode } from "@/agent/types";
