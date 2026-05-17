@@ -1,7 +1,6 @@
 import type { ReactElement } from "react";
 import { Button } from "@/components/ui/button";
-import type { AgentPendingPermission } from "@/hooks/useAgentSession";
-import type { PermissionChoice } from "@/agent/types";
+import type { AgentPendingPermission, PermissionChoice } from "@/agent/types";
 import { PERMISSION_CHOICE_LABELS } from "@/agent/toolContract";
 import { ShieldAlert } from "lucide-react";
 
@@ -50,7 +49,7 @@ export function PermissionPrompt(props: PermissionPromptProps): ReactElement {
             >
               {props.pending.title}
             </h2>
-            {props.pending.toolName !== null && props.pending.toolName !== "" && (
+            {props.pending.toolName !== undefined && props.pending.toolName !== "" && (
               <p className="mt-1 font-mono text-[11px] text-neutral-500">
                 {props.pending.toolName}
               </p>

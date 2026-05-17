@@ -6,6 +6,16 @@ export type PermissionMode = "ask_risky" | "ask_all" | "session_low_risk";
 
 export type PermissionChoice = "allow_once" | "allow_session" | "allow_always" | "deny";
 
+export type AgentPendingPermission = {
+  readonly permissionId: string;
+  readonly toolName?: string;
+  readonly title: string;
+  readonly summary: string;
+  readonly rationale: string;
+  readonly risk: string;
+  readonly details: string;
+};
+
 export type AgentTimelineItem =
   | { id: string; at: number; kind: "user"; text: string }
   | { id: string; at: number; kind: "assistant"; text: string };

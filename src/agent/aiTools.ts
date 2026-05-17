@@ -2,100 +2,15 @@ import { tool, zodSchema } from "ai";
 import { z } from "zod";
 import type { LiveAgentToolContext } from "@/agent/agentSessionContext";
 import { terminalRunGuidanceForOs } from "@/agent/hostEnvironment";
-import { isUiAutomationTool, toolRequiresPermissionPrompt } from "@/agent/permissionPolicy";
+import { requestToolPermission } from "@/agent/permissionOrchestrator";
 import { readWorkspaceFile, listWorkspaceDirectory, writeWorkspaceFile } from "@/agent/settingsApi";
-import {
-  AGENT_TOOL_NAMES,
-  type AgentToolName,
-  TOOL_CONTRACT,
-  formatRiskLineForTool,
-  riskClassForTool,
-} from "@/agent/toolContract";
-import { createEventId, type PermissionChoice } from "@/agent/types";
+import { AGENT_TOOL_NAMES, type AgentToolName } from "@/agent/toolContract";
+import { createEventId } from "@/agent/types";
 
 function trimText(text: string, max = 400): string {
   const t = text.trim();
   if (t.length <= max) return t;
   return `${t.slice(0, max)}…`;
-}
-
-async function ensureToolAllowed(
-  ctx: LiveAgentToolContext,
-  contractTool: AgentToolName,
-  copy: { summary: string; rationale: string; details: string },
-): Promise<boolean> {
-  if (isUiAutomationTool(contractTool) && !ctx.uiAutomationEnabled) {
-    return false;
-  }
-  if (ctx.persistedToolApprovals.has(contractTool)) {
-    return true;
-  }
-  const riskClass = riskClassForTool(contractTool);
-  if (ctx.sessionRiskApproved.has(riskClass)) {
-    return true;
-  }
-  if (!toolRequiresPermissionPrompt(ctx.permissionMode, contractTool)) {
-    return true;
-  }
-
-  const permissionId = createEventId();
-  const title = TOOL_CONTRACT[contractTool].defaultPermissionTitle;
-  const risk = formatRiskLineForTool(contractTool);
-  ctx.emit({
-    id: createEventId(),
-    at: Date.now(),
-    taskId: ctx.taskId,
-    type: "permission.requested",
-    permissionId,
-    toolName: contractTool,
-    title,
-    summary: copy.summary,
-    rationale: copy.rationale,
-    risk,
-    details: copy.details,
-  });
-  await ctx.appendStructuredLog({
-    id: createEventId(),
-    at: Date.now(),
-    taskId: ctx.taskId,
-    type: "permission.requested",
-    permissionId,
-    toolName: contractTool,
-    title,
-    summary: copy.summary,
-    rationale: copy.rationale,
-    risk,
-    details: copy.details,
-  });
-
-  const choice: PermissionChoice = await ctx.waitForPermission(permissionId);
-  ctx.emit({
-    id: createEventId(),
-    at: Date.now(),
-    taskId: ctx.taskId,
-    type: "permission.resolved",
-    permissionId,
-    choice,
-  });
-  await ctx.appendStructuredLog({
-    id: createEventId(),
-    at: Date.now(),
-    taskId: ctx.taskId,
-    type: "permission.resolved",
-    permissionId,
-    choice,
-  });
-
-  if (choice === "deny") {
-    return false;
-  }
-  if (choice === "allow_session") {
-    ctx.sessionRiskApproved.add(riskClass);
-  }
-  if (choice === "allow_always") {
-    await ctx.persistAlwaysAllow(contractTool);
-  }
-  return true;
 }
 
 async function emitToolStarted(
@@ -144,7 +59,7 @@ export function createActuateTools(ctx: LiveAgentToolContext) {
       }),
     ),
     execute: async (input) => {
-      const ok = await ensureToolAllowed(ctx, AGENT_TOOL_NAMES.TERMINAL_RUN, {
+      const ok = await requestToolPermission(ctx, AGENT_TOOL_NAMES.TERMINAL_RUN, {
         summary: `${input.program} ${input.args.join(" ")}`.trim(),
         rationale: "The model requested a local shell command.",
         details: `program: ${input.program}\nargs: ${JSON.stringify(input.args)}\ncwd: ${input.cwd ?? "(default)"}`,
@@ -189,7 +104,7 @@ export function createActuateTools(ctx: LiveAgentToolContext) {
     description: "Capture the primary display as PNG for vision. Call when you need fresh pixels.",
     inputSchema: zodSchema(z.object({ label: z.string().optional() })),
     execute: async (input) => {
-      const ok = await ensureToolAllowed(ctx, AGENT_TOOL_NAMES.DISPLAY_CAPTURE, {
+      const ok = await requestToolPermission(ctx, AGENT_TOOL_NAMES.DISPLAY_CAPTURE, {
         summary: "Capture primary display",
         rationale: "Vision step requested by the model.",
         details: input.label ?? "keyframe",
@@ -243,7 +158,7 @@ export function createActuateTools(ctx: LiveAgentToolContext) {
         return { ok: false as const, error: "Workspace root is not set." };
       }
       const rel = input.relativeDir ?? "";
-      const ok = await ensureToolAllowed(ctx, AGENT_TOOL_NAMES.WORKSPACE_INSPECT, {
+      const ok = await requestToolPermission(ctx, AGENT_TOOL_NAMES.WORKSPACE_INSPECT, {
         summary: `List ${rel.length > 0 ? rel : "."}`,
         rationale: "The model requested a read-only directory listing.",
         details: `workspace: ${root}\nrelativeDir: ${rel || "(root)"}`,
@@ -274,7 +189,7 @@ export function createActuateTools(ctx: LiveAgentToolContext) {
       if (!root) {
         return { ok: false as const, error: "Workspace root is not set." };
       }
-      const ok = await ensureToolAllowed(ctx, AGENT_TOOL_NAMES.FILE_READ, {
+      const ok = await requestToolPermission(ctx, AGENT_TOOL_NAMES.FILE_READ, {
         summary: `Read ${input.relativePath}`,
         rationale: "The model requested file contents.",
         details: `workspace: ${root}\nrelative: ${input.relativePath}`,
@@ -308,7 +223,7 @@ export function createActuateTools(ctx: LiveAgentToolContext) {
       if (!root) {
         return { ok: false as const, error: "Workspace root is not set." };
       }
-      const ok = await ensureToolAllowed(ctx, AGENT_TOOL_NAMES.FILE_WRITE, {
+      const ok = await requestToolPermission(ctx, AGENT_TOOL_NAMES.FILE_WRITE, {
         summary: `Write ${input.relativePath}`,
         rationale: "The model will create or overwrite a workspace file.",
         details: `workspace: ${root}\nrelative: ${input.relativePath}\nbytes: ${input.content.length}`,
@@ -342,7 +257,7 @@ export function createActuateTools(ctx: LiveAgentToolContext) {
       }),
     ),
     execute: async (input) => {
-      const ok = await ensureToolAllowed(ctx, AGENT_TOOL_NAMES.POINTER_MOVE, {
+      const ok = await requestToolPermission(ctx, AGENT_TOOL_NAMES.POINTER_MOVE, {
         summary: `Move pointer to (${input.x}, ${input.y})`,
         rationale: "UI automation requested by the model.",
         details: `x=${input.x} y=${input.y}`,
@@ -371,7 +286,7 @@ export function createActuateTools(ctx: LiveAgentToolContext) {
     description: "Click a mouse button at the current cursor position.",
     inputSchema: zodSchema(z.object({ button: z.enum(["left", "right", "middle"]) })),
     execute: async (input) => {
-      const ok = await ensureToolAllowed(ctx, AGENT_TOOL_NAMES.POINTER_CLICK, {
+      const ok = await requestToolPermission(ctx, AGENT_TOOL_NAMES.POINTER_CLICK, {
         summary: `${input.button} click`,
         rationale: "UI automation requested by the model.",
         details: `button=${input.button}`,
@@ -400,7 +315,7 @@ export function createActuateTools(ctx: LiveAgentToolContext) {
     description: "Type Unicode text via OS keyboard simulation (focused app).",
     inputSchema: zodSchema(z.object({ text: z.string() })),
     execute: async (input) => {
-      const ok = await ensureToolAllowed(ctx, AGENT_TOOL_NAMES.TYPE_TEXT, {
+      const ok = await requestToolPermission(ctx, AGENT_TOOL_NAMES.TYPE_TEXT, {
         summary: `Type ${input.text.length} characters`,
         rationale: "Keyboard automation requested by the model.",
         details: trimText(input.text, 200),

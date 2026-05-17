@@ -1,6 +1,7 @@
 import type { ReactElement } from "react";
 import { Badge } from "@/components/ui/badge";
-import type { AgentEvent, AgentRunStatus } from "@/agent/types";
+import type { AgentEventLogRow } from "@/agent/sessionProjection";
+import type { AgentRunStatus } from "@/agent/types";
 import {
   CheckCircle2,
   CircleAlert,
@@ -10,48 +11,12 @@ import {
   Sparkles,
 } from "lucide-react";
 
-function formatEventTitle(event: AgentEvent): string {
-  switch (event.type) {
-    case "task.created":
-      return "Task created";
-    case "plan.updated":
-      return "Plan updated";
-    case "step.started":
-      return `Step started: ${event.title}`;
-    case "step.completed":
-      return `Step completed (${event.stepIndex})`;
-    case "permission.requested":
-      return "Permission requested";
-    case "permission.resolved":
-      return `Permission resolved (${event.choice})`;
-    case "tool.started":
-      return `Tool started: ${event.toolName}`;
-    case "tool.completed":
-      return `Tool completed: ${event.toolName}`;
-    case "screenshot.keyframe":
-      return `Screenshot: ${event.label}`;
-    case "assistant.text.delta":
-      return "Assistant streaming";
-    case "assistant.text.done":
-      return "Assistant message complete";
-    case "task.completed":
-      return "Task completed";
-    case "task.failed":
-      return "Task failed";
-    default: {
-      const _never: never = event;
-      return _never;
-    }
-  }
-}
-
 export type AgentEventLogProps = {
-  readonly events: readonly AgentEvent[];
+  readonly rows: readonly AgentEventLogRow[];
 };
 
 export function AgentEventLog(props: AgentEventLogProps): ReactElement | null {
-  const rows = props.events.filter((e) => e.type !== "assistant.text.delta");
-  if (rows.length === 0) {
+  if (props.rows.length === 0) {
     return null;
   }
 
@@ -60,30 +25,20 @@ export function AgentEventLog(props: AgentEventLogProps): ReactElement | null {
       <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2 text-xs font-medium text-neutral-500 hover:text-neutral-300 [&::-webkit-details-marker]:hidden">
         <ListTree className="size-3.5 shrink-0" aria-hidden />
         <span>
-          Execution log <span className="text-neutral-600">({rows.length})</span>
+          Execution log <span className="text-neutral-600">({props.rows.length})</span>
         </span>
       </summary>
       <div className="max-h-36 overflow-y-auto overscroll-contain border-t border-neutral-800/80 px-3 py-2">
         <ol className="space-y-1.5 text-[11px] leading-snug text-neutral-500">
-          {rows.map((event) => (
-            <li key={event.id} className="wrap-break-word pl-0.5">
-              {formatEventTitle(event)}
+          {props.rows.map((row) => (
+            <li key={row.id} className="wrap-break-word pl-0.5">
+              {row.title}
             </li>
           ))}
         </ol>
       </div>
     </details>
   );
-}
-
-export function lastTaskFailedMessage(events: readonly AgentEvent[]): string | null {
-  for (let i = events.length - 1; i >= 0; i--) {
-    const e = events[i];
-    if (e.type === "task.failed") {
-      return e.message;
-    }
-  }
-  return null;
 }
 
 function statusLabel(status: AgentRunStatus): string {

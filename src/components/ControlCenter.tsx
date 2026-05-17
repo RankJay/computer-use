@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useAgentSession } from "@/hooks/useAgentSession";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { ArrowUp, Minus } from "lucide-react";
 import { SettingsSheet } from "@/components/SettingsSheet";
@@ -12,7 +12,6 @@ import { PermissionPrompt } from "@/components/agent/PermissionPrompt";
 import {
   AgentEventLog,
   AgentRunRibbon,
-  lastTaskFailedMessage,
   TaskFailureBanner,
 } from "@/components/agent/AgentSessionPanels";
 import { isTauriRuntime } from "@/agent/nativeBridge";
@@ -47,47 +46,13 @@ export function ControlCenter() {
     },
   });
 
-  const canStart = useMemo(() => {
-    return (
-      agent.status !== "running" &&
-      agent.status !== "awaiting_permission" &&
-      draft.trim().length > 0
-    );
-  }, [agent.status, draft]);
-
-  const taskInputDisabled = agent.status === "running" || agent.status === "awaiting_permission";
+  const canStart = agent.capabilities.canStartRun && draft.trim().length > 0;
 
   function submitTask(): void {
     if (!canStart) return;
     void agent.startRun(draft.trim(), null);
     setDraft("");
   }
-
-  const hasConversation = useMemo(
-    () =>
-      agent.timeline.length > 0 ||
-      agent.assistantStream.trim().length > 0 ||
-      agent.status !== "idle",
-    [agent.assistantStream, agent.status, agent.timeline],
-  );
-
-  const canRegenerateAssistant = useMemo(() => {
-    const timeline = agent.timeline;
-    const last = timeline.length > 0 ? timeline[timeline.length - 1] : undefined;
-    return (
-      last?.kind === "assistant" &&
-      agent.assistantStream.trim() === "" &&
-      agent.status !== "running" &&
-      agent.status !== "awaiting_permission"
-    );
-  }, [agent.assistantStream, agent.status, agent.timeline]);
-
-  const failureMessage = useMemo(() => {
-    if (agent.status !== "failed") {
-      return null;
-    }
-    return lastTaskFailedMessage(agent.events) ?? "The task failed.";
-  }, [agent.events, agent.status]);
 
   return (
     <div className="box-border flex h-full min-h-dvh w-full flex-col gap-0 overflow-hidden rounded-none border-0 bg-[#0E0E0E] p-4 shadow-none ring-0">
@@ -124,28 +89,28 @@ export function ControlCenter() {
           status={agent.status}
         />
         <div className="flex min-h-0 flex-1 flex-col gap-2">
-          {!hasConversation && (
+          {!agent.capabilities.hasConversation && (
             <div className="flex flex-1 items-center px-2">
               <span className="max-w-sm text-3xl font-medium tracking-tight text-[#CDCDCD]">
                 Ready to break some big tasks today?
               </span>
             </div>
           )}
-          {hasConversation && (
+          {agent.capabilities.hasConversation && (
             <AgentChatTranscript
               assistantStream={agent.assistantStream}
-              canRegenerateAssistant={canRegenerateAssistant}
+              canRegenerateAssistant={agent.capabilities.canRegenerateAssistant}
               onRegenerateAssistant={agent.regenerateLastAssistant}
               timeline={agent.timeline}
             />
           )}
         </div>
-        <AgentEventLog events={agent.events} />
+        <AgentEventLog rows={agent.eventLogRows} />
       </div>
 
       <div className="shrink-0 space-y-2 pb-4 pt-2">
-        {failureMessage !== null && failureMessage !== "" && (
-          <TaskFailureBanner message={failureMessage} />
+        {agent.failureMessage !== null && agent.failureMessage !== "" && (
+          <TaskFailureBanner message={agent.failureMessage} />
         )}
         {agent.pendingPermission !== null && (
           <PermissionPrompt
@@ -168,7 +133,7 @@ export function ControlCenter() {
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             placeholder="How can I help you today?"
-            disabled={taskInputDisabled}
+            disabled={agent.capabilities.taskInputDisabled}
             aria-label="Task"
             className="h-auto bg-transparent min-h-0 flex-1 shrink border-0 pl-2.5 py-1 text-sm leading-normal text-white shadow-none outline-none placeholder:text-neutral-500 focus-visible:border-0 focus-visible:ring-0 dark:bg-transparent dark:shadow-none disabled:bg-transparent disabled:opacity-50"
           />

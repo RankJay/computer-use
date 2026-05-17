@@ -1,7 +1,8 @@
 ﻿import type { AgentNativeBridge } from "@/agent/nativeBridge";
-import { AGENT_TOOL_NAMES, TOOL_CONTRACT, formatRiskLineForTool } from "@/agent/toolContract";
-import type { AgentEvent, PermissionChoice } from "./types";
-import { createEventId } from "./types";
+import { requestToolPermission } from "@/agent/permissionOrchestrator";
+import { AGENT_TOOL_NAMES } from "@/agent/toolContract";
+import type { AgentEvent, PermissionChoice, PermissionMode } from "@/agent/types";
+import { createEventId } from "@/agent/types";
 
 export type EmitFn = (event: AgentEvent) => void;
 
@@ -10,6 +11,7 @@ export type DemoAgentSessionOptions = {
   prompt: string;
   emit: EmitFn;
   waitForPermissionChoice: (permissionId: string) => Promise<PermissionChoice>;
+  permissionMode: PermissionMode;
   workspaceRoot: string | null;
   native: AgentNativeBridge | null;
 };
@@ -65,7 +67,8 @@ function workspaceDetails(workspaceRoot: string | null, native: AgentNativeBridg
 }
 
 export async function runDemoAgentSession(options: DemoAgentSessionOptions): Promise<void> {
-  const { taskId, prompt, emit, waitForPermissionChoice, workspaceRoot, native } = options;
+  const { taskId, prompt, emit, waitForPermissionChoice, permissionMode, workspaceRoot, native } =
+    options;
 
   emit({
     id: createEventId(),
@@ -200,34 +203,27 @@ export async function runDemoAgentSession(options: DemoAgentSessionOptions): Pro
     title: "Install dependencies (approved)",
   });
 
-  const permissionId = createEventId();
+  const permitted = await requestToolPermission(
+    {
+      taskId,
+      permissionMode,
+      uiAutomationEnabled: true,
+      persistedToolApprovals: new Set(),
+      sessionRiskApproved: new Set(),
+      emit,
+      waitForPermission: waitForPermissionChoice,
+      persistAlwaysAllow: async () => {},
+      appendStructuredLog: async () => {},
+    },
+    AGENT_TOOL_NAMES.TERMINAL_RUN,
+    {
+      summary: "Run bun install for the selected workspace",
+      rationale: "Install dependencies so the repo is ready for real commands in future steps.",
+      details: workspaceDetails(workspaceRoot, native),
+    },
+  );
 
-  emit({
-    id: createEventId(),
-    at: Date.now(),
-    taskId,
-    type: "permission.requested",
-    permissionId,
-    toolName: AGENT_TOOL_NAMES.TERMINAL_RUN,
-    title: TOOL_CONTRACT[AGENT_TOOL_NAMES.TERMINAL_RUN].defaultPermissionTitle,
-    summary: "Run bun install for the selected workspace",
-    rationale: "Install dependencies so the repo is ready for real commands in future steps.",
-    risk: `${formatRiskLineForTool(AGENT_TOOL_NAMES.TERMINAL_RUN)} This step runs \`bun install\`, which may execute dependency install scripts. Only proceed in workspaces you trust.`,
-    details: workspaceDetails(workspaceRoot, native),
-  });
-
-  const choice = await waitForPermissionChoice(permissionId);
-
-  emit({
-    id: createEventId(),
-    at: Date.now(),
-    taskId,
-    type: "permission.resolved",
-    permissionId,
-    choice,
-  });
-
-  if (choice === "deny") {
+  if (!permitted) {
     emit({
       id: createEventId(),
       at: Date.now(),
