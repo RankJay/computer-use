@@ -3,11 +3,28 @@ import type { ReactElement } from "react";
 import { Button } from "@/components/ui/button";
 import type { AgentActivityRow, AgentTimelineItem } from "@/agent/types";
 import {
+  ChainOfThought,
+  ChainOfThoughtContent,
+  ChainOfThoughtHeader,
+  ChainOfThoughtStep,
+} from "@/components/ai-elements/chain-of-thought";
+import {
   agentChatBrowserAdapter,
   COPIED_FEEDBACK_DURATION_MS,
   STREAMING_ASSISTANT_COPY_ID,
 } from "@/components/agent/agentChatBrowserAdapter";
-import { Check, CheckCircle2, CircleAlert, Copy, Loader2, RotateCw } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import {
+  Camera,
+  Check,
+  Copy,
+  Dot,
+  ListChecks,
+  Loader2,
+  RotateCw,
+  ShieldQuestion,
+  Wrench,
+} from "lucide-react";
 
 const AgentMarkdown = lazy(async () => {
   const module = await import("@/components/agent/AgentMarkdown");
@@ -138,55 +155,56 @@ function AgentActivityBlock(props: {
 }): ReactElement | null {
   if (props.rows.length === 0) return null;
 
-  const latest = props.rows[props.rows.length - 1];
   const isActive = props.status === "active";
 
   return (
-    <details
-      open={isActive}
-      className="group max-w-xl rounded-xl border border-white/7 bg-[#121212]/75 px-3 py-2 text-xs text-neutral-500"
+    <ChainOfThought
+      defaultOpen={isActive}
+      className="max-w-xl space-y-3 text-[#B7C1CC]"
     >
-      <summary className="flex cursor-pointer list-none items-center gap-2 font-medium text-neutral-500 hover:text-neutral-300 [&::-webkit-details-marker]:hidden">
-        <ActivityStatusIcon status={props.status} />
-        <span className="min-w-0 flex-1 truncate">
-          {isActive ? "Working" : props.status === "failed" ? "Stopped" : "Worked"}{" "}
-          <span className="text-neutral-600">({props.rows.length})</span>
-          {latest !== undefined && (
-            <span className="ml-2 font-normal text-neutral-600">{latest.title}</span>
-          )}
-        </span>
-      </summary>
-      <ol className="mt-2 space-y-2 border-t border-white/7 pt-2">
-        {props.rows.map((row) => (
-          <li key={row.id} className="space-y-0.5">
-            <div className="leading-snug text-neutral-400">{row.title}</div>
-            {row.detail !== undefined && row.detail.trim() !== "" && (
-              <div className="whitespace-pre-wrap wrap-break-word text-[11px] leading-snug text-neutral-600">
-                {row.detail}
-              </div>
-            )}
-          </li>
+      <ChainOfThoughtHeader className="text-[#B7C1CC] hover:text-[#E5E7EB]">
+        Chain of Thought
+      </ChainOfThoughtHeader>
+      <ChainOfThoughtContent className="space-y-3 text-[#B7C1CC]">
+        {props.rows.map((row, index) => (
+          <ChainOfThoughtStep
+            key={row.id}
+            icon={activityStepIcon(row, isActive && index === props.rows.length - 1)}
+            label={row.title}
+            description={activityStepDescription(row)}
+            status={activityStepStatus(props.status, index, props.rows.length)}
+            className="**:[[class*='bg-border']]:bg-neutral-800"
+          />
         ))}
-      </ol>
-    </details>
+      </ChainOfThoughtContent>
+    </ChainOfThought>
   );
 }
 
-function ActivityStatusIcon(props: {
-  readonly status: "active" | "completed" | "failed";
-}): ReactElement {
-  switch (props.status) {
-    case "active":
-      return <Loader2 className="size-3.5 shrink-0 animate-spin text-neutral-500" />;
-    case "completed":
-      return <CheckCircle2 className="size-3.5 shrink-0 text-emerald-500/80" />;
-    case "failed":
-      return <CircleAlert className="size-3.5 shrink-0 text-red-400/80" />;
-    default: {
-      const _never: never = props.status;
-      return _never;
-    }
-  }
+function activityStepStatus(
+  status: "active" | "completed" | "failed",
+  index: number,
+  rowCount: number,
+): "complete" | "active" | "pending" {
+  if (status === "failed" && index === rowCount - 1) return "active";
+  if (status === "active" && index === rowCount - 1) return "active";
+  return "complete";
+}
+
+function activityStepIcon(row: AgentActivityRow, active: boolean): LucideIcon {
+  if (active) return Loader2;
+
+  const title = row.title.toLowerCase();
+  if (title.startsWith("planned")) return ListChecks;
+  if (title.includes("permission")) return ShieldQuestion;
+  if (title.includes("screenshot")) return Camera;
+  if (title.includes("running") || title.includes("finished")) return Wrench;
+  return Dot;
+}
+
+function activityStepDescription(row: AgentActivityRow): ReactElement | string | undefined {
+  if (row.detail === undefined || row.detail.trim() === "") return undefined;
+  return <span className="whitespace-pre-wrap wrap-break-word">{row.detail}</span>;
 }
 
 function AssistantBlock(props: {
@@ -210,7 +228,7 @@ function StreamingAssistantBlock(props: {
 }): ReactElement {
   return (
     <div className="space-y-2">
-      <div className="text-[15px] leading-[1.62] wrap-break-word text-[#a1a1aa]">
+      <div className="text-sm wrap-break-word text-[#7E7E7E]">
         <AssistantMarkdown markdown={props.text} />
       </div>
       <AssistantToolbar copyControl={props.copyControl} />

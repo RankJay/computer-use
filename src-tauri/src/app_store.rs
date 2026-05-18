@@ -154,7 +154,9 @@ pub fn write_session_keyframe(
     let dir = session_dir(&app, &session_id)?.join("keyframes");
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     let path = dir.join(&safe_name);
-    let bytes = STANDARD.decode(png_base64.trim()).map_err(|e| e.to_string())?;
+    let bytes = STANDARD
+        .decode(png_base64.trim())
+        .map_err(|e| e.to_string())?;
     fs::write(&path, bytes).map_err(|e| e.to_string())?;
     Ok(path.to_string_lossy().into_owned())
 }

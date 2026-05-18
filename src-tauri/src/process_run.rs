@@ -24,11 +24,7 @@ fn read_limited<R: Read>(r: &mut R, max: usize) -> std::io::Result<String> {
         }
     }
     let truncated = buf.len() > max;
-    let slice = if buf.len() > max {
-        &buf[..max]
-    } else {
-        &buf
-    };
+    let slice = if buf.len() > max { &buf[..max] } else { &buf };
     let mut s = String::from_utf8_lossy(slice).into_owned();
     if truncated {
         s.push_str("\n… [output truncated]");
@@ -63,8 +59,14 @@ pub fn run_command_bounded(
 
     let mut child = cmd.spawn().map_err(|e| e.to_string())?;
 
-    let stdout = child.stdout.take().ok_or_else(|| "missing stdout pipe".to_string())?;
-    let stderr = child.stderr.take().ok_or_else(|| "missing stderr pipe".to_string())?;
+    let stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| "missing stdout pipe".to_string())?;
+    let stderr = child
+        .stderr
+        .take()
+        .ok_or_else(|| "missing stderr pipe".to_string())?;
 
     let max_out = max_each;
     let max_err = max_each;
@@ -84,8 +86,12 @@ pub fn run_command_bounded(
         }
     };
 
-    let stdout_done = th_out.join().map_err(|_| "stdout reader panicked".to_string())?;
-    let stderr_done = th_err.join().map_err(|_| "stderr reader panicked".to_string())?;
+    let stdout_done = th_out
+        .join()
+        .map_err(|_| "stdout reader panicked".to_string())?;
+    let stderr_done = th_err
+        .join()
+        .map_err(|_| "stderr reader panicked".to_string())?;
     let stdout = stdout_done.map_err(|e| e.to_string())?;
     let stderr = stderr_done.map_err(|e| e.to_string())?;
 

@@ -7,10 +7,45 @@ mod workspace_fs;
 
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::Manager;
+use tauri::{Manager, PhysicalPosition, Position, WebviewWindow};
 
 pub use app_store::AppSettings;
 pub use command_output::CommandOutput;
+
+const WINDOW_EDGE_MARGIN: i32 = 16;
+
+fn position_window_bottom_right(window: &WebviewWindow) {
+    let monitor = match window.primary_monitor() {
+        Ok(Some(monitor)) => monitor,
+        _ => {
+            let Ok(Some(monitor)) = window.current_monitor() else {
+                return;
+            };
+            monitor
+        }
+    };
+    let Ok(window_size) = window.outer_size() else {
+        return;
+    };
+
+    let monitor_position = monitor.position();
+    let monitor_size = monitor.size();
+    let x = monitor_position.x + monitor_size.width as i32
+        - window_size.width as i32
+        - WINDOW_EDGE_MARGIN;
+    let y = monitor_position.y + monitor_size.height as i32
+        - window_size.height as i32
+        - WINDOW_EDGE_MARGIN;
+
+    let _ = window.set_position(Position::Physical(PhysicalPosition { x, y }));
+}
+
+fn show_window_bottom_right(window: WebviewWindow) {
+    let _ = window.unminimize();
+    position_window_bottom_right(&window);
+    let _ = window.show();
+    let _ = window.set_focus();
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -24,6 +59,10 @@ pub fn run() {
             }
         })
         .setup(|app| {
+            if let Some(window) = app.get_webview_window("main") {
+                position_window_bottom_right(&window);
+            }
+
             let show_i = MenuItem::with_id(app, "show", "Show Actuate", true, None::<&str>)?;
             let quit_i = MenuItem::with_id(app, "quit", "Exit", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&show_i, &quit_i])?;
@@ -40,20 +79,16 @@ pub fn run() {
                 .tooltip("Actuate — background agent")
                 .menu(&menu)
                 .show_menu_on_left_click(false)
-                .on_menu_event(|app, event| {
-                    match event.id.as_ref() {
-                        "show" => {
-                            if let Some(window) = app.get_webview_window("main") {
-                                let _ = window.unminimize();
-                                let _ = window.show();
-                                let _ = window.set_focus();
-                            }
+                .on_menu_event(|app, event| match event.id.as_ref() {
+                    "show" => {
+                        if let Some(window) = app.get_webview_window("main") {
+                            show_window_bottom_right(window);
                         }
-                        "quit" => {
-                            app.exit(0);
-                        }
-                        _ => {}
                     }
+                    "quit" => {
+                        app.exit(0);
+                    }
+                    _ => {}
                 })
                 .on_tray_icon_event(|tray, event| {
                     if let TrayIconEvent::Click {
@@ -64,9 +99,7 @@ pub fn run() {
                     {
                         let handle = tray.app_handle();
                         if let Some(window) = handle.get_webview_window("main") {
-                            let _ = window.unminimize();
-                            let _ = window.show();
-                            let _ = window.set_focus();
+                            show_window_bottom_right(window);
                         }
                     }
                 })
