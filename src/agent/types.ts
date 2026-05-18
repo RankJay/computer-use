@@ -142,6 +142,9 @@ export type AgentEvent =
   | TaskCompletedEvent
   | TaskFailedEvent;
 
+/** Emit an agent event for the current task run (runner + tools). */
+export type EmitFn = (event: AgentEvent) => void;
+
 export function createEventId(): string {
   return generateId();
 }
