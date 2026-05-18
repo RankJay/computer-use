@@ -30,4 +30,5 @@ enigo = "0.6.1"
 keyring = { version = "3", features = ["windows-native", "apple-native", "linux-native"] }
 wait-timeout = "0.2"
 tauri-plugin-http = "2"
+windows = { version = "0.62.2", features = ["Win32_Foundation", "Win32_Graphics_Dwm", "Win32_Graphics_Gdi", "Win32_UI_WindowsAndMessaging", "Win32_System_LibraryLoader", "Win32_UI_Input_KeyboardAndMouse"] }
 

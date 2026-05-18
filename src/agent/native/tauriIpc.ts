@@ -8,6 +8,9 @@ export const TAURI_COMMAND = {
   pointerMoveTo: "pointer_move_to",
   pointerClick: "pointer_click",
   typeText: "type_text",
+  keyTap: "key_tap",
+  resetPointerAutomationCancel: "reset_pointer_automation_cancel",
+  cancelPointerAutomation: "cancel_pointer_automation",
   loadSettings: "load_settings",
   saveSettings: "save_settings",
   loadSecret: "load_secret",
@@ -49,3 +52,6 @@ export type RunCommandResponse = {
 };
 
 export type PointerButton = "left" | "right" | "middle";
+
+export const KEY_TAP_LOGICAL_KEYS = ["enter", "tab", "escape", "backspace"] as const;
+export type KeyTapLogicalKey = (typeof KEY_TAP_LOGICAL_KEYS)[number];

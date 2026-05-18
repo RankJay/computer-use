@@ -117,7 +117,7 @@ describe("sessionProjection", () => {
     expect(projection.failureMessage).toBe("Latest failure");
   });
 
-  test("task.failed preserves the active assistant stream for post-failure visibility", () => {
+  test("task.failed flushes streamed assistant text into the timeline", () => {
     let projection = createInitialAgentProjection();
 
     projection = applyAgentEvent(projection, {
@@ -132,7 +132,38 @@ describe("sessionProjection", () => {
     });
 
     expect(projection.status).toBe("failed");
-    expect(projection.assistantStream).toBe("Partial answer");
+    expect(projection.assistantStream).toBe("");
+    expect(projection.timeline).toEqual([
+      expect.objectContaining({ kind: "assistant", text: "Partial answer" }),
+    ]);
+  });
+
+  test("assistant preamble is committed above activity when tools start after streaming text", () => {
+    let projection = beginAgentRun(createInitialAgentProjection(), {
+      userTimelineItem: { id: "user-1", at: 900, kind: "user", text: "Run something" },
+    });
+
+    projection = applyAgentEvent(projection, {
+      ...baseEvent("delta-1"),
+      type: "assistant.text.delta",
+      text: "Let me check the machine.",
+    });
+    projection = applyAgentEvent(projection, {
+      ...baseEvent("tool-started"),
+      type: "tool.started",
+      toolName: "terminal.run",
+      inputSummary: "bun test",
+    });
+
+    expect(projection.timeline[0]).toMatchObject({ kind: "user", text: "Run something" });
+    expect(projection.timeline[1]).toMatchObject({ kind: "assistant", text: "Let me check the machine." });
+    expect(projection.timeline[2]).toMatchObject({
+      kind: "activity",
+      rows: [
+        expect.objectContaining({ title: "Running terminal.run", detail: "bun test" }),
+      ],
+    });
+    expect(projection.assistantStream).toBe("");
   });
 
   test("permission request and resolution update pending permission state", () => {
@@ -191,6 +222,25 @@ describe("sessionProjection", () => {
       },
       { id: "done-1", at: 1000, kind: "assistant", text: "Done." },
     ]);
+  });
+
+  test("screenshot.keyframe carries PNG data URL on activity row", () => {
+    let projection = applyAgentEvent(createInitialAgentProjection(), createdEvent());
+    projection = applyAgentEvent(projection, {
+      ...baseEvent("ss-1"),
+      type: "screenshot.keyframe",
+      label: "primary",
+      imageBase64: "AAA",
+    });
+
+    const activity = projection.timeline.find((item) => item.kind === "activity");
+    expect(activity?.kind).toBe("activity");
+    if (activity?.kind !== "activity") throw new Error("expected activity");
+    expect(activity.rows[0]).toMatchObject({
+      title: "Captured screenshot",
+      detail: "primary",
+      screenshotDataUrl: "data:image/png;base64,AAA",
+    });
   });
 
   test("capability flags match idle, running, awaiting permission, completed, and failed states", () => {

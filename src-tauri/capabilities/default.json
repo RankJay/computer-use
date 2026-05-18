@@ -13,6 +13,8 @@
     "allow-pointer-move-to",
     "allow-pointer-click",
     "allow-type-text",
+    "allow-key-tap",
+    "allow-pointer-automation-lifecycle",
     "allow-load-settings",
     "allow-save-settings",
     "allow-load-secret",

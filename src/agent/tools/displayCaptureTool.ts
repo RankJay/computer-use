@@ -8,7 +8,8 @@ import { emitToolCompleted, emitToolStarted } from "@/agent/tools/toolTimeline";
 
 export function createDisplayCaptureTool(ctx: LiveAgentToolContext) {
   return tool({
-    description: "Capture the primary display as PNG for vision. Call when you need fresh pixels.",
+    description:
+      "Capture the primary display as PNG for vision (Actuate hides itself briefly while grabbing pixels). Use only when the answer depends on what is visibly on screen (UI, windows, layout). Do not call twice for the same unchanged view in one task. Do not use for general knowledge or tasks that do not require seeing the desktop.",
     inputSchema: zodSchema(z.object({ label: z.string().optional() })),
     execute: async (input) => {
       const permitted = await requestToolPermission(ctx, AGENT_TOOL_NAMES.DISPLAY_CAPTURE, {

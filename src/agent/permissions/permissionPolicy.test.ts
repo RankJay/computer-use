@@ -13,6 +13,11 @@ describe("permissionPolicy", () => {
     expect(toolRequiresPermissionPrompt("ask_risky", AGENT_TOOL_NAMES.TERMINAL_RUN)).toBe(true);
   });
 
+  test("ask_risky prompts for ui automation", () => {
+    expect(toolRequiresPermissionPrompt("ask_risky", AGENT_TOOL_NAMES.POINTER_MOVE)).toBe(true);
+    expect(toolRequiresPermissionPrompt("ask_risky", AGENT_TOOL_NAMES.KEY_TAP)).toBe(true);
+  });
+
   test("session_low_risk skips prompts", () => {
     expect(toolRequiresPermissionPrompt("session_low_risk", AGENT_TOOL_NAMES.TERMINAL_RUN)).toBe(
       false,

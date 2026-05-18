@@ -61,11 +61,16 @@ export function formatHostOsLabel(os: HostOsKind): string {
 export function describeRuntimeCapabilities(options: {
   readonly nativeBridge: boolean;
   readonly hostOs: HostOsKind;
+  /** When native: whether pointer/keyboard synthesis is allowed at all (Settings). */
+  readonly uiAutomationEnabled: boolean;
 }): string {
   const os = formatHostOsLabel(options.hostOs);
   if (options.nativeBridge) {
+    const uiLine = options.uiAutomationEnabled
+      ? "pointer_move / pointer_click / type_text / key_tap run after user approval."
+      : "UI automation tools (pointer_move, pointer_click, type_text, key_tap) are disabled in Settings—do not call them; ask the user to enable UI automation in Actuate.";
     return (
-      `This run uses the Actuate desktop (Tauri) app on ${os}: terminal_run, display_capture, and UI tools can execute real OS actions after approval. ` +
+      `This run uses the Actuate desktop (Tauri) app on ${os}: terminal_run and display_capture can run after approval. ${uiLine} ` +
       "workspace_inspect / read_file / write_file only work for paths relative to the configured workspace root; they cannot access arbitrary absolute paths—use terminal_run for those (e.g. list or count files under D:\\... on Windows)."
     );
   }

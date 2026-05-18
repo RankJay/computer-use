@@ -63,6 +63,13 @@ export function useAgentSession() {
       const workspaceRoot = resolveAgentWorkspaceRoot(workspaceOverride, settings, host);
 
       try {
+        if (host.native !== null) {
+          try {
+            await host.native.resetPointerAutomationCancel();
+          } catch {
+            /** ignore stale IPC errors */
+          }
+        }
         await runSelectedAgentSession(
           {
             taskId,

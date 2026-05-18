@@ -5,37 +5,37 @@ import remarkGfm from "remark-gfm";
 
 const markdownComponents: Components = {
   p: ({ children }) => (
-    <p className="mb-1.5 text-inherit last:mb-0 wrap-break-word [&:has(+blockquote)]:mb-2">
+    <p className="mb-1.5 font-light text-inherit last:mb-0 wrap-break-word [&:has(+blockquote)]:mb-2">
       {children}
     </p>
   ),
   a: ({ children, href }) => (
     <a
       href={href}
-      className="text-sky-400 underline underline-offset-2 hover:text-sky-300"
+      className="text-sky-400 font-light underline underline-offset-2 hover:text-sky-300"
       rel="noopener noreferrer"
     >
       {children}
     </a>
   ),
-  ul: ({ children }) => <ul className="my-3 list-disc space-y-1 pl-6 last:my-2">{children}</ul>,
-  ol: ({ children }) => <ol className="my-3 list-decimal space-y-1 pl-6 last:my-2">{children}</ol>,
+  ul: ({ children }) => <ul className="my-3 font-light list-disc space-y-1 pl-6 last:my-2">{children}</ul>,
+  ol: ({ children }) => <ol className="my-3 font-light list-decimal space-y-1 pl-6 last:my-2">{children}</ol>,
   li: ({ children }) => <li className="text-inherit leading-relaxed">{children}</li>,
   blockquote: ({ children }) => (
-    <blockquote className="border-l-2 border-neutral-600 py-1 pl-4 italic text-neutral-400">
+    <blockquote className="border-l-2 font-light border-neutral-600 py-1 pl-4 italic text-neutral-400">
       {children}
     </blockquote>
   ),
   h1: ({ children }) => (
-    <h1 className="mt-6 mb-2 text-xl font-semibold text-inherit first:mt-0">{children}</h1>
+    <h1 className="mt-6 mb-2 font-medium text-xl text-inherit first:mt-0">{children}</h1>
   ),
   h2: ({ children }) => (
-    <h2 className="mt-5 mb-2 border-b border-white/10 pb-1 text-lg font-semibold text-inherit first:mt-0">
+    <h2 className="mt-5 mb-2 border-b border-white/10 pb-1 text-lg font-medium text-inherit first:mt-0">
       {children}
     </h2>
   ),
   h3: ({ children }) => (
-    <h3 className="mt-4 mb-2 text-[15px] font-semibold text-inherit first:mt-0">{children}</h3>
+    <h3 className="mt-4 mb-2 text-[15px] font-medium text-inherit first:mt-0">{children}</h3>
   ),
   hr: () => <hr className="my-2 border-neutral-700" />,
   table: ({ children }) => (
@@ -65,7 +65,7 @@ const markdownComponents: Components = {
     const isFence = typeof className === "string" && /\blanguage-/.test(className);
     if (!isFence) {
       return (
-        <code className="rounded-md bg-neutral-800/90 px-1.5 py-0.5 text-[0.875em] text-neutral-300">
+        <code className="rounded-md bg-[#161616] px-1.5 py-0.5 text-[0.875em] text-[#cdcdcd]">
           {children}
         </code>
       );
@@ -73,7 +73,7 @@ const markdownComponents: Components = {
     return <code className={className}>{children}</code>;
   },
   strong: ({ children }) => (
-    <strong className="font-[650] tracking-tight">{children}</strong>
+    <strong className="font-medium tracking-normal">{children}</strong>
   ),
 };
 

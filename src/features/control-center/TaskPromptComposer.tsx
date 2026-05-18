@@ -19,7 +19,7 @@ export function TaskPromptComposer(props: TaskPromptComposerProps): ReactElement
 
   return (
     <form
-      className="flex w-full items-center gap-1 rounded-[9999px] border-0 bg-[#121212] p-1.5 shadow-layered"
+      className="flex w-full items-center gap-1 rounded-[9999px] border-0 bg-[#161616] p-1.5 shadow-layered"
       onSubmit={handleSubmit}
     >
       <Input

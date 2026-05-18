@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import {
   TAURI_COMMAND,
+  type KeyTapLogicalKey,
   type PointerButton,
   type RunCommandRequest,
   type RunCommandResponse,
@@ -14,6 +15,9 @@ export type AgentNativeBridge = {
   pointerMoveTo: (x: number, y: number) => Promise<void>;
   pointerClick: (button: PointerButton) => Promise<void>;
   typeText: (text: string) => Promise<void>;
+  keyTap: (key: KeyTapLogicalKey) => Promise<void>;
+  resetPointerAutomationCancel: () => Promise<void>;
+  cancelPointerAutomation: () => Promise<void>;
 };
 
 declare global {
@@ -44,5 +48,9 @@ export function createNativeBridge(): AgentNativeBridge | null {
     pointerMoveTo: (x, y) => invoke<void>(TAURI_COMMAND.pointerMoveTo, { x, y }),
     pointerClick: (button) => invoke<void>(TAURI_COMMAND.pointerClick, { button }),
     typeText: (text) => invoke<void>(TAURI_COMMAND.typeText, { text }),
+    keyTap: (key) => invoke<void>(TAURI_COMMAND.keyTap, { key }),
+    resetPointerAutomationCancel: () =>
+      invoke<void>(TAURI_COMMAND.resetPointerAutomationCancel),
+    cancelPointerAutomation: () => invoke<void>(TAURI_COMMAND.cancelPointerAutomation),
   };
 }

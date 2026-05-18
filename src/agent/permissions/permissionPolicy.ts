@@ -32,6 +32,7 @@ export function isUiAutomationTool(tool: AgentToolName): boolean {
   return (
     tool === AGENT_TOOL_NAMES.POINTER_MOVE ||
     tool === AGENT_TOOL_NAMES.POINTER_CLICK ||
-    tool === AGENT_TOOL_NAMES.TYPE_TEXT
+    tool === AGENT_TOOL_NAMES.TYPE_TEXT ||
+    tool === AGENT_TOOL_NAMES.KEY_TAP
   );
 }

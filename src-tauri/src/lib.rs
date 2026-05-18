@@ -1,6 +1,8 @@
 mod app_paths;
 mod app_store;
 mod capture_input;
+mod cursor_overlay;
+mod mouse_hook;
 mod command_output;
 mod process_run;
 mod workspace_fs;
@@ -113,6 +115,9 @@ pub fn run() {
             capture_input::pointer_move_to,
             capture_input::pointer_click,
             capture_input::type_text,
+            capture_input::key_tap,
+            capture_input::reset_pointer_automation_cancel,
+            capture_input::cancel_pointer_automation,
             app_store::load_settings,
             app_store::save_settings,
             app_store::load_secret,

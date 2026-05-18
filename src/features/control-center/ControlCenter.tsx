@@ -1,15 +1,17 @@
-﻿import { isTauriRuntime } from "@/agent/native/nativeBridge";
+﻿import { countOpenPointerTools, countOpenUiAutomationTools } from "@/agent/session/uiAutomationDepth";
+import { isTauriRuntime } from "@/agent/native/nativeBridge";
 import type { PermissionChoice } from "@/agent/types";
 import { AgentChatTranscript } from "@/features/agent-chat/AgentChat";
 import {
   AgentEventLog,
-  TaskFailureBanner
+  PointerAutomationEscBar,
+  TaskFailureBanner,
 } from "@/features/agent-chat/AgentSessionPanels";
 import { PermissionPrompt } from "@/features/agent-chat/PermissionPrompt";
 import { TaskPromptComposer } from "@/features/control-center/TaskPromptComposer";
 import { WindowChrome } from "@/features/control-center/WindowChrome";
 import { useAgentSession } from "@/features/control-center/useAgentSession";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 const BROWSER_SAMPLE_PROMPT =
   "Use workspace.inspect on the workspace root, then read preset/actuate-sample.txt and summarize it in a few sentences.";
@@ -26,6 +28,9 @@ export function ControlCenter() {
     void startRun(draft.trim(), null);
     setDraft("");
   }, [canStart, draft, startRun]);
+
+  const uiAutomationBusy = useMemo(() => countOpenUiAutomationTools(agent.events) > 0, [agent.events]);
+  const pointerAutomationBusy = useMemo(() => countOpenPointerTools(agent.events) > 0, [agent.events]);
 
   const handlePermissionResolve = useCallback(
     (choice: PermissionChoice): void => {
@@ -58,6 +63,10 @@ export function ControlCenter() {
           )}
         </div>
         <AgentEventLog rows={agent.eventLogRows} />
+        <PointerAutomationEscBar
+          escArmActive={isTauriRuntime() && uiAutomationBusy}
+          pointerBusy={pointerAutomationBusy}
+        />
       </div>
 
       <div className="shrink-0 space-y-2 py-2">

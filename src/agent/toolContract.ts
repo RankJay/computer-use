@@ -19,6 +19,7 @@ export const AGENT_TOOL_NAMES = {
   POINTER_MOVE: "pointer.move",
   POINTER_CLICK: "pointer.click",
   TYPE_TEXT: "type.text",
+  KEY_TAP: "key.tap",
   FILE_READ: "file.read",
   FILE_WRITE: "file.write",
 } as const;
@@ -71,6 +72,12 @@ export const TOOL_CONTRACT: Record<AgentToolName, ToolContractEntry> = {
     riskClass: "ui_automation",
     displayName: "Type text",
     defaultPermissionTitle: "Allow typing into the focused application",
+  },
+  [AGENT_TOOL_NAMES.KEY_TAP]: {
+    name: AGENT_TOOL_NAMES.KEY_TAP,
+    riskClass: "ui_automation",
+    displayName: "Key tap",
+    defaultPermissionTitle: "Allow a single key press (e.g. Enter)",
   },
   [AGENT_TOOL_NAMES.FILE_READ]: {
     name: AGENT_TOOL_NAMES.FILE_READ,

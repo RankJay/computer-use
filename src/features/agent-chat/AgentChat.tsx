@@ -94,13 +94,13 @@ export function AgentChatTranscript(props: AgentChatTranscriptProps): ReactEleme
   const last = props.timeline.length > 0 ? props.timeline[props.timeline.length - 1] : undefined;
 
   return (
-    <div className="min-h-0 flex-1 space-y-8 p-4 overflow-y-auto overscroll-contain scrollbar-none">
+    <div className="min-h-0 flex-1 p-4 overflow-y-auto overscroll-contain scrollbar-none">
       {props.timeline.map((item) => {
         switch (item.kind) {
           case "user":
             return (
-              <div key={item.id} className="max-w-xl">
-                <p className="text-sm whitespace-pre-wrap text-[#fefefe]">
+              <div key={item.id} className="w-full">
+                <p className="text-sm bg-[#161616] px-3 py-2.5 mb-8 rounded-xl whitespace-pre-wrap text-[#cdcdcd]">
                   {item.text}
                 </p>
               </div>
@@ -136,7 +136,7 @@ export function AgentChatTranscript(props: AgentChatTranscriptProps): ReactEleme
       })}
 
       {props.assistantStream.trim() !== "" && (
-        <div className="max-w-xl">
+        <div className="w-full">
           <StreamingAssistantBlock
             copyControl={createCopyControl(STREAMING_ASSISTANT_COPY_ID, props.assistantStream)}
             text={props.assistantStream}
@@ -160,12 +160,12 @@ function AgentActivityBlock(props: {
   return (
     <ChainOfThought
       defaultOpen={isActive}
-      className="max-w-xl space-y-3 text-[#B7C1CC]"
+      className="w-full text-sm mb-4 text-[#B7C1CC]"
     >
-      <ChainOfThoughtHeader className="text-[#B7C1CC] hover:text-[#E5E7EB]">
-        Chain of Thought
+      <ChainOfThoughtHeader className="text-[#7E7E7E] hover:text-[#cdcdcd]">
+        {agentActivityHeading(props.status)}
       </ChainOfThoughtHeader>
-      <ChainOfThoughtContent className="space-y-3 text-[#B7C1CC]">
+      <ChainOfThoughtContent className="text-[#B7C1CC]">
         {props.rows.map((row, index) => (
           <ChainOfThoughtStep
             key={row.id}
@@ -179,6 +179,21 @@ function AgentActivityBlock(props: {
       </ChainOfThoughtContent>
     </ChainOfThought>
   );
+}
+
+function agentActivityHeading(status: "active" | "completed" | "failed"): string {
+  switch (status) {
+    case "active":
+      return "Here's what's happening";
+    case "completed":
+      return "Here's what happened";
+    case "failed":
+      return "Here's what ran";
+    default: {
+      const _never: never = status;
+      return _never;
+    }
+  }
 }
 
 function activityStepStatus(
@@ -203,7 +218,27 @@ function activityStepIcon(row: AgentActivityRow, active: boolean): LucideIcon {
 }
 
 function activityStepDescription(row: AgentActivityRow): ReactElement | string | undefined {
-  if (row.detail === undefined || row.detail.trim() === "") return undefined;
+  const label = row.detail?.trim() ?? "";
+  const src = row.screenshotDataUrl;
+
+  if (src !== undefined) {
+    return (
+      <div className="space-y-2 pt-0.5">
+        {label !== "" && (
+          <span className="block whitespace-pre-wrap wrap-break-word text-[#9ca3af]">{row.detail}</span>
+        )}
+        <img
+          src={src}
+          alt={label !== "" ? label : "Screen capture"}
+          className="max-w-full rounded-lg border border-neutral-700/70 bg-neutral-950/40 max-h-[min(420px,55vh)] w-auto object-contain object-left"
+          loading="lazy"
+          decoding="async"
+        />
+      </div>
+    );
+  }
+
+  if (label === "") return undefined;
   return <span className="whitespace-pre-wrap wrap-break-word">{row.detail}</span>;
 }
 
@@ -213,8 +248,8 @@ function AssistantBlock(props: {
   readonly onRegenerate?: () => void;
 }): ReactElement {
   return (
-    <div className="max-w-xl space-y-2">
-      <div className="text-sm wrap-break-word text-[#7E7E7E]">
+    <div className="w-full space-y-2 mb-8">
+      <div className="text-sm wrap-break-word text-[#fefefe]">
         <AssistantMarkdown markdown={props.markdown} />
       </div>
       {/* <AssistantToolbar copyControl={props.copyControl} onRegenerate={props.onRegenerate} /> */}

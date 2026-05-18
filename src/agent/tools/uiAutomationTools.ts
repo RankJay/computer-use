@@ -102,3 +102,41 @@ export function createTypeTextTool(ctx: LiveAgentToolContext) {
     },
   });
 }
+
+const keyTapLogicalKeySchema = z.enum(["enter", "tab", "escape", "backspace"]);
+
+export function createKeyTapTool(ctx: LiveAgentToolContext) {
+  return tool({
+    description:
+      "Press a single logical key in the focused application (OS keyboard simulation). Use key enter to submit prompts, send chat, or dialog OK; use escape to dismiss; tab to move focus.",
+    inputSchema: zodSchema(
+      z.object({
+        key: keyTapLogicalKeySchema,
+      }),
+    ),
+    execute: async (input) => {
+      const permitted = await requestToolPermission(ctx, AGENT_TOOL_NAMES.KEY_TAP, {
+        summary: `Press ${input.key}`,
+        rationale: "Keyboard automation requested by the model.",
+        details: input.key,
+      });
+      if (!permitted) {
+        return { ok: false as const, error: "Denied (permission or UI automation disabled)." };
+      }
+      await emitToolStarted(ctx, AGENT_TOOL_NAMES.KEY_TAP, input.key);
+      if (!ctx.native) {
+        await emitToolCompleted(ctx, AGENT_TOOL_NAMES.KEY_TAP, "No native bridge.");
+        return { ok: false as const, error: "Requires Tauri." };
+      }
+      try {
+        await ctx.native.keyTap(input.key);
+        await emitToolCompleted(ctx, AGENT_TOOL_NAMES.KEY_TAP, "Sent.");
+        return { ok: true as const };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        await emitToolCompleted(ctx, AGENT_TOOL_NAMES.KEY_TAP, message);
+        return { ok: false as const, error: message };
+      }
+    },
+  });
+}

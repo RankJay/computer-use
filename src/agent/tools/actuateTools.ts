@@ -2,6 +2,7 @@ import type { LiveAgentToolContext } from "@/agent/agentSessionContext";
 import { createDisplayCaptureTool } from "@/agent/tools/displayCaptureTool";
 import { createTerminalRunTool } from "@/agent/tools/terminalRunTool";
 import {
+  createKeyTapTool,
   createPointerClickTool,
   createPointerMoveTool,
   createTypeTextTool,
@@ -22,6 +23,7 @@ export function createActuateTools(ctx: LiveAgentToolContext) {
     pointer_move: createPointerMoveTool(ctx),
     pointer_click: createPointerClickTool(ctx),
     type_text: createTypeTextTool(ctx),
+    key_tap: createKeyTapTool(ctx),
   };
 }
 

@@ -43,6 +43,8 @@ export type AgentActivityRow = {
   readonly id: string;
   readonly title: string;
   readonly detail?: string;
+  /** Inline PNG preview for display capture rows (`data:image/png;base64,...`). */
+  readonly screenshotDataUrl?: string;
 };
 
 export type AgentEventBase = {

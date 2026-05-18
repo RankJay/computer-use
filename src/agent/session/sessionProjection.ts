@@ -1,9 +1,10 @@
-import type {
-  AgentActivityRow,
-  AgentEvent,
-  AgentPendingPermission,
-  AgentRunStatus,
-  AgentTimelineItem,
+import {
+  createEventId,
+  type AgentActivityRow,
+  type AgentEvent,
+  type AgentPendingPermission,
+  type AgentRunStatus,
+  type AgentTimelineItem,
 } from "@/agent/types";
 import { applyAssistantStreamEvent, trimLastAssistantMessage } from "@/agent/session/streamingAssembly";
 
@@ -109,37 +110,48 @@ export function applyAgentEvent(
         events,
         status: "running",
       });
-    case "plan.updated":
+    case "plan.updated": {
+      const flushed = flushStreamingAssistantToTimeline(prev.timeline, prev.assistantStream);
       return completeProjection({
         ...prev,
         events,
-        timeline: appendActivityRow(prev.timeline, event.taskId, activityRowFromEvent(event)),
+        assistantStream: flushed.assistantStream,
+        timeline: appendActivityRow(flushed.timeline, event.taskId, activityRowFromEvent(event)),
         currentPlan: event.steps,
       });
-    case "step.started":
+    }
+    case "step.started": {
+      const flushed = flushStreamingAssistantToTimeline(prev.timeline, prev.assistantStream);
       return completeProjection({
         ...prev,
         events,
+        assistantStream: flushed.assistantStream,
         status: "running",
-        timeline: appendActivityRow(prev.timeline, event.taskId, activityRowFromEvent(event)),
+        timeline: appendActivityRow(flushed.timeline, event.taskId, activityRowFromEvent(event)),
         currentStep: event.title,
       });
+    }
     case "step.completed":
     case "tool.started":
     case "tool.completed":
-    case "screenshot.keyframe":
+    case "screenshot.keyframe": {
+      const flushed = flushStreamingAssistantToTimeline(prev.timeline, prev.assistantStream);
       return completeProjection({
         ...prev,
         events,
+        assistantStream: flushed.assistantStream,
         status: "running",
-        timeline: appendActivityRow(prev.timeline, event.taskId, activityRowFromEvent(event)),
+        timeline: appendActivityRow(flushed.timeline, event.taskId, activityRowFromEvent(event)),
       });
-    case "permission.requested":
+    }
+    case "permission.requested": {
+      const flushed = flushStreamingAssistantToTimeline(prev.timeline, prev.assistantStream);
       return completeProjection({
         ...prev,
         events,
+        assistantStream: flushed.assistantStream,
         status: "awaiting_permission",
-        timeline: appendActivityRow(prev.timeline, event.taskId, activityRowFromEvent(event)),
+        timeline: appendActivityRow(flushed.timeline, event.taskId, activityRowFromEvent(event)),
         pendingPermission: {
           permissionId: event.permissionId,
           toolName: event.toolName,
@@ -150,14 +162,18 @@ export function applyAgentEvent(
           details: event.details,
         },
       });
-    case "permission.resolved":
+    }
+    case "permission.resolved": {
+      const flushed = flushStreamingAssistantToTimeline(prev.timeline, prev.assistantStream);
       return completeProjection({
         ...prev,
         events,
+        assistantStream: flushed.assistantStream,
         status: "running",
-        timeline: appendActivityRow(prev.timeline, event.taskId, activityRowFromEvent(event)),
+        timeline: appendActivityRow(flushed.timeline, event.taskId, activityRowFromEvent(event)),
         pendingPermission: null,
       });
+    }
     case "assistant.text.delta":
     case "assistant.text.done": {
       const assembly = applyAssistantStreamEvent(prev, event);
@@ -169,24 +185,30 @@ export function applyAgentEvent(
         assistantStream: assembly.assistantStream,
       });
     }
-    case "task.completed":
+    case "task.completed": {
+      const flushed = flushStreamingAssistantToTimeline(prev.timeline, prev.assistantStream);
       return completeProjection({
         ...prev,
         events,
+        assistantStream: flushed.assistantStream,
         status: "completed",
-        timeline: setActivityStatus(prev.timeline, event.taskId, "completed"),
+        timeline: setActivityStatus(flushed.timeline, event.taskId, "completed"),
         currentStep: null,
         lastSummary: event.summary,
       });
-    case "task.failed":
+    }
+    case "task.failed": {
+      const flushed = flushStreamingAssistantToTimeline(prev.timeline, prev.assistantStream);
       return completeProjection({
         ...prev,
         events,
+        assistantStream: flushed.assistantStream,
         status: "failed",
-        timeline: setActivityStatus(prev.timeline, event.taskId, "failed"),
+        timeline: setActivityStatus(flushed.timeline, event.taskId, "failed"),
         currentStep: null,
         failureMessage: event.message,
       });
+    }
     default: {
       const _never: never = event;
       return _never;
@@ -263,6 +285,25 @@ function completeProjection(state: MutableProjection): AgentSessionProjection {
     ...state,
     eventLogRows,
     capabilities: deriveCapabilities(state),
+  };
+}
+
+/** Commits streaming assistant text before tool/plan activity so preamble appears above the activity UI. */
+function flushStreamingAssistantToTimeline(
+  timeline: readonly AgentTimelineItem[],
+  assistantStream: string,
+): { timeline: readonly AgentTimelineItem[]; assistantStream: string } {
+  const text = assistantStream.trim();
+  if (text.length === 0) {
+    return { timeline, assistantStream };
+  }
+
+  return {
+    timeline: [
+      ...timeline,
+      { id: createEventId(), at: Date.now(), kind: "assistant" as const, text },
+    ],
+    assistantStream: "",
   };
 }
 
@@ -356,6 +397,10 @@ function activityRowFromEvent(event: ActivityEvent): AgentActivityRow {
         id: event.id,
         title: "Captured screenshot",
         detail: event.label,
+        screenshotDataUrl:
+          event.imageBase64 !== undefined && event.imageBase64.length > 0
+            ? `data:image/png;base64,${event.imageBase64}`
+            : undefined,
       };
     default: {
       const _never: never = event;
