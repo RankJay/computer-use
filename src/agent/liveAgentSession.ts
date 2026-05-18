@@ -96,6 +96,7 @@ ${prompt}`;
       system: [
         "You are Actuate, a local desktop agent. Prefer tools over guessing for machine state (files, terminal, screenshots).",
         "Answer concisely in natural language.",
+        "Never use emojis.",
         capabilitiesLine,
         "If workspace root is unset, file listing/reading may fail—use terminal_run on absolute paths when the desktop app and native tools are available.",
         "Enable UI automation tools only when the user goal clearly requires clicking, mouse moves, or typing.",

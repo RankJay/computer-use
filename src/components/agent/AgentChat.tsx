@@ -1,13 +1,13 @@
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { ReactElement } from "react";
 import { Button } from "@/components/ui/button";
-import type { AgentTimelineItem } from "@/agent/types";
+import type { AgentActivityRow, AgentTimelineItem } from "@/agent/types";
 import {
   agentChatBrowserAdapter,
   COPIED_FEEDBACK_DURATION_MS,
   STREAMING_ASSISTANT_COPY_ID,
 } from "@/components/agent/agentChatBrowserAdapter";
-import { Check, Copy, RotateCw } from "lucide-react";
+import { Check, CheckCircle2, CircleAlert, Copy, Loader2, RotateCw } from "lucide-react";
 
 const AgentMarkdown = lazy(async () => {
   const module = await import("@/components/agent/AgentMarkdown");
@@ -77,27 +77,46 @@ export function AgentChatTranscript(props: AgentChatTranscriptProps): ReactEleme
   const last = props.timeline.length > 0 ? props.timeline[props.timeline.length - 1] : undefined;
 
   return (
-    <div className="min-h-0 flex-1 space-y-8 overflow-y-auto overscroll-contain py-8">
-      {props.timeline.map((item) =>
-        item.kind === "user" ? (
-          <div key={item.id} className="max-w-xl">
-            <p className="text-[17px] leading-snug font-medium whitespace-pre-wrap text-[#fefefe]">
-              {item.text}
-            </p>
-          </div>
-        ) : (
-          <AssistantBlock
-            key={item.id}
-            copyControl={createCopyControl(item.id, item.text)}
-            markdown={item.text}
-            onRegenerate={
-              props.canRegenerateAssistant && last?.kind === "assistant" && last.id === item.id
-                ? props.onRegenerateAssistant
-                : undefined
-            }
-          />
-        ),
-      )}
+    <div className="min-h-0 flex-1 space-y-8 p-4 overflow-y-auto overscroll-contain scrollbar-none">
+      {props.timeline.map((item) => {
+        switch (item.kind) {
+          case "user":
+            return (
+              <div key={item.id} className="max-w-xl">
+                <p className="text-sm whitespace-pre-wrap text-[#fefefe]">
+                  {item.text}
+                </p>
+              </div>
+            );
+          case "activity":
+            return (
+              <AgentActivityBlock
+                key={item.id}
+                rows={item.rows}
+                status={item.status}
+              />
+            );
+          case "assistant":
+            return (
+              <AssistantBlock
+                key={item.id}
+                copyControl={createCopyControl(item.id, item.text)}
+                markdown={item.text}
+                onRegenerate={
+                  props.canRegenerateAssistant &&
+                  last?.kind === "assistant" &&
+                  last.id === item.id
+                    ? props.onRegenerateAssistant
+                    : undefined
+                }
+              />
+            );
+          default: {
+            const _never: never = item;
+            return _never;
+          }
+        }
+      })}
 
       {props.assistantStream.trim() !== "" && (
         <div className="max-w-xl">
@@ -113,6 +132,63 @@ export function AgentChatTranscript(props: AgentChatTranscriptProps): ReactEleme
   );
 }
 
+function AgentActivityBlock(props: {
+  readonly rows: readonly AgentActivityRow[];
+  readonly status: "active" | "completed" | "failed";
+}): ReactElement | null {
+  if (props.rows.length === 0) return null;
+
+  const latest = props.rows[props.rows.length - 1];
+  const isActive = props.status === "active";
+
+  return (
+    <details
+      open={isActive}
+      className="group max-w-xl rounded-xl border border-white/7 bg-[#121212]/75 px-3 py-2 text-xs text-neutral-500"
+    >
+      <summary className="flex cursor-pointer list-none items-center gap-2 font-medium text-neutral-500 hover:text-neutral-300 [&::-webkit-details-marker]:hidden">
+        <ActivityStatusIcon status={props.status} />
+        <span className="min-w-0 flex-1 truncate">
+          {isActive ? "Working" : props.status === "failed" ? "Stopped" : "Worked"}{" "}
+          <span className="text-neutral-600">({props.rows.length})</span>
+          {latest !== undefined && (
+            <span className="ml-2 font-normal text-neutral-600">{latest.title}</span>
+          )}
+        </span>
+      </summary>
+      <ol className="mt-2 space-y-2 border-t border-white/7 pt-2">
+        {props.rows.map((row) => (
+          <li key={row.id} className="space-y-0.5">
+            <div className="leading-snug text-neutral-400">{row.title}</div>
+            {row.detail !== undefined && row.detail.trim() !== "" && (
+              <div className="whitespace-pre-wrap wrap-break-word text-[11px] leading-snug text-neutral-600">
+                {row.detail}
+              </div>
+            )}
+          </li>
+        ))}
+      </ol>
+    </details>
+  );
+}
+
+function ActivityStatusIcon(props: {
+  readonly status: "active" | "completed" | "failed";
+}): ReactElement {
+  switch (props.status) {
+    case "active":
+      return <Loader2 className="size-3.5 shrink-0 animate-spin text-neutral-500" />;
+    case "completed":
+      return <CheckCircle2 className="size-3.5 shrink-0 text-emerald-500/80" />;
+    case "failed":
+      return <CircleAlert className="size-3.5 shrink-0 text-red-400/80" />;
+    default: {
+      const _never: never = props.status;
+      return _never;
+    }
+  }
+}
+
 function AssistantBlock(props: {
   readonly markdown: string;
   readonly copyControl: CopyControl;
@@ -120,10 +196,10 @@ function AssistantBlock(props: {
 }): ReactElement {
   return (
     <div className="max-w-xl space-y-2">
-      <div className="text-[15px] leading-[1.62] wrap-break-word text-[#a1a1aa]">
+      <div className="text-sm wrap-break-word text-[#7E7E7E]">
         <AssistantMarkdown markdown={props.markdown} />
       </div>
-      <AssistantToolbar copyControl={props.copyControl} onRegenerate={props.onRegenerate} />
+      {/* <AssistantToolbar copyControl={props.copyControl} onRegenerate={props.onRegenerate} /> */}
     </div>
   );
 }

@@ -5,7 +5,7 @@ import remarkGfm from "remark-gfm";
 
 const markdownComponents: Components = {
   p: ({ children }) => (
-    <p className="mb-3 text-inherit last:mb-0 wrap-break-word [&:has(+blockquote)]:mb-2">
+    <p className="mb-1.5 text-inherit last:mb-0 wrap-break-word [&:has(+blockquote)]:mb-2">
       {children}
     </p>
   ),
@@ -37,7 +37,7 @@ const markdownComponents: Components = {
   h3: ({ children }) => (
     <h3 className="mt-4 mb-2 text-[15px] font-semibold text-inherit first:mt-0">{children}</h3>
   ),
-  hr: () => <hr className="my-6 border-neutral-700" />,
+  hr: () => <hr className="my-2 border-neutral-700" />,
   table: ({ children }) => (
     <div className="my-4 w-full overflow-x-auto">
       <table className="w-full border-collapse rounded-lg border border-neutral-700/80 text-left text-[13px]">
@@ -65,13 +65,16 @@ const markdownComponents: Components = {
     const isFence = typeof className === "string" && /\blanguage-/.test(className);
     if (!isFence) {
       return (
-        <code className="rounded-md bg-neutral-800/90 px-1.5 py-0.5 text-[0.875em] text-neutral-100">
+        <code className="rounded-md bg-neutral-800/90 px-1.5 py-0.5 text-[0.875em] text-neutral-300">
           {children}
         </code>
       );
     }
     return <code className={className}>{children}</code>;
   },
+  strong: ({ children }) => (
+    <strong className="font-[650] tracking-tight">{children}</strong>
+  ),
 };
 
 const remarkPlugins = [remarkGfm];

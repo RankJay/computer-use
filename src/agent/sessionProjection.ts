@@ -1,4 +1,5 @@
 import type {
+  AgentActivityRow,
   AgentEvent,
   AgentPendingPermission,
   AgentRunStatus,
@@ -43,6 +44,21 @@ type MutableProjection = {
   readonly failureMessage: string | null;
   readonly pendingPermission: AgentPendingPermission | null;
 };
+
+type ActivityEvent = Extract<
+  AgentEvent,
+  {
+    type:
+      | "plan.updated"
+      | "step.started"
+      | "step.completed"
+      | "permission.requested"
+      | "permission.resolved"
+      | "tool.started"
+      | "tool.completed"
+      | "screenshot.keyframe";
+  }
+>;
 
 export function createInitialAgentProjection(): AgentSessionProjection {
   return completeProjection({
@@ -97,6 +113,7 @@ export function applyAgentEvent(
       return completeProjection({
         ...prev,
         events,
+        timeline: appendActivityRow(prev.timeline, event.taskId, activityRowFromEvent(event)),
         currentPlan: event.steps,
       });
     case "step.started":
@@ -104,6 +121,7 @@ export function applyAgentEvent(
         ...prev,
         events,
         status: "running",
+        timeline: appendActivityRow(prev.timeline, event.taskId, activityRowFromEvent(event)),
         currentStep: event.title,
       });
     case "step.completed":
@@ -114,12 +132,14 @@ export function applyAgentEvent(
         ...prev,
         events,
         status: "running",
+        timeline: appendActivityRow(prev.timeline, event.taskId, activityRowFromEvent(event)),
       });
     case "permission.requested":
       return completeProjection({
         ...prev,
         events,
         status: "awaiting_permission",
+        timeline: appendActivityRow(prev.timeline, event.taskId, activityRowFromEvent(event)),
         pendingPermission: {
           permissionId: event.permissionId,
           toolName: event.toolName,
@@ -135,6 +155,7 @@ export function applyAgentEvent(
         ...prev,
         events,
         status: "running",
+        timeline: appendActivityRow(prev.timeline, event.taskId, activityRowFromEvent(event)),
         pendingPermission: null,
       });
     case "assistant.text.delta":
@@ -153,6 +174,7 @@ export function applyAgentEvent(
         ...prev,
         events,
         status: "completed",
+        timeline: setActivityStatus(prev.timeline, event.taskId, "completed"),
         currentStep: null,
         lastSummary: event.summary,
       });
@@ -161,6 +183,7 @@ export function applyAgentEvent(
         ...prev,
         events,
         status: "failed",
+        timeline: setActivityStatus(prev.timeline, event.taskId, "failed"),
         currentStep: null,
         failureMessage: event.message,
       });
@@ -241,6 +264,104 @@ function completeProjection(state: MutableProjection): AgentSessionProjection {
     eventLogRows,
     capabilities: deriveCapabilities(state),
   };
+}
+
+function appendActivityRow(
+  timeline: readonly AgentTimelineItem[],
+  taskId: string,
+  row: AgentActivityRow,
+): readonly AgentTimelineItem[] {
+  const existingIndex = timeline.findIndex(
+    (item) => item.kind === "activity" && item.taskId === taskId,
+  );
+
+  if (existingIndex === -1) {
+    return [
+      ...timeline,
+      {
+        id: row.id,
+        at: Date.now(),
+        kind: "activity",
+        taskId,
+        status: "active",
+        rows: [row],
+      },
+    ];
+  }
+
+  return timeline.map((item, index) => {
+    if (index !== existingIndex || item.kind !== "activity") return item;
+    return {
+      ...item,
+      at: Date.now(),
+      status: "active",
+      rows: [...item.rows, row],
+    };
+  });
+}
+
+function setActivityStatus(
+  timeline: readonly AgentTimelineItem[],
+  taskId: string,
+  status: "completed" | "failed",
+): readonly AgentTimelineItem[] {
+  return timeline.map((item) =>
+    item.kind === "activity" && item.taskId === taskId ? { ...item, status } : item,
+  );
+}
+
+function activityRowFromEvent(event: ActivityEvent): AgentActivityRow {
+  switch (event.type) {
+    case "plan.updated":
+      return {
+        id: event.id,
+        title: `Planned ${event.steps.length} ${event.steps.length === 1 ? "step" : "steps"}`,
+        detail: event.steps.join("\n"),
+      };
+    case "step.started":
+      return {
+        id: event.id,
+        title: `Started: ${event.title}`,
+      };
+    case "step.completed":
+      return {
+        id: event.id,
+        title: `Completed step ${event.stepIndex + 1}`,
+      };
+    case "permission.requested":
+      return {
+        id: event.id,
+        title: `Asked permission: ${event.summary}`,
+        detail: event.rationale,
+      };
+    case "permission.resolved":
+      return {
+        id: event.id,
+        title: `Permission ${event.choice.replace(/_/g, " ")}`,
+      };
+    case "tool.started":
+      return {
+        id: event.id,
+        title: `Running ${event.toolName}`,
+        detail: event.inputSummary,
+      };
+    case "tool.completed":
+      return {
+        id: event.id,
+        title: `Finished ${event.toolName}`,
+        detail: event.outputSummary,
+      };
+    case "screenshot.keyframe":
+      return {
+        id: event.id,
+        title: "Captured screenshot",
+        detail: event.label,
+      };
+    default: {
+      const _never: never = event;
+      return _never;
+    }
+  }
 }
 
 function deriveCapabilities(state: MutableProjection): AgentSessionCapabilities {

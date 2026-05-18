@@ -147,6 +147,52 @@ describe("sessionProjection", () => {
     expect(projection.pendingPermission).toBeNull();
   });
 
+  test("activity events are kept between user and assistant timeline rows", () => {
+    let projection = beginAgentRun(createInitialAgentProjection(), {
+      userTimelineItem: { id: "user-1", at: 900, kind: "user", text: "Run tests" },
+    });
+
+    projection = applyAgentEvent(projection, {
+      ...baseEvent("tool-started"),
+      type: "tool.started",
+      toolName: "terminal.run",
+      inputSummary: "bun test",
+    });
+    projection = applyAgentEvent(projection, {
+      ...baseEvent("delta-1"),
+      type: "assistant.text.delta",
+      text: "Done.",
+    });
+    projection = applyAgentEvent(projection, {
+      ...baseEvent("done-1"),
+      type: "assistant.text.done",
+    });
+    projection = applyAgentEvent(projection, {
+      ...baseEvent("completed-1"),
+      type: "task.completed",
+      summary: "Finished",
+    });
+
+    expect(projection.timeline).toEqual([
+      { id: "user-1", at: 900, kind: "user", text: "Run tests" },
+      {
+        id: "tool-started",
+        at: expect.any(Number),
+        kind: "activity",
+        taskId,
+        status: "completed",
+        rows: [
+          {
+            id: "tool-started",
+            title: "Running terminal.run",
+            detail: "bun test",
+          },
+        ],
+      },
+      { id: "done-1", at: 1000, kind: "assistant", text: "Done." },
+    ]);
+  });
+
   test("capability flags match idle, running, awaiting permission, completed, and failed states", () => {
     const assistantItem: AgentTimelineItem = {
       id: "assistant-1",

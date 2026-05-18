@@ -3,8 +3,8 @@ import {
   applyAssistantStreamEvent,
   trimLastAssistantMessage,
   type AssistantStreamAssembly,
-} from "@/agent/streamingAssembly";
-import type { AgentEvent, AgentTimelineItem } from "@/agent/types";
+} from "./streamingAssembly";
+import type { AgentEvent, AgentTimelineItem } from "./types";
 
 const taskId = "task-1";
 
@@ -144,5 +144,30 @@ describe("streamingAssembly", () => {
       timeline: [userItem],
       assistantStream: "",
     });
+  });
+
+  test("trim removes the assistant activity block before regeneration", () => {
+    const userItem: AgentTimelineItem = { id: "user-1", at: 900, kind: "user", text: "Prompt" };
+    const activityItem: AgentTimelineItem = {
+      id: "activity-1",
+      at: 950,
+      kind: "activity",
+      taskId,
+      status: "completed",
+      rows: [{ id: "row-1", title: "Running terminal.run" }],
+    };
+    const assistantItem: AgentTimelineItem = {
+      id: "assistant-1",
+      at: 1000,
+      kind: "assistant",
+      text: "Answer",
+    };
+
+    const assembly = trimLastAssistantMessage({
+      timeline: [userItem, activityItem, assistantItem],
+      assistantStream: "",
+    });
+
+    expect(assembly.timeline).toEqual([userItem]);
   });
 });

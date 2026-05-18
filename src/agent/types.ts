@@ -29,7 +29,21 @@ export type AgentPendingPermission = {
 
 export type AgentTimelineItem =
   | { id: string; at: number; kind: "user"; text: string }
-  | { id: string; at: number; kind: "assistant"; text: string };
+  | { id: string; at: number; kind: "assistant"; text: string }
+  | {
+      id: string;
+      at: number;
+      kind: "activity";
+      taskId: string;
+      status: "active" | "completed" | "failed";
+      rows: readonly AgentActivityRow[];
+    };
+
+export type AgentActivityRow = {
+  readonly id: string;
+  readonly title: string;
+  readonly detail?: string;
+};
 
 export type AgentEventBase = {
   id: string;

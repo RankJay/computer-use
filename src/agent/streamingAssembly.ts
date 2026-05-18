@@ -44,7 +44,9 @@ export function trimLastAssistantMessage(
 ): AssistantStreamAssembly {
   const timeline = [...state.timeline];
 
-  while (timeline.length > 0 && timeline[timeline.length - 1]?.kind === "assistant") {
+  while (timeline.length > 0) {
+    const last = timeline[timeline.length - 1];
+    if (last?.kind !== "assistant" && last?.kind !== "activity") break;
     timeline.pop();
   }
 
