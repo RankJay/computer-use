@@ -156,12 +156,13 @@ describe("sessionProjection", () => {
     });
 
     expect(projection.timeline[0]).toMatchObject({ kind: "user", text: "Run something" });
-    expect(projection.timeline[1]).toMatchObject({ kind: "assistant", text: "Let me check the machine." });
+    expect(projection.timeline[1]).toMatchObject({
+      kind: "assistant",
+      text: "Let me check the machine.",
+    });
     expect(projection.timeline[2]).toMatchObject({
       kind: "activity",
-      rows: [
-        expect.objectContaining({ title: "Running terminal.run", detail: "bun test" }),
-      ],
+      rows: [expect.objectContaining({ title: "Running terminal.run", detail: "bun test" })],
     });
     expect(projection.assistantStream).toBe("");
   });

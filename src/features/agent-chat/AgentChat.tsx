@@ -94,25 +94,19 @@ export function AgentChatTranscript(props: AgentChatTranscriptProps): ReactEleme
   const last = props.timeline.length > 0 ? props.timeline[props.timeline.length - 1] : undefined;
 
   return (
-    <div className="min-h-0 flex-1 p-4 overflow-y-auto overscroll-contain scrollbar-none">
+    <div className="min-h-0 flex-1 px-1.5 py-2 overflow-y-auto overscroll-contain scrollbar-none">
       {props.timeline.map((item) => {
         switch (item.kind) {
           case "user":
             return (
               <div key={item.id} className="w-full">
-                <p className="text-sm bg-[#161616] px-3 py-2.5 mb-8 rounded-xl whitespace-pre-wrap text-[#cdcdcd]">
+                <p className="text-sm bg-[#161616] px-3 py-2.5 mb-4 rounded-xl whitespace-pre-wrap text-[#cdcdcd]">
                   {item.text}
                 </p>
               </div>
             );
           case "activity":
-            return (
-              <AgentActivityBlock
-                key={item.id}
-                rows={item.rows}
-                status={item.status}
-              />
-            );
+            return <AgentActivityBlock key={item.id} rows={item.rows} status={item.status} />;
           case "assistant":
             return (
               <AssistantBlock
@@ -120,9 +114,7 @@ export function AgentChatTranscript(props: AgentChatTranscriptProps): ReactEleme
                 copyControl={createCopyControl(item.id, item.text)}
                 markdown={item.text}
                 onRegenerate={
-                  props.canRegenerateAssistant &&
-                  last?.kind === "assistant" &&
-                  last.id === item.id
+                  props.canRegenerateAssistant && last?.kind === "assistant" && last.id === item.id
                     ? props.onRegenerateAssistant
                     : undefined
                 }
@@ -158,10 +150,7 @@ function AgentActivityBlock(props: {
   const isActive = props.status === "active";
 
   return (
-    <ChainOfThought
-      defaultOpen={isActive}
-      className="w-full text-sm mb-4 text-[#B7C1CC]"
-    >
+    <ChainOfThought defaultOpen={isActive} className="w-full text-sm mb-4 px-2.5 text-[#B7C1CC]">
       <ChainOfThoughtHeader className="text-[#7E7E7E] hover:text-[#cdcdcd]">
         {agentActivityHeading(props.status)}
       </ChainOfThoughtHeader>
@@ -225,7 +214,9 @@ function activityStepDescription(row: AgentActivityRow): ReactElement | string |
     return (
       <div className="space-y-2 pt-0.5">
         {label !== "" && (
-          <span className="block whitespace-pre-wrap wrap-break-word text-[#9ca3af]">{row.detail}</span>
+          <span className="block whitespace-pre-wrap wrap-break-word text-[#9ca3af]">
+            {row.detail}
+          </span>
         )}
         <img
           src={src}
@@ -248,7 +239,7 @@ function AssistantBlock(props: {
   readonly onRegenerate?: () => void;
 }): ReactElement {
   return (
-    <div className="w-full space-y-2 mb-8">
+    <div className="w-full space-y-2 mb-8 px-3">
       <div className="text-sm wrap-break-word text-[#fefefe]">
         <AssistantMarkdown markdown={props.markdown} />
       </div>
@@ -262,8 +253,8 @@ function StreamingAssistantBlock(props: {
   readonly copyControl: CopyControl;
 }): ReactElement {
   return (
-    <div className="space-y-2">
-      <div className="text-sm wrap-break-word text-[#7E7E7E]">
+    <div className="space-y-2 px-3 mb-4">
+      <div className="text-sm wrap-break-word text-[#B7C1CC]">
         <AssistantMarkdown markdown={props.text} />
       </div>
       <AssistantToolbar copyControl={props.copyControl} />

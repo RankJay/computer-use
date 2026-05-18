@@ -47,6 +47,7 @@ function installLocalStorage(storage: Storage): void {
 function createSettings(patch: Partial<AppSettingsPayload> = {}): AppSettingsPayload {
   return {
     ...DEFAULT_APP_SETTINGS,
+    persistedApprovals: [...DEFAULT_APP_SETTINGS.persistedApprovals],
     ...patch,
   };
 }

@@ -1,55 +1,32 @@
-import { isTauriRuntime } from "@/agent/native/nativeBridge";
-import { SettingsSheet } from "@/features/settings/SettingsSheet";
 import { Button } from "@/components/ui/button";
-import { getCurrentWindow } from "@tauri-apps/api/window";
-import { Minimize2 } from "lucide-react";
-import type { MouseEvent, ReactElement } from "react";
-import { useCallback } from "react";
+import { MinimizeWindowButton, TitleBarDragRegion } from "@/features/control-center/windowFrame";
+import { Settings2 } from "lucide-react";
+import type { ReactElement } from "react";
+import { Link } from "react-router-dom";
 
-export type WindowChromeProps = {
-  readonly onResetSession: () => void;
-};
+const settingsLinkButtonClassName =
+  "size-8 bg-transparent hover:bg-transparent shrink-0 group cursor-pointer [-webkit-app-region:no-drag]";
 
-async function minimizeActuateWindow(): Promise<void> {
-  if (!isTauriRuntime()) return;
-  await getCurrentWindow().minimize();
-}
-
-function onWindowDragMouseDown(e: MouseEvent): void {
-  if (!isTauriRuntime()) return;
-  if (e.button !== 0) return;
-  void getCurrentWindow().startDragging();
-}
-
-export function WindowChrome(props: WindowChromeProps): ReactElement {
-  const handleMinimizeClick = useCallback((): void => {
-    void minimizeActuateWindow();
-  }, []);
-
+export function WindowChrome(): ReactElement {
   return (
     <div className="relative flex min-h-[44px] shrink-0 select-none items-center justify-between gap-3 px-2">
-      <div
-        data-tauri-drag-region
-        role="presentation"
-        onMouseDown={onWindowDragMouseDown}
-        className="flex w-fit max-w-[min(100%,16rem)] cursor-grab items-center rounded-lg px-2 active:cursor-grabbing [-webkit-app-region:drag]"
-      />
-      <div className="flex shrink-0 items-center gap-1 [-webkit-app-region:no-drag]">
-        <SettingsSheet onResetSession={props.onResetSession} />
+      <TitleBarDragRegion className="flex w-fit max-w-[min(100%,16rem)] items-center px-2" />
+      <div className="flex shrink-0 items-center gap-1">
         <Button
           type="button"
           size="icon"
           variant="ghost"
-          className="size-8 bg-transparent hover:bg-transparent cursor-pointer shrink-0 group"
-          aria-label="Minimize to taskbar"
-          title="Minimize (app keeps running; use the tray menu to exit)"
-          onClick={handleMinimizeClick}
+          className={settingsLinkButtonClassName}
+          asChild
         >
-          <Minimize2
-            className="size-4 text-[#3F3F3F] group-hover:text-[#9c9c9c] transition-colors"
-            strokeWidth={2.5}
-          />
+          <Link to="/settings" aria-label="Open settings">
+            <Settings2
+              className="size-4 text-[#3F3F3F] group-hover:text-[#9c9c9c] transition-colors"
+              strokeWidth={2}
+            />
+          </Link>
         </Button>
+        <MinimizeWindowButton />
       </div>
     </div>
   );

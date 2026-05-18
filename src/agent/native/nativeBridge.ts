@@ -49,8 +49,7 @@ export function createNativeBridge(): AgentNativeBridge | null {
     pointerClick: (button) => invoke<void>(TAURI_COMMAND.pointerClick, { button }),
     typeText: (text) => invoke<void>(TAURI_COMMAND.typeText, { text }),
     keyTap: (key) => invoke<void>(TAURI_COMMAND.keyTap, { key }),
-    resetPointerAutomationCancel: () =>
-      invoke<void>(TAURI_COMMAND.resetPointerAutomationCancel),
+    resetPointerAutomationCancel: () => invoke<void>(TAURI_COMMAND.resetPointerAutomationCancel),
     cancelPointerAutomation: () => invoke<void>(TAURI_COMMAND.cancelPointerAutomation),
   };
 }

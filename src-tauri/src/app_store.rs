@@ -14,8 +14,12 @@ pub struct AppSettings {
     pub permission_mode: String,
     #[serde(default = "default_retention")]
     pub retention_days: u32,
-    #[serde(default = "default_model")]
-    pub model_id: String,
+    #[serde(default = "default_anthropic_model", alias = "modelId")]
+    pub anthropic_model_id: String,
+    #[serde(default = "default_openai_model")]
+    pub openai_model_id: String,
+    #[serde(default = "default_active_api_provider")]
+    pub active_api_provider: String,
     #[serde(default = "default_agent_mode")]
     pub agent_mode: String,
     #[serde(default)]
@@ -28,8 +32,16 @@ fn default_retention() -> u32 {
     30
 }
 
-fn default_model() -> String {
-    "claude-sonnet-4-20250514".to_string()
+fn default_anthropic_model() -> String {
+    "claude-sonnet-4-6".to_string()
+}
+
+fn default_openai_model() -> String {
+    "gpt-5.2".to_string()
+}
+
+fn default_active_api_provider() -> String {
+    "anthropic".to_string()
 }
 
 fn default_agent_mode() -> String {
@@ -42,7 +54,9 @@ impl Default for AppSettings {
             workspace_root: None,
             permission_mode: "ask_risky".into(),
             retention_days: default_retention(),
-            model_id: default_model(),
+            anthropic_model_id: default_anthropic_model(),
+            openai_model_id: default_openai_model(),
+            active_api_provider: default_active_api_provider(),
             agent_mode: default_agent_mode(),
             persisted_approvals: Vec::new(),
             ui_automation_enabled: false,
@@ -62,8 +76,14 @@ pub fn load_settings(app: AppHandle) -> Result<AppSettings, String> {
     }
     let raw = fs::read_to_string(&path).map_err(|e| e.to_string())?;
     let mut s: AppSettings = serde_json::from_str(&raw).map_err(|e| e.to_string())?;
-    if s.model_id.is_empty() {
-        s.model_id = default_model();
+    if s.anthropic_model_id.is_empty() {
+        s.anthropic_model_id = default_anthropic_model();
+    }
+    if s.openai_model_id.is_empty() {
+        s.openai_model_id = default_openai_model();
+    }
+    if s.active_api_provider.is_empty() {
+        s.active_api_provider = default_active_api_provider();
     }
     if s.permission_mode.is_empty() {
         s.permission_mode = "ask_risky".into();

@@ -18,8 +18,12 @@ const markdownComponents: Components = {
       {children}
     </a>
   ),
-  ul: ({ children }) => <ul className="my-3 font-light list-disc space-y-1 pl-6 last:my-2">{children}</ul>,
-  ol: ({ children }) => <ol className="my-3 font-light list-decimal space-y-1 pl-6 last:my-2">{children}</ol>,
+  ul: ({ children }) => (
+    <ul className="my-3 font-light list-disc space-y-1 pl-6 last:my-2">{children}</ul>
+  ),
+  ol: ({ children }) => (
+    <ol className="my-3 font-light list-decimal space-y-1 pl-6 last:my-2">{children}</ol>
+  ),
   li: ({ children }) => <li className="text-inherit leading-relaxed">{children}</li>,
   blockquote: ({ children }) => (
     <blockquote className="border-l-2 font-light border-neutral-600 py-1 pl-4 italic text-neutral-400">
@@ -72,9 +76,7 @@ const markdownComponents: Components = {
     }
     return <code className={className}>{children}</code>;
   },
-  strong: ({ children }) => (
-    <strong className="font-medium tracking-normal">{children}</strong>
-  ),
+  strong: ({ children }) => <strong className="font-medium tracking-normal">{children}</strong>,
 };
 
 const remarkPlugins = [remarkGfm];

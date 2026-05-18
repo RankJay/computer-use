@@ -39,9 +39,7 @@ export function applyAssistantStreamEvent(
   }
 }
 
-export function trimLastAssistantMessage(
-  state: AssistantStreamAssembly,
-): AssistantStreamAssembly {
+export function trimLastAssistantMessage(state: AssistantStreamAssembly): AssistantStreamAssembly {
   const timeline = [...state.timeline];
 
   while (timeline.length > 0) {

@@ -3,11 +3,17 @@ import type { LiveAgentSessionOptions } from "@/agent/session/liveAgentSession";
 import { runDemoAgentSession } from "@/agent/session/demoAgentSession";
 import type { AgentNativeBridge } from "@/agent/native/nativeBridge";
 import { createNativeBridge, isTauriRuntime } from "@/agent/native/nativeBridge";
-import { SECRET_ANTHROPIC_API_KEY } from "@/agent/secrets";
+import { SECRET_ANTHROPIC_API_KEY, SECRET_OPENAI_API_KEY } from "@/agent/secrets";
+import { resolveEffectiveProvider } from "@/agent/llm/resolveEffectiveProvider";
 import { loadSecretKey } from "@/agent/persistence/secretPersistence";
 import type { AppSettingsPayload } from "@/agent/native/tauriIpc";
 import type { AgentToolName } from "@/agent/toolContract";
-import { createEventId, type EmitFn, type PermissionChoice, type PermissionMode } from "@/agent/types";
+import {
+  createEventId,
+  type EmitFn,
+  type PermissionChoice,
+  type PermissionMode,
+} from "@/agent/types";
 import type { WorkspaceAdapter } from "@/agent/workspace/workspaceAdapter";
 
 export type AgentSessionRunnerOptions = {
@@ -74,9 +80,11 @@ export function createLiveAgentSessionRunner(
   liveRunner: LiveAgentSessionRunner = runLiveAgentSessionFromChunk,
 ): AgentSessionRunner {
   return async (options) => {
-    let apiKey: string;
+    let anthropicKey = "";
+    let openaiKey = "";
     try {
-      apiKey = (await host.loadSecretKey(SECRET_ANTHROPIC_API_KEY))?.trim() ?? "";
+      anthropicKey = (await host.loadSecretKey(SECRET_ANTHROPIC_API_KEY))?.trim() ?? "";
+      openaiKey = (await host.loadSecretKey(SECRET_OPENAI_API_KEY))?.trim() ?? "";
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       options.emit({
@@ -91,20 +99,30 @@ export function createLiveAgentSessionRunner(
       return;
     }
 
-    if (!apiKey) {
+    const provider = resolveEffectiveProvider(
+      options.settings.activeApiProvider,
+      anthropicKey.length > 0,
+      openaiKey.length > 0,
+    );
+
+    if (!provider) {
       options.emit({
         id: createEventId(),
         at: Date.now(),
         taskId: options.taskId,
         type: "task.failed",
         message: host.isTauriRuntime
-          ? "No Anthropic API key found in the OS store. Open Settings, save your key again, then retry."
-          : "No Anthropic API key in browser storage. Open Settings → Save API key, then retry.",
+          ? "No API key found in the OS store. Open Settings and save an Anthropic or OpenAI key, then retry."
+          : "No API key in browser storage. Open Settings and save an Anthropic or OpenAI key, then retry.",
       });
       return;
     }
 
-    await liveRunner({ ...options, apiKey });
+    const apiKey = provider === "anthropic" ? anthropicKey : openaiKey;
+    const liveModelId =
+      provider === "anthropic" ? options.settings.anthropicModelId : options.settings.openaiModelId;
+
+    await liveRunner({ ...options, apiKey, llmProvider: provider, liveModelId });
   };
 }
 

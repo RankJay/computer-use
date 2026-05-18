@@ -78,16 +78,17 @@ export function PointerAutomationEscBar(props: PointerAutomationEscBarProps): Re
       <span className="font-medium text-amber-200/95">UI automation in progress.</span>{" "}
       {props.pointerBusy ? (
         <>
-          Physical mouse input is swallowed so automation can steer the cursor — keep hands off until it finishes or you
-          stop it with{" "}
+          Physical mouse input is swallowed so automation can steer the cursor — keep hands off
+          until it finishes or you stop it with{" "}
         </>
       ) : (
-        <>
-          Press{" "}
-        </>
+        <>Press </>
       )}
-      <kbd className="rounded border border-amber-800/70 bg-neutral-950/70 px-1 py-px font-mono text-[10px]">Esc</kbd>{" "}
-      to cancel in-flight automation (effective between mouse steps and before clicks or typing bursts).
+      <kbd className="rounded border border-amber-800/70 bg-neutral-950/70 px-1 py-px font-mono text-[10px]">
+        Esc
+      </kbd>{" "}
+      to cancel in-flight automation (effective between mouse steps and before clicks or typing
+      bursts).
     </output>
   );
 }

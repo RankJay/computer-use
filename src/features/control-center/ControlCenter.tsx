@@ -1,4 +1,7 @@
-﻿import { countOpenPointerTools, countOpenUiAutomationTools } from "@/agent/session/uiAutomationDepth";
+﻿import {
+  countOpenPointerTools,
+  countOpenUiAutomationTools,
+} from "@/agent/session/uiAutomationDepth";
 import { isTauriRuntime } from "@/agent/native/nativeBridge";
 import type { PermissionChoice } from "@/agent/types";
 import { AgentChatTranscript } from "@/features/agent-chat/AgentChat";
@@ -8,16 +11,16 @@ import {
   TaskFailureBanner,
 } from "@/features/agent-chat/AgentSessionPanels";
 import { PermissionPrompt } from "@/features/agent-chat/PermissionPrompt";
+import { useAgentSessionContext } from "@/features/control-center/AgentSessionProvider";
 import { TaskPromptComposer } from "@/features/control-center/TaskPromptComposer";
 import { WindowChrome } from "@/features/control-center/WindowChrome";
-import { useAgentSession } from "@/features/control-center/useAgentSession";
 import { useCallback, useMemo, useState } from "react";
 
 const BROWSER_SAMPLE_PROMPT =
   "Use workspace.inspect on the workspace root, then read preset/actuate-sample.txt and summarize it in a few sentences.";
 
 export function ControlCenter() {
-  const agent = useAgentSession();
+  const agent = useAgentSessionContext();
   const { pendingPermission, resolvePermission, startRun } = agent;
   const [draft, setDraft] = useState(() => (isTauriRuntime() ? "" : BROWSER_SAMPLE_PROMPT));
 
@@ -29,8 +32,14 @@ export function ControlCenter() {
     setDraft("");
   }, [canStart, draft, startRun]);
 
-  const uiAutomationBusy = useMemo(() => countOpenUiAutomationTools(agent.events) > 0, [agent.events]);
-  const pointerAutomationBusy = useMemo(() => countOpenPointerTools(agent.events) > 0, [agent.events]);
+  const uiAutomationBusy = useMemo(
+    () => countOpenUiAutomationTools(agent.events) > 0,
+    [agent.events],
+  );
+  const pointerAutomationBusy = useMemo(
+    () => countOpenPointerTools(agent.events) > 0,
+    [agent.events],
+  );
 
   const handlePermissionResolve = useCallback(
     (choice: PermissionChoice): void => {
@@ -42,12 +51,15 @@ export function ControlCenter() {
 
   return (
     <div className="box-border flex h-full min-h-dvh w-full flex-col gap-0 overflow-hidden rounded-none border-0 bg-[#0E0E0E] p-2 shadow-none ring-0">
-      <WindowChrome onResetSession={agent.resetSession} />
+      <WindowChrome />
 
       <div className="flex min-h-0 flex-1 flex-col gap-2">
         <div className="flex min-h-0 flex-1 flex-col gap-2 scrollbar-none">
           {!agent.capabilities.hasConversation && (
-            <div className="flex flex-1 pt-48 px-2">
+            <div className="flex flex-col flex-1 pt-48 px-2">
+              <span className="max-w-sm text-2xl font-medium mb-2 text-[#414141] tracking-tight">
+                Welcome to actuate.
+              </span>
               <span className="max-w-sm text-2xl font-medium tracking-tight text-[#CDCDCD]">
                 Ready to break some big tasks today?
               </span>
@@ -74,10 +86,7 @@ export function ControlCenter() {
           <TaskFailureBanner message={agent.failureMessage} />
         )}
         {agent.pendingPermission !== null && (
-          <PermissionPrompt
-            pending={agent.pendingPermission}
-            onResolve={handlePermissionResolve}
-          />
+          <PermissionPrompt pending={agent.pendingPermission} onResolve={handlePermissionResolve} />
         )}
         <TaskPromptComposer
           value={draft}

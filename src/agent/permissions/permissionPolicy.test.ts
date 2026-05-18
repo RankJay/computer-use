@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { consequenceRequiresPrompt, toolRequiresPermissionPrompt } from "@/agent/permissions/permissionPolicy";
+import {
+  consequenceRequiresPrompt,
+  toolRequiresPermissionPrompt,
+} from "@/agent/permissions/permissionPolicy";
 import { AGENT_TOOL_NAMES } from "@/agent/toolContract";
 
 describe("permissionPolicy", () => {

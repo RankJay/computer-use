@@ -2,11 +2,7 @@
 
 import { useControllableState } from "@radix-ui/react-use-controllable-state";
 import { Badge } from "@/components/ui/badge";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 import type { LucideIcon } from "lucide-react";
 import { BrainIcon, ChevronDownIcon, DotIcon } from "lucide-react";
@@ -49,10 +45,7 @@ export const ChainOfThought = memo(
       prop: open,
     });
 
-    const chainOfThoughtContext = useMemo(
-      () => ({ isOpen, setIsOpen }),
-      [isOpen, setIsOpen],
-    );
+    const chainOfThoughtContext = useMemo(() => ({ isOpen, setIsOpen }), [isOpen, setIsOpen]);
 
     return (
       <ChainOfThoughtContext.Provider value={chainOfThoughtContext}>

@@ -1,4 +1,5 @@
 import { createAnthropic } from "@ai-sdk/anthropic";
+import { createOpenAI } from "@ai-sdk/openai";
 import { fetch as tauriHttpFetch } from "@tauri-apps/plugin-http";
 import { stepCountIs, streamText } from "ai";
 import type { LiveAgentToolContext } from "@/agent/agentSessionContext";
@@ -10,9 +11,12 @@ import { workspaceAdapter as defaultWorkspaceAdapter } from "@/agent/workspace/w
 import { createEventId } from "@/agent/types";
 import type { AgentEvent } from "@/agent/types";
 import type { ConsequenceRiskClass } from "@/agent/toolContract";
+import type { LlmApiProvider } from "@/agent/native/tauriIpc";
 
 export type LiveAgentSessionOptions = AgentSessionRunnerOptions & {
   readonly apiKey: string;
+  readonly llmProvider: LlmApiProvider;
+  readonly liveModelId: string;
 };
 
 async function appendStructuredLog(taskId: string, event: AgentEvent): Promise<void> {
@@ -28,6 +32,8 @@ export async function runLiveAgentSession(options: LiveAgentSessionOptions): Pro
     taskId,
     prompt,
     apiKey,
+    llmProvider,
+    liveModelId,
     settings,
     workspaceRoot,
     permissionMode,
@@ -61,13 +67,21 @@ export async function runLiveAgentSession(options: LiveAgentSessionOptions): Pro
   };
 
   const tools = createActuateTools(ctx);
-  const anthropic = createAnthropic({
-    apiKey,
-    headers: {
-      "anthropic-dangerous-direct-browser-access": "true",
-    },
-    ...(native !== null ? { fetch: tauriHttpFetch } : {}),
-  });
+  const useTauriFetch = native !== null ? { fetch: tauriHttpFetch } : {};
+
+  const languageModel =
+    llmProvider === "anthropic"
+      ? createAnthropic({
+          apiKey,
+          headers: {
+            "anthropic-dangerous-direct-browser-access": "true",
+          },
+          ...useTauriFetch,
+        })(liveModelId)
+      : createOpenAI({
+          apiKey,
+          ...useTauriFetch,
+        }).chat(liveModelId);
 
   const taskEvent: AgentEvent = {
     id: createEventId(),
@@ -97,7 +111,7 @@ ${prompt}`;
 
   try {
     const result = streamText({
-      model: anthropic(settings.modelId),
+      model: languageModel,
       system: [
         "You are Actuate, a local desktop agent. Prefer tools over guessing for machine-local state (files, terminal, what is on screen) when that state is required to answer.",
         "Answer concisely in natural language.",

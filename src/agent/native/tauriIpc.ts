@@ -25,11 +25,18 @@ export const TAURI_COMMAND = {
   listWorkspaceDir: "list_workspace_dir",
 } as const;
 
+export type LlmApiProvider = "anthropic" | "openai";
+
 export type AppSettingsPayload = {
   workspaceRoot: string | null;
   permissionMode: string;
   retentionDays: number;
-  modelId: string;
+  /** Live runs using Anthropic when this provider is active and a key is saved. */
+  anthropicModelId: string;
+  /** Live runs using OpenAI when this provider is active and a key is saved. */
+  openaiModelId: string;
+  /** Used only when both API keys are saved; otherwise inferred from which key exists. */
+  activeApiProvider: LlmApiProvider;
   agentMode: string;
   persistedApprovals: string[];
   uiAutomationEnabled: boolean;

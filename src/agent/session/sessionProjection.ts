@@ -6,7 +6,10 @@ import {
   type AgentRunStatus,
   type AgentTimelineItem,
 } from "@/agent/types";
-import { applyAssistantStreamEvent, trimLastAssistantMessage } from "@/agent/session/streamingAssembly";
+import {
+  applyAssistantStreamEvent,
+  trimLastAssistantMessage,
+} from "@/agent/session/streamingAssembly";
 
 export type AgentEventLogRow = {
   readonly id: string;

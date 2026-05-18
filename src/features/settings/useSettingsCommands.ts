@@ -1,4 +1,8 @@
-import { deleteSecretKey, loadSecretKey, storeSecretKey } from "@/agent/persistence/secretPersistence";
+import {
+  deleteSecretKey,
+  loadSecretKey,
+  storeSecretKey,
+} from "@/agent/persistence/secretPersistence";
 import { clearAllLogs, openLogsFolder } from "@/agent/persistence/sessionLogs";
 import { isTauriRuntime } from "@/agent/native/nativeBridge";
 import { useCallback, useEffect, useState } from "react";
@@ -15,7 +19,9 @@ export function useSecretKeySettings(secretId: string) {
   const refreshKeyState = useCallback(async () => {
     try {
       const value = await loadSecretKey(secretId);
-      setHasStoredKey(!!value && value.length > 0);
+      const trimmed = value?.trim() ?? "";
+      setHasStoredKey(trimmed.length > 0);
+      setApiKeyDraft(trimmed);
       setApiKeyError(null);
     } catch (error) {
       const storageName = isTauriRuntime() ? "OS store" : "browser storage";
@@ -34,7 +40,6 @@ export function useSecretKeySettings(secretId: string) {
     setApiKeyError(null);
     try {
       await storeSecretKey(secretId, value);
-      setApiKeyDraft("");
       await refreshKeyState();
     } catch (error) {
       setApiKeyError(`Save failed: ${errorMessage(error)}`);
@@ -45,6 +50,7 @@ export function useSecretKeySettings(secretId: string) {
     setApiKeyError(null);
     try {
       await deleteSecretKey(secretId);
+      setApiKeyDraft("");
       await refreshKeyState();
     } catch (error) {
       setApiKeyError(`Remove failed: ${errorMessage(error)}`);
