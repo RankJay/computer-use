@@ -185,6 +185,70 @@ describe("sessionProjection", () => {
     expect(projection.pendingPermission).toBeNull();
   });
 
+  test("each tool round after assistant text gets its own activity timeline item", () => {
+    let projection = beginAgentRun(createInitialAgentProjection(), {
+      userTimelineItem: { id: "user-1", at: 900, kind: "user", text: "Explore" },
+    });
+
+    projection = applyAgentEvent(projection, {
+      ...baseEvent("delta-1"),
+      type: "assistant.text.delta",
+      text: "Checking pwd.",
+    });
+    projection = applyAgentEvent(projection, {
+      ...baseEvent("done-1"),
+      type: "assistant.text.done",
+    });
+    projection = applyAgentEvent(projection, {
+      ...baseEvent("tool-1-started"),
+      type: "tool.started",
+      toolName: "terminal.run",
+      inputSummary: "pwd",
+    });
+    projection = applyAgentEvent(projection, {
+      ...baseEvent("tool-1-done"),
+      type: "tool.completed",
+      toolName: "terminal.run",
+      outputSummary: "D:\\Projects\\actuate",
+    });
+    projection = applyAgentEvent(projection, {
+      ...baseEvent("delta-2"),
+      type: "assistant.text.delta",
+      text: "Now listing files.",
+    });
+    projection = applyAgentEvent(projection, {
+      ...baseEvent("done-2"),
+      type: "assistant.text.done",
+    });
+    projection = applyAgentEvent(projection, {
+      ...baseEvent("tool-2-started"),
+      type: "tool.started",
+      toolName: "terminal.run",
+      inputSummary: "ls",
+    });
+
+    const activityItems = projection.timeline.filter((item) => item.kind === "activity");
+    expect(activityItems).toHaveLength(2);
+    expect(activityItems[0]).toMatchObject({
+      status: "completed",
+      rows: [
+        expect.objectContaining({ title: "Running terminal.run", detail: "pwd" }),
+        expect.objectContaining({ title: "Finished terminal.run", detail: "D:\\Projects\\actuate" }),
+      ],
+    });
+    expect(activityItems[1]).toMatchObject({
+      status: "active",
+      rows: [expect.objectContaining({ title: "Running terminal.run", detail: "ls" })],
+    });
+    expect(projection.timeline.map((item) => item.kind)).toEqual([
+      "user",
+      "assistant",
+      "activity",
+      "assistant",
+      "activity",
+    ]);
+  });
+
   test("activity events are kept between user and assistant timeline rows", () => {
     let projection = beginAgentRun(createInitialAgentProjection(), {
       userTimelineItem: { id: "user-1", at: 900, kind: "user", text: "Run tests" },

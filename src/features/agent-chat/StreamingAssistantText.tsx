@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import type { ReactElement } from "react";
 import { motion } from "motion/react";
+import { joinStreamingText } from "@/agent/session/streamingTextJoin";
 
 type TextSegment = {
   readonly id: number;
@@ -38,8 +39,10 @@ export function StreamingAssistantText(props: { readonly text: string }): ReactE
     const nextCommitted = committedLengthRef.current;
     if (props.text.length <= nextCommitted) return;
 
-    const delta = props.text.slice(nextCommitted);
-    committedLengthRef.current = props.text.length;
+    const previous = props.text.slice(0, nextCommitted);
+    const rawDelta = props.text.slice(nextCommitted);
+    const delta = joinStreamingText(previous, rawDelta).slice(previous.length);
+    committedLengthRef.current = previous.length + delta.length;
 
     const id = nextIdRef.current;
     nextIdRef.current += 1;
@@ -49,7 +52,7 @@ export function StreamingAssistantText(props: { readonly text: string }): ReactE
   if (segments.length === 0 && props.text.length === 0) return null;
 
   return (
-    <span className="whitespace-pre-wrap">
+    <span className="whitespace-pre-wrap text-[#fefefe]">
       {segments.map((segment) => (
         <StreamingTextSegment key={segment.id} text={segment.text} />
       ))}

@@ -3,6 +3,7 @@ import type {
   AssistantTextDeltaEvent,
   AssistantTextDoneEvent,
 } from "@/agent/types";
+import { joinStreamingText } from "@/agent/session/streamingTextJoin";
 
 export type AssistantStreamEvent = AssistantTextDeltaEvent | AssistantTextDoneEvent;
 
@@ -16,7 +17,7 @@ export function applyAssistantStreamEvent(
       if (last?.kind === "assistant" && last.status === "streaming") {
         return [
           ...timeline.slice(0, -1),
-          { ...last, text: last.text + event.text },
+          { ...last, text: joinStreamingText(last.text, event.text) },
         ];
       }
 

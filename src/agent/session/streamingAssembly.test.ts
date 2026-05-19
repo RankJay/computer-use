@@ -30,6 +30,29 @@ describe("streamingAssembly", () => {
     ]);
   });
 
+  test("multiple deltas insert a word boundary space when needed", () => {
+    let timeline = applyAssistantStreamEvent([], {
+      ...baseEvent("delta-1"),
+      type: "assistant.text.delta",
+      text: "guide:",
+    });
+    timeline = applyAssistantStreamEvent(timeline, {
+      ...baseEvent("delta-2"),
+      type: "assistant.text.delta",
+      text: "Since",
+    });
+
+    expect(timeline).toEqual([
+      {
+        id: "delta-1",
+        at: 1000,
+        kind: "assistant",
+        text: "guide: Since",
+        status: "streaming",
+      },
+    ]);
+  });
+
   test("multiple deltas append to the same streaming row", () => {
     let timeline = applyAssistantStreamEvent([], {
       ...baseEvent("delta-1"),
@@ -124,6 +147,46 @@ describe("streamingAssembly", () => {
     const timeline = trimLastAssistantMessage([userItem, firstAssistant, secondAssistant]);
 
     expect(timeline).toEqual([userItem]);
+  });
+
+  test("delta after activity appends to a new assistant row", () => {
+    const userItem: AgentTimelineItem = { id: "user-1", at: 900, kind: "user", text: "Prompt" };
+    const assistantItem: AgentTimelineItem = {
+      id: "assistant-1",
+      at: 1000,
+      kind: "assistant",
+      text: "Partial",
+      status: "complete",
+    };
+    const activityItem: AgentTimelineItem = {
+      id: "activity-1",
+      at: 1050,
+      kind: "activity",
+      taskId: "task-1",
+      status: "active",
+      rows: [{ id: "row-1", title: "Running terminal.run" }],
+    };
+
+    const timeline = applyAssistantStreamEvent([userItem, assistantItem, activityItem], {
+      id: "delta-2",
+      at: 1100,
+      taskId: "task-1",
+      type: "assistant.text.delta",
+      text: " answer",
+    });
+
+    expect(timeline).toEqual([
+      userItem,
+      assistantItem,
+      activityItem,
+      {
+        id: "delta-2",
+        at: 1100,
+        kind: "assistant",
+        text: " answer",
+        status: "streaming",
+      },
+    ]);
   });
 
   test("trim removes the assistant activity block before regeneration", () => {

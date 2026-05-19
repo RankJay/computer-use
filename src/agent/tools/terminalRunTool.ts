@@ -18,10 +18,11 @@ export function createTerminalRunTool(ctx: LiveAgentToolContext) {
       }),
     ),
     execute: async (input) => {
+      const command = `${input.program} ${input.args.join(" ")}`.trim();
       const permitted = await requestToolPermission(ctx, AGENT_TOOL_NAMES.TERMINAL_RUN, {
-        summary: `${input.program} ${input.args.join(" ")}`.trim(),
+        summary: shortenForTimeline(command, 120),
         rationale: "The model requested a local shell command.",
-        details: `program: ${input.program}\nargs: ${JSON.stringify(input.args)}\ncwd: ${input.cwd ?? "(default)"}`,
+        details: `program: ${input.program}\nargs: ${JSON.stringify(input.args)}\ncwd: ${input.cwd ?? "(default)"}\n\ncommand:\n${command}`,
       });
       if (!permitted) {
         return { ok: false as const, error: "User denied permission for terminal execution." };

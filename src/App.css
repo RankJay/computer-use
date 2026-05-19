@@ -21,6 +21,10 @@
   -webkit-text-size-adjust: 100%;
 }
 
+div {
+  overscroll-behavior: contain;
+}
+
 .container {
   margin: 0;
   padding-top: 10vh;

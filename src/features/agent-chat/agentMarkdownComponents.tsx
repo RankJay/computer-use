@@ -1,9 +1,7 @@
-import type { ReactElement } from "react";
-import ReactMarkdown from "react-markdown";
-import type { Components } from "react-markdown";
-import remarkGfm from "remark-gfm";
+import type { Components } from "streamdown";
 
-const markdownComponents: Components = {
+/** Shared markdown element styles for assistant transcript rendering. */
+export const agentMarkdownComponents: Components = {
   p: ({ children }) => (
     <p className="mb-1.5 font-light tracking-[0.003em] text-inherit last:mb-0 wrap-break-word [&:has(+blockquote)]:mb-2">
       {children}
@@ -60,37 +58,10 @@ const markdownComponents: Components = {
   td: ({ children }) => (
     <td className="border border-neutral-700/60 px-3 py-2 text-neutral-400">{children}</td>
   ),
-  pre: ({ children }) => (
-    <pre className="mb-4 overflow-x-auto rounded-xl border border-neutral-700/80 bg-[#151515] p-4 text-[13px] leading-relaxed last:mb-0">
+  inlineCode: ({ children }) => (
+    <code className="rounded-md bg-[#161616] scrollbar-none px-1.5 py-0.5 text-[0.875em] text-[#cdcdcd]">
       {children}
-    </pre>
+    </code>
   ),
-  code: ({ className, children }) => {
-    const isFence = typeof className === "string" && /\blanguage-/.test(className);
-    if (!isFence) {
-      return (
-        <code className="rounded-md bg-[#161616] px-1.5 py-0.5 text-[0.875em] text-[#cdcdcd]">
-          {children}
-        </code>
-      );
-    }
-    return <code className={className}>{children}</code>;
-  },
   strong: ({ children }) => <strong className="font-medium tracking-normal">{children}</strong>,
 };
-
-const remarkPlugins = [remarkGfm];
-
-type AgentMarkdownProps = {
-  readonly markdown: string;
-};
-
-export function AgentMarkdown({ markdown }: AgentMarkdownProps): ReactElement | null {
-  if (markdown.trim() === "") return null;
-
-  return (
-    <ReactMarkdown remarkPlugins={remarkPlugins} components={markdownComponents}>
-      {markdown}
-    </ReactMarkdown>
-  );
-}

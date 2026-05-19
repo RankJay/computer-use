@@ -2,6 +2,7 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/geist";
+@source "../node_modules/streamdown/dist/*.js";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -151,5 +152,9 @@
 
   .scrollbar-none::-webkit-scrollbar {
     display: none !important;
+  }
+
+  .agent-stream-markdown [data-streamdown="code-block"] {
+    @apply mb-4 overflow-x-auto rounded-xl border border-neutral-700/80 bg-[#151515] text-[13px] leading-relaxed last:mb-0;
   }
 }

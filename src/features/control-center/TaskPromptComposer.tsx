@@ -39,7 +39,7 @@ export function TaskPromptComposer(props: TaskPromptComposerProps): ReactElement
         disabled={props.inputDisabled}
         aria-label="Task"
         rows={1}
-        className="field-sizing-content h-auto max-h-[5lh] scrollbar-none min-h-0 flex-1 shrink resize-none overflow-y-auto border-0 bg-transparent py-1 pl-3 text-sm leading-normal text-white shadow-none outline-none placeholder:text-neutral-500 focus-visible:border-0 focus-visible:ring-0 dark:bg-transparent dark:shadow-none disabled:bg-transparent disabled:opacity-50"
+        className="field-sizing-content disabled:bg-transparent! h-auto max-h-[5lh] scrollbar-none min-h-0 flex-1 shrink resize-none overflow-y-auto border-0 bg-transparent py-1 pl-3 text-sm leading-normal text-white shadow-none outline-none placeholder:text-neutral-500 focus-visible:border-0 focus-visible:ring-0 dark:bg-transparent dark:shadow-none"
       />
       <Button
         type="submit"

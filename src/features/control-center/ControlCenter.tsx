@@ -51,17 +51,17 @@ export function ControlCenter() {
   );
 
   return (
-    <div className="box-border flex h-full min-h-dvh w-full flex-col gap-0 overflow-hidden rounded-none border-0 bg-[#0E0E0E] p-2 shadow-none ring-0">
+    <div className="box-border overscroll-contain flex h-full min-h-dvh w-full flex-col gap-0 overflow-hidden rounded-none border-0 bg-[#0E0E0E] p-2 shadow-none ring-0">
       <WindowChrome />
 
       <div className="flex min-h-0 flex-1 flex-col gap-2">
         <Container className="flex min-h-0 flex-1 flex-col gap-2 scrollbar-none">
           {!agent.capabilities.hasConversation && (
             <div className="flex flex-col flex-1 pt-48 px-4">
-              <Item className="max-w-sm text-2xl font-medium mb-2 text-[#414141] tracking-tight">
+              <Item className="max-w-sm text-2xl mb-2 text-[#414141] tracking-tight">
                 Welcome to actuate.
               </Item>
-              <Item className="max-w-sm text-2xl font-medium tracking-tight text-[#CDCDCD]">
+              <Item className="max-w-xs text-2xl tracking-tight text-[#CDCDCD]">
                 Ready to break some big tasks today?
               </Item>
             </div>
@@ -71,6 +71,9 @@ export function ControlCenter() {
               canRegenerateAssistant={agent.capabilities.canRegenerateAssistant}
               onRegenerateAssistant={agent.regenerateLastAssistant}
               timeline={agent.timeline}
+              isRunActive={
+                agent.status === "running" || agent.status === "awaiting_permission"
+              }
             />
           )}
         </Container>

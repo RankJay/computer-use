@@ -276,27 +276,52 @@ function completeProjection(state: MutableProjection): AgentSessionProjection {
   };
 }
 
+function findLastActivityIndex(
+  timeline: readonly AgentTimelineItem[],
+  taskId: string,
+): number {
+  for (let index = timeline.length - 1; index >= 0; index -= 1) {
+    const item = timeline[index];
+    if (item?.kind === "activity" && item.taskId === taskId) {
+      return index;
+    }
+  }
+  return -1;
+}
+
+function createActivityItem(taskId: string, row: AgentActivityRow): AgentTimelineItem {
+  return {
+    id: row.id,
+    at: Date.now(),
+    kind: "activity",
+    taskId,
+    status: "active",
+    rows: [row],
+  };
+}
+
+/** Appends tool/plan rows; starts a new activity segment after intervening assistant text. */
 function appendActivityRow(
   timeline: readonly AgentTimelineItem[],
   taskId: string,
   row: AgentActivityRow,
 ): readonly AgentTimelineItem[] {
-  const existingIndex = timeline.findIndex(
-    (item) => item.kind === "activity" && item.taskId === taskId,
-  );
+  const existingIndex = findLastActivityIndex(timeline, taskId);
 
   if (existingIndex === -1) {
-    return [
-      ...timeline,
-      {
-        id: row.id,
-        at: Date.now(),
-        kind: "activity",
-        taskId,
-        status: "active",
-        rows: [row],
-      },
-    ];
+    return [...timeline, createActivityItem(taskId, row)];
+  }
+
+  const hasAssistantAfter = timeline
+    .slice(existingIndex + 1)
+    .some((item) => item.kind === "assistant");
+
+  if (hasAssistantAfter) {
+    const sealed = timeline.map((item, index) => {
+      if (index !== existingIndex || item.kind !== "activity") return item;
+      return { ...item, status: "completed" as const };
+    });
+    return [...sealed, createActivityItem(taskId, row)];
   }
 
   return timeline.map((item, index) => {
