@@ -1,9 +1,8 @@
-import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Minimize2 } from "lucide-react";
 import type { ComponentProps, MouseEvent, ReactElement } from "react";
 import { useCallback } from "react";
 
-import { isTauriRuntime } from "@/agent/native/nativeBridge";
+import { minimizeActuateWindow, startActuateWindowDrag } from "@/agent/native/nativeBridge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -29,15 +28,9 @@ export function ChromeIconButton({
   );
 }
 
-async function minimizeActuateWindow(): Promise<void> {
-  if (!isTauriRuntime()) return;
-  await getCurrentWindow().minimize();
-}
-
 function onTitleBarDragMouseDown(e: MouseEvent): void {
-  if (!isTauriRuntime()) return;
   if (e.button !== 0) return;
-  void getCurrentWindow().startDragging();
+  startActuateWindowDrag();
 }
 
 export function TitleBarDragRegion(props: { className?: string }): ReactElement {

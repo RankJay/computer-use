@@ -1,7 +1,12 @@
 import { invoke } from "@tauri-apps/api/core";
 
 import { isTauriRuntime } from "@/agent/native/nativeBridge";
-import { TAURI_COMMAND } from "@/agent/native/tauriIpc";
+import {
+  TAURI_COMMAND,
+  type ListWorkspaceDirRequest,
+  type ReadWorkspaceFileRequest,
+  type WriteWorkspaceFileRequest,
+} from "@/agent/native/tauriIpc";
 import {
   browserSampleFileUrl,
   isBrowserSampleWorkspace,
@@ -57,10 +62,8 @@ export function createWorkspaceAdapter(deps: WorkspaceAdapterDependencies): Work
         }
         return await res.text();
       }
-      const result = await deps.invoke(TAURI_COMMAND.readWorkspaceFile, {
-        workspaceRoot,
-        relativePath,
-      });
+      const request: ReadWorkspaceFileRequest = { workspaceRoot, relativePath };
+      const result = await deps.invoke(TAURI_COMMAND.readWorkspaceFile, request);
       return requireStringResult(result, TAURI_COMMAND.readWorkspaceFile);
     },
     listDirectory: async (workspaceRoot, relativeDir) => {
@@ -68,21 +71,16 @@ export function createWorkspaceAdapter(deps: WorkspaceAdapterDependencies): Work
         requireBrowserSampleWorkspace(workspaceRoot, "list");
         return listBrowserSampleChildren(relativeDir);
       }
-      const result = await deps.invoke(TAURI_COMMAND.listWorkspaceDir, {
-        workspaceRoot,
-        relativeDir,
-      });
+      const request: ListWorkspaceDirRequest = { workspaceRoot, relativeDir };
+      const result = await deps.invoke(TAURI_COMMAND.listWorkspaceDir, request);
       return requireStringArrayResult(result, TAURI_COMMAND.listWorkspaceDir);
     },
     writeFile: async (workspaceRoot, relativePath, content) => {
       if (!deps.isTauriRuntime()) {
         throw new Error("Writing workspace files requires the Tauri desktop app.");
       }
-      const result = await deps.invoke(TAURI_COMMAND.writeWorkspaceFile, {
-        workspaceRoot,
-        relativePath,
-        content,
-      });
+      const request: WriteWorkspaceFileRequest = { workspaceRoot, relativePath, content };
+      const result = await deps.invoke(TAURI_COMMAND.writeWorkspaceFile, request);
       return requireStringResult(result, TAURI_COMMAND.writeWorkspaceFile);
     },
   };

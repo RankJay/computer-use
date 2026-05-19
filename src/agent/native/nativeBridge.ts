@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 
 import {
   TAURI_COMMAND,
@@ -53,4 +54,19 @@ export function createNativeBridge(): AgentNativeBridge | null {
     resetPointerAutomationCancel: () => invoke<void>(TAURI_COMMAND.resetPointerAutomationCancel),
     cancelPointerAutomation: () => invoke<void>(TAURI_COMMAND.cancelPointerAutomation),
   };
+}
+
+export async function cancelPointerAutomation(): Promise<void> {
+  if (!isTauriRuntime()) return;
+  await invoke<void>(TAURI_COMMAND.cancelPointerAutomation);
+}
+
+export async function minimizeActuateWindow(): Promise<void> {
+  if (!isTauriRuntime()) return;
+  await getCurrentWindow().minimize();
+}
+
+export function startActuateWindowDrag(): void {
+  if (!isTauriRuntime()) return;
+  void getCurrentWindow().startDragging();
 }

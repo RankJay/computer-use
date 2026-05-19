@@ -149,6 +149,5 @@ export const PERMISSION_CHOICE_LABELS: Record<PermissionChoice, string> = {
 export const PERMISSION_MODE_LABELS: Record<PermissionMode, string> = {
   ask_risky: "Ask before risky actions",
   ask_all: "Ask before every meaningful action",
-  session_low_risk:
-    "Allow low-risk actions this session (dev shortcut — full policy wiring follows S4)",
+  session_low_risk: "Ask once per approved risk class this session",
 };

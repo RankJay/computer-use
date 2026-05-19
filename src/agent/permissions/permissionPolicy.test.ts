@@ -22,9 +22,12 @@ describe("permissionPolicy", () => {
     expect(toolRequiresPermissionPrompt("ask_risky", AGENT_TOOL_NAMES.KEY_TAP)).toBe(true);
   });
 
-  test("session_low_risk skips prompts", () => {
+  test("session_low_risk prompts so low-risk tools can be approved for the session", () => {
+    expect(toolRequiresPermissionPrompt("session_low_risk", AGENT_TOOL_NAMES.DISPLAY_CAPTURE)).toBe(
+      true,
+    );
     expect(toolRequiresPermissionPrompt("session_low_risk", AGENT_TOOL_NAMES.TERMINAL_RUN)).toBe(
-      false,
+      true,
     );
   });
 

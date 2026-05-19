@@ -7,7 +7,11 @@ import {
   isOpenAIModelId,
 } from "@/agent/llm/modelCatalog";
 import { isTauriRuntime } from "@/agent/native/nativeBridge";
-import type { AppSettingsPayload, LlmApiProvider } from "@/agent/native/tauriIpc";
+import type {
+  AppSettingsPayload,
+  LlmApiProvider,
+  SaveSettingsRequest,
+} from "@/agent/native/tauriIpc";
 import { TAURI_COMMAND } from "@/agent/native/tauriIpc";
 import { BROWSER_SAMPLE_WORKSPACE_ROOT } from "@/agent/workspace/browserWorkspace";
 
@@ -192,5 +196,6 @@ export async function saveAppSettings(settings: AppSettingsPayload): Promise<voi
     globalThis.localStorage?.setItem(WEB_SETTINGS_STORAGE_KEY, JSON.stringify(normalized));
     return;
   }
-  await invoke(TAURI_COMMAND.saveSettings, { settings: normalized });
+  const request: SaveSettingsRequest = { settings: normalized };
+  await invoke(TAURI_COMMAND.saveSettings, request);
 }

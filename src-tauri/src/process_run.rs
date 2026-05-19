@@ -122,3 +122,24 @@ pub fn run_command(request: RunCommandInvoke) -> Result<CommandOutput, String> {
         request.max_output_bytes,
     )
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{read_limited, run_command_bounded};
+    use std::io::Cursor;
+
+    #[test]
+    fn read_limited_marks_truncated_output() {
+        let mut input = Cursor::new(b"abcdef".to_vec());
+        let output = read_limited(&mut input, 3).expect("read should succeed");
+
+        assert_eq!(output, "abc\n… [output truncated]");
+    }
+
+    #[test]
+    fn run_command_bounded_rejects_empty_program() {
+        let result = run_command_bounded("  ".to_string(), Vec::new(), None, None, None);
+
+        assert!(result.is_err());
+    }
+}

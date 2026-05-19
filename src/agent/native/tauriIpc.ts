@@ -62,3 +62,55 @@ export type PointerButton = "left" | "right" | "middle";
 
 export const KEY_TAP_LOGICAL_KEYS = ["enter", "tab", "escape", "backspace"] as const;
 export type KeyTapLogicalKey = (typeof KEY_TAP_LOGICAL_KEYS)[number];
+
+export type SaveSettingsRequest = {
+  settings: AppSettingsPayload;
+};
+
+export type LoadSecretRequest = {
+  key: string;
+};
+
+export type StoreSecretRequest = {
+  key: string;
+  value: string;
+};
+
+export type DeleteSecretRequest = {
+  key: string;
+};
+
+export type AppendSessionLogRequest = {
+  sessionId: string;
+  line: string;
+};
+
+export type WriteSessionKeyframeRequest = {
+  sessionId: string;
+  filename: string;
+  pngBase64: string;
+};
+
+/** Absolute path of the written keyframe PNG on disk. */
+export type WriteSessionKeyframeResponse = string;
+
+export type ReadWorkspaceFileRequest = {
+  workspaceRoot: string;
+  relativePath: string;
+};
+
+export type WriteWorkspaceFileRequest = {
+  workspaceRoot: string;
+  relativePath: string;
+  content: string;
+};
+
+/** Absolute path of the written file on disk. */
+export type WriteWorkspaceFileResponse = string;
+
+export type ListWorkspaceDirRequest = {
+  workspaceRoot: string;
+  relativeDir: string;
+};
+
+export type ListWorkspaceDirResponse = string[];

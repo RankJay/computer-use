@@ -1,8 +1,7 @@
-import { invoke } from "@tauri-apps/api/core";
 import type { ReactElement } from "react";
 import { useEffect } from "react";
 
-import { TAURI_COMMAND } from "@/agent/native/tauriIpc";
+import { cancelPointerAutomation } from "@/agent/native/nativeBridge";
 
 export type PointerAutomationEscBarProps = {
   /** Enables global Esc listener to invoke cancel_pointer_automation. */
@@ -21,7 +20,7 @@ export function PointerAutomationEscBar(props: PointerAutomationEscBarProps): Re
         return;
       }
       e.preventDefault();
-      void invoke<void>(TAURI_COMMAND.cancelPointerAutomation).catch(() => {
+      void cancelPointerAutomation().catch(() => {
         /** ignore invoke errors (capabilities / dev shells) */
       });
     };

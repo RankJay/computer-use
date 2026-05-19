@@ -117,18 +117,35 @@ describe("permissionOrchestrator", () => {
     expect(harness.events[1]?.type).toBe("permission.resolved");
   });
 
-  test("session_low_risk does not leave a pending prompt", async () => {
+  test("session_low_risk prompts until the risk class is approved for the session", async () => {
     const harness = createHarness("session_low_risk");
 
-    const permitted = await requestToolPermission(harness.context, AGENT_TOOL_NAMES.TERMINAL_RUN, {
-      summary: "Run bun test",
-      rationale: "Verify changes",
-      details: "bun test src",
+    const permittedPromise = requestToolPermission(
+      harness.context,
+      AGENT_TOOL_NAMES.DISPLAY_CAPTURE,
+      {
+        summary: "Capture screen",
+        rationale: "Observe UI",
+        details: "primary display",
+      },
+    );
+
+    await flushPermissionWaiter();
+    expect(harness.requestedPermissionId).not.toBeNull();
+
+    harness.deferred.resolve("allow_session");
+    await expect(permittedPromise).resolves.toBe(true);
+    expect(harness.sessionRiskApproved.has("observe")).toBe(true);
+
+    harness.events.length = 0;
+    const nextPermitted = await requestToolPermission(harness.context, AGENT_TOOL_NAMES.FILE_READ, {
+      summary: "Read file",
+      rationale: "Same low-risk class",
+      details: "README.md",
     });
 
-    expect(permitted).toBe(true);
+    expect(nextPermitted).toBe(true);
     expect(harness.events).toEqual([]);
-    expect(harness.requestedPermissionId).toBeNull();
   });
 
   test("deny returns a denied result", async () => {

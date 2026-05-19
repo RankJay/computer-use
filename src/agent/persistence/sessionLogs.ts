@@ -1,7 +1,11 @@
 import { invoke } from "@tauri-apps/api/core";
 
 import { isTauriRuntime } from "@/agent/native/nativeBridge";
-import { TAURI_COMMAND } from "@/agent/native/tauriIpc";
+import {
+  TAURI_COMMAND,
+  type AppendSessionLogRequest,
+  type WriteSessionKeyframeRequest,
+} from "@/agent/native/tauriIpc";
 import type { AgentEvent } from "@/agent/types";
 
 export function eventForDiskLog(event: AgentEvent): Record<string, unknown> {
@@ -16,7 +20,8 @@ export function eventForDiskLog(event: AgentEvent): Record<string, unknown> {
 export async function appendSessionLogLine(sessionId: string, event: AgentEvent): Promise<void> {
   if (!isTauriRuntime()) return;
   const line = JSON.stringify(eventForDiskLog(event));
-  await invoke(TAURI_COMMAND.appendSessionLog, { sessionId, line });
+  const request: AppendSessionLogRequest = { sessionId, line };
+  await invoke(TAURI_COMMAND.appendSessionLog, request);
 }
 
 export async function persistKeyframePng(
@@ -25,11 +30,8 @@ export async function persistKeyframePng(
   pngBase64: string,
 ): Promise<void> {
   if (!isTauriRuntime()) return;
-  await invoke(TAURI_COMMAND.writeSessionKeyframe, {
-    sessionId,
-    filename,
-    pngBase64,
-  });
+  const request: WriteSessionKeyframeRequest = { sessionId, filename, pngBase64 };
+  await invoke(TAURI_COMMAND.writeSessionKeyframe, request);
 }
 
 export async function clearAllLogs(): Promise<void> {

@@ -164,13 +164,7 @@ pub fn write_session_keyframe(
     filename: String,
     png_base64: String,
 ) -> Result<String, String> {
-    let safe_name: String = filename
-        .chars()
-        .filter(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
-        .collect();
-    if safe_name.is_empty() {
-        return Err("invalid filename".into());
-    }
+    let safe_name = sanitize_keyframe_filename(&filename)?;
     let dir = session_dir(&app, &session_id)?.join("keyframes");
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     let path = dir.join(&safe_name);
@@ -219,18 +213,33 @@ pub fn open_logs_folder(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+fn sanitize_keyframe_filename(filename: &str) -> Result<String, String> {
+    let safe_name: String = filename
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
+        .collect();
+    if safe_name.is_empty() {
+        return Err("invalid filename".into());
+    }
+    Ok(safe_name)
+}
+
 fn prune_old_sessions(app: &AppHandle, retention_days: u32) -> Result<(), String> {
     let root = sessions_dir(app)?;
+    prune_old_sessions_at(&root, retention_days)
+}
+
+fn prune_old_sessions_at(root: &std::path::Path, retention_days: u32) -> Result<(), String> {
     if !root.exists() || retention_days == 0 {
         return Ok(());
     }
-    let cutoff = SystemTime::now()
+    let now_secs = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_err(|e| e.to_string())?
-        .as_secs()
-        .saturating_sub(retention_days as u64 * 86400);
+        .as_secs();
+    let cutoff = session_retention_cutoff(now_secs, retention_days);
 
-    let entries = fs::read_dir(&root).map_err(|e| e.to_string())?;
+    let entries = fs::read_dir(root).map_err(|e| e.to_string())?;
     for ent in entries.flatten() {
         let path = ent.path();
         let Ok(meta) = ent.metadata() else {
@@ -242,9 +251,111 @@ fn prune_old_sessions(app: &AppHandle, retention_days: u32) -> Result<(), String
             .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
             .map(|d| d.as_secs())
             .unwrap_or(0);
-        if modified < cutoff {
+        if is_session_dir_stale(modified, cutoff) {
             let _ = fs::remove_dir_all(&path);
         }
     }
     Ok(())
+}
+
+fn session_retention_cutoff(now_secs: u64, retention_days: u32) -> u64 {
+    now_secs.saturating_sub(retention_days as u64 * 86400)
+}
+
+fn is_session_dir_stale(modified_secs: u64, cutoff_secs: u64) -> bool {
+    modified_secs < cutoff_secs
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        is_session_dir_stale, prune_old_sessions_at, sanitize_keyframe_filename,
+        session_retention_cutoff, AppSettings, default_anthropic_model,
+    };
+    use std::fs;
+    use std::path::PathBuf;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn app_settings_serializes_camel_case() {
+        let settings = AppSettings::default();
+        let json = serde_json::to_value(&settings).expect("serialize settings");
+
+        assert_eq!(json["permissionMode"], "ask_risky");
+        assert_eq!(json["retentionDays"], 30);
+        assert_eq!(json["anthropicModelId"], default_anthropic_model());
+        assert_eq!(json["activeApiProvider"], "anthropic");
+        assert_eq!(json["uiAutomationEnabled"], false);
+    }
+
+    #[test]
+    fn app_settings_deserializes_legacy_model_id_alias() {
+        let raw = r#"{
+            "workspaceRoot": null,
+            "permissionMode": "ask_all",
+            "retentionDays": 7,
+            "modelId": "claude-sonnet-4-6",
+            "agentMode": "demo",
+            "persistedApprovals": [],
+            "uiAutomationEnabled": true
+        }"#;
+
+        let settings: AppSettings = serde_json::from_str(raw).expect("deserialize legacy settings");
+
+        assert_eq!(settings.anthropic_model_id, "claude-sonnet-4-6");
+        assert_eq!(settings.permission_mode, "ask_all");
+        assert_eq!(settings.retention_days, 7);
+        assert!(settings.ui_automation_enabled);
+    }
+
+    #[test]
+    fn sanitize_keyframe_filename_strips_unsafe_chars() {
+        let safe = sanitize_keyframe_filename("shot-01_final.png").expect("sanitize filename");
+
+        assert_eq!(safe, "shot-01_final.png");
+    }
+
+    #[test]
+    fn sanitize_keyframe_filename_rejects_empty_after_strip() {
+        let result = sanitize_keyframe_filename("!!!");
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn session_retention_cutoff_subtracts_days_in_seconds() {
+        let now = 10_000_000_u64;
+
+        assert_eq!(session_retention_cutoff(now, 30), now - 30 * 86400);
+        assert_eq!(session_retention_cutoff(now, 0), now);
+    }
+
+    #[test]
+    fn is_session_dir_stale_compares_modified_time_to_cutoff() {
+        assert!(is_session_dir_stale(100, 200));
+        assert!(!is_session_dir_stale(200, 200));
+        assert!(!is_session_dir_stale(300, 200));
+    }
+
+    fn temp_sessions_root() -> PathBuf {
+        let id = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock should be after epoch")
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!("actuate-store-test-{id}"));
+        fs::create_dir_all(&path).expect("create temp sessions root");
+        path
+    }
+
+    #[test]
+    fn prune_old_sessions_keeps_all_when_retention_is_zero() {
+        let root = temp_sessions_root();
+        let stale = root.join("old");
+        fs::create_dir_all(&stale).expect("create stale dir");
+
+        prune_old_sessions_at(&root, 0).expect("skip prune");
+
+        assert!(stale.exists());
+        let _ = fs::remove_dir_all(root);
+    }
 }

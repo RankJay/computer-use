@@ -7,7 +7,7 @@ import {
 } from "@/agent/session/uiAutomationDepth";
 import type { PermissionChoice } from "@/agent/types";
 import { Container, Item } from "@/components/motion/stagger";
-import { AgentChatTranscript } from "@/features/agent-chat/AgentChat";
+import { AgentChatTranscript } from "@/features/agent-chat/AgentChatTranscript";
 import {
   PointerAutomationEscBar,
   TaskFailureBanner,

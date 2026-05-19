@@ -39,6 +39,12 @@ function createRunnerOptions(
   };
 }
 
+async function loadBothApiKeys(id: string): Promise<string> {
+  if (id === SECRET_ANTHROPIC_API_KEY) return "anthropic-key";
+  if (id === SECRET_OPENAI_API_KEY) return "openai-key";
+  return "";
+}
+
 describe("sessionRunner", () => {
   test("runSelectedAgentSession chooses demo when settings request demo mode", async () => {
     const calls: string[] = [];
@@ -170,16 +176,11 @@ describe("sessionRunner", () => {
 
   test("live runner respects activeApiProvider when both keys exist", async () => {
     let received: LiveAgentSessionOptions | null = null;
-    const loadBoth = async (id: string) => {
-      if (id === SECRET_ANTHROPIC_API_KEY) return "anthropic-key";
-      if (id === SECRET_OPENAI_API_KEY) return "openai-key";
-      return "";
-    };
     const runner = createLiveAgentSessionRunner(
       {
         native: null,
         isTauriRuntime: false,
-        loadSecretKey: loadBoth,
+        loadSecretKey: loadBothApiKeys,
       },
       async (options) => {
         received = options;

@@ -12,7 +12,7 @@ export function consequenceRequiresPrompt(
 ): boolean {
   switch (mode) {
     case "session_low_risk":
-      return false;
+      return true;
     case "ask_all":
       return true;
     case "ask_risky":
