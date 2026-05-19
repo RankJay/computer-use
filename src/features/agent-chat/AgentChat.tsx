@@ -11,7 +11,6 @@ import {
 import {
   clipboardAdapter,
   COPIED_FEEDBACK_DURATION_MS,
-  STREAMING_ASSISTANT_COPY_ID,
 } from "@/features/agent-chat/clipboardAdapter";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -25,6 +24,8 @@ import {
   ShieldQuestion,
   Wrench,
 } from "lucide-react";
+import { Item } from "@/components/motion/stagger";
+import { StreamingAssistantText } from "@/features/agent-chat/StreamingAssistantText";
 
 const AgentMarkdown = lazy(async () => {
   const module = await import("@/features/agent-chat/AgentMarkdown");
@@ -33,7 +34,6 @@ const AgentMarkdown = lazy(async () => {
 
 export type AgentChatTranscriptProps = {
   readonly timeline: readonly AgentTimelineItem[];
-  readonly assistantStream: string;
   readonly canRegenerateAssistant: boolean;
   readonly onRegenerateAssistant: () => void;
 };
@@ -51,7 +51,7 @@ export function AgentChatTranscript(props: AgentChatTranscriptProps): ReactEleme
 
   useLayoutEffect(() => {
     anchorRef.current?.scrollIntoView({ block: "end", behavior: "auto" });
-  }, [props.timeline, props.assistantStream]);
+  }, [props.timeline]);
 
   useEffect(() => {
     return () => {
@@ -111,10 +111,15 @@ export function AgentChatTranscript(props: AgentChatTranscriptProps): ReactEleme
             return (
               <AssistantBlock
                 key={item.id}
+                messageId={item.id}
                 copyControl={createCopyControl(item.id, item.text)}
+                isStreaming={item.status === "streaming"}
                 markdown={item.text}
                 onRegenerate={
-                  props.canRegenerateAssistant && last?.kind === "assistant" && last.id === item.id
+                  props.canRegenerateAssistant &&
+                  last?.kind === "assistant" &&
+                  last.id === item.id &&
+                  item.status === "complete"
                     ? props.onRegenerateAssistant
                     : undefined
                 }
@@ -126,15 +131,6 @@ export function AgentChatTranscript(props: AgentChatTranscriptProps): ReactEleme
           }
         }
       })}
-
-      {props.assistantStream.trim() !== "" && (
-        <div className="w-full">
-          <StreamingAssistantBlock
-            copyControl={createCopyControl(STREAMING_ASSISTANT_COPY_ID, props.assistantStream)}
-            text={props.assistantStream}
-          />
-        </div>
-      )}
 
       <div ref={anchorRef} aria-hidden />
     </div>
@@ -234,30 +230,26 @@ function activityStepDescription(row: AgentActivityRow): ReactElement | string |
 }
 
 function AssistantBlock(props: {
+  readonly messageId: string;
   readonly markdown: string;
+  readonly isStreaming: boolean;
   readonly copyControl: CopyControl;
   readonly onRegenerate?: () => void;
 }): ReactElement {
   return (
     <div className="w-full space-y-2 mb-8 px-3">
-      <div className="text-sm wrap-break-word text-[#fefefe]">
-        <AssistantMarkdown markdown={props.markdown} />
+      <div
+        className={`text-sm wrap-break-word ${props.isStreaming ? "text-[#B7C1CC]" : "text-[#fefefe]"}`}
+      >
+        {props.isStreaming ? (
+          <StreamingAssistantText key={props.messageId} text={props.markdown} />
+        ) : (
+          <AssistantMarkdown markdown={props.markdown} />
+        )}
       </div>
-      {/* <AssistantToolbar copyControl={props.copyControl} onRegenerate={props.onRegenerate} /> */}
-    </div>
-  );
-}
-
-function StreamingAssistantBlock(props: {
-  readonly text: string;
-  readonly copyControl: CopyControl;
-}): ReactElement {
-  return (
-    <div className="space-y-2 px-3 mb-4">
-      <div className="text-sm wrap-break-word text-[#B7C1CC]">
-        <AssistantMarkdown markdown={props.text} />
-      </div>
-      <AssistantToolbar copyControl={props.copyControl} />
+      {!props.isStreaming && (
+        <AssistantToolbar copyControl={props.copyControl} onRegenerate={props.onRegenerate} />
+      )}
     </div>
   );
 }

@@ -1,5 +1,4 @@
 export const COPIED_FEEDBACK_DURATION_MS = 2200;
-export const STREAMING_ASSISTANT_COPY_ID = "assistant-stream";
 
 export type NavigatorClipboardWriter = {
   readonly writeText: (text: string) => Promise<void>;

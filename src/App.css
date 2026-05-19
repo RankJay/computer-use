@@ -91,6 +91,14 @@ button {
   outline: none;
 }
 
+textarea {
+  field-sizing: content;
+  min-height: 1lh;
+  max-height: 3lh;
+  resize: none;
+  white-space: pre-wrap;
+}
+
 #greet-input {
   margin-right: 5px;
 }

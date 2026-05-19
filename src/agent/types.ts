@@ -29,7 +29,13 @@ export type AgentPendingPermission = {
 
 export type AgentTimelineItem =
   | { id: string; at: number; kind: "user"; text: string }
-  | { id: string; at: number; kind: "assistant"; text: string }
+  | {
+      id: string;
+      at: number;
+      kind: "assistant";
+      text: string;
+      status: "streaming" | "complete";
+    }
   | {
       id: string;
       at: number;

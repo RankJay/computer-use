@@ -2,7 +2,6 @@ import { describe, expect, test } from "bun:test";
 import {
   applyAssistantStreamEvent,
   trimLastAssistantMessage,
-  type AssistantStreamAssembly,
 } from "./streamingAssembly";
 import type { AgentEvent, AgentTimelineItem } from "@/agent/types";
 
@@ -12,138 +11,119 @@ function baseEvent(id: string): Pick<AgentEvent, "id" | "at" | "taskId"> {
   return { id, at: 1000, taskId };
 }
 
-function emptyAssembly(): AssistantStreamAssembly {
-  return {
-    timeline: [],
-    assistantStream: "",
-  };
-}
-
 describe("streamingAssembly", () => {
-  test("one delta updates the active assistant stream", () => {
-    const assembly = applyAssistantStreamEvent(emptyAssembly(), {
+  test("one delta creates a streaming assistant timeline row", () => {
+    const timeline = applyAssistantStreamEvent([], {
       ...baseEvent("delta-1"),
       type: "assistant.text.delta",
       text: "Hello",
     });
 
-    expect(assembly.assistantStream).toBe("Hello");
-    expect(assembly.timeline).toEqual([]);
+    expect(timeline).toEqual([
+      {
+        id: "delta-1",
+        at: 1000,
+        kind: "assistant",
+        text: "Hello",
+        status: "streaming",
+      },
+    ]);
   });
 
-  test("multiple deltas concatenate in order", () => {
-    let assembly = emptyAssembly();
-
-    assembly = applyAssistantStreamEvent(assembly, {
+  test("multiple deltas append to the same streaming row", () => {
+    let timeline = applyAssistantStreamEvent([], {
       ...baseEvent("delta-1"),
       type: "assistant.text.delta",
       text: "Hello ",
     });
-    assembly = applyAssistantStreamEvent(assembly, {
+    timeline = applyAssistantStreamEvent(timeline, {
       ...baseEvent("delta-2"),
       type: "assistant.text.delta",
       text: "there",
     });
 
-    expect(assembly.assistantStream).toBe("Hello there");
+    expect(timeline).toEqual([
+      {
+        id: "delta-1",
+        at: 1000,
+        kind: "assistant",
+        text: "Hello there",
+        status: "streaming",
+      },
+    ]);
   });
 
-  test("done flushes one trimmed assistant timeline row", () => {
-    let assembly = emptyAssembly();
-
-    assembly = applyAssistantStreamEvent(assembly, {
+  test("done finalizes one trimmed assistant timeline row", () => {
+    let timeline = applyAssistantStreamEvent([], {
       ...baseEvent("delta-1"),
       type: "assistant.text.delta",
       text: " Done. ",
     });
-    assembly = applyAssistantStreamEvent(assembly, {
+    timeline = applyAssistantStreamEvent(timeline, {
       ...baseEvent("done-1"),
       type: "assistant.text.done",
     });
 
-    expect(assembly.timeline).toEqual([
-      { id: "done-1", at: 1000, kind: "assistant", text: "Done." },
+    expect(timeline).toEqual([
+      { id: "done-1", at: 1000, kind: "assistant", text: "Done.", status: "complete" },
     ]);
   });
 
-  test("done clears the active assistant stream", () => {
-    let assembly = emptyAssembly();
-
-    assembly = applyAssistantStreamEvent(assembly, {
-      ...baseEvent("delta-1"),
-      type: "assistant.text.delta",
-      text: "Done.",
-    });
-    assembly = applyAssistantStreamEvent(assembly, {
-      ...baseEvent("done-1"),
-      type: "assistant.text.done",
-    });
-
-    expect(assembly.assistantStream).toBe("");
-  });
-
   test("done without deltas does not create a blank assistant row", () => {
-    const assembly = applyAssistantStreamEvent(emptyAssembly(), {
+    const timeline = applyAssistantStreamEvent([], {
       ...baseEvent("done-1"),
       type: "assistant.text.done",
     });
 
-    expect(assembly.assistantStream).toBe("");
-    expect(assembly.timeline).toEqual([]);
+    expect(timeline).toEqual([]);
   });
 
   test("a second delta and done cycle creates a second assistant row", () => {
-    let assembly = emptyAssembly();
-
-    assembly = applyAssistantStreamEvent(assembly, {
+    let timeline = applyAssistantStreamEvent([], {
       ...baseEvent("delta-1"),
       type: "assistant.text.delta",
       text: "First",
     });
-    assembly = applyAssistantStreamEvent(assembly, {
+    timeline = applyAssistantStreamEvent(timeline, {
       ...baseEvent("done-1"),
       type: "assistant.text.done",
     });
-    assembly = applyAssistantStreamEvent(assembly, {
+    timeline = applyAssistantStreamEvent(timeline, {
       ...baseEvent("delta-2"),
       type: "assistant.text.delta",
       text: "Second",
     });
-    assembly = applyAssistantStreamEvent(assembly, {
+    timeline = applyAssistantStreamEvent(timeline, {
       ...baseEvent("done-2"),
       type: "assistant.text.done",
     });
 
-    expect(assembly.timeline).toEqual([
-      { id: "done-1", at: 1000, kind: "assistant", text: "First" },
-      { id: "done-2", at: 1000, kind: "assistant", text: "Second" },
+    expect(timeline).toEqual([
+      { id: "done-1", at: 1000, kind: "assistant", text: "First", status: "complete" },
+      { id: "done-2", at: 1000, kind: "assistant", text: "Second", status: "complete" },
     ]);
   });
 
-  test("trim removes trailing assistant rows and clears the active stream", () => {
+  test("trim removes trailing assistant rows", () => {
     const userItem: AgentTimelineItem = { id: "user-1", at: 900, kind: "user", text: "Prompt" };
     const firstAssistant: AgentTimelineItem = {
       id: "assistant-1",
       at: 1000,
       kind: "assistant",
       text: "First",
+      status: "complete",
     };
     const secondAssistant: AgentTimelineItem = {
       id: "assistant-2",
       at: 1100,
       kind: "assistant",
       text: "Second",
+      status: "streaming",
     };
 
-    const assembly = trimLastAssistantMessage({
-      timeline: [userItem, firstAssistant, secondAssistant],
-      assistantStream: "Partial",
-    });
+    const timeline = trimLastAssistantMessage([userItem, firstAssistant, secondAssistant]);
 
-    expect(assembly).toEqual({
-      timeline: [userItem],
-      assistantStream: "",
-    });
+    expect(timeline).toEqual([userItem]);
   });
 
   test("trim removes the assistant activity block before regeneration", () => {
@@ -161,13 +141,11 @@ describe("streamingAssembly", () => {
       at: 1000,
       kind: "assistant",
       text: "Answer",
+      status: "complete",
     };
 
-    const assembly = trimLastAssistantMessage({
-      timeline: [userItem, activityItem, assistantItem],
-      assistantStream: "",
-    });
+    const timeline = trimLastAssistantMessage([userItem, activityItem, assistantItem]);
 
-    expect(assembly.timeline).toEqual([userItem]);
+    expect(timeline).toEqual([userItem]);
   });
 });

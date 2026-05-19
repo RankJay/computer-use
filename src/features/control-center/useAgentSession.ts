@@ -130,7 +130,6 @@ export function useAgentSession() {
     status: projection.status,
     events: projection.events,
     timeline: projection.timeline,
-    assistantStream: projection.assistantStream,
     currentPlan: projection.currentPlan,
     currentStep: projection.currentStep,
     lastSummary: projection.lastSummary,

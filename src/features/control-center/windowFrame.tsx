@@ -3,8 +3,30 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Minimize2 } from "lucide-react";
-import type { MouseEvent, ReactElement } from "react";
+import type { ComponentProps, MouseEvent, ReactElement } from "react";
 import { useCallback } from "react";
+
+/** Title-bar icon controls: no bg hover, no click shift — feedback on the SVG only. */
+export const chromeIconButtonClassName =
+  "size-8 shrink-0 cursor-pointer group [-webkit-app-region:no-drag]";
+
+export const chromeIconSvgClassName =
+  "size-4 text-[#3F3F3F] transition-[color,transform] duration-150 group-hover:text-[#9c9c9c] group-active:scale-[0.88] group-active:text-[#aeaeae]";
+
+export function ChromeIconButton({
+  className,
+  ...props
+}: ComponentProps<typeof Button>): ReactElement {
+  return (
+    <Button
+      type="button"
+      size="icon"
+      variant="chromeIcon"
+      className={cn(chromeIconButtonClassName, className)}
+      {...props}
+    />
+  );
+}
 
 async function minimizeActuateWindow(): Promise<void> {
   if (!isTauriRuntime()) return;
@@ -37,19 +59,12 @@ export function MinimizeWindowButton(): ReactElement {
   }, []);
 
   return (
-    <Button
-      type="button"
-      size="icon"
-      variant="ghost"
-      className="size-8 bg-transparent hover:bg-transparent cursor-pointer shrink-0 group [-webkit-app-region:no-drag]"
+    <ChromeIconButton
       aria-label="Minimize to taskbar"
       title="Minimize (app keeps running; use the tray menu to exit)"
       onClick={handleMinimizeClick}
     >
-      <Minimize2
-        className="size-4 text-[#3F3F3F] group-hover:text-[#9c9c9c] transition-colors"
-        strokeWidth={2.5}
-      />
-    </Button>
+      <Minimize2 className={chromeIconSvgClassName} strokeWidth={2.5} />
+    </ChromeIconButton>
   );
 }

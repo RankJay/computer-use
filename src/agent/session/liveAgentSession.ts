@@ -1,7 +1,7 @@
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAI } from "@ai-sdk/openai";
 import { fetch as tauriHttpFetch } from "@tauri-apps/plugin-http";
-import { stepCountIs, streamText } from "ai";
+import { smoothStream, stepCountIs, streamText } from "ai";
 import type { LiveAgentToolContext } from "@/agent/agentSessionContext";
 import { createActuateTools } from "@/agent/tools/actuateTools";
 import { describeRuntimeCapabilities, getHostOsKind } from "@/agent/hostEnvironment";
@@ -26,6 +26,12 @@ async function appendStructuredLog(taskId: string, event: AgentEvent): Promise<v
     await persistKeyframePng(taskId, fn, event.imageBase64);
   }
 }
+
+/** Buffers provider bursts and releases word-sized chunks with a steady cadence. */
+const assistantTextStreamTransform = smoothStream({
+  chunking: "word",
+  delayInMs: 24,
+});
 
 export async function runLiveAgentSession(options: LiveAgentSessionOptions): Promise<void> {
   const {
@@ -112,6 +118,7 @@ ${prompt}`;
   try {
     const result = streamText({
       model: languageModel,
+      experimental_transform: assistantTextStreamTransform,
       system: [
         "You are Actuate, a local desktop agent. Prefer tools over guessing for machine-local state (files, terminal, what is on screen) when that state is required to answer.",
         "Answer concisely in natural language.",

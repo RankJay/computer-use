@@ -22,7 +22,12 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { useAgentSessionContext } from "@/features/control-center/AgentSessionProvider";
-import { MinimizeWindowButton, TitleBarDragRegion } from "@/features/control-center/windowFrame";
+import {
+  ChromeIconButton,
+  chromeIconSvgClassName,
+  MinimizeWindowButton,
+  TitleBarDragRegion,
+} from "@/features/control-center/windowFrame";
 import { PERMISSION_MODE_LABELS } from "@/agent/toolContract";
 import { ANTHROPIC_MODEL_OPTIONS, OPENAI_MODEL_OPTIONS } from "@/agent/llm/modelCatalog";
 import { resolveEffectiveProvider } from "@/agent/llm/resolveEffectiveProvider";
@@ -125,20 +130,14 @@ export function SettingsPage() {
 
   const storageHint = isDesktop ? "OS keychain" : "browser localStorage";
 
-  const backButtonClassName =
-    "size-8 shrink-0 bg-transparent hover:bg-transparent cursor-pointer group [-webkit-app-region:no-drag]";
-
   return (
     <div className="box-border flex h-full min-h-dvh w-full flex-col gap-0 overflow-hidden rounded-none border-0 bg-[#0E0E0E] p-2 text-[#cdcdcd] shadow-none ring-0">
       <header className="relative flex min-h-[44px] shrink-0 select-none items-center gap-2 border-b border-white/6 px-2">
-        <Button type="button" size="icon" variant="ghost" className={backButtonClassName} asChild>
+        <ChromeIconButton asChild>
           <Link to="/" aria-label="Back to home">
-            <ArrowLeft
-              className="size-4 text-[#3F3F3F] group-hover:text-[#9c9c9c] transition-colors"
-              strokeWidth={2}
-            />
+            <ArrowLeft className={chromeIconSvgClassName} strokeWidth={2} />
           </Link>
-        </Button>
+        </ChromeIconButton>
         <h1 className="shrink-0 text-base font-medium tracking-tight text-[#eaeaea] [-webkit-app-region:no-drag]">
           Settings
         </h1>

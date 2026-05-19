@@ -15,6 +15,7 @@ import { useAgentSessionContext } from "@/features/control-center/AgentSessionPr
 import { TaskPromptComposer } from "@/features/control-center/TaskPromptComposer";
 import { WindowChrome } from "@/features/control-center/WindowChrome";
 import { useCallback, useMemo, useState } from "react";
+import { Container, Item } from "@/components/motion/stagger";
 
 const BROWSER_SAMPLE_PROMPT =
   "Use workspace.inspect on the workspace root, then read preset/actuate-sample.txt and summarize it in a few sentences.";
@@ -54,26 +55,25 @@ export function ControlCenter() {
       <WindowChrome />
 
       <div className="flex min-h-0 flex-1 flex-col gap-2">
-        <div className="flex min-h-0 flex-1 flex-col gap-2 scrollbar-none">
+        <Container className="flex min-h-0 flex-1 flex-col gap-2 scrollbar-none">
           {!agent.capabilities.hasConversation && (
-            <div className="flex flex-col flex-1 pt-48 px-2">
-              <span className="max-w-sm text-2xl font-medium mb-2 text-[#414141] tracking-tight">
+            <div className="flex flex-col flex-1 pt-48 px-4">
+              <Item className="max-w-sm text-2xl font-medium mb-2 text-[#414141] tracking-tight">
                 Welcome to actuate.
-              </span>
-              <span className="max-w-sm text-2xl font-medium tracking-tight text-[#CDCDCD]">
+              </Item>
+              <Item className="max-w-sm text-2xl font-medium tracking-tight text-[#CDCDCD]">
                 Ready to break some big tasks today?
-              </span>
+              </Item>
             </div>
           )}
           {agent.capabilities.hasConversation && (
             <AgentChatTranscript
-              assistantStream={agent.assistantStream}
               canRegenerateAssistant={agent.capabilities.canRegenerateAssistant}
               onRegenerateAssistant={agent.regenerateLastAssistant}
               timeline={agent.timeline}
             />
           )}
-        </div>
+        </Container>
         <AgentEventLog rows={agent.eventLogRows} />
         <PointerAutomationEscBar
           escArmActive={isTauriRuntime() && uiAutomationBusy}

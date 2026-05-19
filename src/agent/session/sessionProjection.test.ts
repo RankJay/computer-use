@@ -52,7 +52,7 @@ describe("sessionProjection", () => {
     expect(projection.capabilities.taskInputDisabled).toBe(true);
   });
 
-  test("assistant deltas accumulate in assistantStream", () => {
+  test("assistant deltas update the streaming assistant timeline row", () => {
     let projection = applyAgentEvent(createInitialAgentProjection(), createdEvent());
 
     projection = applyAgentEvent(projection, {
@@ -66,10 +66,18 @@ describe("sessionProjection", () => {
       text: "there",
     });
 
-    expect(projection.assistantStream).toBe("Hello there");
+    expect(projection.timeline).toEqual([
+      {
+        id: "delta-1",
+        at: 1000,
+        kind: "assistant",
+        text: "Hello there",
+        status: "streaming",
+      },
+    ]);
   });
 
-  test("assistant.text.done flushes one assistant timeline item and clears stream", () => {
+  test("assistant.text.done finalizes the assistant timeline item", () => {
     let projection = createInitialAgentProjection();
     projection = applyAgentEvent(projection, {
       ...baseEvent("delta-1"),
@@ -81,9 +89,8 @@ describe("sessionProjection", () => {
       type: "assistant.text.done",
     });
 
-    expect(projection.assistantStream).toBe("");
     expect(projection.timeline).toEqual([
-      { id: "done-1", at: 1000, kind: "assistant", text: "Done." },
+      { id: "done-1", at: 1000, kind: "assistant", text: "Done.", status: "complete" },
     ]);
   });
 
@@ -132,9 +139,8 @@ describe("sessionProjection", () => {
     });
 
     expect(projection.status).toBe("failed");
-    expect(projection.assistantStream).toBe("");
     expect(projection.timeline).toEqual([
-      expect.objectContaining({ kind: "assistant", text: "Partial answer" }),
+      expect.objectContaining({ kind: "assistant", text: "Partial answer", status: "complete" }),
     ]);
   });
 
@@ -159,12 +165,12 @@ describe("sessionProjection", () => {
     expect(projection.timeline[1]).toMatchObject({
       kind: "assistant",
       text: "Let me check the machine.",
+      status: "complete",
     });
     expect(projection.timeline[2]).toMatchObject({
       kind: "activity",
       rows: [expect.objectContaining({ title: "Running terminal.run", detail: "bun test" })],
     });
-    expect(projection.assistantStream).toBe("");
   });
 
   test("permission request and resolution update pending permission state", () => {
@@ -221,7 +227,7 @@ describe("sessionProjection", () => {
           },
         ],
       },
-      { id: "done-1", at: 1000, kind: "assistant", text: "Done." },
+      { id: "done-1", at: 1000, kind: "assistant", text: "Done.", status: "complete" },
     ]);
   });
 
@@ -250,6 +256,7 @@ describe("sessionProjection", () => {
       at: 1000,
       kind: "assistant",
       text: "Answer",
+      status: "complete",
     };
 
     const idle = createInitialAgentProjection();

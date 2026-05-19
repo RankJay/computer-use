@@ -5,7 +5,7 @@ import remarkGfm from "remark-gfm";
 
 const markdownComponents: Components = {
   p: ({ children }) => (
-    <p className="mb-1.5 font-light text-inherit last:mb-0 wrap-break-word [&:has(+blockquote)]:mb-2">
+    <p className="mb-1.5 font-light tracking-[0.003em] text-inherit last:mb-0 wrap-break-word [&:has(+blockquote)]:mb-2">
       {children}
     </p>
   ),
