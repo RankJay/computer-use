@@ -1,5 +1,5 @@
-import type { AgentEvent } from "@/agent/types";
 import { AGENT_TOOL_NAMES } from "@/agent/toolContract";
+import type { AgentEvent } from "@/agent/types";
 
 const POINTER_TOOLS = new Set<string>([
   AGENT_TOOL_NAMES.POINTER_MOVE,

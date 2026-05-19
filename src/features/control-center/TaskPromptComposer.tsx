@@ -1,7 +1,8 @@
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { ArrowUp } from "lucide-react";
 import type { FormEvent, KeyboardEvent, ReactElement } from "react";
+
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 
 export type TaskPromptComposerProps = {
   readonly value: string;

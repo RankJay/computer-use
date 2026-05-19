@@ -1,5 +1,6 @@
 import { tool, zodSchema } from "ai";
 import { z } from "zod";
+
 import type { LiveAgentToolContext } from "@/agent/agentSessionContext";
 import { terminalRunGuidanceForOs } from "@/agent/hostEnvironment";
 import { requestToolPermission } from "@/agent/permissions/permissionOrchestrator";

@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, test } from "bun:test";
+
+import type { AppSettingsPayload } from "@/agent/native/tauriIpc";
 import {
   DEFAULT_APP_SETTINGS,
   loadAppSettings,
@@ -6,7 +8,6 @@ import {
   settingsForRuntime,
   settingsOrDefault,
 } from "@/agent/persistence/settingsPersistence";
-import type { AppSettingsPayload } from "@/agent/native/tauriIpc";
 import { BROWSER_SAMPLE_WORKSPACE_ROOT } from "@/agent/workspace/browserWorkspace";
 
 class MemoryStorage implements Storage {

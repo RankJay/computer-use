@@ -1,8 +1,9 @@
-import type { ReactElement } from "react";
-import { Button } from "@/components/ui/button";
-import type { AgentPendingPermission, PermissionChoice } from "@/agent/types";
-import { PERMISSION_CHOICE_LABELS } from "@/agent/toolContract";
 import { ShieldAlert } from "lucide-react";
+import type { ReactElement } from "react";
+
+import { PERMISSION_CHOICE_LABELS } from "@/agent/toolContract";
+import type { AgentPendingPermission, PermissionChoice } from "@/agent/types";
+import { Button } from "@/components/ui/button";
 
 const CHOICE_ORDER: PermissionChoice[] = ["allow_once", "allow_session", "allow_always", "deny"];
 

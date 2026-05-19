@@ -1,12 +1,13 @@
+import { Settings2 } from "lucide-react";
+import type { ReactElement } from "react";
+import { Link } from "react-router-dom";
+
 import {
   ChromeIconButton,
   chromeIconSvgClassName,
   MinimizeWindowButton,
   TitleBarDragRegion,
 } from "@/features/control-center/windowFrame";
-import { Settings2 } from "lucide-react";
-import type { ReactElement } from "react";
-import { Link } from "react-router-dom";
 
 export function WindowChrome(): ReactElement {
   return (

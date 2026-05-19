@@ -1,9 +1,9 @@
+import { joinStreamingText } from "@/agent/session/streamingTextJoin";
 import type {
   AgentTimelineItem,
   AssistantTextDeltaEvent,
   AssistantTextDoneEvent,
 } from "@/agent/types";
-import { joinStreamingText } from "@/agent/session/streamingTextJoin";
 
 export type AssistantStreamEvent = AssistantTextDeltaEvent | AssistantTextDoneEvent;
 
@@ -43,10 +43,7 @@ export function applyAssistantStreamEvent(
         return timeline.slice(0, -1);
       }
 
-      return [
-        ...timeline.slice(0, -1),
-        { ...last, id: event.id, text, status: "complete" },
-      ];
+      return [...timeline.slice(0, -1), { ...last, id: event.id, text, status: "complete" }];
     }
     default: {
       const _never: never = event;

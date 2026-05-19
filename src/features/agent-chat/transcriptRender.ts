@@ -23,10 +23,7 @@ export type TranscriptAssistantTextPart = {
 export type TranscriptAssistantTurnItem = {
   readonly kind: "assistant-turn";
   readonly id: string;
-  readonly parts: readonly (
-    | TranscriptAssistantTextPart
-    | TranscriptActivityItem
-  )[];
+  readonly parts: readonly (TranscriptAssistantTextPart | TranscriptActivityItem)[];
   readonly copyText: string;
   readonly isStreaming: boolean;
 };
@@ -162,7 +159,9 @@ function pushAssistantTextPart(
   parts.push({ kind: "text", text, isStreaming });
 }
 
-function toActivityItem(item: Extract<AgentTimelineItem, { kind: "activity" }>): TranscriptActivityItem {
+function toActivityItem(
+  item: Extract<AgentTimelineItem, { kind: "activity" }>,
+): TranscriptActivityItem {
   return {
     kind: "activity",
     id: item.id,

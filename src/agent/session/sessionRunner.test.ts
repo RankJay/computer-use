@@ -1,17 +1,18 @@
 import { describe, expect, test } from "bun:test";
-import { BROWSER_SAMPLE_WORKSPACE_ROOT } from "@/agent/workspace/browserWorkspace";
-import type { LiveAgentSessionOptions } from "@/agent/session/liveAgentSession";
+
 import type { AgentNativeBridge } from "@/agent/native/nativeBridge";
+import type { AppSettingsPayload } from "@/agent/native/tauriIpc";
+import { DEFAULT_APP_SETTINGS } from "@/agent/persistence/settingsPersistence";
+import { SECRET_ANTHROPIC_API_KEY, SECRET_OPENAI_API_KEY } from "@/agent/secrets";
+import type { LiveAgentSessionOptions } from "@/agent/session/liveAgentSession";
 import {
   createLiveAgentSessionRunner,
   resolveAgentWorkspaceRoot,
   runSelectedAgentSession,
   type AgentSessionRunnerOptions,
 } from "@/agent/session/sessionRunner";
-import type { AppSettingsPayload } from "@/agent/native/tauriIpc";
 import type { AgentEvent } from "@/agent/types";
-import { DEFAULT_APP_SETTINGS } from "@/agent/persistence/settingsPersistence";
-import { SECRET_ANTHROPIC_API_KEY, SECRET_OPENAI_API_KEY } from "@/agent/secrets";
+import { BROWSER_SAMPLE_WORKSPACE_ROOT } from "@/agent/workspace/browserWorkspace";
 
 function createSettings(patch: Partial<AppSettingsPayload> = {}): AppSettingsPayload {
   return {

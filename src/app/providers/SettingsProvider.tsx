@@ -1,13 +1,3 @@
-import type { AgentToolName } from "@/agent/toolContract";
-import { isTauriRuntime } from "@/agent/native/nativeBridge";
-import {
-  loadAppSettings,
-  saveAppSettings,
-  settingsForRuntime,
-  settingsOrDefault,
-} from "@/agent/persistence/settingsPersistence";
-import type { AppSettingsPayload } from "@/agent/native/tauriIpc";
-import { parsePermissionMode, type PermissionMode } from "@/agent/types";
 import {
   createContext,
   useCallback,
@@ -17,6 +7,17 @@ import {
   useState,
   type ReactNode,
 } from "react";
+
+import { isTauriRuntime } from "@/agent/native/nativeBridge";
+import type { AppSettingsPayload } from "@/agent/native/tauriIpc";
+import {
+  loadAppSettings,
+  saveAppSettings,
+  settingsForRuntime,
+  settingsOrDefault,
+} from "@/agent/persistence/settingsPersistence";
+import type { AgentToolName } from "@/agent/toolContract";
+import { parsePermissionMode, type PermissionMode } from "@/agent/types";
 
 type SettingsContextValue = {
   ready: boolean;

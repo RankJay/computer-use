@@ -1,12 +1,14 @@
-﻿import {
+﻿import { useCallback, useMemo, useState } from "react";
+
+import { isTauriRuntime } from "@/agent/native/nativeBridge";
+import {
   countOpenPointerTools,
   countOpenUiAutomationTools,
 } from "@/agent/session/uiAutomationDepth";
-import { isTauriRuntime } from "@/agent/native/nativeBridge";
 import type { PermissionChoice } from "@/agent/types";
+import { Container, Item } from "@/components/motion/stagger";
 import { AgentChatTranscript } from "@/features/agent-chat/AgentChat";
 import {
-  AgentEventLog,
   PointerAutomationEscBar,
   TaskFailureBanner,
 } from "@/features/agent-chat/AgentSessionPanels";
@@ -14,8 +16,6 @@ import { PermissionPrompt } from "@/features/agent-chat/PermissionPrompt";
 import { useAgentSessionContext } from "@/features/control-center/AgentSessionProvider";
 import { TaskPromptComposer } from "@/features/control-center/TaskPromptComposer";
 import { WindowChrome } from "@/features/control-center/WindowChrome";
-import { useCallback, useMemo, useState } from "react";
-import { Container, Item } from "@/components/motion/stagger";
 
 const BROWSER_SAMPLE_PROMPT =
   "Use workspace.inspect on the workspace root, then read preset/actuate-sample.txt and summarize it in a few sentences.";
@@ -71,13 +71,10 @@ export function ControlCenter() {
               canRegenerateAssistant={agent.capabilities.canRegenerateAssistant}
               onRegenerateAssistant={agent.regenerateLastAssistant}
               timeline={agent.timeline}
-              isRunActive={
-                agent.status === "running" || agent.status === "awaiting_permission"
-              }
+              isRunActive={agent.status === "running" || agent.status === "awaiting_permission"}
             />
           )}
         </Container>
-        <AgentEventLog rows={agent.eventLogRows} />
         <PointerAutomationEscBar
           escArmActive={isTauriRuntime() && uiAutomationBusy}
           pointerBusy={pointerAutomationBusy}

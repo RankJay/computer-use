@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { buildTranscriptRenderItems } from "./transcriptRender";
+
 import type { AgentTimelineItem } from "@/agent/types";
+
+import { buildTranscriptRenderItems } from "./transcriptRender";
 
 describe("buildTranscriptRenderItems", () => {
   test("merges consecutive assistant rows without activity into one turn", () => {

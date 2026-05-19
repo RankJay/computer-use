@@ -1,20 +1,15 @@
 import {
+  applyAssistantStreamEvent,
+  finalizeStreamingAssistant,
+  trimLastAssistantMessage,
+} from "@/agent/session/streamingAssembly";
+import {
   type AgentActivityRow,
   type AgentEvent,
   type AgentPendingPermission,
   type AgentRunStatus,
   type AgentTimelineItem,
 } from "@/agent/types";
-import {
-  applyAssistantStreamEvent,
-  finalizeStreamingAssistant,
-  trimLastAssistantMessage,
-} from "@/agent/session/streamingAssembly";
-
-export type AgentEventLogRow = {
-  readonly id: string;
-  readonly title: string;
-};
 
 export type AgentSessionCapabilities = {
   readonly canStartRun: boolean;
@@ -27,12 +22,8 @@ export type AgentSessionProjection = {
   readonly status: AgentRunStatus;
   readonly events: readonly AgentEvent[];
   readonly timeline: readonly AgentTimelineItem[];
-  readonly currentPlan: readonly string[];
-  readonly currentStep: string | null;
-  readonly lastSummary: string | null;
   readonly failureMessage: string | null;
   readonly pendingPermission: AgentPendingPermission | null;
-  readonly eventLogRows: readonly AgentEventLogRow[];
   readonly capabilities: AgentSessionCapabilities;
 };
 
@@ -40,9 +31,6 @@ type MutableProjection = {
   readonly status: AgentRunStatus;
   readonly events: readonly AgentEvent[];
   readonly timeline: readonly AgentTimelineItem[];
-  readonly currentPlan: readonly string[];
-  readonly currentStep: string | null;
-  readonly lastSummary: string | null;
   readonly failureMessage: string | null;
   readonly pendingPermission: AgentPendingPermission | null;
 };
@@ -67,9 +55,6 @@ export function createInitialAgentProjection(): AgentSessionProjection {
     status: "idle",
     events: [],
     timeline: [],
-    currentPlan: [],
-    currentStep: null,
-    lastSummary: null,
     failureMessage: null,
     pendingPermission: null,
   });
@@ -88,9 +73,6 @@ export function beginAgentRun(
       options.userTimelineItem === null
         ? prev.timeline
         : [...prev.timeline, options.userTimelineItem],
-    currentPlan: [],
-    currentStep: null,
-    lastSummary: null,
     failureMessage: null,
     pendingPermission: null,
   });
@@ -115,7 +97,6 @@ export function applyAgentEvent(
         ...prev,
         events,
         timeline: appendActivityRow(timeline, event.taskId, activityRowFromEvent(event)),
-        currentPlan: event.steps,
       });
     }
     case "step.started": {
@@ -125,7 +106,6 @@ export function applyAgentEvent(
         events,
         status: "running",
         timeline: appendActivityRow(timeline, event.taskId, activityRowFromEvent(event)),
-        currentStep: event.title,
       });
     }
     case "step.completed":
@@ -184,8 +164,6 @@ export function applyAgentEvent(
         events,
         status: "completed",
         timeline: setActivityStatus(timeline, event.taskId, "completed"),
-        currentStep: null,
-        lastSummary: event.summary,
       });
     }
     case "task.failed": {
@@ -195,7 +173,6 @@ export function applyAgentEvent(
         events,
         status: "failed",
         timeline: setActivityStatus(timeline, event.taskId, "failed"),
-        currentStep: null,
         failureMessage: event.message,
       });
     }
@@ -229,57 +206,14 @@ export function findLastUserPrompt(projection: AgentSessionProjection): string |
   return null;
 }
 
-export function formatAgentEventTitle(event: AgentEvent): string {
-  switch (event.type) {
-    case "task.created":
-      return "Task created";
-    case "plan.updated":
-      return "Plan updated";
-    case "step.started":
-      return `Step started: ${event.title}`;
-    case "step.completed":
-      return `Step completed (${event.stepIndex})`;
-    case "permission.requested":
-      return "Permission requested";
-    case "permission.resolved":
-      return `Permission resolved (${event.choice})`;
-    case "tool.started":
-      return `Tool started: ${event.toolName}`;
-    case "tool.completed":
-      return `Tool completed: ${event.toolName}`;
-    case "screenshot.keyframe":
-      return `Screenshot: ${event.label}`;
-    case "assistant.text.delta":
-      return "Assistant streaming";
-    case "assistant.text.done":
-      return "Assistant message complete";
-    case "task.completed":
-      return "Task completed";
-    case "task.failed":
-      return "Task failed";
-    default: {
-      const _never: never = event;
-      return _never;
-    }
-  }
-}
-
 function completeProjection(state: MutableProjection): AgentSessionProjection {
-  const eventLogRows = state.events
-    .filter((event) => event.type !== "assistant.text.delta")
-    .map((event) => ({ id: event.id, title: formatAgentEventTitle(event) }));
-
   return {
     ...state,
-    eventLogRows,
     capabilities: deriveCapabilities(state),
   };
 }
 
-function findLastActivityIndex(
-  timeline: readonly AgentTimelineItem[],
-  taskId: string,
-): number {
+function findLastActivityIndex(timeline: readonly AgentTimelineItem[], taskId: string): number {
   for (let index = timeline.length - 1; index >= 0; index -= 1) {
     const item = timeline[index];
     if (item?.kind === "activity" && item.taskId === taskId) {
@@ -410,8 +344,7 @@ function deriveCapabilities(state: MutableProjection): AgentSessionCapabilities 
   return {
     canStartRun: !busy,
     taskInputDisabled: busy,
-    canRegenerateAssistant:
-      last?.kind === "assistant" && last.status === "complete" && !busy,
+    canRegenerateAssistant: last?.kind === "assistant" && last.status === "complete" && !busy,
     hasConversation: state.timeline.length > 0 || state.status !== "idle",
   };
 }

@@ -1,17 +1,3 @@
-import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import type { ReactElement, RefObject } from "react";
-import { Button } from "@/components/ui/button";
-import type { AgentActivityRow, AgentTimelineItem } from "@/agent/types";
-import {
-  ChainOfThought,
-  ChainOfThoughtContent,
-  ChainOfThoughtHeader,
-  ChainOfThoughtStep,
-} from "@/components/ai-elements/chain-of-thought";
-import {
-  clipboardAdapter,
-  COPIED_FEEDBACK_DURATION_MS,
-} from "@/features/agent-chat/clipboardAdapter";
 import type { LucideIcon } from "lucide-react";
 import {
   Camera,
@@ -24,11 +10,25 @@ import {
   ShieldQuestion,
   Wrench,
 } from "lucide-react";
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import type { ReactElement, RefObject } from "react";
+
+import type { AgentActivityRow, AgentTimelineItem } from "@/agent/types";
+import {
+  ChainOfThought,
+  ChainOfThoughtContent,
+  ChainOfThoughtHeader,
+  ChainOfThoughtStep,
+} from "@/components/ai-elements/chain-of-thought";
+import { Button } from "@/components/ui/button";
+import {
+  clipboardAdapter,
+  COPIED_FEEDBACK_DURATION_MS,
+} from "@/features/agent-chat/clipboardAdapter";
 import {
   buildTranscriptRenderItems,
   type TranscriptRenderItem,
 } from "@/features/agent-chat/transcriptRender";
-import { StreamingAssistantText } from "@/features/agent-chat/StreamingAssistantText";
 
 const AgentStreamMarkdown = lazy(async () => {
   const module = await import("@/features/agent-chat/AgentStreamMarkdown");
@@ -179,13 +179,11 @@ export function AgentChatTranscript(props: AgentChatTranscriptProps): ReactEleme
   );
 
   const renderItems = buildTranscriptRenderItems(props.timeline);
-  const lastRenderItem =
-    renderItems.length > 0 ? renderItems[renderItems.length - 1] : undefined;
+  const lastRenderItem = renderItems.length > 0 ? renderItems[renderItems.length - 1] : undefined;
   const lastUserIndex = findLastUserRenderIndex(renderItems);
   const lastUserItem = lastUserIndex >= 0 ? renderItems[lastUserIndex] : undefined;
   const lastUserId = lastUserItem?.kind === "user" ? lastUserItem.id : null;
-  const useTurnViewport =
-    props.isRunActive && lastUserIndex >= 0 && renderItems.length > 0;
+  const useTurnViewport = props.isRunActive && lastUserIndex >= 0 && renderItems.length > 0;
   const historyItems = useTurnViewport ? renderItems.slice(0, lastUserIndex) : [];
   const currentTurnItems = useTurnViewport ? renderItems.slice(lastUserIndex) : renderItems;
 
@@ -193,8 +191,7 @@ export function AgentChatTranscript(props: AgentChatTranscriptProps): ReactEleme
     const container = scrollContainerRef.current;
     const isNewTurn = lastUserId !== null && lastUserId !== lastUserIdRef.current;
     const shouldPinTurn =
-      pendingTurnScrollUserIdRef.current === lastUserId ||
-      (isNewTurn && props.isRunActive);
+      pendingTurnScrollUserIdRef.current === lastUserId || (isNewTurn && props.isRunActive);
 
     if (isNewTurn) {
       lastUserIdRef.current = lastUserId;
@@ -286,18 +283,14 @@ function TranscriptRenderRow(props: {
         </div>
       );
     case "activity":
-      return (
-        <AgentActivityBlock rows={props.item.rows} status={props.item.status} />
-      );
+      return <AgentActivityBlock rows={props.item.rows} status={props.item.status} />;
     case "assistant-turn":
       return (
         <AssistantTurnBlock
           turn={props.item}
           copyControl={props.createCopyControl(props.item.id, props.item.copyText)}
           onRegenerate={
-            props.canRegenerateAssistant &&
-            props.isLastRenderItem &&
-            !props.item.isStreaming
+            props.canRegenerateAssistant && props.isLastRenderItem && !props.item.isStreaming
               ? props.onRegenerateAssistant
               : undefined
           }
@@ -329,7 +322,7 @@ function AgentActivityBlock(props: {
     <ChainOfThought
       open={isOpen}
       onOpenChange={setIsOpen}
-      className="w-full text-sm mb-4 text-[#B7C1CC]"
+      className="w-full text-sm px-3 mb-4 text-[#B7C1CC]"
     >
       <ChainOfThoughtHeader className="text-[#7E7E7E] hover:text-[#cdcdcd]">
         {agentActivityHeading(props.status)}
@@ -419,7 +412,7 @@ function AssistantTurnBlock(props: {
   readonly onRegenerate?: () => void;
 }): ReactElement {
   return (
-    <div className="w-full space-y-2 mb-8 px-3">
+    <div className="w-full space-y-2 mb-8">
       {props.turn.parts.map((part, index) => {
         switch (part.kind) {
           case "text":
@@ -457,16 +450,10 @@ function AssistantTextPart(props: {
   readonly isStreaming: boolean;
 }): ReactElement {
   return (
-    <div
-      className={`text-sm wrap-break-word text-[#fefefe]`}
-    >
-      {props.isStreaming ? (
-        <StreamingAssistantText text={props.markdown} />
-      ) : (
-        <Suspense fallback={<span className="whitespace-pre-wrap">{props.markdown}</span>}>
-          <AgentStreamMarkdown markdown={props.markdown} isStreaming={false} />
-        </Suspense>
-      )}
+    <div className={`text-sm wrap-break-word text-[#fefefe]`}>
+      <Suspense fallback={<span className="whitespace-pre-wrap">{props.markdown}</span>}>
+        <AgentStreamMarkdown markdown={props.markdown} isStreaming={props.isStreaming} />
+      </Suspense>
     </div>
   );
 }
@@ -476,7 +463,7 @@ function AssistantToolbar(props: {
   readonly onRegenerate?: () => void;
 }): ReactElement {
   return (
-    <div className="flex items-center gap-0.5 opacity-55 transition-opacity hover:opacity-95">
+    <div className="flex items-center opacity-55 transition-opacity hover:opacity-95">
       <Button
         type="button"
         variant="ghost"
@@ -507,4 +494,3 @@ function AssistantToolbar(props: {
     </div>
   );
 }
-

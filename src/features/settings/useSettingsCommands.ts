@@ -1,11 +1,12 @@
+import { useCallback, useEffect, useState } from "react";
+
+import { isTauriRuntime } from "@/agent/native/nativeBridge";
 import {
   deleteSecretKey,
   loadSecretKey,
   storeSecretKey,
 } from "@/agent/persistence/secretPersistence";
 import { clearAllLogs, openLogsFolder } from "@/agent/persistence/sessionLogs";
-import { isTauriRuntime } from "@/agent/native/nativeBridge";
-import { useCallback, useEffect, useState } from "react";
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);

@@ -2,16 +2,17 @@ import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAI } from "@ai-sdk/openai";
 import { fetch as tauriHttpFetch } from "@tauri-apps/plugin-http";
 import { smoothStream, stepCountIs, streamText } from "ai";
+
 import type { LiveAgentToolContext } from "@/agent/agentSessionContext";
-import { createActuateTools } from "@/agent/tools/actuateTools";
 import { describeRuntimeCapabilities, getHostOsKind } from "@/agent/hostEnvironment";
-import type { AgentSessionRunnerOptions } from "@/agent/session/sessionRunner";
+import type { LlmApiProvider } from "@/agent/native/tauriIpc";
 import { appendSessionLogLine, persistKeyframePng } from "@/agent/persistence/sessionLogs";
-import { workspaceAdapter as defaultWorkspaceAdapter } from "@/agent/workspace/workspaceAdapter";
+import type { AgentSessionRunnerOptions } from "@/agent/session/sessionRunner";
+import type { ConsequenceRiskClass } from "@/agent/toolContract";
+import { createActuateTools } from "@/agent/tools/actuateTools";
 import { createEventId } from "@/agent/types";
 import type { AgentEvent } from "@/agent/types";
-import type { ConsequenceRiskClass } from "@/agent/toolContract";
-import type { LlmApiProvider } from "@/agent/native/tauriIpc";
+import { workspaceAdapter as defaultWorkspaceAdapter } from "@/agent/workspace/workspaceAdapter";
 
 export type LiveAgentSessionOptions = AgentSessionRunnerOptions & {
   readonly apiKey: string;

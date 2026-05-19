@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { BROWSER_SAMPLE_WORKSPACE_ROOT } from "@/agent/workspace/browserWorkspace";
+
 import { TAURI_COMMAND } from "@/agent/native/tauriIpc";
+import { BROWSER_SAMPLE_WORKSPACE_ROOT } from "@/agent/workspace/browserWorkspace";
 import { createWorkspaceAdapter, type TauriInvoke } from "@/agent/workspace/workspaceAdapter";
 
 describe("workspaceAdapter", () => {

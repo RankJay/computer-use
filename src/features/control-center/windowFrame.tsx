@@ -1,10 +1,11 @@
-import { isTauriRuntime } from "@/agent/native/nativeBridge";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Minimize2 } from "lucide-react";
 import type { ComponentProps, MouseEvent, ReactElement } from "react";
 import { useCallback } from "react";
+
+import { isTauriRuntime } from "@/agent/native/nativeBridge";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 /** Title-bar icon controls: no bg hover, no click shift — feedback on the SVG only. */
 export const chromeIconButtonClassName =

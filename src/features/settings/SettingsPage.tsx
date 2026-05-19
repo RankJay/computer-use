@@ -1,3 +1,16 @@
+import { ArrowLeft } from "lucide-react";
+import { useCallback, useMemo } from "react";
+import { Link } from "react-router-dom";
+
+import { ANTHROPIC_MODEL_OPTIONS, OPENAI_MODEL_OPTIONS } from "@/agent/llm/modelCatalog";
+import { resolveEffectiveProvider } from "@/agent/llm/resolveEffectiveProvider";
+import { isTauriRuntime } from "@/agent/native/nativeBridge";
+import type { LlmApiProvider } from "@/agent/native/tauriIpc";
+import { SECRET_ANTHROPIC_API_KEY, SECRET_OPENAI_API_KEY } from "@/agent/secrets";
+import { PERMISSION_MODE_LABELS } from "@/agent/toolContract";
+import { parsePermissionMode } from "@/agent/types";
+import { BROWSER_SAMPLE_WORKSPACE_ROOT } from "@/agent/workspace/browserWorkspace";
+import { useSettings } from "@/app/providers/SettingsProvider";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -28,22 +41,10 @@ import {
   MinimizeWindowButton,
   TitleBarDragRegion,
 } from "@/features/control-center/windowFrame";
-import { PERMISSION_MODE_LABELS } from "@/agent/toolContract";
-import { ANTHROPIC_MODEL_OPTIONS, OPENAI_MODEL_OPTIONS } from "@/agent/llm/modelCatalog";
-import { resolveEffectiveProvider } from "@/agent/llm/resolveEffectiveProvider";
-import type { LlmApiProvider } from "@/agent/native/tauriIpc";
-import { BROWSER_SAMPLE_WORKSPACE_ROOT } from "@/agent/workspace/browserWorkspace";
-import { SECRET_ANTHROPIC_API_KEY, SECRET_OPENAI_API_KEY } from "@/agent/secrets";
-import { parsePermissionMode } from "@/agent/types";
-import { isTauriRuntime } from "@/agent/native/nativeBridge";
 import {
   useLogSettingsCommands,
   useSecretKeySettings,
 } from "@/features/settings/useSettingsCommands";
-import { useSettings } from "@/app/providers/SettingsProvider";
-import { ArrowLeft } from "lucide-react";
-import { Link } from "react-router-dom";
-import { useCallback, useMemo } from "react";
 
 const UNIFIED_MODEL_KEY_SEP = ":";
 

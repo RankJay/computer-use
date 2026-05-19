@@ -1,4 +1,3 @@
-import { isUiAutomationTool, toolRequiresPermissionPrompt } from "./permissionPolicy";
 import {
   type AgentToolName,
   type ConsequenceRiskClass,
@@ -13,6 +12,8 @@ import type {
   PermissionMode,
   PermissionRequestedEvent,
 } from "@/agent/types";
+
+import { isUiAutomationTool, toolRequiresPermissionPrompt } from "./permissionPolicy";
 
 export type PermissionRequestCopy = {
   readonly summary: string;

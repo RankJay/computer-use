@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+
 import {
   COPIED_FEEDBACK_DURATION_MS,
   createClipboardAdapter,

@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+
 import {
   applyAgentEvent,
   beginAgentRun,
@@ -102,8 +103,6 @@ describe("sessionProjection", () => {
     });
 
     expect(projection.status).toBe("completed");
-    expect(projection.lastSummary).toBe("Finished");
-    expect(projection.currentStep).toBeNull();
   });
 
   test("task.failed exposes the latest failure message", () => {
@@ -233,7 +232,10 @@ describe("sessionProjection", () => {
       status: "completed",
       rows: [
         expect.objectContaining({ title: "Running terminal.run", detail: "pwd" }),
-        expect.objectContaining({ title: "Finished terminal.run", detail: "D:\\Projects\\actuate" }),
+        expect.objectContaining({
+          title: "Finished terminal.run",
+          detail: "D:\\Projects\\actuate",
+        }),
       ],
     });
     expect(activityItems[1]).toMatchObject({

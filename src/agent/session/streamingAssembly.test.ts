@@ -1,9 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import {
-  applyAssistantStreamEvent,
-  trimLastAssistantMessage,
-} from "./streamingAssembly";
+
 import type { AgentEvent, AgentTimelineItem } from "@/agent/types";
+
+import { applyAssistantStreamEvent, trimLastAssistantMessage } from "./streamingAssembly";
 
 const taskId = "task-1";
 

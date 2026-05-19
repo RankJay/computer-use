@@ -1,12 +1,11 @@
-import { BROWSER_SAMPLE_WORKSPACE_ROOT } from "@/agent/workspace/browserWorkspace";
-import type { LiveAgentSessionOptions } from "@/agent/session/liveAgentSession";
-import { runDemoAgentSession } from "@/agent/session/demoAgentSession";
+import { resolveEffectiveProvider } from "@/agent/llm/resolveEffectiveProvider";
 import type { AgentNativeBridge } from "@/agent/native/nativeBridge";
 import { createNativeBridge, isTauriRuntime } from "@/agent/native/nativeBridge";
-import { SECRET_ANTHROPIC_API_KEY, SECRET_OPENAI_API_KEY } from "@/agent/secrets";
-import { resolveEffectiveProvider } from "@/agent/llm/resolveEffectiveProvider";
-import { loadSecretKey } from "@/agent/persistence/secretPersistence";
 import type { AppSettingsPayload } from "@/agent/native/tauriIpc";
+import { loadSecretKey } from "@/agent/persistence/secretPersistence";
+import { SECRET_ANTHROPIC_API_KEY, SECRET_OPENAI_API_KEY } from "@/agent/secrets";
+import { runDemoAgentSession } from "@/agent/session/demoAgentSession";
+import type { LiveAgentSessionOptions } from "@/agent/session/liveAgentSession";
 import type { AgentToolName } from "@/agent/toolContract";
 import {
   createEventId,
@@ -14,6 +13,7 @@ import {
   type PermissionChoice,
   type PermissionMode,
 } from "@/agent/types";
+import { BROWSER_SAMPLE_WORKSPACE_ROOT } from "@/agent/workspace/browserWorkspace";
 import type { WorkspaceAdapter } from "@/agent/workspace/workspaceAdapter";
 
 export type AgentSessionRunnerOptions = {

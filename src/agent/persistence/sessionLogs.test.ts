@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+
 import { eventForDiskLog } from "@/agent/persistence/sessionLogs";
 import type { AgentEvent } from "@/agent/types";
 

@@ -34,19 +34,18 @@ const item = {
 
 function Container({ children, className }: React.HTMLProps<HTMLDivElement>) {
   return (
-    <motion.div
-      variants={container}
-      initial="hidden"
-      animate="show"
-      className={className}
-    >
+    <motion.div variants={container} initial="hidden" animate="show" className={className}>
       {children}
     </motion.div>
   );
 }
 
 function Item({ children, className }: React.HTMLProps<HTMLDivElement>) {
-  return <motion.div variants={item as Variants} className={className}>{children}</motion.div>;
+  return (
+    <motion.div variants={item as Variants} className={className}>
+      {children}
+    </motion.div>
+  );
 }
 
 export { Container, Item };

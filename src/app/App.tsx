@@ -1,9 +1,10 @@
-﻿import { AppQueryProvider } from "@/app/providers/QueryProvider";
+﻿import { BrowserRouter, Route, Routes } from "react-router-dom";
+
+import { AppQueryProvider } from "@/app/providers/QueryProvider";
 import { SettingsProvider } from "@/app/providers/SettingsProvider";
 import { AgentSessionProvider } from "@/features/control-center/AgentSessionProvider";
 import { ControlCenter } from "@/features/control-center/ControlCenter";
 import { SettingsPage } from "@/features/settings/SettingsPage";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
 
 export default function App() {
   return (

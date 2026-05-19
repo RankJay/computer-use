@@ -1,4 +1,6 @@
 ﻿import { useCallback, useMemo, useRef, useState } from "react";
+
+import { PermissionResolverLifecycle } from "@/agent/permissions/permissionOrchestrator";
 import {
   applyAgentEvent,
   beginAgentRun,
@@ -7,15 +9,14 @@ import {
   resetAgentProjection,
   trimLastAssistantTurn,
 } from "@/agent/session/sessionProjection";
-import { createEventId } from "@/agent/types";
-import type { AgentEvent, PermissionChoice } from "@/agent/types";
-import { PermissionResolverLifecycle } from "@/agent/permissions/permissionOrchestrator";
 import {
   createAgentSessionRunnerHost,
   createAgentSessionRunners,
   resolveAgentWorkspaceRoot,
   runSelectedAgentSession,
 } from "@/agent/session/sessionRunner";
+import { createEventId } from "@/agent/types";
+import type { AgentEvent, PermissionChoice } from "@/agent/types";
 import { useSettings } from "@/app/providers/SettingsProvider";
 
 export function useAgentSession() {
@@ -130,12 +131,8 @@ export function useAgentSession() {
     status: projection.status,
     events: projection.events,
     timeline: projection.timeline,
-    currentPlan: projection.currentPlan,
-    currentStep: projection.currentStep,
-    lastSummary: projection.lastSummary,
     failureMessage: projection.failureMessage,
     pendingPermission: projection.pendingPermission,
-    eventLogRows: projection.eventLogRows,
     capabilities,
     permissionMode,
     startRun,

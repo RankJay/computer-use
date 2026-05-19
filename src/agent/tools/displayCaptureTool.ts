@@ -1,10 +1,11 @@
 import { tool, zodSchema } from "ai";
 import { z } from "zod";
+
 import type { LiveAgentToolContext } from "@/agent/agentSessionContext";
 import { requestToolPermission } from "@/agent/permissions/permissionOrchestrator";
 import { AGENT_TOOL_NAMES } from "@/agent/toolContract";
-import { createEventId } from "@/agent/types";
 import { emitToolCompleted, emitToolStarted } from "@/agent/tools/toolTimeline";
+import { createEventId } from "@/agent/types";
 
 export function createDisplayCaptureTool(ctx: LiveAgentToolContext) {
   return tool({

@@ -1,14 +1,15 @@
 import { invoke } from "@tauri-apps/api/core";
+
 import {
   DEFAULT_ANTHROPIC_MODEL_ID,
   DEFAULT_OPENAI_MODEL_ID,
   isAnthropicModelId,
   isOpenAIModelId,
 } from "@/agent/llm/modelCatalog";
-import { BROWSER_SAMPLE_WORKSPACE_ROOT } from "@/agent/workspace/browserWorkspace";
 import { isTauriRuntime } from "@/agent/native/nativeBridge";
 import type { AppSettingsPayload, LlmApiProvider } from "@/agent/native/tauriIpc";
 import { TAURI_COMMAND } from "@/agent/native/tauriIpc";
+import { BROWSER_SAMPLE_WORKSPACE_ROOT } from "@/agent/workspace/browserWorkspace";
 
 const WEB_SETTINGS_STORAGE_KEY = "actuate.settings.v1";
 

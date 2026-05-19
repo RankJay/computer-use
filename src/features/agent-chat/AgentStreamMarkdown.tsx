@@ -1,5 +1,6 @@
 import type { ReactElement } from "react";
 import { Streamdown } from "streamdown";
+
 import { agentMarkdownComponents } from "@/features/agent-chat/agentMarkdownComponents";
 
 type AgentStreamMarkdownProps = {
@@ -16,7 +17,7 @@ export function AgentStreamMarkdown(props: AgentStreamMarkdownProps): ReactEleme
 
   return (
     <Streamdown
-      className="agent-stream-markdown text-inherit"
+      className="agent-stream-markdown px-3 text-inherit"
       mode={props.isStreaming ? "streaming" : "static"}
       isAnimating={props.isStreaming}
       animated={false}
