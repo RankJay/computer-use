@@ -68,13 +68,31 @@ describe("settingsPersistence", () => {
       permissionMode: "ask_all",
       retentionDays: 7,
       agentMode: "demo",
-      persistedApprovals: ["terminal_run"],
+      persistedApprovals: ["terminal.run"],
       uiAutomationEnabled: true,
     });
 
     await saveAppSettings(settings);
 
     expect(await loadAppSettings()).toEqual(settings);
+  });
+
+  test("load migrates legacy snake_case persisted approvals to contract ids", async () => {
+    installLocalStorage(new MemoryStorage());
+    globalThis.localStorage.setItem(
+      "actuate.settings.v1",
+      JSON.stringify(
+        createSettings({
+          persistedApprovals: ["terminal_run", "read_file", "bogus"],
+        }),
+      ),
+    );
+
+    expect(await loadAppSettings()).toEqual(
+      createSettings({
+        persistedApprovals: ["terminal.run", "file.read"],
+      }),
+    );
   });
 
   test("browser runtime fills the sample workspace when settings have no root", () => {

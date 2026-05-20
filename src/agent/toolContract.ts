@@ -26,6 +26,38 @@ export const AGENT_TOOL_NAMES = {
 
 export type AgentToolName = (typeof AGENT_TOOL_NAMES)[keyof typeof AGENT_TOOL_NAMES];
 
+/** AI SDK / model-facing tool registry keys (snake_case). */
+export const MODEL_TOOL_KEYS = {
+  TERMINAL_RUN: "terminal_run",
+  WORKSPACE_INSPECT: "workspace_inspect",
+  DISPLAY_CAPTURE: "display_capture",
+  READ_FILE: "read_file",
+  WRITE_FILE: "write_file",
+  POINTER_MOVE: "pointer_move",
+  POINTER_CLICK: "pointer_click",
+  TYPE_TEXT: "type_text",
+  KEY_TAP: "key_tap",
+} as const;
+
+export type ModelToolKey = (typeof MODEL_TOOL_KEYS)[keyof typeof MODEL_TOOL_KEYS];
+
+/** One model registry key maps to exactly one internal contract id. */
+export const MODEL_TOOL_TO_AGENT_TOOL: Record<ModelToolKey, AgentToolName> = {
+  [MODEL_TOOL_KEYS.TERMINAL_RUN]: AGENT_TOOL_NAMES.TERMINAL_RUN,
+  [MODEL_TOOL_KEYS.WORKSPACE_INSPECT]: AGENT_TOOL_NAMES.WORKSPACE_INSPECT,
+  [MODEL_TOOL_KEYS.DISPLAY_CAPTURE]: AGENT_TOOL_NAMES.DISPLAY_CAPTURE,
+  [MODEL_TOOL_KEYS.READ_FILE]: AGENT_TOOL_NAMES.FILE_READ,
+  [MODEL_TOOL_KEYS.WRITE_FILE]: AGENT_TOOL_NAMES.FILE_WRITE,
+  [MODEL_TOOL_KEYS.POINTER_MOVE]: AGENT_TOOL_NAMES.POINTER_MOVE,
+  [MODEL_TOOL_KEYS.POINTER_CLICK]: AGENT_TOOL_NAMES.POINTER_CLICK,
+  [MODEL_TOOL_KEYS.TYPE_TEXT]: AGENT_TOOL_NAMES.TYPE_TEXT,
+  [MODEL_TOOL_KEYS.KEY_TAP]: AGENT_TOOL_NAMES.KEY_TAP,
+};
+
+export function agentToolNameForModelToolKey(key: ModelToolKey): AgentToolName {
+  return MODEL_TOOL_TO_AGENT_TOOL[key];
+}
+
 type ToolContractEntry = {
   /** Stable tool id exposed to the model and timeline. */
   name: AgentToolName;
@@ -92,6 +124,31 @@ export const TOOL_CONTRACT: Record<AgentToolName, ToolContractEntry> = {
     defaultPermissionTitle: "Allow writing a file",
   },
 };
+
+export function isAgentToolName(value: string): value is AgentToolName {
+  return value in TOOL_CONTRACT;
+}
+
+/** Accept dotted contract ids; migrate legacy snake_case model keys; drop unknown values. */
+export function normalizePersistedApprovals(raw: readonly string[]): AgentToolName[] {
+  const seen = new Set<AgentToolName>();
+  const normalized: AgentToolName[] = [];
+
+  for (const id of raw) {
+    let tool: AgentToolName | undefined;
+    if (isAgentToolName(id)) {
+      tool = id;
+    } else if (id in MODEL_TOOL_TO_AGENT_TOOL) {
+      tool = MODEL_TOOL_TO_AGENT_TOOL[id as ModelToolKey];
+    }
+    if (tool !== undefined && !seen.has(tool)) {
+      seen.add(tool);
+      normalized.push(tool);
+    }
+  }
+
+  return normalized;
+}
 
 const RISK_CLASS_COPY: Record<
   ConsequenceRiskClass,

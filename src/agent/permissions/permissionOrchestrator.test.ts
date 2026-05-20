@@ -41,7 +41,10 @@ async function flushPermissionWaiter(): Promise<void> {
   await Promise.resolve();
 }
 
-function createHarness(mode: PermissionMode): Harness {
+function createHarness(
+  mode: PermissionMode,
+  persistedToolApprovals: readonly string[] = [],
+): Harness {
   const events: AgentEvent[] = [];
   const loggedEvents: AgentEvent[] = [];
   const persistedTools: AgentToolName[] = [];
@@ -62,7 +65,7 @@ function createHarness(mode: PermissionMode): Harness {
       taskId: "task-1",
       permissionMode: mode,
       uiAutomationEnabled: true,
-      persistedToolApprovals: new Set(),
+      persistedToolApprovals: new Set(persistedToolApprovals),
       sessionRiskApproved,
       emit: (event) => {
         events.push(event);
@@ -82,6 +85,20 @@ function createHarness(mode: PermissionMode): Harness {
 }
 
 describe("permissionOrchestrator", () => {
+  test("persisted approval for terminal.run skips the prompt", async () => {
+    const harness = createHarness("ask_all", [AGENT_TOOL_NAMES.TERMINAL_RUN]);
+
+    const permitted = await requestToolPermission(harness.context, AGENT_TOOL_NAMES.TERMINAL_RUN, {
+      summary: "Run command",
+      rationale: "Previously approved",
+      details: "bun test",
+    });
+
+    expect(permitted).toBe(true);
+    expect(harness.events).toEqual([]);
+    expect(harness.requestedPermissionId).toBeNull();
+  });
+
   test("ask_risky skips prompt for observe tools", async () => {
     const harness = createHarness("ask_risky");
 

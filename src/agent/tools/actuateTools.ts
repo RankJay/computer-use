@@ -1,4 +1,5 @@
 import type { LiveAgentToolContext } from "@/agent/agentSessionContext";
+import { MODEL_TOOL_KEYS } from "@/agent/toolContract";
 import { createDisplayCaptureTool } from "@/agent/tools/displayCaptureTool";
 import { createTerminalRunTool } from "@/agent/tools/terminalRunTool";
 import {
@@ -13,17 +14,18 @@ import {
   createWriteFileTool,
 } from "@/agent/tools/workspaceTools";
 
+/** Model registry keys (MODEL_TOOL_KEYS) → tool factories bound to internal contract ids inside each factory. */
 export function createActuateTools(ctx: LiveAgentToolContext) {
   return {
-    terminal_run: createTerminalRunTool(ctx),
-    workspace_inspect: createWorkspaceInspectTool(ctx),
-    display_capture: createDisplayCaptureTool(ctx),
-    read_file: createReadFileTool(ctx),
-    write_file: createWriteFileTool(ctx),
-    pointer_move: createPointerMoveTool(ctx),
-    pointer_click: createPointerClickTool(ctx),
-    type_text: createTypeTextTool(ctx),
-    key_tap: createKeyTapTool(ctx),
+    [MODEL_TOOL_KEYS.TERMINAL_RUN]: createTerminalRunTool(ctx),
+    [MODEL_TOOL_KEYS.WORKSPACE_INSPECT]: createWorkspaceInspectTool(ctx),
+    [MODEL_TOOL_KEYS.DISPLAY_CAPTURE]: createDisplayCaptureTool(ctx),
+    [MODEL_TOOL_KEYS.READ_FILE]: createReadFileTool(ctx),
+    [MODEL_TOOL_KEYS.WRITE_FILE]: createWriteFileTool(ctx),
+    [MODEL_TOOL_KEYS.POINTER_MOVE]: createPointerMoveTool(ctx),
+    [MODEL_TOOL_KEYS.POINTER_CLICK]: createPointerClickTool(ctx),
+    [MODEL_TOOL_KEYS.TYPE_TEXT]: createTypeTextTool(ctx),
+    [MODEL_TOOL_KEYS.KEY_TAP]: createKeyTapTool(ctx),
   };
 }
 

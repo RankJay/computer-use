@@ -13,6 +13,7 @@ import type {
   SaveSettingsRequest,
 } from "@/agent/native/tauriIpc";
 import { TAURI_COMMAND } from "@/agent/native/tauriIpc";
+import { normalizePersistedApprovals } from "@/agent/toolContract";
 import { BROWSER_SAMPLE_WORKSPACE_ROOT } from "@/agent/workspace/browserWorkspace";
 
 const WEB_SETTINGS_STORAGE_KEY = "actuate.settings.v1";
@@ -48,7 +49,12 @@ function clampModels(payload: AppSettingsPayload): AppSettingsPayload {
   const openaiModelId = isOpenAIModelId(payload.openaiModelId)
     ? payload.openaiModelId
     : DEFAULT_OPENAI_MODEL_ID;
-  return { ...payload, anthropicModelId, openaiModelId };
+  return {
+    ...payload,
+    anthropicModelId,
+    openaiModelId,
+    persistedApprovals: normalizePersistedApprovals(payload.persistedApprovals),
+  };
 }
 
 function isAppSettingsPayloadV2(value: unknown): value is AppSettingsPayload {
