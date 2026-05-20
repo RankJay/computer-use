@@ -195,9 +195,7 @@ export function isUiAutomationToolName(value: string): boolean {
 
 /** In-flight pointer move/click only (excludes type.text and key.tap). */
 export function isPointerAutomationToolName(value: string): boolean {
-  return (
-    value === AGENT_TOOL_NAMES.POINTER_MOVE || value === AGENT_TOOL_NAMES.POINTER_CLICK
-  );
+  return value === AGENT_TOOL_NAMES.POINTER_MOVE || value === AGENT_TOOL_NAMES.POINTER_CLICK;
 }
 
 /** Permission drawer: line explaining the risk category (aligned with S1 taxonomy). */

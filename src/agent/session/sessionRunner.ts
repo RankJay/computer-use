@@ -1,8 +1,7 @@
+import { hostRuntime, type HostRuntime } from "@/agent/host/hostRuntime";
 import { resolveEffectiveProvider } from "@/agent/llm/resolveEffectiveProvider";
 import type { AgentNativeBridge } from "@/agent/native/nativeBridge";
-import { createNativeBridge, isTauriRuntime } from "@/agent/native/nativeBridge";
 import type { AppSettingsPayload } from "@/agent/native/tauriIpc";
-import { loadSecretKey } from "@/agent/persistence/secretPersistence";
 import { SECRET_ANTHROPIC_API_KEY, SECRET_OPENAI_API_KEY } from "@/agent/secrets";
 import { runDemoAgentSession } from "@/agent/session/demoAgentSession";
 import type { LiveAgentSessionOptions } from "@/agent/session/liveAgentSession";
@@ -13,7 +12,6 @@ import {
   type PermissionChoice,
   type PermissionMode,
 } from "@/agent/types";
-import { BROWSER_SAMPLE_WORKSPACE_ROOT } from "@/agent/workspace/browserWorkspace";
 import type { WorkspaceAdapter } from "@/agent/workspace/workspaceAdapter";
 
 export type AgentSessionRunnerOptions = {
@@ -32,11 +30,7 @@ export type AgentSessionRunnerOptions = {
 
 export type AgentSessionRunner = (options: AgentSessionRunnerOptions) => Promise<void>;
 
-export type AgentSessionRunnerHost = {
-  readonly native: AgentNativeBridge | null;
-  readonly isTauriRuntime: boolean;
-  readonly loadSecretKey: (key: string) => Promise<string | null>;
-};
+export type AgentSessionRunnerHost = HostRuntime;
 
 export type AgentSessionRunners = {
   readonly demo: AgentSessionRunner;
@@ -50,29 +44,18 @@ async function runLiveAgentSessionFromChunk(options: LiveAgentSessionOptions): P
   await module.runLiveAgentSession(options);
 }
 
-export function createAgentSessionRunnerHost(): AgentSessionRunnerHost {
-  return {
-    native: createNativeBridge(),
-    isTauriRuntime: isTauriRuntime(),
-    loadSecretKey,
-  };
+export function createAgentSessionRunnerHost(
+  runtime: HostRuntime = hostRuntime,
+): AgentSessionRunnerHost {
+  return runtime;
 }
 
 export function resolveAgentWorkspaceRoot(
   workspaceOverride: string | null,
   settings: Pick<AppSettingsPayload, "workspaceRoot">,
-  host: Pick<AgentSessionRunnerHost, "isTauriRuntime">,
+  host: AgentSessionRunnerHost,
 ): string | null {
-  const workspaceRoot =
-    workspaceOverride && workspaceOverride.trim().length > 0
-      ? workspaceOverride.trim()
-      : settings.workspaceRoot?.trim() || null;
-
-  if (!workspaceRoot && !host.isTauriRuntime) {
-    return BROWSER_SAMPLE_WORKSPACE_ROOT;
-  }
-
-  return workspaceRoot;
+  return host.resolveWorkspaceRoot(workspaceOverride, settings);
 }
 
 export function createLiveAgentSessionRunner(
@@ -83,8 +66,8 @@ export function createLiveAgentSessionRunner(
     let anthropicKey = "";
     let openaiKey = "";
     try {
-      anthropicKey = (await host.loadSecretKey(SECRET_ANTHROPIC_API_KEY))?.trim() ?? "";
-      openaiKey = (await host.loadSecretKey(SECRET_OPENAI_API_KEY))?.trim() ?? "";
+      anthropicKey = (await host.loadSecret(SECRET_ANTHROPIC_API_KEY))?.trim() ?? "";
+      openaiKey = (await host.loadSecret(SECRET_OPENAI_API_KEY))?.trim() ?? "";
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       options.emit({
@@ -92,9 +75,7 @@ export function createLiveAgentSessionRunner(
         at: Date.now(),
         taskId: options.taskId,
         type: "task.failed",
-        message: host.isTauriRuntime
-          ? `Could not read API key from OS credential store: ${message}`
-          : `Could not read API key from browser storage: ${message}`,
+        message: host.apiKeyReadFailureMessage(message),
       });
       return;
     }
@@ -111,9 +92,7 @@ export function createLiveAgentSessionRunner(
         at: Date.now(),
         taskId: options.taskId,
         type: "task.failed",
-        message: host.isTauriRuntime
-          ? "No API key found in the OS store. Open Settings and save an Anthropic or OpenAI key, then retry."
-          : "No API key in browser storage. Open Settings and save an Anthropic or OpenAI key, then retry.",
+        message: host.missingApiKeyFailureMessage(),
       });
       return;
     }

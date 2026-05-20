@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 
-import { isTauriRuntime } from "@/agent/native/nativeBridge";
+import { hostRuntime } from "@/agent/host/hostRuntime";
 import {
   TAURI_COMMAND,
   type ListWorkspaceDirRequest,
@@ -22,7 +22,7 @@ export type WorkspaceAdapter = {
 };
 
 export type WorkspaceAdapterDependencies = {
-  readonly isTauriRuntime: () => boolean;
+  readonly isDesktop: () => boolean;
   readonly invoke: TauriInvoke;
   readonly fetch: (url: string) => Promise<Response>;
 };
@@ -54,7 +54,7 @@ function requireBrowserSampleWorkspace(workspaceRoot: string, operation: "read" 
 export function createWorkspaceAdapter(deps: WorkspaceAdapterDependencies): WorkspaceAdapter {
   return {
     readFile: async (workspaceRoot, relativePath) => {
-      if (!deps.isTauriRuntime()) {
+      if (!deps.isDesktop()) {
         requireBrowserSampleWorkspace(workspaceRoot, "read");
         const res = await deps.fetch(browserSampleFileUrl(relativePath));
         if (!res.ok) {
@@ -67,7 +67,7 @@ export function createWorkspaceAdapter(deps: WorkspaceAdapterDependencies): Work
       return requireStringResult(result, TAURI_COMMAND.readWorkspaceFile);
     },
     listDirectory: async (workspaceRoot, relativeDir) => {
-      if (!deps.isTauriRuntime()) {
+      if (!deps.isDesktop()) {
         requireBrowserSampleWorkspace(workspaceRoot, "list");
         return listBrowserSampleChildren(relativeDir);
       }
@@ -76,7 +76,7 @@ export function createWorkspaceAdapter(deps: WorkspaceAdapterDependencies): Work
       return requireStringArrayResult(result, TAURI_COMMAND.listWorkspaceDir);
     },
     writeFile: async (workspaceRoot, relativePath, content) => {
-      if (!deps.isTauriRuntime()) {
+      if (!deps.isDesktop()) {
         throw new Error("Writing workspace files requires the Tauri desktop app.");
       }
       const request: WriteWorkspaceFileRequest = { workspaceRoot, relativePath, content };
@@ -87,7 +87,7 @@ export function createWorkspaceAdapter(deps: WorkspaceAdapterDependencies): Work
 }
 
 export const workspaceAdapter = createWorkspaceAdapter({
-  isTauriRuntime,
+  isDesktop: () => hostRuntime.isDesktop,
   invoke: invokeTauri,
   fetch: (url) => fetch(url),
 });

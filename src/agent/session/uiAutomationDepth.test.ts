@@ -1,10 +1,10 @@
 import { describe, expect, test } from "bun:test";
 
-import { AGENT_TOOL_NAMES } from "@/agent/toolContract";
 import {
   countOpenPointerTools,
   countOpenUiAutomationTools,
 } from "@/agent/session/uiAutomationDepth";
+import { AGENT_TOOL_NAMES } from "@/agent/toolContract";
 import type { AgentEvent } from "@/agent/types";
 
 const taskId = "task-1";

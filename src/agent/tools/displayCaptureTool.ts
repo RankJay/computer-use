@@ -2,6 +2,7 @@ import { tool, zodSchema } from "ai";
 import { z } from "zod";
 
 import type { LiveAgentToolContext } from "@/agent/agentSessionContext";
+import { gateNativeTool } from "@/agent/host/nativeToolGate";
 import { requestToolPermission } from "@/agent/permissions/permissionOrchestrator";
 import { AGENT_TOOL_NAMES } from "@/agent/toolContract";
 import { emitToolCompleted, emitToolStarted } from "@/agent/tools/toolTimeline";
@@ -22,12 +23,13 @@ export function createDisplayCaptureTool(ctx: LiveAgentToolContext) {
         return { ok: false as const, error: "User denied screen capture." };
       }
       await emitToolStarted(ctx, AGENT_TOOL_NAMES.DISPLAY_CAPTURE, input.label ?? "screenshot");
-      if (!ctx.native) {
-        await emitToolCompleted(ctx, AGENT_TOOL_NAMES.DISPLAY_CAPTURE, "No native bridge.");
-        return { ok: false as const, error: "Capture requires the Tauri desktop app." };
+      const nativeGate = gateNativeTool(ctx.native, "displayCapture");
+      if (!nativeGate.ok) {
+        await emitToolCompleted(ctx, AGENT_TOOL_NAMES.DISPLAY_CAPTURE, nativeGate.timelineSummary);
+        return { ok: false as const, error: nativeGate.error };
       }
       try {
-        const b64 = await ctx.native.capturePrimaryDisplayPngBase64();
+        const b64 = await nativeGate.native.capturePrimaryDisplayPngBase64();
         ctx.vision.latestPng = b64;
         const ev = {
           id: createEventId(),

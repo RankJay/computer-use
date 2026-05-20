@@ -1,6 +1,6 @@
 import type { ReactElement } from "react";
 
-import { isTauriRuntime } from "@/agent/native/nativeBridge";
+import { hostRuntime } from "@/agent/host/hostRuntime";
 import { SECRET_ANTHROPIC_API_KEY, SECRET_OPENAI_API_KEY } from "@/agent/secrets";
 import { useSettings } from "@/app/providers/SettingsProvider";
 import { Separator } from "@/components/ui/separator";
@@ -24,7 +24,7 @@ export function SettingsPage(): ReactElement {
   const anthropicKey = useSecretKeySettings(SECRET_ANTHROPIC_API_KEY);
   const openaiKey = useSecretKeySettings(SECRET_OPENAI_API_KEY);
   const logs = useLogSettingsCommands();
-  const isDesktop = isTauriRuntime();
+  const isDesktop = hostRuntime.isDesktop;
   const storageHint = isDesktop ? "OS keychain" : "browser localStorage";
 
   const modelSelection = useUnifiedModelSelection(

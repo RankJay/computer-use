@@ -1,11 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
-
-import { isTauriRuntime } from "@/agent/native/nativeBridge";
-import {
-  TAURI_COMMAND,
-  type AppendSessionLogRequest,
-  type WriteSessionKeyframeRequest,
-} from "@/agent/native/tauriIpc";
+import { hostRuntime, type HostRuntime } from "@/agent/host/hostRuntime";
 import type { AgentEvent } from "@/agent/types";
 
 export function eventForDiskLog(event: AgentEvent): Record<string, unknown> {
@@ -17,29 +10,30 @@ export function eventForDiskLog(event: AgentEvent): Record<string, unknown> {
   return base;
 }
 
-export async function appendSessionLogLine(sessionId: string, event: AgentEvent): Promise<void> {
-  if (!isTauriRuntime()) return;
+export async function appendSessionLogLine(
+  sessionId: string,
+  event: AgentEvent,
+  runtime: HostRuntime = hostRuntime,
+): Promise<void> {
+  if (!runtime.canPersistSessionLogs) return;
   const line = JSON.stringify(eventForDiskLog(event));
-  const request: AppendSessionLogRequest = { sessionId, line };
-  await invoke(TAURI_COMMAND.appendSessionLog, request);
+  await runtime.appendSessionLogLine(sessionId, line);
 }
 
 export async function persistKeyframePng(
   sessionId: string,
   filename: string,
   pngBase64: string,
+  runtime: HostRuntime = hostRuntime,
 ): Promise<void> {
-  if (!isTauriRuntime()) return;
-  const request: WriteSessionKeyframeRequest = { sessionId, filename, pngBase64 };
-  await invoke(TAURI_COMMAND.writeSessionKeyframe, request);
+  if (!runtime.canPersistSessionLogs) return;
+  await runtime.writeSessionKeyframe(sessionId, filename, pngBase64);
 }
 
-export async function clearAllLogs(): Promise<void> {
-  if (!isTauriRuntime()) return;
-  await invoke(TAURI_COMMAND.clearAllLogs);
+export async function clearAllLogs(runtime: HostRuntime = hostRuntime): Promise<void> {
+  await runtime.clearAllLogs();
 }
 
-export async function openLogsFolder(): Promise<void> {
-  if (!isTauriRuntime()) return;
-  await invoke(TAURI_COMMAND.openLogsFolder);
+export async function openLogsFolder(runtime: HostRuntime = hostRuntime): Promise<void> {
+  await runtime.openLogsFolder();
 }

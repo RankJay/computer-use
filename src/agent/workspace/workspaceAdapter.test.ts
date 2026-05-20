@@ -7,7 +7,7 @@ import { createWorkspaceAdapter, type TauriInvoke } from "@/agent/workspace/work
 describe("workspaceAdapter", () => {
   test("browser workspace rejects non-sample roots for read and list", async () => {
     const adapter = createWorkspaceAdapter({
-      isTauriRuntime: () => false,
+      isDesktop: () => false,
       invoke: async () => null,
       fetch: async () => new Response(""),
     });
@@ -23,7 +23,7 @@ describe("workspaceAdapter", () => {
   test("browser sample workspace reads via static sample URL", async () => {
     const fetchedUrls: string[] = [];
     const adapter = createWorkspaceAdapter({
-      isTauriRuntime: () => false,
+      isDesktop: () => false,
       invoke: async () => null,
       fetch: async (url) => {
         fetchedUrls.push(url);
@@ -46,7 +46,7 @@ describe("workspaceAdapter", () => {
       return "file text";
     };
     const adapter = createWorkspaceAdapter({
-      isTauriRuntime: () => true,
+      isDesktop: () => true,
       invoke,
       fetch: async () => new Response(""),
     });

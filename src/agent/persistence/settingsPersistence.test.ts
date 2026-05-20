@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 
+import { createHostRuntime } from "@/agent/host/hostRuntime";
 import type { AppSettingsPayload } from "@/agent/native/tauriIpc";
 import {
   DEFAULT_APP_SETTINGS,
@@ -96,8 +97,16 @@ describe("settingsPersistence", () => {
   });
 
   test("browser runtime fills the sample workspace when settings have no root", () => {
-    expect(settingsForRuntime(createSettings({ workspaceRoot: null }), false).workspaceRoot).toBe(
-      BROWSER_SAMPLE_WORKSPACE_ROOT,
-    );
+    const webRuntime = createHostRuntime({
+      detectDesktop: () => false,
+      invoke: async () => null,
+      localStorage: () => globalThis.localStorage,
+      createNativeBridge: () => null,
+      minimizeWindow: async () => {},
+      startWindowDrag: () => {},
+    });
+    expect(
+      settingsForRuntime(createSettings({ workspaceRoot: null }), webRuntime).workspaceRoot,
+    ).toBe(BROWSER_SAMPLE_WORKSPACE_ROOT);
   });
 });

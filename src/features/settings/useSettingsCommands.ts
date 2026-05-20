@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 
-import { isTauriRuntime } from "@/agent/native/nativeBridge";
+import { hostRuntime } from "@/agent/host/hostRuntime";
 import {
   deleteSecretKey,
   loadSecretKey,
@@ -25,7 +25,7 @@ export function useSecretKeySettings(secretId: string) {
       setApiKeyDraft(trimmed);
       setApiKeyError(null);
     } catch (error) {
-      const storageName = isTauriRuntime() ? "OS store" : "browser storage";
+      const storageName = hostRuntime.secretStorageLabel;
       setApiKeyError(`Could not read key from ${storageName}: ${errorMessage(error)}`);
       setHasStoredKey(false);
     }

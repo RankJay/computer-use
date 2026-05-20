@@ -2,6 +2,7 @@ import { tool, zodSchema } from "ai";
 import { z } from "zod";
 
 import type { LiveAgentToolContext } from "@/agent/agentSessionContext";
+import { gateNativeTool } from "@/agent/host/nativeToolGate";
 import { requestToolPermission } from "@/agent/permissions/permissionOrchestrator";
 import { AGENT_TOOL_NAMES } from "@/agent/toolContract";
 import { emitToolCompleted, emitToolStarted, shortenForTimeline } from "@/agent/tools/toolTimeline";
@@ -25,12 +26,13 @@ export function createPointerMoveTool(ctx: LiveAgentToolContext) {
         return { ok: false as const, error: "Denied (permission or UI automation disabled)." };
       }
       await emitToolStarted(ctx, AGENT_TOOL_NAMES.POINTER_MOVE, `(${input.x},${input.y})`);
-      if (!ctx.native) {
-        await emitToolCompleted(ctx, AGENT_TOOL_NAMES.POINTER_MOVE, "No native bridge.");
-        return { ok: false as const, error: "Requires Tauri." };
+      const nativeGate = gateNativeTool(ctx.native, "uiAutomation");
+      if (!nativeGate.ok) {
+        await emitToolCompleted(ctx, AGENT_TOOL_NAMES.POINTER_MOVE, nativeGate.timelineSummary);
+        return { ok: false as const, error: nativeGate.error };
       }
       try {
-        await ctx.native.pointerMoveTo(input.x, input.y);
+        await nativeGate.native.pointerMoveTo(input.x, input.y);
         await emitToolCompleted(ctx, AGENT_TOOL_NAMES.POINTER_MOVE, "Moved.");
         return { ok: true as const };
       } catch (err) {
@@ -56,12 +58,13 @@ export function createPointerClickTool(ctx: LiveAgentToolContext) {
         return { ok: false as const, error: "Denied (permission or UI automation disabled)." };
       }
       await emitToolStarted(ctx, AGENT_TOOL_NAMES.POINTER_CLICK, input.button);
-      if (!ctx.native) {
-        await emitToolCompleted(ctx, AGENT_TOOL_NAMES.POINTER_CLICK, "No native bridge.");
-        return { ok: false as const, error: "Requires Tauri." };
+      const nativeGate = gateNativeTool(ctx.native, "uiAutomation");
+      if (!nativeGate.ok) {
+        await emitToolCompleted(ctx, AGENT_TOOL_NAMES.POINTER_CLICK, nativeGate.timelineSummary);
+        return { ok: false as const, error: nativeGate.error };
       }
       try {
-        await ctx.native.pointerClick(input.button);
+        await nativeGate.native.pointerClick(input.button);
         await emitToolCompleted(ctx, AGENT_TOOL_NAMES.POINTER_CLICK, "Clicked.");
         return { ok: true as const };
       } catch (err) {
@@ -87,12 +90,13 @@ export function createTypeTextTool(ctx: LiveAgentToolContext) {
         return { ok: false as const, error: "Denied (permission or UI automation disabled)." };
       }
       await emitToolStarted(ctx, AGENT_TOOL_NAMES.TYPE_TEXT, `${input.text.length} chars`);
-      if (!ctx.native) {
-        await emitToolCompleted(ctx, AGENT_TOOL_NAMES.TYPE_TEXT, "No native bridge.");
-        return { ok: false as const, error: "Requires Tauri." };
+      const nativeGate = gateNativeTool(ctx.native, "uiAutomation");
+      if (!nativeGate.ok) {
+        await emitToolCompleted(ctx, AGENT_TOOL_NAMES.TYPE_TEXT, nativeGate.timelineSummary);
+        return { ok: false as const, error: nativeGate.error };
       }
       try {
-        await ctx.native.typeText(input.text);
+        await nativeGate.native.typeText(input.text);
         await emitToolCompleted(ctx, AGENT_TOOL_NAMES.TYPE_TEXT, "Typed.");
         return { ok: true as const };
       } catch (err) {
@@ -125,12 +129,13 @@ export function createKeyTapTool(ctx: LiveAgentToolContext) {
         return { ok: false as const, error: "Denied (permission or UI automation disabled)." };
       }
       await emitToolStarted(ctx, AGENT_TOOL_NAMES.KEY_TAP, input.key);
-      if (!ctx.native) {
-        await emitToolCompleted(ctx, AGENT_TOOL_NAMES.KEY_TAP, "No native bridge.");
-        return { ok: false as const, error: "Requires Tauri." };
+      const nativeGate = gateNativeTool(ctx.native, "uiAutomation");
+      if (!nativeGate.ok) {
+        await emitToolCompleted(ctx, AGENT_TOOL_NAMES.KEY_TAP, nativeGate.timelineSummary);
+        return { ok: false as const, error: nativeGate.error };
       }
       try {
-        await ctx.native.keyTap(input.key);
+        await nativeGate.native.keyTap(input.key);
         await emitToolCompleted(ctx, AGENT_TOOL_NAMES.KEY_TAP, "Sent.");
         return { ok: true as const };
       } catch (err) {

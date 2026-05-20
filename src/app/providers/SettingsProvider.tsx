@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from "react";
 
-import { isTauriRuntime } from "@/agent/native/nativeBridge";
+import { hostRuntime } from "@/agent/host/hostRuntime";
 import type { AppSettingsPayload } from "@/agent/native/tauriIpc";
 import {
   loadAppSettings,
@@ -38,7 +38,7 @@ export function SettingsProvider(props: { children: ReactNode }) {
 
   const refresh = useCallback(async () => {
     const loaded = await loadAppSettings();
-    setSettingsState(settingsForRuntime(loaded, isTauriRuntime()));
+    setSettingsState(settingsForRuntime(loaded, hostRuntime));
     setReady(true);
   }, []);
 

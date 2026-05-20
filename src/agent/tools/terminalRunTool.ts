@@ -2,6 +2,7 @@ import { tool, zodSchema } from "ai";
 import { z } from "zod";
 
 import type { LiveAgentToolContext } from "@/agent/agentSessionContext";
+import { gateNativeTool } from "@/agent/host/nativeToolGate";
 import { terminalRunGuidanceForOs } from "@/agent/hostEnvironment";
 import { requestToolPermission } from "@/agent/permissions/permissionOrchestrator";
 import { AGENT_TOOL_NAMES } from "@/agent/toolContract";
@@ -33,16 +34,13 @@ export function createTerminalRunTool(ctx: LiveAgentToolContext) {
         AGENT_TOOL_NAMES.TERMINAL_RUN,
         shortenForTimeline(`${input.program} ${input.args.join(" ")}`),
       );
-      if (!ctx.native) {
-        await emitToolCompleted(
-          ctx,
-          AGENT_TOOL_NAMES.TERMINAL_RUN,
-          "No native bridge (web build).",
-        );
-        return { ok: false as const, error: "Terminal tools require the Tauri desktop app." };
+      const nativeGate = gateNativeTool(ctx.native, "terminal");
+      if (!nativeGate.ok) {
+        await emitToolCompleted(ctx, AGENT_TOOL_NAMES.TERMINAL_RUN, nativeGate.timelineSummary);
+        return { ok: false as const, error: nativeGate.error };
       }
       try {
-        const result = await ctx.native.runCommand({
+        const result = await nativeGate.native.runCommand({
           program: input.program,
           args: input.args,
           cwd: input.cwd ?? ctx.workspaceRoot,

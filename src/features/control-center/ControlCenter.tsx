@@ -1,6 +1,6 @@
 ﻿import { useCallback, useState } from "react";
 
-import { isTauriRuntime } from "@/agent/native/nativeBridge";
+import { hostRuntime } from "@/agent/host/hostRuntime";
 import type { PermissionChoice } from "@/agent/types";
 import { Container, Item } from "@/components/motion/stagger";
 import { AgentChatTranscript } from "@/features/agent-chat/AgentChatTranscript";
@@ -13,13 +13,10 @@ import { useAgentSessionContext } from "@/features/control-center/AgentSessionPr
 import { TaskPromptComposer } from "@/features/control-center/TaskPromptComposer";
 import { WindowChrome } from "@/features/control-center/WindowChrome";
 
-const BROWSER_SAMPLE_PROMPT =
-  "Use workspace.inspect on the workspace root, then read preset/actuate-sample.txt and summarize it in a few sentences.";
-
 export function ControlCenter() {
   const agent = useAgentSessionContext();
   const { pendingPermission, resolvePermission, startRun } = agent;
-  const [draft, setDraft] = useState(() => (isTauriRuntime() ? "" : BROWSER_SAMPLE_PROMPT));
+  const [draft, setDraft] = useState(() => hostRuntime.defaultComposerDraft);
 
   const canStart = agent.capabilities.canStartRun && draft.trim().length > 0;
 
@@ -63,7 +60,7 @@ export function ControlCenter() {
           )}
         </Container>
         <PointerAutomationEscBar
-          escArmActive={isTauriRuntime() && agent.capabilities.uiAutomationBusy}
+          escArmActive={hostRuntime.isDesktop && agent.capabilities.uiAutomationBusy}
           pointerBusy={agent.capabilities.pointerAutomationBusy}
         />
       </div>

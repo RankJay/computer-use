@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
+import { detectDesktopHost } from "@/agent/host/detectDesktopHost";
 import {
   TAURI_COMMAND,
   type KeyTapLogicalKey,
@@ -22,18 +23,12 @@ export type AgentNativeBridge = {
   cancelPointerAutomation: () => Promise<void>;
 };
 
-declare global {
-  interface Window {
-    __TAURI_INTERNALS__?: unknown;
-  }
-}
-
 export function isTauriRuntime(): boolean {
-  return typeof window !== "undefined" && window.__TAURI_INTERNALS__ !== undefined;
+  return detectDesktopHost();
 }
 
 export function createNativeBridge(): AgentNativeBridge | null {
-  if (!isTauriRuntime()) return null;
+  if (!detectDesktopHost()) return null;
   return {
     capturePrimaryDisplayPngBase64: () =>
       invoke<string>(TAURI_COMMAND.capturePrimaryDisplayPngBase64),
@@ -57,16 +52,16 @@ export function createNativeBridge(): AgentNativeBridge | null {
 }
 
 export async function cancelPointerAutomation(): Promise<void> {
-  if (!isTauriRuntime()) return;
+  if (!detectDesktopHost()) return;
   await invoke<void>(TAURI_COMMAND.cancelPointerAutomation);
 }
 
 export async function minimizeActuateWindow(): Promise<void> {
-  if (!isTauriRuntime()) return;
+  if (!detectDesktopHost()) return;
   await getCurrentWindow().minimize();
 }
 
 export function startActuateWindowDrag(): void {
-  if (!isTauriRuntime()) return;
+  if (!detectDesktopHost()) return;
   void getCurrentWindow().startDragging();
 }

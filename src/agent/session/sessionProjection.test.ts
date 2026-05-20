@@ -1,6 +1,5 @@
 import { describe, expect, test } from "bun:test";
 
-import { AGENT_TOOL_NAMES } from "@/agent/toolContract";
 import {
   applyAgentEvent,
   beginAgentRun,
@@ -8,6 +7,7 @@ import {
   findLastUserPrompt,
   resetAgentProjection,
 } from "@/agent/session/sessionProjection";
+import { AGENT_TOOL_NAMES } from "@/agent/toolContract";
 import type { AgentEvent, AgentTimelineItem, PermissionChoice } from "@/agent/types";
 
 const taskId = "task-1";

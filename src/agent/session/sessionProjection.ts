@@ -1,12 +1,12 @@
 import {
-  countOpenPointerTools,
-  countOpenUiAutomationTools,
-} from "@/agent/session/uiAutomationDepth";
-import {
   applyAssistantStreamEvent,
   finalizeStreamingAssistant,
   trimLastAssistantMessage,
 } from "@/agent/session/streamingAssembly";
+import {
+  countOpenPointerTools,
+  countOpenUiAutomationTools,
+} from "@/agent/session/uiAutomationDepth";
 import {
   type AgentActivityRow,
   type AgentEvent,

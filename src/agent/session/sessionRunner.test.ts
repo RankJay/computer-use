@@ -1,5 +1,10 @@
 import { describe, expect, test } from "bun:test";
 
+import {
+  createDesktopTestHost,
+  createWebTestHost,
+  resolveWorkspaceRootWithHost,
+} from "@/agent/host/testHostRuntime";
 import type { AgentNativeBridge } from "@/agent/native/nativeBridge";
 import type { AppSettingsPayload } from "@/agent/native/tauriIpc";
 import { DEFAULT_APP_SETTINGS } from "@/agent/persistence/settingsPersistence";
@@ -37,12 +42,6 @@ function createRunnerOptions(
     persistAlwaysAllow: async () => {},
     ...patch,
   };
-}
-
-async function loadBothApiKeys(id: string): Promise<string> {
-  if (id === SECRET_ANTHROPIC_API_KEY) return "anthropic-key";
-  if (id === SECRET_OPENAI_API_KEY) return "openai-key";
-  return "";
 }
 
 describe("sessionRunner", () => {
@@ -84,14 +83,16 @@ describe("sessionRunner", () => {
 
   test("resolveAgentWorkspaceRoot prefers override, then settings, then browser sample", () => {
     expect(
-      resolveAgentWorkspaceRoot("  d:/tmp/project  ", createSettings(), { isTauriRuntime: false }),
+      resolveAgentWorkspaceRoot("  d:/tmp/project  ", createSettings(), createWebTestHost()),
     ).toBe("d:/tmp/project");
     expect(
-      resolveAgentWorkspaceRoot(null, createSettings({ workspaceRoot: " d:/settings/project " }), {
-        isTauriRuntime: true,
-      }),
+      resolveAgentWorkspaceRoot(
+        null,
+        createSettings({ workspaceRoot: " d:/settings/project " }),
+        createDesktopTestHost(),
+      ),
     ).toBe("d:/settings/project");
-    expect(resolveAgentWorkspaceRoot(null, createSettings(), { isTauriRuntime: false })).toBe(
+    expect(resolveWorkspaceRootWithHost(null, createSettings(), false)).toBe(
       BROWSER_SAMPLE_WORKSPACE_ROOT,
     );
   });
@@ -99,16 +100,9 @@ describe("sessionRunner", () => {
   test("live runner emits failed session when no API keys are saved", async () => {
     const events: AgentEvent[] = [];
     let liveCalls = 0;
-    const runner = createLiveAgentSessionRunner(
-      {
-        native: null,
-        isTauriRuntime: false,
-        loadSecretKey: async () => "",
-      },
-      async () => {
-        liveCalls += 1;
-      },
-    );
+    const runner = createLiveAgentSessionRunner(createWebTestHost(), async () => {
+      liveCalls += 1;
+    });
 
     await runner(
       createRunnerOptions({
@@ -129,14 +123,7 @@ describe("sessionRunner", () => {
     const native: AgentNativeBridge | null = null;
     let received: LiveAgentSessionOptions | null = null;
     const runner = createLiveAgentSessionRunner(
-      {
-        native,
-        isTauriRuntime: false,
-        loadSecretKey: async (id) => {
-          if (id === SECRET_ANTHROPIC_API_KEY) return " key-1 ";
-          return "";
-        },
-      },
+      createWebTestHost({ [SECRET_ANTHROPIC_API_KEY]: " key-1 " }),
       async (options) => {
         received = options;
       },
@@ -154,14 +141,7 @@ describe("sessionRunner", () => {
   test("live runner passes OpenAI options when only OpenAI key exists", async () => {
     let received: LiveAgentSessionOptions | null = null;
     const runner = createLiveAgentSessionRunner(
-      {
-        native: null,
-        isTauriRuntime: false,
-        loadSecretKey: async (id) => {
-          if (id === SECRET_OPENAI_API_KEY) return " sk-openai ";
-          return "";
-        },
-      },
+      createWebTestHost({ [SECRET_OPENAI_API_KEY]: " sk-openai " }),
       async (options) => {
         received = options;
       },
@@ -177,11 +157,10 @@ describe("sessionRunner", () => {
   test("live runner respects activeApiProvider when both keys exist", async () => {
     let received: LiveAgentSessionOptions | null = null;
     const runner = createLiveAgentSessionRunner(
-      {
-        native: null,
-        isTauriRuntime: false,
-        loadSecretKey: loadBothApiKeys,
-      },
+      createWebTestHost({
+        [SECRET_ANTHROPIC_API_KEY]: "anthropic-key",
+        [SECRET_OPENAI_API_KEY]: "openai-key",
+      }),
       async (options) => {
         received = options;
       },

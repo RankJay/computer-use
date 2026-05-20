@@ -1,7 +1,4 @@
-import {
-  isPointerAutomationToolName,
-  isUiAutomationToolName,
-} from "@/agent/toolContract";
+import { isPointerAutomationToolName, isUiAutomationToolName } from "@/agent/toolContract";
 import type { AgentEvent } from "@/agent/types";
 
 function countOpenTools(
