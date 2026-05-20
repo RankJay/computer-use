@@ -20,16 +20,14 @@ import {
   settingLeadClass,
   settingsSeparatorClassName,
 } from "@/features/settings/settingsStyles";
-import type { useLogSettingsCommands } from "@/features/settings/useSettingsCommands";
+import type { SettingsMaintenanceCommands } from "@/features/settings/useSettingsPageModel";
 
 export type SettingsMaintenanceSectionProps = {
-  readonly onRevokePersistedApprovals: () => void;
-  readonly onResetSession: () => void;
-  readonly logs: ReturnType<typeof useLogSettingsCommands>;
+  readonly commands: SettingsMaintenanceCommands;
 };
 
 export function SettingsMaintenanceSection(props: SettingsMaintenanceSectionProps): ReactElement {
-  const { onRevokePersistedApprovals, onResetSession, logs } = props;
+  const { onRevokePersistedApprovals, onResetSession, logs } = props.commands;
 
   return (
     <>

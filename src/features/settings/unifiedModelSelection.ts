@@ -13,6 +13,8 @@ export function parseUnifiedModelOptionValue(
   if (i <= 0 || i === value.length - 1) return null;
   const providerRaw = value.slice(0, i);
   const modelId = value.slice(i + UNIFIED_MODEL_KEY_SEP.length);
-  const provider: LlmApiProvider = providerRaw === "openai" ? "openai" : "anthropic";
-  return { provider, modelId };
+  if (providerRaw === "anthropic" || providerRaw === "openai") {
+    return { provider: providerRaw, modelId };
+  }
+  return null;
 }

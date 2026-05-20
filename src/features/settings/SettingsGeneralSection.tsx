@@ -1,8 +1,6 @@
 import type { ChangeEvent, ReactElement } from "react";
 
-import type { AppSettingsPayload } from "@/agent/native/tauriIpc";
 import { PERMISSION_MODE_LABELS } from "@/agent/toolContract";
-import type { PermissionMode } from "@/agent/types";
 import { parsePermissionMode } from "@/agent/types";
 import { BROWSER_SAMPLE_WORKSPACE_ROOT } from "@/agent/workspace/browserWorkspace";
 import { Input } from "@/components/ui/input";
@@ -24,17 +22,14 @@ import {
   settingsSelectContentClassName,
   settingsSelectItemClassName,
 } from "@/features/settings/settingsStyles";
+import type { SettingsGeneralModel } from "@/features/settings/useSettingsPageModel";
 
 export type SettingsGeneralSectionProps = {
-  readonly isDesktop: boolean;
-  readonly settings: AppSettingsPayload;
-  readonly permissionMode: PermissionMode;
-  readonly updateSettings: (patch: Partial<AppSettingsPayload>) => Promise<void>;
-  readonly setPermissionMode: (mode: PermissionMode) => void;
+  readonly general: SettingsGeneralModel;
 };
 
 export function SettingsGeneralSection(props: SettingsGeneralSectionProps): ReactElement {
-  const { isDesktop, settings, permissionMode, updateSettings, setPermissionMode } = props;
+  const { isDesktop, settings, permissionMode, updateSettings, setPermissionMode } = props.general;
 
   function handleWorkspaceChange(e: ChangeEvent<HTMLInputElement>): void {
     void updateSettings({

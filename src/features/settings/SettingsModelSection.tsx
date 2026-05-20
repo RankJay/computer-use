@@ -1,7 +1,6 @@
 import type { ReactElement } from "react";
 
 import { ANTHROPIC_MODEL_OPTIONS, OPENAI_MODEL_OPTIONS } from "@/agent/llm/modelCatalog";
-import type { AppSettingsPayload } from "@/agent/native/tauriIpc";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -23,18 +22,14 @@ import {
   settingsSelectItemClassName,
 } from "@/features/settings/settingsStyles";
 import { unifiedModelOptionValue } from "@/features/settings/unifiedModelSelection";
-import type { UnifiedModelSelectionState } from "@/features/settings/useUnifiedModelSelection";
+import type { SettingsModelProviderModel } from "@/features/settings/useSettingsPageModel";
 
 export type SettingsModelSectionProps = {
-  readonly settings: AppSettingsPayload;
-  readonly updateSettings: (patch: Partial<AppSettingsPayload>) => Promise<void>;
-  readonly anthropicKeyStored: boolean;
-  readonly openaiKeyStored: boolean;
-  readonly modelSelection: UnifiedModelSelectionState;
+  readonly modelProvider: SettingsModelProviderModel;
 };
 
 export function SettingsModelSection(props: SettingsModelSectionProps): ReactElement {
-  const { settings, updateSettings, anthropicKeyStored, openaiKeyStored, modelSelection } = props;
+  const { settings, updateSettings, modelSelection, providerKeys } = props.modelProvider;
 
   return (
     <>
@@ -94,7 +89,7 @@ export function SettingsModelSection(props: SettingsModelSectionProps): ReactEle
                 <SelectItem
                   key={`anthropic:${opt.id}`}
                   value={unifiedModelOptionValue("anthropic", opt.id)}
-                  disabled={!anthropicKeyStored}
+                  disabled={providerKeys.anthropic.disabled}
                   className={settingsSelectItemClassName}
                 >
                   {opt.label}
@@ -108,7 +103,7 @@ export function SettingsModelSection(props: SettingsModelSectionProps): ReactEle
                 <SelectItem
                   key={`openai:${opt.id}`}
                   value={unifiedModelOptionValue("openai", opt.id)}
-                  disabled={!openaiKeyStored}
+                  disabled={providerKeys.openai.disabled}
                   className={settingsSelectItemClassName}
                 >
                   {opt.label}

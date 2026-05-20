@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react";
+import { useCallback } from "react";
 
 import { resolveEffectiveProvider } from "@/agent/llm/resolveEffectiveProvider";
 import type { AppSettingsPayload, LlmApiProvider } from "@/agent/native/tauriIpc";
@@ -13,23 +13,44 @@ export type UnifiedModelSelectionState = {
   readonly onUnifiedModelChange: (value: string) => void;
 };
 
+export type UnifiedModelSelectionSnapshot = Pick<
+  UnifiedModelSelectionState,
+  "effectiveProvider" | "unifiedModelSelectValue"
+>;
+
+export function resolveUnifiedModelSelectionSnapshot(
+  settings: AppSettingsPayload,
+  anthropicKeyStored: boolean,
+  openaiKeyStored: boolean,
+): UnifiedModelSelectionSnapshot {
+  const effectiveProvider = resolveEffectiveProvider(
+    settings.activeApiProvider,
+    anthropicKeyStored,
+    openaiKeyStored,
+  );
+  if (!effectiveProvider) {
+    return { effectiveProvider, unifiedModelSelectValue: undefined };
+  }
+
+  const modelId =
+    effectiveProvider === "anthropic" ? settings.anthropicModelId : settings.openaiModelId;
+  return {
+    effectiveProvider,
+    unifiedModelSelectValue: unifiedModelOptionValue(effectiveProvider, modelId),
+  };
+}
+
 export function useUnifiedModelSelection(
   settings: AppSettingsPayload,
   updateSettings: (patch: Partial<AppSettingsPayload>) => Promise<void>,
   anthropicKeyStored: boolean,
   openaiKeyStored: boolean,
 ): UnifiedModelSelectionState {
-  const effectiveProvider = useMemo(
-    () => resolveEffectiveProvider(settings.activeApiProvider, anthropicKeyStored, openaiKeyStored),
-    [settings.activeApiProvider, anthropicKeyStored, openaiKeyStored],
+  const selection = resolveUnifiedModelSelectionSnapshot(
+    settings,
+    anthropicKeyStored,
+    openaiKeyStored,
   );
-
-  const unifiedModelSelectValue = useMemo((): string | undefined => {
-    if (!effectiveProvider) return undefined;
-    const modelId =
-      effectiveProvider === "anthropic" ? settings.anthropicModelId : settings.openaiModelId;
-    return unifiedModelOptionValue(effectiveProvider, modelId);
-  }, [effectiveProvider, settings.anthropicModelId, settings.openaiModelId]);
 
   const onUnifiedModelChange = useCallback(
     (value: string) => {
@@ -44,5 +65,9 @@ export function useUnifiedModelSelection(
     [updateSettings],
   );
 
-  return { effectiveProvider, unifiedModelSelectValue, onUnifiedModelChange };
+  return {
+    effectiveProvider: selection.effectiveProvider,
+    unifiedModelSelectValue: selection.unifiedModelSelectValue,
+    onUnifiedModelChange,
+  };
 }

@@ -12,7 +12,16 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-export function useSecretKeySettings(secretId: string) {
+export type SecretKeySettingsState = {
+  readonly apiKeyDraft: string;
+  readonly setApiKeyDraft: (value: string) => void;
+  readonly hasStoredKey: boolean;
+  readonly apiKeyError: string | null;
+  readonly saveSecret: () => Promise<void>;
+  readonly removeSecret: () => Promise<void>;
+};
+
+export function useSecretKeySettings(secretId: string): SecretKeySettingsState {
   const [apiKeyDraft, setApiKeyDraft] = useState("");
   const [hasStoredKey, setHasStoredKey] = useState(false);
   const [apiKeyError, setApiKeyError] = useState<string | null>(null);
