@@ -7,14 +7,16 @@ Terms used across the agent loop, settings UI, and docs. Prefer these words in A
 ```mermaid
 flowchart LR
   Runner[sessionRunner]
-  Events[Agent events]
+  Events[Agent events per run]
   Projection[sessionProjection]
-  Timeline[Timeline]
+  CurrentRunEvents[currentRunEvents]
+  Timeline[Timeline session-wide]
   Transcript[transcriptRender]
   UI[Control center UI]
 
   Runner --> Events
   Events --> Projection
+  Projection --> CurrentRunEvents
   Projection --> Timeline
   Timeline --> Transcript
   Transcript --> UI
@@ -32,7 +34,11 @@ Implemented in `useAgentSession.ts` → `sessionRunner.ts` → `liveAgentSession
 
 Append-only record emitted during a run: `task.created`, `tool.started`, `assistant.text.delta`, `permission.requested`, and so on. Defined in `src/agent/types.ts`.
 
-Events are the source of truth for **session projection** and for **session logs** on disk (desktop).
+Each run emits its own event stream. Events are folded into **projection** and appended to **session logs** on disk (desktop). They are not a second in-memory session log.
+
+## Current-run events
+
+`AgentSessionProjection.currentRunEvents` holds only the active run’s events. `beginAgentRun` clears this buffer while **timeline** keeps prior turns. Use timeline (or disk logs) for session-wide history; use `currentRunEvents` for run-local state such as in-flight UI automation depth.
 
 ## Timeline
 
@@ -42,9 +48,9 @@ Do not confuse timeline items with **transcript render items** — the latter gr
 
 ## Projection
 
-Pure fold of events (plus run status) into timeline, capabilities, pending permission, and failure message. Types: `AgentSessionProjection`, `AgentSessionCapabilities` in `sessionProjection.ts`.
+Pure fold of the current run’s events (plus run status) into a session-wide **timeline**, capabilities, pending permission, and failure message. Types: `AgentSessionProjection`, `AgentSessionCapabilities` in `sessionProjection.ts`.
 
-**Reset session** clears projection state in memory only; it does not delete JSONL **session logs**.
+**Reset session** clears projection state in memory (timeline and `currentRunEvents`); it does not delete JSONL **session logs**.
 
 ## Transcript render
 

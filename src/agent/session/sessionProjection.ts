@@ -27,7 +27,8 @@ export type AgentSessionCapabilities = {
 
 export type AgentSessionProjection = {
   readonly status: AgentRunStatus;
-  readonly events: readonly AgentEvent[];
+  /** Events for the active run only; cleared when a new run starts. */
+  readonly currentRunEvents: readonly AgentEvent[];
   readonly timeline: readonly AgentTimelineItem[];
   readonly failureMessage: string | null;
   readonly pendingPermission: AgentPendingPermission | null;
@@ -36,7 +37,7 @@ export type AgentSessionProjection = {
 
 type MutableProjection = {
   readonly status: AgentRunStatus;
-  readonly events: readonly AgentEvent[];
+  readonly currentRunEvents: readonly AgentEvent[];
   readonly timeline: readonly AgentTimelineItem[];
   readonly failureMessage: string | null;
   readonly pendingPermission: AgentPendingPermission | null;
@@ -60,7 +61,7 @@ type ActivityEvent = Extract<
 export function createInitialAgentProjection(): AgentSessionProjection {
   return completeProjection({
     status: "idle",
-    events: [],
+    currentRunEvents: [],
     timeline: [],
     failureMessage: null,
     pendingPermission: null,
@@ -75,7 +76,7 @@ export function beginAgentRun(
 ): AgentSessionProjection {
   return completeProjection({
     status: "running",
-    events: [],
+    currentRunEvents: [],
     timeline:
       options.userTimelineItem === null
         ? prev.timeline
@@ -89,20 +90,20 @@ export function applyAgentEvent(
   prev: AgentSessionProjection,
   event: AgentEvent,
 ): AgentSessionProjection {
-  const events = [...prev.events, event];
+  const currentRunEvents = [...prev.currentRunEvents, event];
 
   switch (event.type) {
     case "task.created":
       return completeProjection({
         ...prev,
-        events,
+        currentRunEvents,
         status: "running",
       });
     case "plan.updated": {
       const timeline = finalizeStreamingAssistant(prev.timeline);
       return completeProjection({
         ...prev,
-        events,
+        currentRunEvents,
         timeline: appendActivityRow(timeline, event.taskId, activityRowFromEvent(event)),
       });
     }
@@ -110,7 +111,7 @@ export function applyAgentEvent(
       const timeline = finalizeStreamingAssistant(prev.timeline);
       return completeProjection({
         ...prev,
-        events,
+        currentRunEvents,
         status: "running",
         timeline: appendActivityRow(timeline, event.taskId, activityRowFromEvent(event)),
       });
@@ -122,7 +123,7 @@ export function applyAgentEvent(
       const timeline = finalizeStreamingAssistant(prev.timeline);
       return completeProjection({
         ...prev,
-        events,
+        currentRunEvents,
         status: "running",
         timeline: appendActivityRow(timeline, event.taskId, activityRowFromEvent(event)),
       });
@@ -131,7 +132,7 @@ export function applyAgentEvent(
       const timeline = finalizeStreamingAssistant(prev.timeline);
       return completeProjection({
         ...prev,
-        events,
+        currentRunEvents,
         status: "awaiting_permission",
         timeline: appendActivityRow(timeline, event.taskId, activityRowFromEvent(event)),
         pendingPermission: {
@@ -149,7 +150,7 @@ export function applyAgentEvent(
       const timeline = finalizeStreamingAssistant(prev.timeline);
       return completeProjection({
         ...prev,
-        events,
+        currentRunEvents,
         status: "running",
         timeline: appendActivityRow(timeline, event.taskId, activityRowFromEvent(event)),
         pendingPermission: null,
@@ -159,7 +160,7 @@ export function applyAgentEvent(
     case "assistant.text.done": {
       return completeProjection({
         ...prev,
-        events,
+        currentRunEvents,
         status: "running",
         timeline: applyAssistantStreamEvent(prev.timeline, event),
       });
@@ -168,7 +169,7 @@ export function applyAgentEvent(
       const timeline = finalizeStreamingAssistant(prev.timeline);
       return completeProjection({
         ...prev,
-        events,
+        currentRunEvents,
         status: "completed",
         timeline: setActivityStatus(timeline, event.taskId, "completed"),
       });
@@ -177,7 +178,7 @@ export function applyAgentEvent(
       const timeline = finalizeStreamingAssistant(prev.timeline);
       return completeProjection({
         ...prev,
-        events,
+        currentRunEvents,
         status: "failed",
         timeline: setActivityStatus(timeline, event.taskId, "failed"),
         failureMessage: event.message,
@@ -354,7 +355,7 @@ function deriveCapabilities(state: MutableProjection): AgentSessionCapabilities 
     taskInputDisabled: runActive,
     canRegenerateAssistant: last?.kind === "assistant" && last.status === "complete" && !runActive,
     hasConversation: state.timeline.length > 0 || state.status !== "idle",
-    uiAutomationBusy: countOpenUiAutomationTools(state.events) > 0,
-    pointerAutomationBusy: countOpenPointerTools(state.events) > 0,
+    uiAutomationBusy: countOpenUiAutomationTools(state.currentRunEvents) > 0,
+    pointerAutomationBusy: countOpenPointerTools(state.currentRunEvents) > 0,
   };
 }

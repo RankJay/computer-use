@@ -129,7 +129,7 @@ export function useAgentSession() {
 
   return {
     status: projection.status,
-    events: projection.events,
+    currentRunEvents: projection.currentRunEvents,
     timeline: projection.timeline,
     failureMessage: projection.failureMessage,
     pendingPermission: projection.pendingPermission,

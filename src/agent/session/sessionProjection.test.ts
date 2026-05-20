@@ -5,6 +5,8 @@ import {
   applyAgentEvent,
   beginAgentRun,
   createInitialAgentProjection,
+  findLastUserPrompt,
+  resetAgentProjection,
 } from "@/agent/session/sessionProjection";
 import type { AgentEvent, AgentTimelineItem, PermissionChoice } from "@/agent/types";
 
@@ -397,6 +399,70 @@ describe("sessionProjection", () => {
 
     expect(projection.capabilities.uiAutomationBusy).toBe(false);
     expect(projection.capabilities.pointerAutomationBusy).toBe(false);
+  });
+
+  test("beginAgentRun clears currentRunEvents but keeps timeline across runs", () => {
+    const firstUser: AgentTimelineItem = {
+      id: "user-1",
+      at: 900,
+      kind: "user",
+      text: "First prompt",
+    };
+    let projection = beginAgentRun(createInitialAgentProjection(), {
+      userTimelineItem: firstUser,
+    });
+
+    projection = applyAgentEvent(projection, createdEvent("run1-created"));
+    projection = applyAgentEvent(projection, {
+      ...baseEvent("run1-completed"),
+      type: "task.completed",
+      summary: "Done",
+    });
+
+    expect(projection.currentRunEvents.length).toBeGreaterThan(0);
+    expect(projection.timeline).toContainEqual(firstUser);
+
+    const secondUser: AgentTimelineItem = {
+      id: "user-2",
+      at: 1000,
+      kind: "user",
+      text: "Second prompt",
+    };
+    projection = beginAgentRun(projection, { userTimelineItem: secondUser });
+
+    expect(projection.currentRunEvents).toEqual([]);
+    expect(projection.timeline).toEqual([firstUser, secondUser]);
+    expect(projection.status).toBe("running");
+  });
+
+  test("resetAgentProjection clears currentRunEvents and timeline", () => {
+    let projection = beginAgentRun(createInitialAgentProjection(), {
+      userTimelineItem: { id: "user-1", at: 900, kind: "user", text: "Hello" },
+    });
+    projection = applyAgentEvent(projection, createdEvent());
+
+    projection = resetAgentProjection();
+
+    expect(projection.currentRunEvents).toEqual([]);
+    expect(projection.timeline).toEqual([]);
+    expect(projection.capabilities.hasConversation).toBe(false);
+  });
+
+  test("findLastUserPrompt reads session timeline after a new run starts", () => {
+    let projection = beginAgentRun(createInitialAgentProjection(), {
+      userTimelineItem: { id: "user-1", at: 900, kind: "user", text: "Original ask" },
+    });
+    projection = applyAgentEvent(projection, {
+      ...baseEvent("completed-1"),
+      type: "task.completed",
+      summary: "Done",
+    });
+
+    projection = beginAgentRun(projection, {
+      userTimelineItem: null,
+    });
+
+    expect(findLastUserPrompt(projection)).toBe("Original ask");
   });
 
   test("pointerAutomationBusy excludes type.text and key.tap", () => {
