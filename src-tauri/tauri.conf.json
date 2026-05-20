@@ -22,7 +22,7 @@
         "closable": true,
         "decorations": false,
         "shadow": true,
-        "alwaysOnTop": true
+        "alwaysOnTop": false
       }
     ],
     "security": {

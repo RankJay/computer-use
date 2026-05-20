@@ -35,7 +35,7 @@ export function SettingsModelSection(props: SettingsModelSectionProps): ReactEle
     <>
       <div className={settingBlockClass}>
         <div className={settingLeadClass}>
-          <Label htmlFor="agent-mode" className={settingHeadingClass}>
+          <Label className={settingHeadingClass}>
             Agent mode
           </Label>
           <p className={settingDescriptionClass}>
@@ -64,7 +64,7 @@ export function SettingsModelSection(props: SettingsModelSectionProps): ReactEle
 
       <div className={settingBlockClass}>
         <div className={settingLeadClass}>
-          <Label htmlFor="unified-model" className={settingHeadingClass}>
+          <Label className={settingHeadingClass}>
             Live model
           </Label>
           <p className={settingDescriptionClass}>

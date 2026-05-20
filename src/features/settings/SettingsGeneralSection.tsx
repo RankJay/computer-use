@@ -109,7 +109,7 @@ export function SettingsGeneralSection(props: SettingsGeneralSectionProps): Reac
 
       <div className={settingBlockClass}>
         <div className={settingLeadClass}>
-          <Label htmlFor="permission-mode" className={settingHeadingClass}>
+          <Label className={settingHeadingClass}>
             Permission mode
           </Label>
           <p className={settingDescriptionClass}>

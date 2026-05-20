@@ -33,6 +33,7 @@ export function TaskPromptComposer(props: TaskPromptComposerProps): ReactElement
       onSubmit={handleSubmit}
     >
       <Textarea
+        autoFocus
         value={props.value}
         onChange={(e) => props.onChange(e.target.value)}
         onKeyDown={handleKeyDown}
