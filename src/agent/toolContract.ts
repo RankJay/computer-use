@@ -188,6 +188,18 @@ export function riskClassForTool(name: AgentToolName): ConsequenceRiskClass {
   return TOOL_CONTRACT[name].riskClass;
 }
 
+/** Tools that drive mouse/keyboard UI automation (excludes observe/execute/mutate). */
+export function isUiAutomationToolName(value: string): boolean {
+  return isAgentToolName(value) && riskClassForTool(value) === "ui_automation";
+}
+
+/** In-flight pointer move/click only (excludes type.text and key.tap). */
+export function isPointerAutomationToolName(value: string): boolean {
+  return (
+    value === AGENT_TOOL_NAMES.POINTER_MOVE || value === AGENT_TOOL_NAMES.POINTER_CLICK
+  );
+}
+
 /** Permission drawer: line explaining the risk category (aligned with S1 taxonomy). */
 export function formatRiskLineForTool(name: AgentToolName): string {
   const rc = riskClassForTool(name);

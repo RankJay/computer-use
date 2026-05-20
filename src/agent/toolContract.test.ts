@@ -6,6 +6,8 @@ import {
   MODEL_TOOL_TO_AGENT_TOOL,
   TOOL_CONTRACT,
   agentToolNameForModelToolKey,
+  isPointerAutomationToolName,
+  isUiAutomationToolName,
   normalizePersistedApprovals,
 } from "@/agent/toolContract";
 
@@ -42,5 +44,13 @@ describe("toolContract", () => {
     expect(
       normalizePersistedApprovals(["terminal.run", "terminal_run", "not_a_tool", "terminal.run"]),
     ).toEqual([AGENT_TOOL_NAMES.TERMINAL_RUN]);
+  });
+
+  test("ui automation membership follows TOOL_CONTRACT risk class", () => {
+    expect(isUiAutomationToolName(AGENT_TOOL_NAMES.POINTER_CLICK)).toBe(true);
+    expect(isUiAutomationToolName(AGENT_TOOL_NAMES.TYPE_TEXT)).toBe(true);
+    expect(isUiAutomationToolName(AGENT_TOOL_NAMES.TERMINAL_RUN)).toBe(false);
+    expect(isPointerAutomationToolName(AGENT_TOOL_NAMES.POINTER_MOVE)).toBe(true);
+    expect(isPointerAutomationToolName(AGENT_TOOL_NAMES.TYPE_TEXT)).toBe(false);
   });
 });

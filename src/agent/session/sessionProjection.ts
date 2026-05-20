@@ -1,4 +1,8 @@
 import {
+  countOpenPointerTools,
+  countOpenUiAutomationTools,
+} from "@/agent/session/uiAutomationDepth";
+import {
   applyAssistantStreamEvent,
   finalizeStreamingAssistant,
   trimLastAssistantMessage,
@@ -12,10 +16,13 @@ import {
 } from "@/agent/types";
 
 export type AgentSessionCapabilities = {
+  readonly runActive: boolean;
   readonly canStartRun: boolean;
   readonly taskInputDisabled: boolean;
   readonly canRegenerateAssistant: boolean;
   readonly hasConversation: boolean;
+  readonly uiAutomationBusy: boolean;
+  readonly pointerAutomationBusy: boolean;
 };
 
 export type AgentSessionProjection = {
@@ -338,13 +345,16 @@ function activityRowFromEvent(event: ActivityEvent): AgentActivityRow {
 }
 
 function deriveCapabilities(state: MutableProjection): AgentSessionCapabilities {
-  const busy = state.status === "running" || state.status === "awaiting_permission";
+  const runActive = state.status === "running" || state.status === "awaiting_permission";
   const last = state.timeline.length > 0 ? state.timeline[state.timeline.length - 1] : undefined;
 
   return {
-    canStartRun: !busy,
-    taskInputDisabled: busy,
-    canRegenerateAssistant: last?.kind === "assistant" && last.status === "complete" && !busy,
+    runActive,
+    canStartRun: !runActive,
+    taskInputDisabled: runActive,
+    canRegenerateAssistant: last?.kind === "assistant" && last.status === "complete" && !runActive,
     hasConversation: state.timeline.length > 0 || state.status !== "idle",
+    uiAutomationBusy: countOpenUiAutomationTools(state.events) > 0,
+    pointerAutomationBusy: countOpenPointerTools(state.events) > 0,
   };
 }

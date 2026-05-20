@@ -1,10 +1,6 @@
-﻿import { useCallback, useMemo, useState } from "react";
+﻿import { useCallback, useState } from "react";
 
 import { isTauriRuntime } from "@/agent/native/nativeBridge";
-import {
-  countOpenPointerTools,
-  countOpenUiAutomationTools,
-} from "@/agent/session/uiAutomationDepth";
 import type { PermissionChoice } from "@/agent/types";
 import { Container, Item } from "@/components/motion/stagger";
 import { AgentChatTranscript } from "@/features/agent-chat/AgentChatTranscript";
@@ -32,15 +28,6 @@ export function ControlCenter() {
     void startRun(draft.trim(), null);
     setDraft("");
   }, [canStart, draft, startRun]);
-
-  const uiAutomationBusy = useMemo(
-    () => countOpenUiAutomationTools(agent.events) > 0,
-    [agent.events],
-  );
-  const pointerAutomationBusy = useMemo(
-    () => countOpenPointerTools(agent.events) > 0,
-    [agent.events],
-  );
 
   const handlePermissionResolve = useCallback(
     (choice: PermissionChoice): void => {
@@ -71,13 +58,13 @@ export function ControlCenter() {
               canRegenerateAssistant={agent.capabilities.canRegenerateAssistant}
               onRegenerateAssistant={agent.regenerateLastAssistant}
               timeline={agent.timeline}
-              isRunActive={agent.status === "running" || agent.status === "awaiting_permission"}
+              isRunActive={agent.capabilities.runActive}
             />
           )}
         </Container>
         <PointerAutomationEscBar
-          escArmActive={isTauriRuntime() && uiAutomationBusy}
-          pointerBusy={pointerAutomationBusy}
+          escArmActive={isTauriRuntime() && agent.capabilities.uiAutomationBusy}
+          pointerBusy={agent.capabilities.pointerAutomationBusy}
         />
       </div>
 

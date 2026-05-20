@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
+import { AGENT_TOOL_NAMES } from "@/agent/toolContract";
 import {
   applyAgentEvent,
   beginAgentRun,
@@ -340,18 +341,86 @@ describe("sessionProjection", () => {
     });
 
     expect(idle.capabilities).toEqual({
+      runActive: false,
       canStartRun: true,
       taskInputDisabled: false,
       canRegenerateAssistant: false,
       hasConversation: false,
+      uiAutomationBusy: false,
+      pointerAutomationBusy: false,
     });
+    expect(running.capabilities.runActive).toBe(true);
     expect(running.capabilities.canStartRun).toBe(false);
     expect(running.capabilities.taskInputDisabled).toBe(true);
+    expect(awaitingPermission.capabilities.runActive).toBe(true);
     expect(awaitingPermission.capabilities.canStartRun).toBe(false);
     expect(awaitingPermission.capabilities.taskInputDisabled).toBe(true);
+    expect(completed.capabilities.runActive).toBe(false);
     expect(completed.capabilities.canStartRun).toBe(true);
     expect(completed.capabilities.canRegenerateAssistant).toBe(true);
+    expect(failed.capabilities.runActive).toBe(false);
     expect(failed.capabilities.canStartRun).toBe(true);
     expect(failed.capabilities.canRegenerateAssistant).toBe(true);
+  });
+
+  test("runActive is true for running and awaiting_permission", () => {
+    const running = applyAgentEvent(createInitialAgentProjection(), createdEvent());
+    const awaitingPermission = applyAgentEvent(running, permissionRequestEvent());
+
+    expect(running.capabilities.runActive).toBe(true);
+    expect(awaitingPermission.capabilities.runActive).toBe(true);
+  });
+
+  test("uiAutomationBusy tracks in-flight ui automation tools", () => {
+    let projection = beginAgentRun(createInitialAgentProjection(), {
+      userTimelineItem: { id: "user-1", at: 900, kind: "user", text: "Click" },
+    });
+
+    expect(projection.capabilities.uiAutomationBusy).toBe(false);
+
+    projection = applyAgentEvent(projection, {
+      ...baseEvent("pointer-started"),
+      type: "tool.started",
+      toolName: AGENT_TOOL_NAMES.POINTER_CLICK,
+      inputSummary: "left at 10,10",
+    });
+
+    expect(projection.capabilities.uiAutomationBusy).toBe(true);
+    expect(projection.capabilities.pointerAutomationBusy).toBe(true);
+
+    projection = applyAgentEvent(projection, {
+      ...baseEvent("pointer-done"),
+      type: "tool.completed",
+      toolName: AGENT_TOOL_NAMES.POINTER_CLICK,
+      outputSummary: "clicked",
+    });
+
+    expect(projection.capabilities.uiAutomationBusy).toBe(false);
+    expect(projection.capabilities.pointerAutomationBusy).toBe(false);
+  });
+
+  test("pointerAutomationBusy excludes type.text and key.tap", () => {
+    let projection = beginAgentRun(createInitialAgentProjection(), {
+      userTimelineItem: { id: "user-1", at: 900, kind: "user", text: "Type" },
+    });
+
+    projection = applyAgentEvent(projection, {
+      ...baseEvent("type-started"),
+      type: "tool.started",
+      toolName: AGENT_TOOL_NAMES.TYPE_TEXT,
+      inputSummary: "hello",
+    });
+
+    expect(projection.capabilities.uiAutomationBusy).toBe(true);
+    expect(projection.capabilities.pointerAutomationBusy).toBe(false);
+
+    projection = applyAgentEvent(projection, {
+      ...baseEvent("type-done"),
+      type: "tool.completed",
+      toolName: AGENT_TOOL_NAMES.TYPE_TEXT,
+      outputSummary: "typed",
+    });
+
+    expect(projection.capabilities.uiAutomationBusy).toBe(false);
   });
 });
