@@ -1,7 +1,7 @@
 use base64::{engine::general_purpose::STANDARD, Engine as _};
-use enigo::{Button, Direction, Enigo, Key, Keyboard, Mouse, Settings};
 #[cfg(not(target_os = "windows"))]
 use enigo::Coordinate;
+use enigo::{Button, Direction, Enigo, Key, Keyboard, Mouse, Settings};
 use screenshots::image::{DynamicImage, ImageFormat};
 use screenshots::Screen;
 use std::io::Cursor;
@@ -122,12 +122,54 @@ fn sleep_step_cancel_aware(step_ms: u64) {
     std::thread::sleep(Duration::from_millis(step_ms));
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct PointerBounds {
+    min_x: i32,
+    max_x: i32,
+    min_y: i32,
+    max_y: i32,
+}
+
+fn pointer_bounds_from_display(
+    display_info: &screenshots::display_info::DisplayInfo,
+) -> PointerBounds {
+    let width_offset = i32::try_from(display_info.width.saturating_sub(1)).unwrap_or(i32::MAX);
+    let height_offset = i32::try_from(display_info.height.saturating_sub(1)).unwrap_or(i32::MAX);
+
+    PointerBounds {
+        min_x: display_info.x,
+        max_x: display_info.x.saturating_add(width_offset),
+        min_y: display_info.y,
+        max_y: display_info.y.saturating_add(height_offset),
+    }
+}
+
+fn clamp_pointer_target(x: i32, y: i32, bounds: PointerBounds) -> (i32, i32) {
+    (
+        x.clamp(bounds.min_x, bounds.max_x),
+        y.clamp(bounds.min_y, bounds.max_y),
+    )
+}
+
+fn clamp_pointer_target_to_primary_display(x: i32, y: i32) -> Result<(i32, i32), String> {
+    let screens = Screen::all().map_err(|e| e.to_string())?;
+    let Some(screen) = screens.first() else {
+        return Ok((x, y));
+    };
+    Ok(clamp_pointer_target(
+        x,
+        y,
+        pointer_bounds_from_display(&screen.display_info),
+    ))
+}
+
 /// Windows: `SetCursorPos` in small steps (virtual screen pixels). Does not enable mouse swallow —
 /// swallowing low-level mouse messages can interfere with seeing the cursor move reliably.
 /// Other OS: enigo absolute move in steps from current position.
 #[tauri::command]
 pub fn pointer_move_to(x: i32, y: i32) -> Result<(), String> {
     POINTER_CANCEL.store(false, Ordering::Release);
+    let (x, y) = clamp_pointer_target_to_primary_display(x, y)?;
 
     if pointer_cancel_requested() {
         return Err("Pointer automation cancelled.".to_string());
@@ -159,7 +201,9 @@ pub fn pointer_move_to(x: i32, y: i32) -> Result<(), String> {
     #[cfg(not(target_os = "windows"))]
     {
         let mut enigo = Enigo::new(&Settings::default()).map_err(|e| e.to_string())?;
-        let (sx, sy) = enigo.location().map_err(|e| format!("mouse location: {e}"))?;
+        let (sx, sy) = enigo
+            .location()
+            .map_err(|e| format!("mouse location: {e}"))?;
         let dx = x - sx;
         let dy = y - sy;
         let dist_sq = (dx as i64) * (dx as i64) + (dy as i64) * (dy as i64);
@@ -236,4 +280,73 @@ pub fn key_tap(key: String) -> Result<(), String> {
     let k = parse_logical_key(&key)?;
     enigo.key(k, Direction::Click).map_err(|e| e.to_string())?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{clamp_pointer_target, parse_logical_key, parse_mouse_button, PointerBounds};
+    use enigo::{Button, Key};
+
+    #[test]
+    fn parse_mouse_button_maps_supported_buttons() {
+        assert_eq!(
+            parse_mouse_button("left").expect("left button"),
+            Button::Left
+        );
+        assert_eq!(
+            parse_mouse_button("RIGHT").expect("right button"),
+            Button::Right
+        );
+        assert_eq!(
+            parse_mouse_button("middle").expect("middle button"),
+            Button::Middle
+        );
+    }
+
+    #[test]
+    fn parse_mouse_button_rejects_unknown_button() {
+        let err = parse_mouse_button("side").expect_err("side is unsupported");
+
+        assert!(err.contains("expected left, right, or middle"));
+    }
+
+    #[test]
+    fn parse_logical_key_maps_supported_aliases() {
+        assert_eq!(parse_logical_key("enter").expect("enter key"), Key::Return);
+        assert_eq!(
+            parse_logical_key("return").expect("return key"),
+            Key::Return
+        );
+        assert_eq!(parse_logical_key("tab").expect("tab key"), Key::Tab);
+        assert_eq!(
+            parse_logical_key("escape").expect("escape key"),
+            Key::Escape
+        );
+        assert_eq!(parse_logical_key("esc").expect("esc key"), Key::Escape);
+        assert_eq!(
+            parse_logical_key("backspace").expect("backspace key"),
+            Key::Backspace
+        );
+    }
+
+    #[test]
+    fn parse_logical_key_rejects_unknown_key() {
+        let err = parse_logical_key("space").expect_err("space is unsupported");
+
+        assert!(err.contains("expected enter, tab, escape, backspace"));
+    }
+
+    #[test]
+    fn clamp_pointer_target_clamps_to_bounds() {
+        let bounds = PointerBounds {
+            min_x: -10,
+            max_x: 100,
+            min_y: 20,
+            max_y: 80,
+        };
+
+        assert_eq!(clamp_pointer_target(-20, 120, bounds), (-10, 80));
+        assert_eq!(clamp_pointer_target(50, 40, bounds), (50, 40));
+        assert_eq!(clamp_pointer_target(200, -100, bounds), (100, 20));
+    }
 }

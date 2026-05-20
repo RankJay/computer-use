@@ -142,4 +142,49 @@ mod tests {
 
         assert!(result.is_err());
     }
+
+    #[test]
+    fn run_command_bounded_truncates_stdout_in_command_output() {
+        let output = run_command_bounded(
+            "rustc".to_string(),
+            vec!["--version".to_string()],
+            None,
+            Some(10_000),
+            Some(4),
+        )
+        .expect("rustc --version should run");
+
+        assert_eq!(output.code, Some(0));
+        assert!(output.stdout.starts_with("rust"));
+        assert!(output.stdout.ends_with("\n… [output truncated]"));
+    }
+
+    #[cfg(target_os = "windows")]
+    fn sleep_command() -> (String, Vec<String>) {
+        (
+            "powershell".to_string(),
+            vec![
+                "-NoProfile".to_string(),
+                "-Command".to_string(),
+                "Start-Sleep -Milliseconds 200".to_string(),
+            ],
+        )
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    fn sleep_command() -> (String, Vec<String>) {
+        (
+            "sh".to_string(),
+            vec!["-c".to_string(), "sleep 0.2".to_string()],
+        )
+    }
+
+    #[test]
+    fn run_command_bounded_times_out_long_running_process() {
+        let (program, args) = sleep_command();
+        let result = run_command_bounded(program, args, None, Some(1), Some(1024));
+
+        let err = result.expect_err("sleep command should time out");
+        assert!(err.contains("command timed out after 1 ms"));
+    }
 }

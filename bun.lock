@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "tauri-app",
+      "name": "actuate",
       "dependencies": {
         "@ai-sdk/anthropic": "^3.0.78",
         "@ai-sdk/openai": "^3.0.64",

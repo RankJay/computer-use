@@ -109,9 +109,7 @@ export function SettingsGeneralSection(props: SettingsGeneralSectionProps): Reac
 
       <div className={settingBlockClass}>
         <div className={settingLeadClass}>
-          <Label className={settingHeadingClass}>
-            Permission mode
-          </Label>
+          <Label className={settingHeadingClass}>Permission mode</Label>
           <p className={settingDescriptionClass}>
             How often Actuate asks before risky tools run or UI automation acts.
           </p>

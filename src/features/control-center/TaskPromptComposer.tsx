@@ -1,4 +1,5 @@
 import { ArrowUp } from "lucide-react";
+import { useEffect, useRef } from "react";
 import type { FormEvent, KeyboardEvent, ReactElement } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -13,6 +14,12 @@ export type TaskPromptComposerProps = {
 };
 
 export function TaskPromptComposer(props: TaskPromptComposerProps): ReactElement {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    textareaRef.current?.focus();
+  }, []);
+
   function handleSubmit(e: FormEvent<HTMLFormElement>): void {
     e.preventDefault();
     props.onSubmit();
@@ -33,7 +40,7 @@ export function TaskPromptComposer(props: TaskPromptComposerProps): ReactElement
       onSubmit={handleSubmit}
     >
       <Textarea
-        autoFocus
+        ref={textareaRef}
         value={props.value}
         onChange={(e) => props.onChange(e.target.value)}
         onKeyDown={handleKeyDown}

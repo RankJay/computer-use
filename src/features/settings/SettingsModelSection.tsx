@@ -35,9 +35,7 @@ export function SettingsModelSection(props: SettingsModelSectionProps): ReactEle
     <>
       <div className={settingBlockClass}>
         <div className={settingLeadClass}>
-          <Label className={settingHeadingClass}>
-            Agent mode
-          </Label>
+          <Label className={settingHeadingClass}>Agent mode</Label>
           <p className={settingDescriptionClass}>
             Demo runs an offline fixture script; Live calls your chosen cloud model with tools.
           </p>
@@ -64,9 +62,7 @@ export function SettingsModelSection(props: SettingsModelSectionProps): ReactEle
 
       <div className={settingBlockClass}>
         <div className={settingLeadClass}>
-          <Label className={settingHeadingClass}>
-            Live model
-          </Label>
+          <Label className={settingHeadingClass}>Live model</Label>
           <p className={settingDescriptionClass}>
             One list for Anthropic and OpenAI. Rows stay locked until that provider&apos;s key is
             saved below; picking an unlocked row sets Live mode to that provider.

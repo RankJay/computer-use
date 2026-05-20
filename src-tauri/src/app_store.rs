@@ -75,7 +75,11 @@ pub fn load_settings(app: AppHandle) -> Result<AppSettings, String> {
         return Ok(AppSettings::default());
     }
     let raw = fs::read_to_string(&path).map_err(|e| e.to_string())?;
-    let mut s: AppSettings = serde_json::from_str(&raw).map_err(|e| e.to_string())?;
+    parse_settings(&raw)
+}
+
+fn parse_settings(raw: &str) -> Result<AppSettings, String> {
+    let mut s: AppSettings = serde_json::from_str(raw).map_err(|e| e.to_string())?;
     if s.anthropic_model_id.is_empty() {
         s.anthropic_model_id = default_anthropic_model();
     }
@@ -112,6 +116,10 @@ pub fn load_secret(_app: AppHandle, key: String) -> Result<Option<String>, Strin
         return Err("secret key must not be empty".into());
     }
     let entry = keyring_entry(&key)?;
+    load_secret_from_entry(&entry)
+}
+
+fn load_secret_from_entry(entry: &Entry) -> Result<Option<String>, String> {
     match entry.get_password() {
         Ok(v) => Ok(Some(v)),
         Err(keyring::Error::NoEntry) => Ok(None),
@@ -125,8 +133,12 @@ pub fn store_secret(_app: AppHandle, key: String, value: String) -> Result<(), S
         return Err("secret key must not be empty".into());
     }
     let entry = keyring_entry(&key)?;
+    store_secret_in_entry(&entry, &value)
+}
+
+fn store_secret_in_entry(entry: &Entry, value: &str) -> Result<(), String> {
     entry
-        .set_password(&value)
+        .set_password(value)
         .map_err(|e| format!("keyring write: {e}"))
 }
 
@@ -136,6 +148,10 @@ pub fn delete_secret(_app: AppHandle, key: String) -> Result<(), String> {
         return Err("secret key must not be empty".into());
     }
     let entry = keyring_entry(&key)?;
+    delete_secret_from_entry(&entry)
+}
+
+fn delete_secret_from_entry(entry: &Entry) -> Result<(), String> {
     match entry.delete_credential() {
         Ok(()) => Ok(()),
         Err(keyring::Error::NoEntry) => Ok(()),
@@ -237,6 +253,14 @@ fn prune_old_sessions_at(root: &std::path::Path, retention_days: u32) -> Result<
         .duration_since(UNIX_EPOCH)
         .map_err(|e| e.to_string())?
         .as_secs();
+    prune_old_sessions_at_with_now(root, retention_days, now_secs)
+}
+
+fn prune_old_sessions_at_with_now(
+    root: &std::path::Path,
+    retention_days: u32,
+    now_secs: u64,
+) -> Result<(), String> {
     let cutoff = session_retention_cutoff(now_secs, retention_days);
 
     let entries = fs::read_dir(root).map_err(|e| e.to_string())?;
@@ -269,9 +293,12 @@ fn is_session_dir_stale(modified_secs: u64, cutoff_secs: u64) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{
-        is_session_dir_stale, prune_old_sessions_at, sanitize_keyframe_filename,
-        session_retention_cutoff, AppSettings, default_anthropic_model,
+        default_anthropic_model, delete_secret_from_entry, is_session_dir_stale,
+        load_secret_from_entry, parse_settings, prune_old_sessions_at,
+        prune_old_sessions_at_with_now, sanitize_keyframe_filename, session_retention_cutoff,
+        store_secret_in_entry, AppSettings,
     };
+    use keyring::Entry;
     use std::fs;
     use std::path::PathBuf;
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -300,9 +327,11 @@ mod tests {
             "uiAutomationEnabled": true
         }"#;
 
-        let settings: AppSettings = serde_json::from_str(raw).expect("deserialize legacy settings");
+        let settings = parse_settings(raw).expect("deserialize legacy settings");
 
         assert_eq!(settings.anthropic_model_id, "claude-sonnet-4-6");
+        assert_eq!(settings.openai_model_id, "gpt-5.2");
+        assert_eq!(settings.active_api_provider, "anthropic");
         assert_eq!(settings.permission_mode, "ask_all");
         assert_eq!(settings.retention_days, 7);
         assert!(settings.ui_automation_enabled);
@@ -357,5 +386,54 @@ mod tests {
 
         assert!(stale.exists());
         let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn prune_old_sessions_removes_dirs_older_than_retention_cutoff() {
+        let root = temp_sessions_root();
+        let stale = root.join("old");
+        fs::create_dir_all(&stale).expect("create stale dir");
+
+        let stale_modified = fs::metadata(&stale)
+            .expect("read stale metadata")
+            .modified()
+            .expect("read stale modified time")
+            .duration_since(UNIX_EPOCH)
+            .expect("stale modified after epoch")
+            .as_secs();
+        let simulated_now = stale_modified + 2 * 86400;
+
+        prune_old_sessions_at_with_now(&root, 1, simulated_now).expect("prune old sessions");
+
+        assert!(!stale.exists());
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn keyring_entry_helpers_round_trip_with_mock_entry() {
+        let entry = Entry::new_with_credential(
+            keyring::mock::default_credential_builder()
+                .build(None, "actuate-test", "api-key")
+                .expect("build mock keyring credential"),
+        );
+
+        assert_eq!(
+            load_secret_from_entry(&entry).expect("load empty secret"),
+            None
+        );
+
+        store_secret_in_entry(&entry, "sk-test").expect("store secret");
+
+        assert_eq!(
+            load_secret_from_entry(&entry).expect("load stored secret"),
+            Some("sk-test".to_string())
+        );
+
+        delete_secret_from_entry(&entry).expect("delete secret");
+
+        assert_eq!(
+            load_secret_from_entry(&entry).expect("load deleted secret"),
+            None
+        );
     }
 }

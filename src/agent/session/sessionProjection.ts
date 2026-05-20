@@ -104,7 +104,7 @@ export function applyAgentEvent(
       return completeProjection({
         ...prev,
         currentRunEvents,
-        timeline: appendActivityRow(timeline, event.taskId, activityRowFromEvent(event)),
+        timeline: appendActivityRow(timeline, event.taskId, event.at, activityRowFromEvent(event)),
       });
     }
     case "step.started": {
@@ -113,7 +113,7 @@ export function applyAgentEvent(
         ...prev,
         currentRunEvents,
         status: "running",
-        timeline: appendActivityRow(timeline, event.taskId, activityRowFromEvent(event)),
+        timeline: appendActivityRow(timeline, event.taskId, event.at, activityRowFromEvent(event)),
       });
     }
     case "step.completed":
@@ -125,7 +125,7 @@ export function applyAgentEvent(
         ...prev,
         currentRunEvents,
         status: "running",
-        timeline: appendActivityRow(timeline, event.taskId, activityRowFromEvent(event)),
+        timeline: appendActivityRow(timeline, event.taskId, event.at, activityRowFromEvent(event)),
       });
     }
     case "permission.requested": {
@@ -134,7 +134,7 @@ export function applyAgentEvent(
         ...prev,
         currentRunEvents,
         status: "awaiting_permission",
-        timeline: appendActivityRow(timeline, event.taskId, activityRowFromEvent(event)),
+        timeline: appendActivityRow(timeline, event.taskId, event.at, activityRowFromEvent(event)),
         pendingPermission: {
           permissionId: event.permissionId,
           toolName: event.toolName,
@@ -152,7 +152,7 @@ export function applyAgentEvent(
         ...prev,
         currentRunEvents,
         status: "running",
-        timeline: appendActivityRow(timeline, event.taskId, activityRowFromEvent(event)),
+        timeline: appendActivityRow(timeline, event.taskId, event.at, activityRowFromEvent(event)),
         pendingPermission: null,
       });
     }
@@ -231,10 +231,10 @@ function findLastActivityIndex(timeline: readonly AgentTimelineItem[], taskId: s
   return -1;
 }
 
-function createActivityItem(taskId: string, row: AgentActivityRow): AgentTimelineItem {
+function createActivityItem(taskId: string, at: number, row: AgentActivityRow): AgentTimelineItem {
   return {
     id: row.id,
-    at: Date.now(),
+    at,
     kind: "activity",
     taskId,
     status: "active",
@@ -246,12 +246,13 @@ function createActivityItem(taskId: string, row: AgentActivityRow): AgentTimelin
 function appendActivityRow(
   timeline: readonly AgentTimelineItem[],
   taskId: string,
+  at: number,
   row: AgentActivityRow,
 ): readonly AgentTimelineItem[] {
   const existingIndex = findLastActivityIndex(timeline, taskId);
 
   if (existingIndex === -1) {
-    return [...timeline, createActivityItem(taskId, row)];
+    return [...timeline, createActivityItem(taskId, at, row)];
   }
 
   const hasAssistantAfter = timeline
@@ -263,14 +264,14 @@ function appendActivityRow(
       if (index !== existingIndex || item.kind !== "activity") return item;
       return { ...item, status: "completed" as const };
     });
-    return [...sealed, createActivityItem(taskId, row)];
+    return [...sealed, createActivityItem(taskId, at, row)];
   }
 
   return timeline.map((item, index) => {
     if (index !== existingIndex || item.kind !== "activity") return item;
     return {
       ...item,
-      at: Date.now(),
+      at,
       status: "active",
       rows: [...item.rows, row],
     };
