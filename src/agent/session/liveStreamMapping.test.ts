@@ -41,11 +41,10 @@ describe("liveStreamMapping", () => {
   });
 
   test("mapStreamChunkToAgentEvent uses createEventMeta for ids", () => {
-    const ev = mapStreamChunkToAgentEvent(
-      { type: "text-delta", text: "word" },
-      taskId,
-      () => ({ id: "gen-1", at: 42 }),
-    );
+    const ev = mapStreamChunkToAgentEvent({ type: "text-delta", text: "word" }, taskId, () => ({
+      id: "gen-1",
+      at: 42,
+    }));
 
     expect(ev?.id).toBe("gen-1");
     expect(ev?.at).toBe(42);

@@ -5,15 +5,15 @@ import { getHostOsKind } from "@/agent/hostEnvironment";
 import type { LlmApiProvider } from "@/agent/native/tauriIpc";
 import { createLiveLanguageModel } from "@/agent/session/liveProviderModel";
 import {
-  emitAndPersistLiveSessionEvent,
-  persistLiveSessionEvent,
-} from "@/agent/session/liveSessionLogPolicy";
-import {
   buildScreenshotAttachmentStep,
   shouldAttachLatestScreenshot,
 } from "@/agent/session/liveScreenshotAttachment";
-import { buildLivePromptBundle } from "@/agent/session/liveSystemPrompt";
+import {
+  emitAndPersistLiveSessionEvent,
+  persistLiveSessionEvent,
+} from "@/agent/session/liveSessionLogPolicy";
 import { mapStreamChunkToAgentEvent } from "@/agent/session/liveStreamMapping";
+import { buildLivePromptBundle } from "@/agent/session/liveSystemPrompt";
 import {
   buildLiveCompletionEvents,
   buildTaskCreatedEvent,

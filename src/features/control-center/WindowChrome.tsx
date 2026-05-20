@@ -4,10 +4,10 @@ import { Link } from "react-router-dom";
 
 import {
   ChromeIconButton,
-  chromeIconSvgClassName,
   MinimizeWindowButton,
   TitleBarDragRegion,
 } from "@/features/control-center/windowFrame";
+import { chromeIconSvgClassName } from "@/features/control-center/windowFrameStyles";
 
 export function WindowChrome(): ReactElement {
   return (

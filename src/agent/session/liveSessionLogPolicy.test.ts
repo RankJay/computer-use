@@ -44,11 +44,7 @@ describe("liveSessionLogPolicy", () => {
       appendSessionLogLine: async (_sessionId: string, line: string) => {
         lines.push(line);
       },
-      writeSessionKeyframe: async (
-        _sessionId: string,
-        filename: string,
-        pngBase64: string,
-      ) => {
+      writeSessionKeyframe: async (_sessionId: string, filename: string, pngBase64: string) => {
         keyframes.push({ filename, png: pngBase64 });
       },
     };

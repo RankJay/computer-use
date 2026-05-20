@@ -71,7 +71,7 @@ function AssistantToolbar(props: {
   readonly onRegenerate?: () => void;
 }): ReactElement {
   return (
-    <div className="flex items-center opacity-55 transition-opacity hover:opacity-95">
+    <div className="flex items-center opacity-55 transition-opacity duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] hover:opacity-95 motion-reduce:transition-none">
       <Button
         type="button"
         variant="ghost"

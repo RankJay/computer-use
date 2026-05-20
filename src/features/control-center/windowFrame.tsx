@@ -4,14 +4,11 @@ import { useCallback } from "react";
 
 import { minimizeActuateWindow, startActuateWindowDrag } from "@/agent/native/nativeBridge";
 import { Button } from "@/components/ui/button";
+import {
+  chromeIconButtonClassName,
+  chromeIconSvgClassName,
+} from "@/features/control-center/windowFrameStyles";
 import { cn } from "@/lib/utils";
-
-/** Title-bar icon controls: no bg hover, no click shift — feedback on the SVG only. */
-export const chromeIconButtonClassName =
-  "size-8 shrink-0 cursor-pointer group [-webkit-app-region:no-drag]";
-
-export const chromeIconSvgClassName =
-  "size-4 text-[#3F3F3F] transition-[color,transform] duration-150 group-hover:text-[#9c9c9c] group-active:scale-[0.88] group-active:text-[#aeaeae]";
 
 export function ChromeIconButton({
   className,

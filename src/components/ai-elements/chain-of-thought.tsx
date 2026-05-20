@@ -68,7 +68,7 @@ export const ChainOfThoughtHeader = memo(
     return (
       <CollapsibleTrigger
         className={cn(
-          "flex w-full items-center gap-1.5 text-muted-foreground text-sm transition-colors hover:text-foreground",
+          "flex w-full items-center gap-1.5 text-muted-foreground text-sm transition-colors duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] hover:text-foreground motion-reduce:transition-none",
           className,
         )}
         {...props}
@@ -77,7 +77,7 @@ export const ChainOfThoughtHeader = memo(
         <span className="flex-1 text-left leading-snug">{children ?? "Behind the scenes"}</span>
         <ChevronDownIcon
           className={cn(
-            "size-3.5 shrink-0 transition-transform",
+            "size-3.5 shrink-0 transition-transform duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] motion-reduce:transition-none",
             isOpen ? "rotate-180" : "rotate-0",
           )}
         />
@@ -113,7 +113,7 @@ export const ChainOfThoughtStep = memo(
       className={cn(
         "flex gap-1.5 text-sm leading-snug",
         stepStatusStyles[status],
-        "fade-in-0 slide-in-from-top-2 animate-in",
+        "fade-in-0 slide-in-from-top-1 animate-in duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] motion-reduce:animate-none",
         className,
       )}
       {...props}
@@ -140,7 +140,7 @@ export const ChainOfThoughtContent = memo(
     <CollapsibleContent
       className={cn(
         "mt-1 space-y-1.5",
-        "data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-top-2 data-[state=open]:slide-in-from-top-2 text-popover-foreground outline-none data-[state=closed]:animate-out data-[state=open]:animate-in",
+        "data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-top-1 data-[state=open]:slide-in-from-top-1 text-popover-foreground duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] outline-none data-[state=closed]:animate-out data-[state=open]:animate-in motion-reduce:animate-none",
         className,
       )}
       {...props}
