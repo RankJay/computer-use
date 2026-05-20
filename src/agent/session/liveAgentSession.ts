@@ -13,10 +13,7 @@ import {
   shouldAttachLatestScreenshot,
 } from "@/agent/session/liveScreenshotAttachment";
 import { buildLivePromptBundle } from "@/agent/session/liveSystemPrompt";
-import {
-  assistantTextStreamTransform,
-  mapStreamChunkToAgentEvent,
-} from "@/agent/session/liveStreamMapping";
+import { mapStreamChunkToAgentEvent } from "@/agent/session/liveStreamMapping";
 import {
   buildLiveCompletionEvents,
   buildTaskCreatedEvent,
@@ -33,6 +30,10 @@ export type LiveAgentSessionOptions = AgentSessionRunnerOptions & {
   readonly llmProvider: LlmApiProvider;
   readonly liveModelId: string;
 };
+
+function createMeta(): { readonly id: string; readonly at: number } {
+  return { id: createEventId(), at: Date.now() };
+}
 
 export async function runLiveAgentSession(options: LiveAgentSessionOptions): Promise<void> {
   const {
@@ -82,8 +83,6 @@ export async function runLiveAgentSession(options: LiveAgentSessionOptions): Pro
     useTauriHttp: native !== null,
   });
 
-  const createMeta = () => ({ id: createEventId(), at: Date.now() });
-
   const taskEvent = buildTaskCreatedEvent(taskId, prompt, createMeta());
   await emitAndPersistLiveSessionEvent(emit, taskId, taskEvent);
 
@@ -98,7 +97,6 @@ export async function runLiveAgentSession(options: LiveAgentSessionOptions): Pro
   try {
     const result = streamText({
       model: languageModel,
-      experimental_transform: assistantTextStreamTransform,
       system,
       messages: [{ role: "user", content: userMessage }],
       tools,

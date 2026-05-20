@@ -4,7 +4,7 @@ import { hostRuntime } from "@/agent/host/hostRuntime";
 import { SECRET_ANTHROPIC_API_KEY, SECRET_OPENAI_API_KEY } from "@/agent/secrets";
 import { useSettings } from "@/app/providers/SettingsProvider";
 import { Separator } from "@/components/ui/separator";
-import { useAgentSessionContext } from "@/features/control-center/AgentSessionProvider";
+import { useAgentSessionContext } from "@/features/control-center/AgentSessionContext";
 import { SettingsGeneralSection } from "@/features/settings/SettingsGeneralSection";
 import { SettingsMaintenanceSection } from "@/features/settings/SettingsMaintenanceSection";
 import { SettingsModelSection } from "@/features/settings/SettingsModelSection";

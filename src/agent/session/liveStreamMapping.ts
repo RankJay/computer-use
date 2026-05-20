@@ -1,17 +1,9 @@
-import { smoothStream } from "ai";
-
 import type { AgentEvent, AssistantTextDeltaEvent } from "@/agent/types";
 
 export type LiveStreamTextDeltaChunk = {
   readonly type: "text-delta";
   readonly text: string;
 };
-
-/** Buffers provider bursts and releases word-sized chunks with a steady cadence. */
-export const assistantTextStreamTransform = smoothStream({
-  chunking: "word",
-  delayInMs: 24,
-});
 
 export function mapAssistantTextDeltaChunk(
   chunk: LiveStreamTextDeltaChunk,

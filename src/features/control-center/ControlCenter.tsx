@@ -9,7 +9,7 @@ import {
   TaskFailureBanner,
 } from "@/features/agent-chat/AgentSessionPanels";
 import { PermissionPrompt } from "@/features/agent-chat/PermissionPrompt";
-import { useAgentSessionContext } from "@/features/control-center/AgentSessionProvider";
+import { useAgentSessionContext } from "@/features/control-center/AgentSessionContext";
 import { TaskPromptComposer } from "@/features/control-center/TaskPromptComposer";
 import { WindowChrome } from "@/features/control-center/WindowChrome";
 
