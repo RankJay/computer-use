@@ -1,26 +1,11 @@
-import { tool, zodSchema } from "ai";
+import { zodSchema } from "ai";
 import { z } from "zod";
 
 import type { LiveAgentToolContext } from "@/agent/agentSessionContext";
-import { gateNativeTool } from "@/agent/host/nativeToolGate";
 import { terminalRunGuidanceForOs } from "@/agent/hostEnvironment";
-import { requestToolPermission } from "@/agent/permissions/permissionOrchestrator";
 import { AGENT_TOOL_NAMES, timeoutMsForTool } from "@/agent/toolContract";
-import {
-  abortable,
-  isCancellationError,
-  TOOL_CANCELLED_REASON,
-  toolTimeoutFromNativeError,
-  throwIfAborted,
-  withToolTimeout,
-} from "@/agent/tools/toolCancellation";
-import {
-  emitToolCancelled,
-  emitToolCompleted,
-  emitToolError,
-  emitToolStarted,
-  shortenForTimeline,
-} from "@/agent/tools/toolTimeline";
+import { defineActuateTool } from "@/agent/tools/defineActuateTool";
+import { shortenForTimeline } from "@/agent/tools/toolTimeline";
 
 let nextTerminalCancelToken = 1;
 
@@ -32,7 +17,8 @@ function createTerminalCancelToken(): number {
 
 export function createTerminalRunTool(ctx: LiveAgentToolContext) {
   const hostShellHint = terminalRunGuidanceForOs(ctx.hostOs);
-  return tool({
+  return defineActuateTool(ctx, {
+    toolName: AGENT_TOOL_NAMES.TERMINAL_RUN,
     description: `Run a terminal command (subprocess). Prefer short, non-interactive commands. Use for absolute paths outside the workspace (file tools are workspace-relative only). ${hostShellHint}`,
     inputSchema: zodSchema(
       z.object({
@@ -41,73 +27,41 @@ export function createTerminalRunTool(ctx: LiveAgentToolContext) {
         cwd: z.string().nullable().optional(),
       }),
     ),
-    execute: async (input) => {
+    nativeGate: "terminal",
+    permission: (input) => {
       const command = `${input.program} ${input.args.join(" ")}`.trim();
-      const permitted = await abortable(
-        ctx.signal,
-        requestToolPermission(ctx, AGENT_TOOL_NAMES.TERMINAL_RUN, {
-          summary: shortenForTimeline(command, 120),
-          rationale: "The model requested a local shell command.",
-          details: `program: ${input.program}\nargs: ${JSON.stringify(input.args)}\ncwd: ${input.cwd ?? "(default)"}\n\ncommand:\n${command}`,
-        }),
-      );
-      if (!permitted) {
-        return { ok: false as const, error: "User denied permission for terminal execution." };
-      }
-      throwIfAborted(ctx.signal);
-      await emitToolStarted(
-        ctx,
-        AGENT_TOOL_NAMES.TERMINAL_RUN,
-        shortenForTimeline(`${input.program} ${input.args.join(" ")}`),
-      );
-      const nativeGate = gateNativeTool(ctx.native, "terminal");
-      if (!nativeGate.ok) {
-        await emitToolCompleted(ctx, AGENT_TOOL_NAMES.TERMINAL_RUN, nativeGate.timelineSummary);
-        return { ok: false as const, error: nativeGate.error };
-      }
+      return {
+        summary: shortenForTimeline(command, 120),
+        rationale: "The model requested a local shell command.",
+        details: `program: ${input.program}\nargs: ${JSON.stringify(input.args)}\ncwd: ${input.cwd ?? "(default)"}\n\ncommand:\n${command}`,
+      };
+    },
+    deniedError: "User denied permission for terminal execution.",
+    describe: (input) => shortenForTimeline(`${input.program} ${input.args.join(" ")}`),
+    formatThrownErrorSummary: (message) => `Error: ${message}`,
+    execute: async (input, executeCtx, native) => {
       const cancelToken = createTerminalCancelToken();
-      try {
-        const result = await withToolTimeout(
-          AGENT_TOOL_NAMES.TERMINAL_RUN,
-          abortable(
-            ctx.signal,
-            nativeGate.native.runCommand({
-              program: input.program,
-              args: input.args,
-              cwd: input.cwd ?? ctx.workspaceRoot,
-              timeoutMs: timeoutMsForTool(AGENT_TOOL_NAMES.TERMINAL_RUN),
-              cancelToken,
-            }),
-            () => nativeGate.native.cancelRunCommand(cancelToken),
-          ),
-          () => nativeGate.native.cancelRunCommand(cancelToken),
-        );
-        const summary =
-          result.code === 0
-            ? `exit 0: ${shortenForTimeline(result.stdout || result.stderr)}`
-            : `exit ${result.code}: ${shortenForTimeline(result.stderr || result.stdout)}`;
-        throwIfAborted(ctx.signal);
-        await emitToolCompleted(ctx, AGENT_TOOL_NAMES.TERMINAL_RUN, summary);
-        return {
-          ok: true as const,
+      executeCtx.setNativeCancel(() => native.cancelRunCommand(cancelToken));
+      const result = await native.runCommand({
+        program: input.program,
+        args: input.args,
+        cwd: input.cwd ?? ctx.workspaceRoot,
+        timeoutMs: timeoutMsForTool(AGENT_TOOL_NAMES.TERMINAL_RUN),
+        cancelToken,
+      });
+      const summary =
+        result.code === 0
+          ? `exit 0: ${shortenForTimeline(result.stdout || result.stderr)}`
+          : `exit ${result.code}: ${shortenForTimeline(result.stderr || result.stdout)}`;
+      return {
+        ok: true,
+        value: {
           code: result.code,
           stdout: result.stdout,
           stderr: result.stderr,
-        };
-      } catch (err) {
-        if (ctx.signal.aborted || isCancellationError(err)) {
-          await emitToolCancelled(ctx, AGENT_TOOL_NAMES.TERMINAL_RUN, TOOL_CANCELLED_REASON);
-          return { ok: false as const, error: TOOL_CANCELLED_REASON };
-        }
-        const timeoutError = toolTimeoutFromNativeError(err, AGENT_TOOL_NAMES.TERMINAL_RUN);
-        if (timeoutError !== null) {
-          await emitToolError(ctx, AGENT_TOOL_NAMES.TERMINAL_RUN, timeoutError.payload);
-          return { ok: false as const, error: timeoutError.payload };
-        }
-        const message = err instanceof Error ? err.message : String(err);
-        await emitToolCompleted(ctx, AGENT_TOOL_NAMES.TERMINAL_RUN, `Error: ${message}`);
-        return { ok: false as const, error: message };
-      }
+        },
+        timelineSummary: summary,
+      };
     },
   });
 }
