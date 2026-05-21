@@ -190,12 +190,13 @@ function usageFromAnthropicRawChunk(
     return null;
   }
 
-  return {
+  const usageSnapshot = {
     inputTokens: numberProperty(usage, "input_tokens"),
     outputTokens: numberProperty(usage, "output_tokens"),
     cacheReadInputTokens: numberProperty(usage, "cache_read_input_tokens"),
     cacheWriteInputTokens: numberProperty(usage, "cache_creation_input_tokens"),
   };
+  return hasPartialUsage(usageSnapshot) ? usageSnapshot : null;
 }
 
 function usageFromOpenAiRawChunk(
@@ -209,7 +210,7 @@ function usageFromOpenAiRawChunk(
   const promptDetails = recordProperty(usage, "prompt_tokens_details");
   const inputDetails = recordProperty(usage, "input_tokens_details");
 
-  return {
+  const usageSnapshot = {
     inputTokens: numberProperty(usage, "prompt_tokens") ?? numberProperty(usage, "input_tokens"),
     outputTokens:
       numberProperty(usage, "completion_tokens") ?? numberProperty(usage, "output_tokens"),
@@ -217,10 +218,20 @@ function usageFromOpenAiRawChunk(
       numberProperty(promptDetails, "cached_tokens") ??
       numberProperty(inputDetails, "cached_tokens"),
   };
+  return hasPartialUsage(usageSnapshot) ? usageSnapshot : null;
 }
 
 function positiveDelta(next: number, prev: number): number {
   return Math.max(next - prev, 0);
+}
+
+function hasPartialUsage(usage: PartialUsageSnapshot): boolean {
+  return (
+    usage.inputTokens !== undefined ||
+    usage.outputTokens !== undefined ||
+    usage.cacheReadInputTokens !== undefined ||
+    usage.cacheWriteInputTokens !== undefined
+  );
 }
 
 function numberProperty(

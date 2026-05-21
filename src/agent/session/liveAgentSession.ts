@@ -13,14 +13,8 @@ import {
   persistLiveSessionEvent,
 } from "@/agent/session/liveSessionLogPolicy";
 import {
-  addUsageSnapshots,
-  createEmptyUsageSnapshot,
   extractUsageSnapshotFromStreamChunk,
   mapStreamChunkToAgentEvent,
-  mapUsageDeltaToAgentEvent,
-  mergeUsageSnapshot,
-  type StreamUsageSnapshot,
-  usageSnapshotDelta,
 } from "@/agent/session/liveStreamMapping";
 import { buildLivePromptBundle } from "@/agent/session/liveSystemPrompt";
 import {
@@ -29,6 +23,7 @@ import {
   buildTaskCreatedEvent,
   buildTaskFailedEvent,
 } from "@/agent/session/liveTaskEvents";
+import { createLiveUsageAccumulator } from "@/agent/session/liveUsageAccumulator";
 import { createRunBudgetProgress, exceededBudgetLimit } from "@/agent/session/runBudget";
 import type { AgentSessionRunnerOptions } from "@/agent/session/sessionRunner";
 import type { ConsequenceRiskClass } from "@/agent/toolContract";
@@ -79,9 +74,10 @@ export async function runLiveAgentSession(options: LiveAgentSessionOptions): Pro
   const budgetStartedAt = Date.now();
   let budgetExceededLimit: RunBudgetLimit | null = null;
   let finishedSteps: BudgetStep[] = [];
-  let committedUsage = createEmptyUsageSnapshot();
-  let currentStepUsage = createEmptyUsageSnapshot();
-  let emittedUsage = createEmptyUsageSnapshot();
+  const usageAccumulator = createLiveUsageAccumulator({
+    provider: llmProvider,
+    modelId: liveModelId,
+  });
 
   const ctx: LiveAgentToolContext = {
     taskId,
@@ -151,38 +147,6 @@ export async function runLiveAgentSession(options: LiveAgentSessionOptions): Pro
     return progress;
   }
 
-  function recordUsageSnapshot(usageSnapshot: StreamUsageSnapshot): void {
-    const nextUsage =
-      usageSnapshot.scope === "run"
-        ? mergeUsageSnapshot(emittedUsage, usageSnapshot.usage)
-        : addUsageSnapshots(
-            committedUsage,
-            mergeUsageSnapshot(currentStepUsage, usageSnapshot.usage),
-          );
-    const usageDelta = usageSnapshotDelta(nextUsage, emittedUsage);
-    const usageEvent = mapUsageDeltaToAgentEvent(
-      usageDelta,
-      taskId,
-      llmProvider,
-      liveModelId,
-      createMeta,
-    );
-
-    if (usageEvent !== null) {
-      emit(usageEvent);
-      emittedUsage = addUsageSnapshots(emittedUsage, usageDelta);
-    }
-
-    if (usageSnapshot.scope === "step") {
-      currentStepUsage = mergeUsageSnapshot(currentStepUsage, usageSnapshot.usage);
-    }
-  }
-
-  function commitCurrentStepUsage(): void {
-    committedUsage = addUsageSnapshots(committedUsage, currentStepUsage);
-    currentStepUsage = createEmptyUsageSnapshot();
-  }
-
   try {
     throwIfAborted(abortSignal);
     const result = streamText({
@@ -233,7 +197,15 @@ export async function runLiveAgentSession(options: LiveAgentSessionOptions): Pro
 
         const usageSnapshot = extractUsageSnapshotFromStreamChunk(chunk);
         if (usageSnapshot !== null) {
-          recordUsageSnapshot(usageSnapshot);
+          const usageDelta = usageAccumulator.ingest(usageSnapshot);
+          if (usageDelta !== null) {
+            emit({
+              ...createMeta(),
+              taskId,
+              type: "usage.delta",
+              delta: usageDelta,
+            });
+          }
         }
       },
       onStepFinish: async (step) => {
@@ -245,9 +217,17 @@ export async function runLiveAgentSession(options: LiveAgentSessionOptions): Pro
           usage: step.usage,
         });
         if (usageSnapshot !== null) {
-          recordUsageSnapshot(usageSnapshot);
-          commitCurrentStepUsage();
+          const usageDelta = usageAccumulator.ingest(usageSnapshot);
+          if (usageDelta !== null) {
+            emit({
+              ...createMeta(),
+              taskId,
+              type: "usage.delta",
+              delta: usageDelta,
+            });
+          }
         }
+        usageAccumulator.commitStep();
       },
     });
 

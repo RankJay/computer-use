@@ -82,6 +82,30 @@ describe("liveStreamMapping", () => {
     });
   });
 
+  test("extracts OpenAI raw usage snapshots", () => {
+    expect(
+      extractUsageSnapshotFromStreamChunk({
+        type: "raw",
+        rawValue: {
+          usage: {
+            prompt_tokens: 100,
+            completion_tokens: 25,
+            prompt_tokens_details: {
+              cached_tokens: 40,
+            },
+          },
+        },
+      }),
+    ).toEqual({
+      scope: "step",
+      usage: {
+        inputTokens: 100,
+        outputTokens: 25,
+        cacheReadInputTokens: 40,
+      },
+    });
+  });
+
   test("extracts AI SDK final usage snapshots", () => {
     expect(
       extractUsageSnapshotFromStreamChunk({
