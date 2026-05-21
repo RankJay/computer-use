@@ -11,11 +11,14 @@ const taskId = "task-1";
 
 function toolEvent(
   id: string,
-  type: "tool.started" | "tool.completed",
+  type: "tool.started" | "tool.completed" | "tool.cancelled",
   toolName: string,
 ): AgentEvent {
   if (type === "tool.started") {
     return { id, at: 1000, taskId, type, toolName, inputSummary: "in" };
+  }
+  if (type === "tool.cancelled") {
+    return { id, at: 1000, taskId, type, toolName, reason: "Stopped" };
   }
   return { id, at: 1000, taskId, type, toolName, outputSummary: "out" };
 }
@@ -29,6 +32,16 @@ describe("uiAutomationDepth", () => {
 
     expect(countOpenUiAutomationTools(events.slice(0, 1))).toBe(1);
     expect(countOpenUiAutomationTools(events)).toBe(0);
+  });
+
+  test("countOpenUiAutomationTools decrements on cancelled tools", () => {
+    const events = [
+      toolEvent("s1", "tool.started", AGENT_TOOL_NAMES.POINTER_MOVE),
+      toolEvent("x1", "tool.cancelled", AGENT_TOOL_NAMES.POINTER_MOVE),
+    ] as const;
+
+    expect(countOpenUiAutomationTools(events)).toBe(0);
+    expect(countOpenPointerTools(events)).toBe(0);
   });
 
   test("countOpenPointerTools ignores type.text and key.tap", () => {

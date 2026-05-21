@@ -1,5 +1,6 @@
 ﻿import { useCallback, useMemo, useRef, useState } from "react";
 
+import type { AgentNativeBridge } from "@/agent/native/nativeBridge";
 import { PermissionResolverLifecycle } from "@/agent/permissions/permissionOrchestrator";
 import {
   applyAgentEvent,
@@ -25,6 +26,8 @@ export function useAgentSession() {
   const [projection, setProjection] = useState(createInitialAgentProjection);
   const permissionLifecycleRef = useRef(new PermissionResolverLifecycle());
   const activeTaskRef = useRef<string | null>(null);
+  const activeAbortControllerRef = useRef<AbortController | null>(null);
+  const activeNativeRef = useRef<AgentNativeBridge | null>(null);
   const runBusyRef = useRef(false);
 
   const waitForPermissionChoice = useCallback((permissionId: string) => {
@@ -49,8 +52,11 @@ export function useAgentSession() {
       runBusyRef.current = true;
 
       const taskId = createEventId();
+      const abortController = new AbortController();
       activeTaskRef.current = taskId;
+      activeAbortControllerRef.current = abortController;
       const host = createAgentSessionRunnerHost();
+      activeNativeRef.current = host.native;
 
       const echoUser = opts?.echoUserPrompt !== false;
       setProjection((prev) =>
@@ -77,6 +83,7 @@ export function useAgentSession() {
             prompt,
             settings,
             workspaceRoot,
+            abortSignal: abortController.signal,
             permissionMode,
             native: host.native,
             runBudgetOverride: opts?.runBudgetOverride,
@@ -93,6 +100,10 @@ export function useAgentSession() {
         runBusyRef.current = false;
         if (activeTaskRef.current === taskId) {
           activeTaskRef.current = null;
+        }
+        if (activeAbortControllerRef.current === abortController) {
+          activeAbortControllerRef.current = null;
+          activeNativeRef.current = null;
         }
       }
     },
@@ -111,8 +122,25 @@ export function useAgentSession() {
     void startRun(lastPrompt, null, { echoUserPrompt: false });
   }, [projection, ready, startRun]);
 
+  const cancelRun = useCallback(() => {
+    const controller = activeAbortControllerRef.current;
+    if (controller === null || controller.signal.aborted) return;
+
+    controller.abort();
+    permissionLifecycleRef.current.cancelAll();
+    void activeNativeRef.current?.cancelPointerAutomation().catch(() => {
+      /** ignore stale IPC errors */
+    });
+  }, []);
+
   const resetSession = useCallback(() => {
+    activeAbortControllerRef.current?.abort();
+    void activeNativeRef.current?.cancelPointerAutomation().catch(() => {
+      /** ignore stale IPC errors */
+    });
     activeTaskRef.current = null;
+    activeAbortControllerRef.current = null;
+    activeNativeRef.current = null;
     runBusyRef.current = false;
     permissionLifecycleRef.current.cancelAll();
     setProjection(resetAgentProjection());
@@ -139,6 +167,7 @@ export function useAgentSession() {
     capabilities,
     permissionMode,
     startRun,
+    cancelRun,
     resolvePermission,
     resetSession,
     regenerateLastAssistant,

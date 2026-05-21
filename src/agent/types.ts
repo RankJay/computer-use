@@ -1,6 +1,12 @@
 ﻿import { generateId } from "ai";
 
-export type AgentRunStatus = "idle" | "running" | "awaiting_permission" | "completed" | "failed";
+export type AgentRunStatus =
+  | "idle"
+  | "running"
+  | "awaiting_permission"
+  | "completed"
+  | "failed"
+  | "cancelled";
 
 export type PermissionMode = "ask_risky" | "ask_all" | "session_low_risk";
 
@@ -66,7 +72,7 @@ export type AgentTimelineItem =
       at: number;
       kind: "activity";
       taskId: string;
-      status: "active" | "completed" | "failed";
+      status: "active" | "completed" | "failed" | "cancelled";
       rows: readonly AgentActivityRow[];
     };
 
@@ -74,6 +80,7 @@ export type AgentActivityRow = {
   readonly id: string;
   readonly title: string;
   readonly detail?: string;
+  readonly surface?: "reasoning" | "task" | "thought";
   /** Inline PNG preview for display capture rows (`data:image/png;base64,...`). */
   readonly screenshotDataUrl?: string;
 };
@@ -135,6 +142,12 @@ export type ToolCompletedEvent = AgentEventBase & {
   outputSummary: string;
 };
 
+export type ToolCancelledEvent = AgentEventBase & {
+  type: "tool.cancelled";
+  toolName: string;
+  reason: string;
+};
+
 export type ScreenshotKeyframeEvent = AgentEventBase & {
   type: "screenshot.keyframe";
   label: string;
@@ -158,6 +171,11 @@ export type TaskCompletedEvent = AgentEventBase & {
 export type TaskFailedEvent = AgentEventBase & {
   type: "task.failed";
   message: string;
+};
+
+export type TaskCancelledEvent = AgentEventBase & {
+  type: "task.cancelled";
+  reason: string;
 };
 
 export type AgentBudgetDeltaEvent = AgentEventBase & {
@@ -185,11 +203,13 @@ export type AgentEvent =
   | PermissionResolvedEvent
   | ToolStartedEvent
   | ToolCompletedEvent
+  | ToolCancelledEvent
   | ScreenshotKeyframeEvent
   | AssistantTextDeltaEvent
   | AssistantTextDoneEvent
   | TaskCompletedEvent
   | TaskFailedEvent
+  | TaskCancelledEvent
   | AgentBudgetDeltaEvent
   | AgentBudgetExceededEvent
   | UsageDeltaEvent;

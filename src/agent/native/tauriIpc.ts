@@ -7,6 +7,7 @@ import type { RunBudget } from "@/agent/types";
 export const TAURI_COMMAND = {
   capturePrimaryDisplayPngBase64: "capture_primary_display_png_base64",
   runCommand: "run_command",
+  cancelRunCommand: "cancel_run_command",
   pointerMoveTo: "pointer_move_to",
   pointerClick: "pointer_click",
   typeText: "type_text",
@@ -53,6 +54,8 @@ export type RunCommandRequest = {
   timeoutMs?: number | null;
   /** Max bytes read per stdout/stderr stream. */
   maxOutputBytes?: number | null;
+  /** Optional cooperative cancel token used by cancel_run_command. */
+  cancelToken?: number | null;
 };
 
 export type RunCommandResponse = {

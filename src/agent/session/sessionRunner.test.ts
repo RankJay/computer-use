@@ -35,6 +35,7 @@ function createRunnerOptions(
     prompt: "Summarize the workspace",
     settings: createSettings(),
     workspaceRoot: null,
+    abortSignal: new AbortController().signal,
     permissionMode: "ask_risky",
     native: null,
     emit: () => {},

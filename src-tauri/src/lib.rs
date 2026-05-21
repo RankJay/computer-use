@@ -1,9 +1,9 @@
 mod app_paths;
 mod app_store;
 mod capture_input;
+mod command_output;
 mod cursor_overlay;
 mod mouse_hook;
-mod command_output;
 mod process_run;
 mod workspace_fs;
 
@@ -111,6 +111,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             process_run::run_command,
+            process_run::cancel_run_command,
             capture_input::capture_primary_display_png_base64,
             capture_input::pointer_move_to,
             capture_input::pointer_click,

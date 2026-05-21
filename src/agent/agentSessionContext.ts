@@ -10,6 +10,7 @@ export type LiveAgentToolContext = {
   workspaceFiles: WorkspaceAdapter;
   hostOs: HostOsKind;
   workspaceRoot: string | null;
+  signal: AbortSignal;
   permissionMode: PermissionMode;
   uiAutomationEnabled: boolean;
   persistedToolApprovals: Set<string>;

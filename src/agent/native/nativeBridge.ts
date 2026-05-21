@@ -15,6 +15,7 @@ export type RunCommandResult = RunCommandResponse;
 export type AgentNativeBridge = {
   capturePrimaryDisplayPngBase64: () => Promise<string>;
   runCommand: (input: RunCommandRequest) => Promise<RunCommandResult>;
+  cancelRunCommand: (cancelToken: number) => Promise<void>;
   pointerMoveTo: (x: number, y: number) => Promise<void>;
   pointerClick: (button: PointerButton) => Promise<void>;
   typeText: (text: string) => Promise<void>;
@@ -40,8 +41,11 @@ export function createNativeBridge(): AgentNativeBridge | null {
           cwd: input.cwd,
           timeoutMs: input.timeoutMs ?? null,
           maxOutputBytes: input.maxOutputBytes ?? null,
+          cancelToken: input.cancelToken ?? null,
         },
       }),
+    cancelRunCommand: (cancelToken) =>
+      invoke<void>(TAURI_COMMAND.cancelRunCommand, { cancelToken }),
     pointerMoveTo: (x, y) => invoke<void>(TAURI_COMMAND.pointerMoveTo, { x, y }),
     pointerClick: (button) => invoke<void>(TAURI_COMMAND.pointerClick, { button }),
     typeText: (text) => invoke<void>(TAURI_COMMAND.typeText, { text }),

@@ -5,7 +5,13 @@ import type { LiveAgentToolContext } from "@/agent/agentSessionContext";
 import { gateNativeTool } from "@/agent/host/nativeToolGate";
 import { requestToolPermission } from "@/agent/permissions/permissionOrchestrator";
 import { AGENT_TOOL_NAMES } from "@/agent/toolContract";
-import { emitToolCompleted, emitToolStarted } from "@/agent/tools/toolTimeline";
+import {
+  abortable,
+  isCancellationError,
+  TOOL_CANCELLED_REASON,
+  throwIfAborted,
+} from "@/agent/tools/toolCancellation";
+import { emitToolCancelled, emitToolCompleted, emitToolStarted } from "@/agent/tools/toolTimeline";
 import { createEventId } from "@/agent/types";
 
 export function createDisplayCaptureTool(ctx: LiveAgentToolContext) {
@@ -14,14 +20,18 @@ export function createDisplayCaptureTool(ctx: LiveAgentToolContext) {
       "Capture the primary display as PNG for vision (Actuate hides itself briefly while grabbing pixels). Use only when the answer depends on what is visibly on screen (UI, windows, layout). Do not call twice for the same unchanged view in one task. Do not use for general knowledge or tasks that do not require seeing the desktop.",
     inputSchema: zodSchema(z.object({ label: z.string().optional() })),
     execute: async (input) => {
-      const permitted = await requestToolPermission(ctx, AGENT_TOOL_NAMES.DISPLAY_CAPTURE, {
-        summary: "Capture primary display",
-        rationale: "Vision step requested by the model.",
-        details: input.label ?? "keyframe",
-      });
+      const permitted = await abortable(
+        ctx.signal,
+        requestToolPermission(ctx, AGENT_TOOL_NAMES.DISPLAY_CAPTURE, {
+          summary: "Capture primary display",
+          rationale: "Vision step requested by the model.",
+          details: input.label ?? "keyframe",
+        }),
+      );
       if (!permitted) {
         return { ok: false as const, error: "User denied screen capture." };
       }
+      throwIfAborted(ctx.signal);
       await emitToolStarted(ctx, AGENT_TOOL_NAMES.DISPLAY_CAPTURE, input.label ?? "screenshot");
       const nativeGate = gateNativeTool(ctx.native, "displayCapture");
       if (!nativeGate.ok) {
@@ -29,7 +39,8 @@ export function createDisplayCaptureTool(ctx: LiveAgentToolContext) {
         return { ok: false as const, error: nativeGate.error };
       }
       try {
-        const b64 = await nativeGate.native.capturePrimaryDisplayPngBase64();
+        const b64 = await abortable(ctx.signal, nativeGate.native.capturePrimaryDisplayPngBase64());
+        throwIfAborted(ctx.signal);
         ctx.vision.latestPng = b64;
         const ev = {
           id: createEventId(),
@@ -48,6 +59,10 @@ export function createDisplayCaptureTool(ctx: LiveAgentToolContext) {
         );
         return { ok: true as const, bytes: b64.length };
       } catch (err) {
+        if (ctx.signal.aborted || isCancellationError(err)) {
+          await emitToolCancelled(ctx, AGENT_TOOL_NAMES.DISPLAY_CAPTURE, TOOL_CANCELLED_REASON);
+          return { ok: false as const, error: TOOL_CANCELLED_REASON };
+        }
         const message = err instanceof Error ? err.message : String(err);
         await emitToolCompleted(ctx, AGENT_TOOL_NAMES.DISPLAY_CAPTURE, message);
         return { ok: false as const, error: message };

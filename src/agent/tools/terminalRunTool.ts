@@ -6,7 +6,26 @@ import { gateNativeTool } from "@/agent/host/nativeToolGate";
 import { terminalRunGuidanceForOs } from "@/agent/hostEnvironment";
 import { requestToolPermission } from "@/agent/permissions/permissionOrchestrator";
 import { AGENT_TOOL_NAMES } from "@/agent/toolContract";
-import { emitToolCompleted, emitToolStarted, shortenForTimeline } from "@/agent/tools/toolTimeline";
+import {
+  abortable,
+  isCancellationError,
+  TOOL_CANCELLED_REASON,
+  throwIfAborted,
+} from "@/agent/tools/toolCancellation";
+import {
+  emitToolCancelled,
+  emitToolCompleted,
+  emitToolStarted,
+  shortenForTimeline,
+} from "@/agent/tools/toolTimeline";
+
+let nextTerminalCancelToken = 1;
+
+function createTerminalCancelToken(): number {
+  const token = nextTerminalCancelToken;
+  nextTerminalCancelToken = nextTerminalCancelToken === Number.MAX_SAFE_INTEGER ? 1 : token + 1;
+  return token;
+}
 
 export function createTerminalRunTool(ctx: LiveAgentToolContext) {
   const hostShellHint = terminalRunGuidanceForOs(ctx.hostOs);
@@ -21,14 +40,18 @@ export function createTerminalRunTool(ctx: LiveAgentToolContext) {
     ),
     execute: async (input) => {
       const command = `${input.program} ${input.args.join(" ")}`.trim();
-      const permitted = await requestToolPermission(ctx, AGENT_TOOL_NAMES.TERMINAL_RUN, {
-        summary: shortenForTimeline(command, 120),
-        rationale: "The model requested a local shell command.",
-        details: `program: ${input.program}\nargs: ${JSON.stringify(input.args)}\ncwd: ${input.cwd ?? "(default)"}\n\ncommand:\n${command}`,
-      });
+      const permitted = await abortable(
+        ctx.signal,
+        requestToolPermission(ctx, AGENT_TOOL_NAMES.TERMINAL_RUN, {
+          summary: shortenForTimeline(command, 120),
+          rationale: "The model requested a local shell command.",
+          details: `program: ${input.program}\nargs: ${JSON.stringify(input.args)}\ncwd: ${input.cwd ?? "(default)"}\n\ncommand:\n${command}`,
+        }),
+      );
       if (!permitted) {
         return { ok: false as const, error: "User denied permission for terminal execution." };
       }
+      throwIfAborted(ctx.signal);
       await emitToolStarted(
         ctx,
         AGENT_TOOL_NAMES.TERMINAL_RUN,
@@ -39,16 +62,23 @@ export function createTerminalRunTool(ctx: LiveAgentToolContext) {
         await emitToolCompleted(ctx, AGENT_TOOL_NAMES.TERMINAL_RUN, nativeGate.timelineSummary);
         return { ok: false as const, error: nativeGate.error };
       }
+      const cancelToken = createTerminalCancelToken();
       try {
-        const result = await nativeGate.native.runCommand({
-          program: input.program,
-          args: input.args,
-          cwd: input.cwd ?? ctx.workspaceRoot,
-        });
+        const result = await abortable(
+          ctx.signal,
+          nativeGate.native.runCommand({
+            program: input.program,
+            args: input.args,
+            cwd: input.cwd ?? ctx.workspaceRoot,
+            cancelToken,
+          }),
+          () => nativeGate.native.cancelRunCommand(cancelToken),
+        );
         const summary =
           result.code === 0
             ? `exit 0: ${shortenForTimeline(result.stdout || result.stderr)}`
             : `exit ${result.code}: ${shortenForTimeline(result.stderr || result.stdout)}`;
+        throwIfAborted(ctx.signal);
         await emitToolCompleted(ctx, AGENT_TOOL_NAMES.TERMINAL_RUN, summary);
         return {
           ok: true as const,
@@ -57,6 +87,10 @@ export function createTerminalRunTool(ctx: LiveAgentToolContext) {
           stderr: result.stderr,
         };
       } catch (err) {
+        if (ctx.signal.aborted || isCancellationError(err)) {
+          await emitToolCancelled(ctx, AGENT_TOOL_NAMES.TERMINAL_RUN, TOOL_CANCELLED_REASON);
+          return { ok: false as const, error: TOOL_CANCELLED_REASON };
+        }
         const message = err instanceof Error ? err.message : String(err);
         await emitToolCompleted(ctx, AGENT_TOOL_NAMES.TERMINAL_RUN, `Error: ${message}`);
         return { ok: false as const, error: message };

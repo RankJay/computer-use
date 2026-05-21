@@ -41,3 +41,20 @@ export async function emitToolCompleted(
   ctx.emit(ev);
   await ctx.appendStructuredLog(ev);
 }
+
+export async function emitToolCancelled(
+  ctx: LiveAgentToolContext,
+  toolName: AgentToolName,
+  reason: string,
+): Promise<void> {
+  const ev = {
+    id: createEventId(),
+    at: Date.now(),
+    taskId: ctx.taskId,
+    type: "tool.cancelled" as const,
+    toolName,
+    reason,
+  };
+  ctx.emit(ev);
+  await ctx.appendStructuredLog(ev);
+}

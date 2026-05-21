@@ -25,6 +25,7 @@ import {
 import { buildLivePromptBundle } from "@/agent/session/liveSystemPrompt";
 import {
   buildLiveCompletionEvents,
+  buildTaskCancelledEvent,
   buildTaskCreatedEvent,
   buildTaskFailedEvent,
 } from "@/agent/session/liveTaskEvents";
@@ -32,6 +33,11 @@ import { createRunBudgetProgress, exceededBudgetLimit } from "@/agent/session/ru
 import type { AgentSessionRunnerOptions } from "@/agent/session/sessionRunner";
 import type { ConsequenceRiskClass } from "@/agent/toolContract";
 import { createActuateTools } from "@/agent/tools/actuateTools";
+import {
+  isCancellationError,
+  TOOL_CANCELLED_REASON,
+  throwIfAborted,
+} from "@/agent/tools/toolCancellation";
 import { createEventId, type RunBudgetLimit, type RunBudgetProgress } from "@/agent/types";
 import { workspaceAdapter as defaultWorkspaceAdapter } from "@/agent/workspace/workspaceAdapter";
 
@@ -56,6 +62,7 @@ export async function runLiveAgentSession(options: LiveAgentSessionOptions): Pro
     liveModelId,
     settings,
     workspaceRoot,
+    abortSignal,
     permissionMode,
     native,
     workspaceAdapter: workspaceAdapterOverride,
@@ -82,6 +89,7 @@ export async function runLiveAgentSession(options: LiveAgentSessionOptions): Pro
     workspaceFiles: workspaceFilesAdapter,
     hostOs,
     workspaceRoot,
+    signal: abortSignal,
     permissionMode,
     uiAutomationEnabled: settings.uiAutomationEnabled,
     persistedToolApprovals: persisted,
@@ -176,11 +184,13 @@ export async function runLiveAgentSession(options: LiveAgentSessionOptions): Pro
   }
 
   try {
+    throwIfAborted(abortSignal);
     const result = streamText({
       model: languageModel,
       system,
       messages: [{ role: "user", content: userMessage }],
       tools,
+      abortSignal,
       includeRawChunks: true,
       providerOptions:
         llmProvider === "openai"
@@ -242,12 +252,18 @@ export async function runLiveAgentSession(options: LiveAgentSessionOptions): Pro
     });
 
     await result.consumeStream();
+    throwIfAborted(abortSignal);
     const text = (await result.text).trim();
 
     const { done, completed } = buildLiveCompletionEvents(taskId, text, createMeta);
     await emitAndPersistLiveSessionEvent(emit, taskId, done);
     await emitAndPersistLiveSessionEvent(emit, taskId, completed);
   } catch (err) {
+    if (abortSignal.aborted || isCancellationError(err)) {
+      const cancelledEv = buildTaskCancelledEvent(taskId, TOOL_CANCELLED_REASON, createMeta());
+      await emitAndPersistLiveSessionEvent(emit, taskId, cancelledEv);
+      return;
+    }
     const failEv = buildTaskFailedEvent(taskId, err, createMeta());
     await emitAndPersistLiveSessionEvent(emit, taskId, failEv);
   }

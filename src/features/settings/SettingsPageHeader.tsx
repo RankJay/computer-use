@@ -17,10 +17,9 @@ export function SettingsPageHeader(): ReactElement {
           <ArrowLeft className={chromeIconSvgClassName} strokeWidth={2} />
         </Link>
       </ChromeIconButton>
-      <h1 className="shrink-0 text-base font-medium tracking-tight text-[#eaeaea] [-webkit-app-region:no-drag]">
+      <h1 className="shrink-0 text-base flex-1 font-medium tracking-tight text-[#eaeaea] [-webkit-app-region:no-drag]">
         Settings
       </h1>
-      <TitleBarDragRegion className="min-h-[44px] min-w-8 flex-1 self-stretch rounded-md" />
       <MinimizeWindowButton />
     </header>
   );

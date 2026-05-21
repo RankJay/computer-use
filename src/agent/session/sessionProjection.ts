@@ -8,6 +8,12 @@ import {
   countOpenUiAutomationTools,
 } from "@/agent/session/uiAutomationDepth";
 import {
+  AGENT_TOOL_NAMES,
+  type AgentToolName,
+  isAgentToolName,
+  riskClassForTool,
+} from "@/agent/toolContract";
+import {
   type AgentActivityRow,
   type AgentEvent,
   type AgentPendingPermission,
@@ -66,6 +72,7 @@ type ActivityEvent = Extract<
       | "permission.resolved"
       | "tool.started"
       | "tool.completed"
+      | "tool.cancelled"
       | "screenshot.keyframe";
   }
 >;
@@ -135,6 +142,7 @@ export function applyAgentEvent(
     case "step.completed":
     case "tool.started":
     case "tool.completed":
+    case "tool.cancelled":
     case "screenshot.keyframe": {
       const timeline = finalizeStreamingAssistant(prev.timeline);
       return completeProjection({
@@ -198,6 +206,16 @@ export function applyAgentEvent(
         status: "failed",
         timeline: setActivityStatus(timeline, event.taskId, "failed"),
         failureMessage: event.message,
+      });
+    }
+    case "task.cancelled": {
+      const timeline = finalizeStreamingAssistant(prev.timeline);
+      return completeProjection({
+        ...prev,
+        currentRunEvents,
+        status: "cancelled",
+        timeline: setActivityStatus(timeline, event.taskId, "cancelled"),
+        pendingPermission: null,
       });
     }
     case "agent.budget.delta":
@@ -338,7 +356,7 @@ function appendActivityRow(
 function setActivityStatus(
   timeline: readonly AgentTimelineItem[],
   taskId: string,
-  status: "completed" | "failed",
+  status: "completed" | "failed" | "cancelled",
 ): readonly AgentTimelineItem[] {
   return timeline.map((item) =>
     item.kind === "activity" && item.taskId === taskId ? { ...item, status } : item,
@@ -368,6 +386,7 @@ function activityRowFromEvent(event: ActivityEvent): AgentActivityRow {
         id: event.id,
         title: `Asked permission: ${event.summary}`,
         detail: event.rationale,
+        surface: activitySurfaceForTool(event.toolName),
       };
     case "permission.resolved":
       return {
@@ -379,12 +398,21 @@ function activityRowFromEvent(event: ActivityEvent): AgentActivityRow {
         id: event.id,
         title: `Running ${event.toolName}`,
         detail: event.inputSummary,
+        surface: activitySurfaceForTool(event.toolName),
       };
     case "tool.completed":
       return {
         id: event.id,
         title: `Finished ${event.toolName}`,
         detail: event.outputSummary,
+        surface: activitySurfaceForTool(event.toolName),
+      };
+    case "tool.cancelled":
+      return {
+        id: event.id,
+        title: `Cancelled ${event.toolName}`,
+        detail: event.reason,
+        surface: activitySurfaceForTool(event.toolName),
       };
     case "screenshot.keyframe":
       return {
@@ -401,6 +429,20 @@ function activityRowFromEvent(event: ActivityEvent): AgentActivityRow {
       return _never;
     }
   }
+}
+
+function activitySurfaceForTool(toolName: string | undefined): AgentActivityRow["surface"] {
+  if (toolName === undefined || !isAgentToolName(toolName)) return undefined;
+  if (isWorkspaceIoTool(toolName)) return "task";
+  return undefined;
+}
+
+function isWorkspaceIoTool(toolName: AgentToolName): boolean {
+  return (
+    toolName === AGENT_TOOL_NAMES.WORKSPACE_INSPECT ||
+    toolName === AGENT_TOOL_NAMES.FILE_READ ||
+    riskClassForTool(toolName) === "mutate_workspace"
+  );
 }
 
 function deriveCapabilities(state: MutableProjection): AgentSessionCapabilities {

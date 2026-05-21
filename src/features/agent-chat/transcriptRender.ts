@@ -11,7 +11,7 @@ export type TranscriptActivityItem = {
   readonly kind: "activity";
   readonly id: string;
   readonly rows: readonly AgentActivityRow[];
-  readonly status: "active" | "completed" | "failed";
+  readonly status: "active" | "completed" | "failed" | "cancelled";
 };
 
 export type TranscriptAssistantTextPart = {

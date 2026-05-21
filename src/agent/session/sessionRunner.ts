@@ -20,6 +20,7 @@ export type AgentSessionRunnerOptions = {
   readonly prompt: string;
   readonly settings: AppSettingsPayload;
   readonly workspaceRoot: string | null;
+  readonly abortSignal: AbortSignal;
   readonly permissionMode: PermissionMode;
   readonly native: AgentNativeBridge | null;
   readonly runBudgetOverride?: RunBudget;

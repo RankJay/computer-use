@@ -1,5 +1,6 @@
 import type {
   AssistantTextDoneEvent,
+  TaskCancelledEvent,
   TaskCompletedEvent,
   TaskCreatedEvent,
   TaskFailedEvent,
@@ -62,6 +63,19 @@ export function buildTaskFailedEvent(
     taskId,
     type: "task.failed",
     message,
+  };
+}
+
+export function buildTaskCancelledEvent(
+  taskId: string,
+  reason: string,
+  meta: LiveTaskEventMeta,
+): TaskCancelledEvent {
+  return {
+    ...meta,
+    taskId,
+    type: "task.cancelled",
+    reason,
   };
 }
 

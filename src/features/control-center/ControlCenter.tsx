@@ -16,7 +16,7 @@ import { WindowChrome } from "@/features/control-center/WindowChrome";
 
 export function ControlCenter() {
   const agent = useAgentSessionContext();
-  const { pendingPermission, resolvePermission, startRun } = agent;
+  const { cancelRun, pendingPermission, resolvePermission, startRun } = agent;
   const [draft, setDraft] = useState(() => hostRuntime.defaultComposerDraft);
 
   const canStart = agent.capabilities.canStartRun && draft.trim().length > 0;
@@ -81,8 +81,10 @@ export function ControlCenter() {
           value={draft}
           onChange={setDraft}
           onSubmit={submitTask}
+          onCancel={cancelRun}
           inputDisabled={agent.capabilities.taskInputDisabled}
           submitDisabled={!canStart}
+          cancelVisible={agent.capabilities.runActive}
         />
       </div>
     </div>

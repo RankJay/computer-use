@@ -126,6 +126,40 @@ describe("sessionProjection", () => {
     expect(projection.failureMessage).toBe("Latest failure");
   });
 
+  test("task.cancelled clears active run without marking failure", () => {
+    let projection = applyAgentEvent(createInitialAgentProjection(), createdEvent());
+    projection = applyAgentEvent(projection, {
+      ...baseEvent("tool-started"),
+      type: "tool.started",
+      toolName: "terminal.run",
+      inputSummary: "sleep 60",
+    });
+    projection = applyAgentEvent(projection, {
+      ...baseEvent("tool-cancelled"),
+      type: "tool.cancelled",
+      toolName: "terminal.run",
+      reason: "Cancelled by user.",
+    });
+    projection = applyAgentEvent(projection, {
+      ...baseEvent("cancelled"),
+      type: "task.cancelled",
+      reason: "Cancelled by user.",
+    });
+
+    expect(projection.status).toBe("cancelled");
+    expect(projection.failureMessage).toBeNull();
+    expect(projection.capabilities.runActive).toBe(false);
+    expect(projection.timeline).toContainEqual(
+      expect.objectContaining({
+        kind: "activity",
+        status: "cancelled",
+        rows: expect.arrayContaining([
+          expect.objectContaining({ title: "Cancelled terminal.run" }),
+        ]),
+      }),
+    );
+  });
+
   test("task.failed flushes streamed assistant text into the timeline", () => {
     let projection = createInitialAgentProjection();
 
@@ -353,7 +387,7 @@ describe("sessionProjection", () => {
     });
   });
 
-  test("capability flags match idle, running, awaiting permission, completed, and failed states", () => {
+  test("capability flags match idle, running, awaiting permission, completed, failed, and cancelled states", () => {
     const assistantItem: AgentTimelineItem = {
       id: "assistant-1",
       at: 1000,
@@ -374,6 +408,11 @@ describe("sessionProjection", () => {
       ...baseEvent("failed"),
       type: "task.failed",
       message: "Boom",
+    });
+    const cancelled = applyAgentEvent(beginAgentRun(idle, { userTimelineItem: assistantItem }), {
+      ...baseEvent("cancelled"),
+      type: "task.cancelled",
+      reason: "Stopped",
     });
 
     expect(idle.capabilities).toEqual({
@@ -397,6 +436,9 @@ describe("sessionProjection", () => {
     expect(failed.capabilities.runActive).toBe(false);
     expect(failed.capabilities.canStartRun).toBe(true);
     expect(failed.capabilities.canRegenerateAssistant).toBe(true);
+    expect(cancelled.capabilities.runActive).toBe(false);
+    expect(cancelled.capabilities.canStartRun).toBe(true);
+    expect(cancelled.capabilities.canRegenerateAssistant).toBe(true);
   });
 
   test("runActive is true for running and awaiting_permission", () => {

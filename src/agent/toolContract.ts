@@ -62,6 +62,8 @@ type ToolContractEntry = {
   /** Stable tool id exposed to the model and timeline. */
   name: AgentToolName;
   riskClass: ConsequenceRiskClass;
+  /** Whether AbortSignal cancellation can interrupt or only stop before/after execution. */
+  cancellation: string;
   /** Short label for timeline / cards. */
   displayName: string;
   /** One line for permission drawer “what”. */
@@ -72,54 +74,63 @@ export const TOOL_CONTRACT: Record<AgentToolName, ToolContractEntry> = {
   [AGENT_TOOL_NAMES.WORKSPACE_INSPECT]: {
     name: AGENT_TOOL_NAMES.WORKSPACE_INSPECT,
     riskClass: "observe",
+    cancellation: "Honors cancellation before and after the directory read.",
     displayName: "Workspace listing",
     defaultPermissionTitle: "List files in a workspace directory",
   },
   [AGENT_TOOL_NAMES.TERMINAL_RUN]: {
     name: AGENT_TOOL_NAMES.TERMINAL_RUN,
     riskClass: "execute_local",
+    cancellation: "Honors cancellation mid-command by killing the spawned child process.",
     displayName: "Terminal",
     defaultPermissionTitle: "Allow a terminal command",
   },
   [AGENT_TOOL_NAMES.DISPLAY_CAPTURE]: {
     name: AGENT_TOOL_NAMES.DISPLAY_CAPTURE,
     riskClass: "observe",
+    cancellation: "Honors cancellation before and after the native capture.",
     displayName: "Screenshot",
     defaultPermissionTitle: "Allow screen capture",
   },
   [AGENT_TOOL_NAMES.POINTER_MOVE]: {
     name: AGENT_TOOL_NAMES.POINTER_MOVE,
     riskClass: "ui_automation",
+    cancellation: "Honors cancellation mid-move between pointer animation steps.",
     displayName: "Move pointer",
     defaultPermissionTitle: "Allow moving the mouse pointer",
   },
   [AGENT_TOOL_NAMES.POINTER_CLICK]: {
     name: AGENT_TOOL_NAMES.POINTER_CLICK,
     riskClass: "ui_automation",
+    cancellation: "Honors cancellation before the click is synthesized.",
     displayName: "Click",
     defaultPermissionTitle: "Allow a mouse click",
   },
   [AGENT_TOOL_NAMES.TYPE_TEXT]: {
     name: AGENT_TOOL_NAMES.TYPE_TEXT,
     riskClass: "ui_automation",
+    cancellation: "Honors cancellation before the typing burst starts.",
     displayName: "Type text",
     defaultPermissionTitle: "Allow typing into the focused application",
   },
   [AGENT_TOOL_NAMES.KEY_TAP]: {
     name: AGENT_TOOL_NAMES.KEY_TAP,
     riskClass: "ui_automation",
+    cancellation: "Honors cancellation before the key press is synthesized.",
     displayName: "Key tap",
     defaultPermissionTitle: "Allow a single key press (e.g. Enter)",
   },
   [AGENT_TOOL_NAMES.FILE_READ]: {
     name: AGENT_TOOL_NAMES.FILE_READ,
     riskClass: "observe",
+    cancellation: "Honors cancellation before and after the file read.",
     displayName: "Read file",
     defaultPermissionTitle: "Allow reading a file",
   },
   [AGENT_TOOL_NAMES.FILE_WRITE]: {
     name: AGENT_TOOL_NAMES.FILE_WRITE,
     riskClass: "mutate_workspace",
+    cancellation: "Honors cancellation before and after the file write.",
     displayName: "Write file",
     defaultPermissionTitle: "Allow writing a file",
   },

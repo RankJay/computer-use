@@ -10,7 +10,7 @@ function countOpenTools(
     if (e.type === "tool.started" && matchesTool(e.toolName)) {
       depth += 1;
     }
-    if (e.type === "tool.completed" && matchesTool(e.toolName)) {
+    if ((e.type === "tool.completed" || e.type === "tool.cancelled") && matchesTool(e.toolName)) {
       depth -= 1;
     }
     if (depth < 0) {
