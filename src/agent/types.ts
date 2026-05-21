@@ -89,8 +89,9 @@ export type AgentActivityRow = {
   readonly detail?: string;
   readonly surface: AgentActivitySurface;
   readonly tone?: "timeout";
-  /** Inline PNG preview for display capture rows (`data:image/png;base64,...`). */
-  readonly screenshotDataUrl?: string;
+  readonly toolError?: ToolErrorPayload;
+  /** Raw PNG preview bytes for display capture rows. */
+  readonly screenshotImageBase64?: string;
 };
 
 export type AgentEventBase = {

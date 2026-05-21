@@ -419,7 +419,7 @@ function activityRowFromEvent(event: ActivityEvent): AgentActivityRow {
       return {
         id: event.id,
         title: `Timed out ${event.toolName}`,
-        detail: formatToolErrorDetail(event.error),
+        toolError: event.error,
         surface: activitySurfaceForTool(event.toolName),
         tone: "timeout",
       };
@@ -429,36 +429,13 @@ function activityRowFromEvent(event: ActivityEvent): AgentActivityRow {
         title: "Captured screenshot",
         detail: event.label,
         surface: "thought",
-        screenshotDataUrl:
-          event.imageBase64 !== undefined && event.imageBase64.length > 0
-            ? `data:image/png;base64,${event.imageBase64}`
-            : undefined,
+        screenshotImageBase64: event.imageBase64,
       };
     default: {
       const _never: never = event;
       return _never;
     }
   }
-}
-
-function formatToolErrorDetail(
-  error: Extract<AgentEvent, { type: "tool.error" }>["error"],
-): string {
-  switch (error.kind) {
-    case "timeout":
-      return `Stopped after ${formatDuration(error.timeoutMs)}.`;
-    default: {
-      const _never: never = error.kind;
-      return _never;
-    }
-  }
-}
-
-function formatDuration(ms: number): string {
-  if (ms % 1000 === 0) {
-    return `${ms / 1000}s`;
-  }
-  return `${ms}ms`;
 }
 
 function activitySurfaceForTool(toolName: string | undefined): AgentActivityRow["surface"] {

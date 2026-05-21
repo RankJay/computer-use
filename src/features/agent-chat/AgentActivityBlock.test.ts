@@ -22,4 +22,42 @@ describe("AgentActivityBlock", () => {
       expect(html).toContain(`data-activity-surface="${surface}"`);
     }
   });
+
+  test("renders timeout detail from raw tool error payload", () => {
+    const html = renderToStaticMarkup(
+      createElement(AgentActivityBlock, {
+        rows: [
+          {
+            id: "timeout",
+            title: "Timed out terminal.run",
+            surface: "thought",
+            tone: "timeout",
+            toolError: { kind: "timeout", timeoutMs: 2_000, elapsedMs: 2_004 },
+          },
+        ],
+        status: "active",
+      }),
+    );
+
+    expect(html).toContain("Stopped after 2s.");
+  });
+
+  test("renders screenshot image URL from raw base64 payload", () => {
+    const html = renderToStaticMarkup(
+      createElement(AgentActivityBlock, {
+        rows: [
+          {
+            id: "screenshot",
+            title: "Captured screenshot",
+            detail: "primary",
+            surface: "thought",
+            screenshotImageBase64: "AAA",
+          },
+        ],
+        status: "active",
+      }),
+    );
+
+    expect(html).toContain('src="data:image/png;base64,AAA"');
+  });
 });

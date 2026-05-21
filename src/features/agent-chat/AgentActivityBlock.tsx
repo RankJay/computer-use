@@ -274,7 +274,10 @@ function activitySegments(rows: readonly AgentActivityRow[]): readonly ActivityS
 
 function reasoningContent(rows: readonly AgentActivityRow[]): string {
   return rows
-    .map((row) => (row.detail !== undefined ? `${row.title}\n\n${row.detail}` : row.title))
+    .map((row) => {
+      const detail = activityRowDetailText(row);
+      return detail !== undefined ? `${row.title}\n\n${detail}` : row.title;
+    })
     .join("\n\n");
 }
 
@@ -343,15 +346,16 @@ function activityIconClassName(row: AgentActivityRow): string | undefined {
 }
 
 function activityStepDescription(row: AgentActivityRow): ReactElement | string | undefined {
-  const label = row.detail?.trim() ?? "";
-  const src = row.screenshotDataUrl;
+  const detail = activityRowDetailText(row);
+  const label = detail?.trim() ?? "";
+  const src = screenshotDataUrl(row.screenshotImageBase64);
 
   if (src !== undefined) {
     return (
       <div className="space-y-2 pt-0.5">
         {label !== "" && (
           <span className="block whitespace-pre-wrap wrap-break-word text-[#9ca3af]">
-            {row.detail}
+            {detail}
           </span>
         )}
         <img
@@ -366,5 +370,33 @@ function activityStepDescription(row: AgentActivityRow): ReactElement | string |
   }
 
   if (label === "") return undefined;
-  return <span className="whitespace-pre-wrap wrap-break-word">{row.detail}</span>;
+  return <span className="whitespace-pre-wrap wrap-break-word">{detail}</span>;
+}
+
+function activityRowDetailText(row: AgentActivityRow): string | undefined {
+  if (row.toolError !== undefined) return formatToolErrorDetail(row.toolError);
+  return row.detail;
+}
+
+function formatToolErrorDetail(error: NonNullable<AgentActivityRow["toolError"]>): string {
+  switch (error.kind) {
+    case "timeout":
+      return `Stopped after ${formatDuration(error.timeoutMs)}.`;
+    default: {
+      const _never: never = error.kind;
+      return _never;
+    }
+  }
+}
+
+function formatDuration(ms: number): string {
+  if (ms % 1000 === 0) {
+    return `${ms / 1000}s`;
+  }
+  return `${ms}ms`;
+}
+
+function screenshotDataUrl(imageBase64: string | undefined): string | undefined {
+  if (imageBase64 === undefined || imageBase64.length === 0) return undefined;
+  return `data:image/png;base64,${imageBase64}`;
 }

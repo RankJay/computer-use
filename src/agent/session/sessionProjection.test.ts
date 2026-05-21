@@ -179,7 +179,11 @@ describe("sessionProjection", () => {
         rows: [
           expect.objectContaining({
             title: "Timed out terminal.run",
-            detail: "Stopped after 120s.",
+            toolError: {
+              kind: "timeout",
+              timeoutMs: 120_000,
+              elapsedMs: 120_004,
+            },
             surface: "thought",
             tone: "timeout",
           }),
@@ -414,7 +418,7 @@ describe("sessionProjection", () => {
     ]);
   });
 
-  test("screenshot.keyframe carries PNG data URL on activity row", () => {
+  test("screenshot.keyframe carries raw PNG image data on activity row", () => {
     let projection = applyAgentEvent(createInitialAgentProjection(), createdEvent());
     projection = applyAgentEvent(projection, {
       ...baseEvent("ss-1"),
@@ -430,7 +434,7 @@ describe("sessionProjection", () => {
       title: "Captured screenshot",
       detail: "primary",
       surface: "thought",
-      screenshotDataUrl: "data:image/png;base64,AAA",
+      screenshotImageBase64: "AAA",
     });
   });
 
