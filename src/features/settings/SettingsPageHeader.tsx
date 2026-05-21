@@ -2,11 +2,7 @@ import { ArrowLeft } from "lucide-react";
 import type { ReactElement } from "react";
 import { Link } from "react-router-dom";
 
-import {
-  ChromeIconButton,
-  MinimizeWindowButton,
-  TitleBarDragRegion,
-} from "@/features/control-center/windowFrame";
+import { ChromeIconButton, MinimizeWindowButton } from "@/features/control-center/windowFrame";
 import { chromeIconSvgClassName } from "@/features/control-center/windowFrameStyles";
 
 export function SettingsPageHeader(): ReactElement {

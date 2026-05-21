@@ -9,11 +9,14 @@ import {
   abortable,
   isCancellationError,
   TOOL_CANCELLED_REASON,
+  toolTimeoutFromNativeError,
   throwIfAborted,
+  withToolTimeout,
 } from "@/agent/tools/toolCancellation";
 import {
   emitToolCancelled,
   emitToolCompleted,
+  emitToolError,
   emitToolStarted,
   shortenForTimeline,
 } from "@/agent/tools/toolTimeline";
@@ -47,9 +50,13 @@ export function createPointerMoveTool(ctx: LiveAgentToolContext) {
         return { ok: false as const, error: nativeGate.error };
       }
       try {
-        await abortable(
-          ctx.signal,
-          nativeGate.native.pointerMoveTo(input.x, input.y),
+        await withToolTimeout(
+          AGENT_TOOL_NAMES.POINTER_MOVE,
+          abortable(
+            ctx.signal,
+            nativeGate.native.pointerMoveTo(input.x, input.y),
+            nativeGate.native.cancelPointerAutomation,
+          ),
           nativeGate.native.cancelPointerAutomation,
         );
         throwIfAborted(ctx.signal);
@@ -59,6 +66,11 @@ export function createPointerMoveTool(ctx: LiveAgentToolContext) {
         if (ctx.signal.aborted || isCancellationError(err)) {
           await emitToolCancelled(ctx, AGENT_TOOL_NAMES.POINTER_MOVE, TOOL_CANCELLED_REASON);
           return { ok: false as const, error: TOOL_CANCELLED_REASON };
+        }
+        const timeoutError = toolTimeoutFromNativeError(err, AGENT_TOOL_NAMES.POINTER_MOVE);
+        if (timeoutError !== null) {
+          await emitToolError(ctx, AGENT_TOOL_NAMES.POINTER_MOVE, timeoutError.payload);
+          return { ok: false as const, error: timeoutError.payload };
         }
         const message = err instanceof Error ? err.message : String(err);
         await emitToolCompleted(ctx, AGENT_TOOL_NAMES.POINTER_MOVE, message);
@@ -92,9 +104,13 @@ export function createPointerClickTool(ctx: LiveAgentToolContext) {
         return { ok: false as const, error: nativeGate.error };
       }
       try {
-        await abortable(
-          ctx.signal,
-          nativeGate.native.pointerClick(input.button),
+        await withToolTimeout(
+          AGENT_TOOL_NAMES.POINTER_CLICK,
+          abortable(
+            ctx.signal,
+            nativeGate.native.pointerClick(input.button),
+            nativeGate.native.cancelPointerAutomation,
+          ),
           nativeGate.native.cancelPointerAutomation,
         );
         throwIfAborted(ctx.signal);
@@ -104,6 +120,11 @@ export function createPointerClickTool(ctx: LiveAgentToolContext) {
         if (ctx.signal.aborted || isCancellationError(err)) {
           await emitToolCancelled(ctx, AGENT_TOOL_NAMES.POINTER_CLICK, TOOL_CANCELLED_REASON);
           return { ok: false as const, error: TOOL_CANCELLED_REASON };
+        }
+        const timeoutError = toolTimeoutFromNativeError(err, AGENT_TOOL_NAMES.POINTER_CLICK);
+        if (timeoutError !== null) {
+          await emitToolError(ctx, AGENT_TOOL_NAMES.POINTER_CLICK, timeoutError.payload);
+          return { ok: false as const, error: timeoutError.payload };
         }
         const message = err instanceof Error ? err.message : String(err);
         await emitToolCompleted(ctx, AGENT_TOOL_NAMES.POINTER_CLICK, message);
@@ -137,9 +158,13 @@ export function createTypeTextTool(ctx: LiveAgentToolContext) {
         return { ok: false as const, error: nativeGate.error };
       }
       try {
-        await abortable(
-          ctx.signal,
-          nativeGate.native.typeText(input.text),
+        await withToolTimeout(
+          AGENT_TOOL_NAMES.TYPE_TEXT,
+          abortable(
+            ctx.signal,
+            nativeGate.native.typeText(input.text),
+            nativeGate.native.cancelPointerAutomation,
+          ),
           nativeGate.native.cancelPointerAutomation,
         );
         throwIfAborted(ctx.signal);
@@ -149,6 +174,11 @@ export function createTypeTextTool(ctx: LiveAgentToolContext) {
         if (ctx.signal.aborted || isCancellationError(err)) {
           await emitToolCancelled(ctx, AGENT_TOOL_NAMES.TYPE_TEXT, TOOL_CANCELLED_REASON);
           return { ok: false as const, error: TOOL_CANCELLED_REASON };
+        }
+        const timeoutError = toolTimeoutFromNativeError(err, AGENT_TOOL_NAMES.TYPE_TEXT);
+        if (timeoutError !== null) {
+          await emitToolError(ctx, AGENT_TOOL_NAMES.TYPE_TEXT, timeoutError.payload);
+          return { ok: false as const, error: timeoutError.payload };
         }
         const message = err instanceof Error ? err.message : String(err);
         await emitToolCompleted(ctx, AGENT_TOOL_NAMES.TYPE_TEXT, message);
@@ -189,9 +219,13 @@ export function createKeyTapTool(ctx: LiveAgentToolContext) {
         return { ok: false as const, error: nativeGate.error };
       }
       try {
-        await abortable(
-          ctx.signal,
-          nativeGate.native.keyTap(input.key),
+        await withToolTimeout(
+          AGENT_TOOL_NAMES.KEY_TAP,
+          abortable(
+            ctx.signal,
+            nativeGate.native.keyTap(input.key),
+            nativeGate.native.cancelPointerAutomation,
+          ),
           nativeGate.native.cancelPointerAutomation,
         );
         throwIfAborted(ctx.signal);
@@ -201,6 +235,11 @@ export function createKeyTapTool(ctx: LiveAgentToolContext) {
         if (ctx.signal.aborted || isCancellationError(err)) {
           await emitToolCancelled(ctx, AGENT_TOOL_NAMES.KEY_TAP, TOOL_CANCELLED_REASON);
           return { ok: false as const, error: TOOL_CANCELLED_REASON };
+        }
+        const timeoutError = toolTimeoutFromNativeError(err, AGENT_TOOL_NAMES.KEY_TAP);
+        if (timeoutError !== null) {
+          await emitToolError(ctx, AGENT_TOOL_NAMES.KEY_TAP, timeoutError.payload);
+          return { ok: false as const, error: timeoutError.payload };
         }
         const message = err instanceof Error ? err.message : String(err);
         await emitToolCompleted(ctx, AGENT_TOOL_NAMES.KEY_TAP, message);

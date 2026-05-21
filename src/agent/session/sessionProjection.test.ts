@@ -160,6 +160,33 @@ describe("sessionProjection", () => {
     );
   });
 
+  test("tool.error projects timeout rows with structured detail", () => {
+    let projection = applyAgentEvent(createInitialAgentProjection(), createdEvent());
+    projection = applyAgentEvent(projection, {
+      ...baseEvent("tool-timeout"),
+      type: "tool.error",
+      toolName: "terminal.run",
+      error: {
+        kind: "timeout",
+        timeoutMs: 120_000,
+        elapsedMs: 120_004,
+      },
+    });
+
+    expect(projection.timeline).toContainEqual(
+      expect.objectContaining({
+        kind: "activity",
+        rows: [
+          expect.objectContaining({
+            title: "Timed out terminal.run",
+            detail: "Stopped after 120s.",
+            tone: "timeout",
+          }),
+        ],
+      }),
+    );
+  });
+
   test("task.failed flushes streamed assistant text into the timeline", () => {
     let projection = createInitialAgentProjection();
 

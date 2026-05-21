@@ -73,6 +73,7 @@ type ActivityEvent = Extract<
       | "tool.started"
       | "tool.completed"
       | "tool.cancelled"
+      | "tool.error"
       | "screenshot.keyframe";
   }
 >;
@@ -143,6 +144,7 @@ export function applyAgentEvent(
     case "tool.started":
     case "tool.completed":
     case "tool.cancelled":
+    case "tool.error":
     case "screenshot.keyframe": {
       const timeline = finalizeStreamingAssistant(prev.timeline);
       return completeProjection({
@@ -414,6 +416,14 @@ function activityRowFromEvent(event: ActivityEvent): AgentActivityRow {
         detail: event.reason,
         surface: activitySurfaceForTool(event.toolName),
       };
+    case "tool.error":
+      return {
+        id: event.id,
+        title: `Timed out ${event.toolName}`,
+        detail: formatToolErrorDetail(event.error),
+        surface: activitySurfaceForTool(event.toolName),
+        tone: "timeout",
+      };
     case "screenshot.keyframe":
       return {
         id: event.id,
@@ -429,6 +439,26 @@ function activityRowFromEvent(event: ActivityEvent): AgentActivityRow {
       return _never;
     }
   }
+}
+
+function formatToolErrorDetail(
+  error: Extract<AgentEvent, { type: "tool.error" }>["error"],
+): string {
+  switch (error.kind) {
+    case "timeout":
+      return `Stopped after ${formatDuration(error.timeoutMs)}.`;
+    default: {
+      const _never: never = error.kind;
+      return _never;
+    }
+  }
+}
+
+function formatDuration(ms: number): string {
+  if (ms % 1000 === 0) {
+    return `${ms / 1000}s`;
+  }
+  return `${ms}ms`;
 }
 
 function activitySurfaceForTool(toolName: string | undefined): AgentActivityRow["surface"] {

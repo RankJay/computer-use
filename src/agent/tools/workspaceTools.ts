@@ -8,11 +8,14 @@ import {
   abortable,
   isCancellationError,
   TOOL_CANCELLED_REASON,
+  toolTimeoutFromNativeError,
   throwIfAborted,
+  withToolTimeout,
 } from "@/agent/tools/toolCancellation";
 import {
   emitToolCancelled,
   emitToolCompleted,
+  emitToolError,
   emitToolStarted,
   shortenForTimeline,
 } from "@/agent/tools/toolTimeline";
@@ -46,7 +49,10 @@ export function createWorkspaceInspectTool(ctx: LiveAgentToolContext) {
       throwIfAborted(ctx.signal);
       await emitToolStarted(ctx, AGENT_TOOL_NAMES.WORKSPACE_INSPECT, rel || ".");
       try {
-        const entries = await abortable(ctx.signal, ctx.workspaceFiles.listDirectory(root, rel));
+        const entries = await withToolTimeout(
+          AGENT_TOOL_NAMES.WORKSPACE_INSPECT,
+          abortable(ctx.signal, ctx.workspaceFiles.listDirectory(root, rel)),
+        );
         const summary = `${entries.length} entr${entries.length === 1 ? "y" : "ies"}: ${entries.slice(0, 24).join(", ")}${entries.length > 24 ? "…" : ""}`;
         throwIfAborted(ctx.signal);
         await emitToolCompleted(ctx, AGENT_TOOL_NAMES.WORKSPACE_INSPECT, summary);
@@ -55,6 +61,11 @@ export function createWorkspaceInspectTool(ctx: LiveAgentToolContext) {
         if (ctx.signal.aborted || isCancellationError(err)) {
           await emitToolCancelled(ctx, AGENT_TOOL_NAMES.WORKSPACE_INSPECT, TOOL_CANCELLED_REASON);
           return { ok: false as const, error: TOOL_CANCELLED_REASON };
+        }
+        const timeoutError = toolTimeoutFromNativeError(err, AGENT_TOOL_NAMES.WORKSPACE_INSPECT);
+        if (timeoutError !== null) {
+          await emitToolError(ctx, AGENT_TOOL_NAMES.WORKSPACE_INSPECT, timeoutError.payload);
+          return { ok: false as const, error: timeoutError.payload };
         }
         const message = err instanceof Error ? err.message : String(err);
         await emitToolCompleted(ctx, AGENT_TOOL_NAMES.WORKSPACE_INSPECT, message);
@@ -88,9 +99,9 @@ export function createReadFileTool(ctx: LiveAgentToolContext) {
       throwIfAborted(ctx.signal);
       await emitToolStarted(ctx, AGENT_TOOL_NAMES.FILE_READ, input.relativePath);
       try {
-        const text = await abortable(
-          ctx.signal,
-          ctx.workspaceFiles.readFile(root, input.relativePath),
+        const text = await withToolTimeout(
+          AGENT_TOOL_NAMES.FILE_READ,
+          abortable(ctx.signal, ctx.workspaceFiles.readFile(root, input.relativePath)),
         );
         throwIfAborted(ctx.signal);
         await emitToolCompleted(ctx, AGENT_TOOL_NAMES.FILE_READ, shortenForTimeline(text));
@@ -99,6 +110,11 @@ export function createReadFileTool(ctx: LiveAgentToolContext) {
         if (ctx.signal.aborted || isCancellationError(err)) {
           await emitToolCancelled(ctx, AGENT_TOOL_NAMES.FILE_READ, TOOL_CANCELLED_REASON);
           return { ok: false as const, error: TOOL_CANCELLED_REASON };
+        }
+        const timeoutError = toolTimeoutFromNativeError(err, AGENT_TOOL_NAMES.FILE_READ);
+        if (timeoutError !== null) {
+          await emitToolError(ctx, AGENT_TOOL_NAMES.FILE_READ, timeoutError.payload);
+          return { ok: false as const, error: timeoutError.payload };
         }
         const message = err instanceof Error ? err.message : String(err);
         await emitToolCompleted(ctx, AGENT_TOOL_NAMES.FILE_READ, message);
@@ -140,9 +156,12 @@ export function createWriteFileTool(ctx: LiveAgentToolContext) {
         `${input.relativePath} (${input.content.length} bytes)`,
       );
       try {
-        const path = await abortable(
-          ctx.signal,
-          ctx.workspaceFiles.writeFile(root, input.relativePath, input.content),
+        const path = await withToolTimeout(
+          AGENT_TOOL_NAMES.FILE_WRITE,
+          abortable(
+            ctx.signal,
+            ctx.workspaceFiles.writeFile(root, input.relativePath, input.content),
+          ),
         );
         throwIfAborted(ctx.signal);
         await emitToolCompleted(ctx, AGENT_TOOL_NAMES.FILE_WRITE, `Wrote ${path}`);
@@ -151,6 +170,11 @@ export function createWriteFileTool(ctx: LiveAgentToolContext) {
         if (ctx.signal.aborted || isCancellationError(err)) {
           await emitToolCancelled(ctx, AGENT_TOOL_NAMES.FILE_WRITE, TOOL_CANCELLED_REASON);
           return { ok: false as const, error: TOOL_CANCELLED_REASON };
+        }
+        const timeoutError = toolTimeoutFromNativeError(err, AGENT_TOOL_NAMES.FILE_WRITE);
+        if (timeoutError !== null) {
+          await emitToolError(ctx, AGENT_TOOL_NAMES.FILE_WRITE, timeoutError.payload);
+          return { ok: false as const, error: timeoutError.payload };
         }
         const message = err instanceof Error ? err.message : String(err);
         await emitToolCompleted(ctx, AGENT_TOOL_NAMES.FILE_WRITE, message);

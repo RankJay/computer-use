@@ -7,6 +7,7 @@ import {
   ListChecks,
   Loader2,
   ShieldQuestion,
+  TimerOff,
   Wrench,
 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -136,7 +137,10 @@ function ThoughtActivitySegment(props: StatusActivitySegmentProps): ReactElement
             label={row.title}
             description={activityStepDescription(row)}
             status={activityStepStatus(props.status, index, props.rows.length)}
-            className="**:[[class*='bg-border']]:bg-neutral-800"
+            className={cn(
+              "**:[[class*='bg-border']]:bg-neutral-800",
+              activityRowClassName(row, props.status, index, props.rows.length),
+            )}
           />
         ))}
       </ChainOfThoughtContent>
@@ -207,8 +211,20 @@ function ActivityTaskItem(props: ActivityTaskItemProps): ReactElement {
   const description = activityStepDescription(props.row);
 
   return (
-    <TaskItem className={cn("flex gap-1.5 text-sm leading-snug", stepStatusStyles[props.status])}>
-      <Icon className={cn("mt-px size-3.5 shrink-0", props.active && spinnerIconClassName)} />
+    <TaskItem
+      className={cn(
+        "flex gap-1.5 text-sm leading-snug",
+        stepStatusStyles[props.status],
+        activityRowClassName(props.row, props.status),
+      )}
+    >
+      <Icon
+        className={cn(
+          "mt-px size-3.5 shrink-0",
+          props.active && spinnerIconClassName,
+          activityIconClassName(props.row),
+        )}
+      />
       <div className="min-w-0 flex-1 space-y-0.5 overflow-hidden">
         <div className="text-xs font-medium">{props.row.title}</div>
         {description !== undefined && (
@@ -312,6 +328,7 @@ const spinnerIconClassName = "origin-center animate-spin transform-view";
 function activityStepIcon(row: AgentActivityRow, active: boolean): LucideIcon {
   if (active) return Loader2;
 
+  if (row.tone === "timeout") return TimerOff;
   const title = row.title.toLowerCase();
   if (title.startsWith("cancelled")) return Ban;
   if (title.startsWith("planned")) return ListChecks;
@@ -319,6 +336,22 @@ function activityStepIcon(row: AgentActivityRow, active: boolean): LucideIcon {
   if (title.includes("screenshot")) return Camera;
   if (title.includes("running") || title.includes("finished")) return Wrench;
   return Dot;
+}
+
+function activityRowClassName(
+  row: AgentActivityRow,
+  status: "complete" | "active" | "pending" | "completed" | "failed" | "cancelled",
+  index?: number,
+  rowCount?: number,
+): string | undefined {
+  const isFailedFinalRow = status === "failed" && index !== undefined && rowCount === index + 1;
+  if (row.tone === "timeout" && !isFailedFinalRow) return "text-amber-300";
+  return undefined;
+}
+
+function activityIconClassName(row: AgentActivityRow): string | undefined {
+  if (row.tone === "timeout") return "text-amber-300";
+  return undefined;
 }
 
 function activityStepDescription(row: AgentActivityRow): ReactElement | string | undefined {

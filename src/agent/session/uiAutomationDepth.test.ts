@@ -11,7 +11,7 @@ const taskId = "task-1";
 
 function toolEvent(
   id: string,
-  type: "tool.started" | "tool.completed" | "tool.cancelled",
+  type: "tool.started" | "tool.completed" | "tool.cancelled" | "tool.error",
   toolName: string,
 ): AgentEvent {
   if (type === "tool.started") {
@@ -19,6 +19,16 @@ function toolEvent(
   }
   if (type === "tool.cancelled") {
     return { id, at: 1000, taskId, type, toolName, reason: "Stopped" };
+  }
+  if (type === "tool.error") {
+    return {
+      id,
+      at: 1000,
+      taskId,
+      type,
+      toolName,
+      error: { kind: "timeout", timeoutMs: 10_000, elapsedMs: 10_001 },
+    };
   }
   return { id, at: 1000, taskId, type, toolName, outputSummary: "out" };
 }
@@ -38,6 +48,16 @@ describe("uiAutomationDepth", () => {
     const events = [
       toolEvent("s1", "tool.started", AGENT_TOOL_NAMES.POINTER_MOVE),
       toolEvent("x1", "tool.cancelled", AGENT_TOOL_NAMES.POINTER_MOVE),
+    ] as const;
+
+    expect(countOpenUiAutomationTools(events)).toBe(0);
+    expect(countOpenPointerTools(events)).toBe(0);
+  });
+
+  test("countOpenUiAutomationTools decrements on timeout errors", () => {
+    const events = [
+      toolEvent("s1", "tool.started", AGENT_TOOL_NAMES.POINTER_MOVE),
+      toolEvent("e1", "tool.error", AGENT_TOOL_NAMES.POINTER_MOVE),
     ] as const;
 
     expect(countOpenUiAutomationTools(events)).toBe(0);

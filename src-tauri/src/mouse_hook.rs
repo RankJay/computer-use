@@ -9,12 +9,12 @@ use std::time::Duration;
 
 #[cfg(target_os = "windows")]
 mod win {
-    use super::{AtomicBool, Ordering, mpsc, thread, Duration, OnceLock};
+    use super::{mpsc, thread, AtomicBool, Duration, OnceLock, Ordering};
     use windows::Win32::Foundation::{LPARAM, LRESULT, POINT, WPARAM};
     use windows::Win32::System::LibraryLoader::GetModuleHandleW;
     use windows::Win32::UI::WindowsAndMessaging::{
-        CallNextHookEx, DispatchMessageW, PeekMessageW, SetWindowsHookExW, TranslateMessage,
-        MSG, PM_REMOVE, WH_MOUSE_LL,
+        CallNextHookEx, DispatchMessageW, PeekMessageW, SetWindowsHookExW, TranslateMessage, MSG,
+        PM_REMOVE, WH_MOUSE_LL,
     };
 
     static SWALLOW_MOUSE: AtomicBool = AtomicBool::new(false);

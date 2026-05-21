@@ -26,6 +26,15 @@ describe("toolContract", () => {
     }
   });
 
+  test("every tool has an explicit timeout", () => {
+    expect(TOOL_CONTRACT[AGENT_TOOL_NAMES.TERMINAL_RUN].timeoutMs).toBe(120_000);
+    expect(TOOL_CONTRACT[AGENT_TOOL_NAMES.DISPLAY_CAPTURE].timeoutMs).toBe(10_000);
+
+    for (const toolName of Object.values(AGENT_TOOL_NAMES)) {
+      expect(TOOL_CONTRACT[toolName].timeoutMs).toBeGreaterThan(0);
+    }
+  });
+
   test("normalizePersistedApprovals keeps dotted contract ids", () => {
     expect(normalizePersistedApprovals(["terminal.run", "file.read"])).toEqual([
       AGENT_TOOL_NAMES.TERMINAL_RUN,

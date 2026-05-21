@@ -5,16 +5,19 @@ import type { LiveAgentToolContext } from "@/agent/agentSessionContext";
 import { gateNativeTool } from "@/agent/host/nativeToolGate";
 import { terminalRunGuidanceForOs } from "@/agent/hostEnvironment";
 import { requestToolPermission } from "@/agent/permissions/permissionOrchestrator";
-import { AGENT_TOOL_NAMES } from "@/agent/toolContract";
+import { AGENT_TOOL_NAMES, timeoutMsForTool } from "@/agent/toolContract";
 import {
   abortable,
   isCancellationError,
   TOOL_CANCELLED_REASON,
+  toolTimeoutFromNativeError,
   throwIfAborted,
+  withToolTimeout,
 } from "@/agent/tools/toolCancellation";
 import {
   emitToolCancelled,
   emitToolCompleted,
+  emitToolError,
   emitToolStarted,
   shortenForTimeline,
 } from "@/agent/tools/toolTimeline";
@@ -64,14 +67,19 @@ export function createTerminalRunTool(ctx: LiveAgentToolContext) {
       }
       const cancelToken = createTerminalCancelToken();
       try {
-        const result = await abortable(
-          ctx.signal,
-          nativeGate.native.runCommand({
-            program: input.program,
-            args: input.args,
-            cwd: input.cwd ?? ctx.workspaceRoot,
-            cancelToken,
-          }),
+        const result = await withToolTimeout(
+          AGENT_TOOL_NAMES.TERMINAL_RUN,
+          abortable(
+            ctx.signal,
+            nativeGate.native.runCommand({
+              program: input.program,
+              args: input.args,
+              cwd: input.cwd ?? ctx.workspaceRoot,
+              timeoutMs: timeoutMsForTool(AGENT_TOOL_NAMES.TERMINAL_RUN),
+              cancelToken,
+            }),
+            () => nativeGate.native.cancelRunCommand(cancelToken),
+          ),
           () => nativeGate.native.cancelRunCommand(cancelToken),
         );
         const summary =
@@ -90,6 +98,11 @@ export function createTerminalRunTool(ctx: LiveAgentToolContext) {
         if (ctx.signal.aborted || isCancellationError(err)) {
           await emitToolCancelled(ctx, AGENT_TOOL_NAMES.TERMINAL_RUN, TOOL_CANCELLED_REASON);
           return { ok: false as const, error: TOOL_CANCELLED_REASON };
+        }
+        const timeoutError = toolTimeoutFromNativeError(err, AGENT_TOOL_NAMES.TERMINAL_RUN);
+        if (timeoutError !== null) {
+          await emitToolError(ctx, AGENT_TOOL_NAMES.TERMINAL_RUN, timeoutError.payload);
+          return { ok: false as const, error: timeoutError.payload };
         }
         const message = err instanceof Error ? err.message : String(err);
         await emitToolCompleted(ctx, AGENT_TOOL_NAMES.TERMINAL_RUN, `Error: ${message}`);

@@ -81,6 +81,7 @@ export type AgentActivityRow = {
   readonly title: string;
   readonly detail?: string;
   readonly surface?: "reasoning" | "task" | "thought";
+  readonly tone?: "timeout";
   /** Inline PNG preview for display capture rows (`data:image/png;base64,...`). */
   readonly screenshotDataUrl?: string;
 };
@@ -148,6 +149,18 @@ export type ToolCancelledEvent = AgentEventBase & {
   reason: string;
 };
 
+export type ToolErrorPayload = {
+  readonly kind: "timeout";
+  readonly timeoutMs: number;
+  readonly elapsedMs: number;
+};
+
+export type ToolErrorEvent = AgentEventBase & {
+  type: "tool.error";
+  toolName: string;
+  error: ToolErrorPayload;
+};
+
 export type ScreenshotKeyframeEvent = AgentEventBase & {
   type: "screenshot.keyframe";
   label: string;
@@ -204,6 +217,7 @@ export type AgentEvent =
   | ToolStartedEvent
   | ToolCompletedEvent
   | ToolCancelledEvent
+  | ToolErrorEvent
   | ScreenshotKeyframeEvent
   | AssistantTextDeltaEvent
   | AssistantTextDoneEvent

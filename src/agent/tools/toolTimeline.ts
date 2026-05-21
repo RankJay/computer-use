@@ -1,6 +1,6 @@
 import type { LiveAgentToolContext } from "@/agent/agentSessionContext";
 import type { AgentToolName } from "@/agent/toolContract";
-import { createEventId } from "@/agent/types";
+import { createEventId, type ToolErrorPayload } from "@/agent/types";
 
 export function shortenForTimeline(text: string, max = 400): string {
   const t = text.trim();
@@ -54,6 +54,23 @@ export async function emitToolCancelled(
     type: "tool.cancelled" as const,
     toolName,
     reason,
+  };
+  ctx.emit(ev);
+  await ctx.appendStructuredLog(ev);
+}
+
+export async function emitToolError(
+  ctx: LiveAgentToolContext,
+  toolName: AgentToolName,
+  error: ToolErrorPayload,
+): Promise<void> {
+  const ev = {
+    id: createEventId(),
+    at: Date.now(),
+    taskId: ctx.taskId,
+    type: "tool.error" as const,
+    toolName,
+    error,
   };
   ctx.emit(ev);
   await ctx.appendStructuredLog(ev);

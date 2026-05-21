@@ -19,15 +19,18 @@ pub fn composite_cursor_into_rgba(
     use screenshots::display_info::DisplayInfo;
     use windows::Win32::Foundation::HWND;
     use windows::Win32::Graphics::Gdi::{
-        CreateCompatibleDC, CreateDIBSection, DeleteDC, DeleteObject, GetDC, ReleaseDC, SelectObject,
-        BITMAPINFO, BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS, HGDIOBJ, RGBQUAD,
+        CreateCompatibleDC, CreateDIBSection, DeleteDC, DeleteObject, GetDC, ReleaseDC,
+        SelectObject, BITMAPINFO, BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS, HGDIOBJ, RGBQUAD,
     };
     use windows::Win32::UI::WindowsAndMessaging::{
-        DrawIconEx, GetCursorInfo, GetIconInfo, CURSOR_SHOWING, CURSORINFO, DI_NORMAL, HICON,
+        DrawIconEx, GetCursorInfo, GetIconInfo, CURSORINFO, CURSOR_SHOWING, DI_NORMAL, HICON,
         ICONINFO,
     };
 
-    fn monitor_contains_logical_pt(di: &DisplayInfo, pt: windows::Win32::Foundation::POINT) -> bool {
+    fn monitor_contains_logical_pt(
+        di: &DisplayInfo,
+        pt: windows::Win32::Foundation::POINT,
+    ) -> bool {
         let mx = di.x;
         let my = di.y;
         let mw = di.width as i32;
@@ -35,7 +38,10 @@ pub fn composite_cursor_into_rgba(
         pt.x >= mx && pt.x < mx + mw && pt.y >= my && pt.y < my + mh
     }
 
-    fn logical_monitor_rel_to_capture_px(di: &DisplayInfo, pt: windows::Win32::Foundation::POINT) -> (i32, i32) {
+    fn logical_monitor_rel_to_capture_px(
+        di: &DisplayInfo,
+        pt: windows::Win32::Foundation::POINT,
+    ) -> (i32, i32) {
         let fx = di.scale_factor as f64;
         let ix = ((pt.x - di.x) as f64 * fx).round() as i32;
         let iy = ((pt.y - di.y) as f64 * fx).round() as i32;
@@ -118,21 +124,15 @@ pub fn composite_cursor_into_rgba(
         };
 
         let mut bits: *mut std::ffi::c_void = std::ptr::null_mut();
-        let hbitmap = match CreateDIBSection(
-            Some(hdc_screen),
-            &bmi,
-            DIB_RGB_COLORS,
-            &mut bits,
-            None,
-            0,
-        ) {
-            Ok(hb) => hb,
-            Err(e) => {
-                let _ = ReleaseDC(Some(HWND::default()), hdc_screen);
-                cleanup_icon_bitmaps(&ii);
-                return Err(e.to_string());
-            }
-        };
+        let hbitmap =
+            match CreateDIBSection(Some(hdc_screen), &bmi, DIB_RGB_COLORS, &mut bits, None, 0) {
+                Ok(hb) => hb,
+                Err(e) => {
+                    let _ = ReleaseDC(Some(HWND::default()), hdc_screen);
+                    cleanup_icon_bitmaps(&ii);
+                    return Err(e.to_string());
+                }
+            };
 
         let src_rgba = img.as_raw();
         let len = (w * h * 4) as usize;

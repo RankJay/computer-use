@@ -9,9 +9,16 @@ import {
   abortable,
   isCancellationError,
   TOOL_CANCELLED_REASON,
+  toolTimeoutFromNativeError,
   throwIfAborted,
+  withToolTimeout,
 } from "@/agent/tools/toolCancellation";
-import { emitToolCancelled, emitToolCompleted, emitToolStarted } from "@/agent/tools/toolTimeline";
+import {
+  emitToolCancelled,
+  emitToolCompleted,
+  emitToolError,
+  emitToolStarted,
+} from "@/agent/tools/toolTimeline";
 import { createEventId } from "@/agent/types";
 
 export function createDisplayCaptureTool(ctx: LiveAgentToolContext) {
@@ -39,7 +46,10 @@ export function createDisplayCaptureTool(ctx: LiveAgentToolContext) {
         return { ok: false as const, error: nativeGate.error };
       }
       try {
-        const b64 = await abortable(ctx.signal, nativeGate.native.capturePrimaryDisplayPngBase64());
+        const b64 = await withToolTimeout(
+          AGENT_TOOL_NAMES.DISPLAY_CAPTURE,
+          abortable(ctx.signal, nativeGate.native.capturePrimaryDisplayPngBase64()),
+        );
         throwIfAborted(ctx.signal);
         ctx.vision.latestPng = b64;
         const ev = {
@@ -62,6 +72,11 @@ export function createDisplayCaptureTool(ctx: LiveAgentToolContext) {
         if (ctx.signal.aborted || isCancellationError(err)) {
           await emitToolCancelled(ctx, AGENT_TOOL_NAMES.DISPLAY_CAPTURE, TOOL_CANCELLED_REASON);
           return { ok: false as const, error: TOOL_CANCELLED_REASON };
+        }
+        const timeoutError = toolTimeoutFromNativeError(err, AGENT_TOOL_NAMES.DISPLAY_CAPTURE);
+        if (timeoutError !== null) {
+          await emitToolError(ctx, AGENT_TOOL_NAMES.DISPLAY_CAPTURE, timeoutError.payload);
+          return { ok: false as const, error: timeoutError.payload };
         }
         const message = err instanceof Error ? err.message : String(err);
         await emitToolCompleted(ctx, AGENT_TOOL_NAMES.DISPLAY_CAPTURE, message);
