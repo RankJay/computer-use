@@ -11,6 +11,7 @@ import {
   type EmitFn,
   type PermissionChoice,
   type PermissionMode,
+  type RunBudget,
 } from "@/agent/types";
 import type { WorkspaceAdapter } from "@/agent/workspace/workspaceAdapter";
 
@@ -21,6 +22,7 @@ export type AgentSessionRunnerOptions = {
   readonly workspaceRoot: string | null;
   readonly permissionMode: PermissionMode;
   readonly native: AgentNativeBridge | null;
+  readonly runBudgetOverride?: RunBudget;
   /** Override workspace file I/O (defaults to app workspace adapter). */
   readonly workspaceAdapter?: WorkspaceAdapter;
   readonly emit: EmitFn;

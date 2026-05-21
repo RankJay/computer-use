@@ -6,6 +6,13 @@ import {
 } from "@/agent/llm/modelCatalog";
 import type { AppSettingsPayload, LlmApiProvider } from "@/agent/native/tauriIpc";
 import { normalizePersistedApprovals } from "@/agent/toolContract";
+import type { RunBudget } from "@/agent/types";
+
+export const DEFAULT_RUN_BUDGET: RunBudget = {
+  maxSteps: 28,
+  maxCostUsd: 1,
+  maxWallClockMs: 10 * 60 * 1000,
+};
 
 export const DEFAULT_APP_SETTINGS: AppSettingsPayload = {
   workspaceRoot: null,
@@ -17,6 +24,7 @@ export const DEFAULT_APP_SETTINGS: AppSettingsPayload = {
   agentMode: "live",
   persistedApprovals: [],
   uiAutomationEnabled: false,
+  runBudgetDefaults: DEFAULT_RUN_BUDGET,
 };
 
 function hasKey<K extends string>(value: object, key: K): value is { readonly [P in K]: unknown } {
@@ -31,6 +39,37 @@ function parseActiveApiProvider(value: unknown): LlmApiProvider {
   return value === "openai" ? "openai" : "anthropic";
 }
 
+function isPositiveFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value > 0;
+}
+
+function isRunBudget(value: unknown): value is RunBudget {
+  if (typeof value !== "object" || value === null) return false;
+  if (
+    !hasKey(value, "maxSteps") ||
+    !hasKey(value, "maxCostUsd") ||
+    !hasKey(value, "maxWallClockMs")
+  ) {
+    return false;
+  }
+  return (
+    isPositiveFiniteNumber(value.maxSteps) &&
+    isPositiveFiniteNumber(value.maxCostUsd) &&
+    isPositiveFiniteNumber(value.maxWallClockMs)
+  );
+}
+
+export function normalizeRunBudget(value: unknown): RunBudget {
+  if (!isRunBudget(value)) {
+    return DEFAULT_RUN_BUDGET;
+  }
+  return {
+    maxSteps: Math.max(1, Math.floor(value.maxSteps)),
+    maxCostUsd: value.maxCostUsd,
+    maxWallClockMs: Math.max(1, Math.floor(value.maxWallClockMs)),
+  };
+}
+
 export function clampModelsForSave(payload: AppSettingsPayload): AppSettingsPayload {
   const anthropicModelId = isAnthropicModelId(payload.anthropicModelId)
     ? payload.anthropicModelId
@@ -43,6 +82,7 @@ export function clampModelsForSave(payload: AppSettingsPayload): AppSettingsPayl
     anthropicModelId,
     openaiModelId,
     persistedApprovals: normalizePersistedApprovals(payload.persistedApprovals),
+    runBudgetDefaults: normalizeRunBudget(payload.runBudgetDefaults),
   };
 }
 
@@ -71,7 +111,8 @@ function isAppSettingsPayloadV2(value: unknown): value is AppSettingsPayload {
     typeof value.activeApiProvider === "string" &&
     typeof value.agentMode === "string" &&
     isStringArray(value.persistedApprovals) &&
-    typeof value.uiAutomationEnabled === "boolean"
+    typeof value.uiAutomationEnabled === "boolean" &&
+    (!hasKey(value, "runBudgetDefaults") || isRunBudget(value.runBudgetDefaults))
   );
 }
 
@@ -84,6 +125,7 @@ function isLegacyAppSettingsPayload(value: unknown): value is {
   agentMode: string;
   persistedApprovals: string[];
   uiAutomationEnabled: boolean;
+  runBudgetDefaults?: RunBudget;
 } {
   if (typeof value !== "object" || value === null) return false;
   if (
@@ -104,7 +146,8 @@ function isLegacyAppSettingsPayload(value: unknown): value is {
     typeof value.modelId === "string" &&
     typeof value.agentMode === "string" &&
     isStringArray(value.persistedApprovals) &&
-    typeof value.uiAutomationEnabled === "boolean"
+    typeof value.uiAutomationEnabled === "boolean" &&
+    (!hasKey(value, "runBudgetDefaults") || isRunBudget(value.runBudgetDefaults))
   );
 }
 
@@ -116,6 +159,7 @@ function migrateLegacyToV2(legacy: {
   agentMode: string;
   persistedApprovals: string[];
   uiAutomationEnabled: boolean;
+  runBudgetDefaults?: RunBudget;
 }): AppSettingsPayload {
   const migratedAnthropicId = isAnthropicModelId(legacy.modelId)
     ? legacy.modelId
@@ -131,6 +175,7 @@ function migrateLegacyToV2(legacy: {
     agentMode: legacy.agentMode,
     persistedApprovals: [...legacy.persistedApprovals],
     uiAutomationEnabled: legacy.uiAutomationEnabled,
+    runBudgetDefaults: normalizeRunBudget(legacy.runBudgetDefaults),
   });
 }
 
@@ -139,6 +184,7 @@ export function normalizeStoredSettings(parsed: unknown): AppSettingsPayload | n
     return clampModelsForSave({
       ...parsed,
       activeApiProvider: parseActiveApiProvider(parsed.activeApiProvider),
+      runBudgetDefaults: normalizeRunBudget(parsed.runBudgetDefaults),
     });
   }
   if (isLegacyAppSettingsPayload(parsed)) {

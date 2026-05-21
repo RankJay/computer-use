@@ -2,6 +2,8 @@
  * Tauri `invoke` names and payloads (S2). Matches `src-tauri` command handlers.
  */
 
+import type { RunBudget } from "@/agent/types";
+
 export const TAURI_COMMAND = {
   capturePrimaryDisplayPngBase64: "capture_primary_display_png_base64",
   runCommand: "run_command",
@@ -40,6 +42,7 @@ export type AppSettingsPayload = {
   agentMode: string;
   persistedApprovals: string[];
   uiAutomationEnabled: boolean;
+  runBudgetDefaults: RunBudget;
 };
 
 export type RunCommandRequest = {

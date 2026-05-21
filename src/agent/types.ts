@@ -6,6 +6,21 @@ export type PermissionMode = "ask_risky" | "ask_all" | "session_low_risk";
 
 export type PermissionChoice = "allow_once" | "allow_session" | "allow_always" | "deny";
 
+export type RunBudget = {
+  readonly maxSteps: number;
+  readonly maxCostUsd: number;
+  readonly maxWallClockMs: number;
+};
+
+export type RunBudgetLimit = "maxSteps" | "maxCostUsd" | "maxWallClockMs";
+
+export type RunBudgetProgress = {
+  readonly steps: number;
+  readonly costUsd: number;
+  readonly wallClockMs: number;
+  readonly budget: RunBudget;
+};
+
 export function parsePermissionMode(value: string): PermissionMode {
   switch (value) {
     case "ask_risky":
@@ -135,6 +150,17 @@ export type TaskFailedEvent = AgentEventBase & {
   message: string;
 };
 
+export type AgentBudgetDeltaEvent = AgentEventBase & {
+  type: "agent.budget.delta";
+  progress: RunBudgetProgress;
+};
+
+export type AgentBudgetExceededEvent = AgentEventBase & {
+  type: "agent.budget.exceeded";
+  limit: RunBudgetLimit;
+  progress: RunBudgetProgress;
+};
+
 export type AgentEvent =
   | TaskCreatedEvent
   | PlanUpdatedEvent
@@ -148,7 +174,9 @@ export type AgentEvent =
   | AssistantTextDeltaEvent
   | AssistantTextDoneEvent
   | TaskCompletedEvent
-  | TaskFailedEvent;
+  | TaskFailedEvent
+  | AgentBudgetDeltaEvent
+  | AgentBudgetExceededEvent;
 
 /** Emit an agent event for the current task run (runner + tools). */
 export type EmitFn = (event: AgentEvent) => void;

@@ -146,6 +146,40 @@ describe("sessionProjection", () => {
     ]);
   });
 
+  test("budget events update progress and preserve completed status", () => {
+    let projection = applyAgentEvent(createInitialAgentProjection(), createdEvent());
+    projection = applyAgentEvent(projection, {
+      ...baseEvent("budget-delta"),
+      type: "agent.budget.delta",
+      progress: {
+        steps: 1,
+        costUsd: 0.002,
+        wallClockMs: 500,
+        budget: { maxSteps: 2, maxCostUsd: 1, maxWallClockMs: 1000 },
+      },
+    });
+    projection = applyAgentEvent(projection, {
+      ...baseEvent("budget-exceeded"),
+      type: "agent.budget.exceeded",
+      limit: "maxWallClockMs",
+      progress: {
+        steps: 1,
+        costUsd: 0.002,
+        wallClockMs: 1000,
+        budget: { maxSteps: 2, maxCostUsd: 1, maxWallClockMs: 1000 },
+      },
+    });
+    projection = applyAgentEvent(projection, {
+      ...baseEvent("completed"),
+      type: "task.completed",
+      summary: "Stopped",
+    });
+
+    expect(projection.status).toBe("completed");
+    expect(projection.budget.exceededLimit).toBe("maxWallClockMs");
+    expect(projection.budget.progress?.wallClockMs).toBe(1000);
+  });
+
   test("assistant preamble is committed above activity when tools start after streaming text", () => {
     let projection = beginAgentRun(createInitialAgentProjection(), {
       userTimelineItem: { id: "user-1", at: 900, kind: "user", text: "Run something" },

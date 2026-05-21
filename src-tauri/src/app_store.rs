@@ -9,6 +9,24 @@ use tauri::AppHandle;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct RunBudget {
+    pub max_steps: u32,
+    pub max_cost_usd: f64,
+    pub max_wall_clock_ms: u32,
+}
+
+impl Default for RunBudget {
+    fn default() -> Self {
+        Self {
+            max_steps: 28,
+            max_cost_usd: 1.0,
+            max_wall_clock_ms: 10 * 60 * 1000,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AppSettings {
     pub workspace_root: Option<String>,
     pub permission_mode: String,
@@ -26,6 +44,8 @@ pub struct AppSettings {
     pub persisted_approvals: Vec<String>,
     #[serde(default)]
     pub ui_automation_enabled: bool,
+    #[serde(default)]
+    pub run_budget_defaults: RunBudget,
 }
 
 fn default_retention() -> u32 {
@@ -60,6 +80,7 @@ impl Default for AppSettings {
             agent_mode: default_agent_mode(),
             persisted_approvals: Vec::new(),
             ui_automation_enabled: false,
+            run_budget_defaults: RunBudget::default(),
         }
     }
 }
@@ -313,6 +334,7 @@ mod tests {
         assert_eq!(json["anthropicModelId"], default_anthropic_model());
         assert_eq!(json["activeApiProvider"], "anthropic");
         assert_eq!(json["uiAutomationEnabled"], false);
+        assert_eq!(json["runBudgetDefaults"]["maxSteps"], 28);
     }
 
     #[test]
@@ -335,6 +357,7 @@ mod tests {
         assert_eq!(settings.permission_mode, "ask_all");
         assert_eq!(settings.retention_days, 7);
         assert!(settings.ui_automation_enabled);
+        assert_eq!(settings.run_budget_defaults.max_steps, 28);
     }
 
     #[test]

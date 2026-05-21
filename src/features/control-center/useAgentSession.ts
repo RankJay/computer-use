@@ -16,7 +16,7 @@ import {
   runSelectedAgentSession,
 } from "@/agent/session/sessionRunner";
 import { createEventId } from "@/agent/types";
-import type { AgentEvent, PermissionChoice } from "@/agent/types";
+import type { AgentEvent, PermissionChoice, RunBudget } from "@/agent/types";
 import { useSettings } from "@/app/providers/SettingsProvider";
 
 export function useAgentSession() {
@@ -43,7 +43,7 @@ export function useAgentSession() {
     async (
       prompt: string,
       workspaceOverride: string | null,
-      opts?: Readonly<{ echoUserPrompt?: boolean }>,
+      opts?: Readonly<{ echoUserPrompt?: boolean; runBudgetOverride?: RunBudget }>,
     ) => {
       if (!ready || runBusyRef.current) return;
       runBusyRef.current = true;
@@ -79,6 +79,7 @@ export function useAgentSession() {
             workspaceRoot,
             permissionMode,
             native: host.native,
+            runBudgetOverride: opts?.runBudgetOverride,
             emit: (event) => {
               if (activeTaskRef.current !== taskId) return;
               ingestEvent(event);
@@ -132,6 +133,7 @@ export function useAgentSession() {
     currentRunEvents: projection.currentRunEvents,
     timeline: projection.timeline,
     failureMessage: projection.failureMessage,
+    budget: projection.budget,
     pendingPermission: projection.pendingPermission,
     capabilities,
     permissionMode,

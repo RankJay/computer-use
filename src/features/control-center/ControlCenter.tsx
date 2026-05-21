@@ -6,6 +6,7 @@ import { Container, Item } from "@/components/motion/stagger";
 import { AgentChatTranscript } from "@/features/agent-chat/AgentChatTranscript";
 import {
   PointerAutomationEscBar,
+  TaskBudgetBanner,
   TaskFailureBanner,
 } from "@/features/agent-chat/AgentSessionPanels";
 import { PermissionPrompt } from "@/features/agent-chat/PermissionPrompt";
@@ -66,6 +67,9 @@ export function ControlCenter() {
       </div>
 
       <div className="shrink-0 space-y-2 py-2">
+        {agent.budget.exceededLimit !== null && agent.budget.progress !== null && (
+          <TaskBudgetBanner limit={agent.budget.exceededLimit} progress={agent.budget.progress} />
+        )}
         {agent.failureMessage !== null && agent.failureMessage !== "" && (
           <TaskFailureBanner message={agent.failureMessage} />
         )}

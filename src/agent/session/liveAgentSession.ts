@@ -1,4 +1,4 @@
-import { stepCountIs, streamText } from "ai";
+import { streamText } from "ai";
 
 import type { LiveAgentToolContext } from "@/agent/agentSessionContext";
 import { getHostOsKind } from "@/agent/hostEnvironment";
@@ -19,10 +19,11 @@ import {
   buildTaskCreatedEvent,
   buildTaskFailedEvent,
 } from "@/agent/session/liveTaskEvents";
+import { createRunBudgetProgress, exceededBudgetLimit } from "@/agent/session/runBudget";
 import type { AgentSessionRunnerOptions } from "@/agent/session/sessionRunner";
 import type { ConsequenceRiskClass } from "@/agent/toolContract";
 import { createActuateTools } from "@/agent/tools/actuateTools";
-import { createEventId } from "@/agent/types";
+import { createEventId, type RunBudgetLimit, type RunBudgetProgress } from "@/agent/types";
 import { workspaceAdapter as defaultWorkspaceAdapter } from "@/agent/workspace/workspaceAdapter";
 
 export type LiveAgentSessionOptions = AgentSessionRunnerOptions & {
@@ -30,6 +31,8 @@ export type LiveAgentSessionOptions = AgentSessionRunnerOptions & {
   readonly llmProvider: LlmApiProvider;
   readonly liveModelId: string;
 };
+
+type BudgetStep = Parameters<typeof createRunBudgetProgress>[0]["steps"][number];
 
 function createMeta(): { readonly id: string; readonly at: number } {
   return { id: createEventId(), at: Date.now() };
@@ -56,6 +59,10 @@ export async function runLiveAgentSession(options: LiveAgentSessionOptions): Pro
   const hostOs = getHostOsKind();
   const persisted = new Set(settings.persistedApprovals);
   const sessionRiskApproved = new Set<ConsequenceRiskClass>();
+  const runBudget = options.runBudgetOverride ?? settings.runBudgetDefaults;
+  const budgetStartedAt = Date.now();
+  let budgetExceededLimit: RunBudgetLimit | null = null;
+  let finishedSteps: BudgetStep[] = [];
 
   const ctx: LiveAgentToolContext = {
     taskId,
@@ -94,13 +101,59 @@ export async function runLiveAgentSession(options: LiveAgentSessionOptions): Pro
     prompt,
   });
 
+  async function recordBudgetProgress(steps: readonly BudgetStep[]): Promise<RunBudgetProgress> {
+    const progress = createRunBudgetProgress({
+      budget: runBudget,
+      steps,
+      provider: llmProvider,
+      modelId: liveModelId,
+      startedAt: budgetStartedAt,
+      now: Date.now(),
+    });
+    await emitAndPersistLiveSessionEvent(emit, taskId, {
+      ...createMeta(),
+      taskId,
+      type: "agent.budget.delta",
+      progress,
+    });
+
+    const limit = exceededBudgetLimit(progress);
+    if (limit !== null && budgetExceededLimit === null) {
+      budgetExceededLimit = limit;
+      await emitAndPersistLiveSessionEvent(emit, taskId, {
+        ...createMeta(),
+        taskId,
+        type: "agent.budget.exceeded",
+        limit,
+        progress,
+      });
+    }
+    return progress;
+  }
+
   try {
     const result = streamText({
       model: languageModel,
       system,
       messages: [{ role: "user", content: userMessage }],
       tools,
-      stopWhen: stepCountIs(28),
+      stopWhen: [
+        ({ steps }) => {
+          const progress = createRunBudgetProgress({
+            budget: runBudget,
+            steps,
+            provider: llmProvider,
+            modelId: liveModelId,
+            startedAt: budgetStartedAt,
+            now: Date.now(),
+          });
+          const limit = exceededBudgetLimit(progress);
+          if (limit !== null) {
+            return true;
+          }
+          return false;
+        },
+      ],
       prepareStep: async ({ stepNumber }) => {
         const img = ctx.vision.latestPng;
         if (!shouldAttachLatestScreenshot(img, stepNumber)) {
@@ -114,6 +167,10 @@ export async function runLiveAgentSession(options: LiveAgentSessionOptions): Pro
         if (ev) {
           emit(ev);
         }
+      },
+      onStepFinish: async (step) => {
+        finishedSteps = [...finishedSteps, step];
+        await recordBudgetProgress(finishedSteps);
       },
     });
 

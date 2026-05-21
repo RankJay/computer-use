@@ -1,6 +1,8 @@
 import type { ReactElement } from "react";
 
 import { ANTHROPIC_MODEL_OPTIONS, OPENAI_MODEL_OPTIONS } from "@/agent/llm/modelCatalog";
+import type { RunBudget } from "@/agent/types";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -30,6 +32,20 @@ export type SettingsModelSectionProps = {
 
 export function SettingsModelSection(props: SettingsModelSectionProps): ReactElement {
   const { settings, updateSettings, modelSelection, providerKeys } = props.modelProvider;
+
+  const updateBudget = (field: keyof RunBudget, value: string): void => {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      return;
+    }
+    const normalized = field === "maxCostUsd" ? parsed : Math.floor(parsed);
+    void updateSettings({
+      runBudgetDefaults: {
+        ...settings.runBudgetDefaults,
+        [field]: normalized,
+      },
+    });
+  };
 
   return (
     <>
@@ -108,6 +124,67 @@ export function SettingsModelSection(props: SettingsModelSectionProps): ReactEle
             </SelectGroup>
           </SelectContent>
         </Select>
+      </div>
+
+      <div className={settingBlockClass}>
+        <div className={settingLeadClass}>
+          <Label className={settingHeadingClass}>Run budget</Label>
+          <p className={settingDescriptionClass}>
+            Live runs stop cleanly when any limit is reached between model steps.
+          </p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="run-budget-steps" className="text-xs text-neutral-300">
+              Max steps
+            </Label>
+            <Input
+              id="run-budget-steps"
+              type="number"
+              min={1}
+              value={settings.runBudgetDefaults.maxSteps}
+              onChange={(event) => updateBudget("maxSteps", event.currentTarget.value)}
+              className={settingsFieldClassName}
+            />
+            <p className="text-xs leading-snug text-neutral-500">
+              Stops after this many model turns.
+            </p>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="run-budget-cost" className="text-xs text-neutral-300">
+              Max cost (USD)
+            </Label>
+            <Input
+              id="run-budget-cost"
+              type="number"
+              min={0.01}
+              step={0.01}
+              value={settings.runBudgetDefaults.maxCostUsd}
+              onChange={(event) => updateBudget("maxCostUsd", event.currentTarget.value)}
+              className={settingsFieldClassName}
+            />
+            <p className="text-xs leading-snug text-neutral-500">
+              Stops when estimated model spend reaches this amount.
+            </p>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="run-budget-wall-clock" className="text-xs text-neutral-300">
+              Max wall-clock (ms)
+            </Label>
+            <Input
+              id="run-budget-wall-clock"
+              type="number"
+              min={1000}
+              step={1000}
+              value={settings.runBudgetDefaults.maxWallClockMs}
+              onChange={(event) => updateBudget("maxWallClockMs", event.currentTarget.value)}
+              className={settingsFieldClassName}
+            />
+            <p className="text-xs leading-snug text-neutral-500">
+              Stops once elapsed run time reaches this many milliseconds.
+            </p>
+          </div>
+        </div>
       </div>
     </>
   );

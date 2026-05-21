@@ -13,6 +13,8 @@ import {
   type AgentPendingPermission,
   type AgentRunStatus,
   type AgentTimelineItem,
+  type RunBudgetLimit,
+  type RunBudgetProgress,
 } from "@/agent/types";
 
 export type AgentSessionCapabilities = {
@@ -25,12 +27,18 @@ export type AgentSessionCapabilities = {
   readonly pointerAutomationBusy: boolean;
 };
 
+export type AgentBudgetProjection = {
+  readonly progress: RunBudgetProgress | null;
+  readonly exceededLimit: RunBudgetLimit | null;
+};
+
 export type AgentSessionProjection = {
   readonly status: AgentRunStatus;
   /** Events for the active run only; cleared when a new run starts. */
   readonly currentRunEvents: readonly AgentEvent[];
   readonly timeline: readonly AgentTimelineItem[];
   readonly failureMessage: string | null;
+  readonly budget: AgentBudgetProjection;
   readonly pendingPermission: AgentPendingPermission | null;
   readonly capabilities: AgentSessionCapabilities;
 };
@@ -40,6 +48,7 @@ type MutableProjection = {
   readonly currentRunEvents: readonly AgentEvent[];
   readonly timeline: readonly AgentTimelineItem[];
   readonly failureMessage: string | null;
+  readonly budget: AgentBudgetProjection;
   readonly pendingPermission: AgentPendingPermission | null;
 };
 
@@ -64,6 +73,7 @@ export function createInitialAgentProjection(): AgentSessionProjection {
     currentRunEvents: [],
     timeline: [],
     failureMessage: null,
+    budget: { progress: null, exceededLimit: null },
     pendingPermission: null,
   });
 }
@@ -82,6 +92,7 @@ export function beginAgentRun(
         ? prev.timeline
         : [...prev.timeline, options.userTimelineItem],
     failureMessage: null,
+    budget: { progress: null, exceededLimit: null },
     pendingPermission: null,
   });
 }
@@ -184,6 +195,24 @@ export function applyAgentEvent(
         failureMessage: event.message,
       });
     }
+    case "agent.budget.delta":
+      return completeProjection({
+        ...prev,
+        currentRunEvents,
+        budget: {
+          ...prev.budget,
+          progress: event.progress,
+        },
+      });
+    case "agent.budget.exceeded":
+      return completeProjection({
+        ...prev,
+        currentRunEvents,
+        budget: {
+          progress: event.progress,
+          exceededLimit: event.limit,
+        },
+      });
     default: {
       const _never: never = event;
       return _never;

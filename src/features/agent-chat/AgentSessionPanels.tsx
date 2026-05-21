@@ -2,6 +2,7 @@ import type { ReactElement } from "react";
 import { useEffect } from "react";
 
 import { cancelPointerAutomation } from "@/agent/native/nativeBridge";
+import type { RunBudgetLimit, RunBudgetProgress } from "@/agent/types";
 
 export type PointerAutomationEscBarProps = {
   /** Enables global Esc listener to invoke cancel_pointer_automation. */
@@ -63,6 +64,36 @@ export function TaskFailureBanner(props: TaskFailureBannerProps): ReactElement {
       role="alert"
     >
       {props.message}
+    </div>
+  );
+}
+
+export type TaskBudgetBannerProps = {
+  readonly limit: RunBudgetLimit;
+  readonly progress: RunBudgetProgress;
+};
+
+function budgetLimitLabel(limit: RunBudgetLimit, progress: RunBudgetProgress): string {
+  switch (limit) {
+    case "maxSteps":
+      return `${progress.steps}/${progress.budget.maxSteps} steps`;
+    case "maxCostUsd":
+      return `$${progress.costUsd.toFixed(4)}/$${progress.budget.maxCostUsd.toFixed(2)}`;
+    case "maxWallClockMs":
+      return `${Math.ceil(progress.wallClockMs / 1000)}s/${Math.ceil(
+        progress.budget.maxWallClockMs / 1000,
+      )}s`;
+    default: {
+      const _never: never = limit;
+      return _never;
+    }
+  }
+}
+
+export function TaskBudgetBanner(props: TaskBudgetBannerProps): ReactElement {
+  return (
+    <div className="rounded-xl border border-amber-900/50 bg-amber-950/30 px-3 py-2.5 text-sm leading-relaxed text-amber-100">
+      Run stopped at the configured budget limit: {budgetLimitLabel(props.limit, props.progress)}.
     </div>
   );
 }
