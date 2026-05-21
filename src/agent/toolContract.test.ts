@@ -39,6 +39,8 @@ describe("toolContract", () => {
     expect(TOOL_CONTRACT[AGENT_TOOL_NAMES.WORKSPACE_INSPECT].displaySurface).toBe("task");
     expect(TOOL_CONTRACT[AGENT_TOOL_NAMES.FILE_READ].displaySurface).toBe("task");
     expect(TOOL_CONTRACT[AGENT_TOOL_NAMES.FILE_WRITE].displaySurface).toBe("task");
+    expect(TOOL_CONTRACT[AGENT_TOOL_NAMES.FILE_COPY].displaySurface).toBe("task");
+    expect(TOOL_CONTRACT[AGENT_TOOL_NAMES.PATH_MOVE].displaySurface).toBe("task");
 
     for (const toolName of Object.values(AGENT_TOOL_NAMES)) {
       expect(["reasoning", "task", "thought"]).toContain(TOOL_CONTRACT[toolName].displaySurface);

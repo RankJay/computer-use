@@ -22,6 +22,8 @@ export const AGENT_TOOL_NAMES = {
   KEY_TAP: "key.tap",
   FILE_READ: "file.read",
   FILE_WRITE: "file.write",
+  FILE_COPY: "file.copy",
+  PATH_MOVE: "path.move",
 } as const;
 
 export type AgentToolName = (typeof AGENT_TOOL_NAMES)[keyof typeof AGENT_TOOL_NAMES];
@@ -33,6 +35,8 @@ export const MODEL_TOOL_KEYS = {
   DISPLAY_CAPTURE: "display_capture",
   READ_FILE: "read_file",
   WRITE_FILE: "write_file",
+  COPY_FILE: "copy_file",
+  MOVE_PATH: "move_path",
   POINTER_MOVE: "pointer_move",
   POINTER_CLICK: "pointer_click",
   TYPE_TEXT: "type_text",
@@ -48,6 +52,8 @@ export const MODEL_TOOL_TO_AGENT_TOOL: Record<ModelToolKey, AgentToolName> = {
   [MODEL_TOOL_KEYS.DISPLAY_CAPTURE]: AGENT_TOOL_NAMES.DISPLAY_CAPTURE,
   [MODEL_TOOL_KEYS.READ_FILE]: AGENT_TOOL_NAMES.FILE_READ,
   [MODEL_TOOL_KEYS.WRITE_FILE]: AGENT_TOOL_NAMES.FILE_WRITE,
+  [MODEL_TOOL_KEYS.COPY_FILE]: AGENT_TOOL_NAMES.FILE_COPY,
+  [MODEL_TOOL_KEYS.MOVE_PATH]: AGENT_TOOL_NAMES.PATH_MOVE,
   [MODEL_TOOL_KEYS.POINTER_MOVE]: AGENT_TOOL_NAMES.POINTER_MOVE,
   [MODEL_TOOL_KEYS.POINTER_CLICK]: AGENT_TOOL_NAMES.POINTER_CLICK,
   [MODEL_TOOL_KEYS.TYPE_TEXT]: AGENT_TOOL_NAMES.TYPE_TEXT,
@@ -155,6 +161,24 @@ export const TOOL_CONTRACT: Record<AgentToolName, ToolContractEntry> = {
     displayName: "Write file",
     displaySurface: "task",
     defaultPermissionTitle: "Allow writing a file",
+  },
+  [AGENT_TOOL_NAMES.FILE_COPY]: {
+    name: AGENT_TOOL_NAMES.FILE_COPY,
+    riskClass: "mutate_workspace",
+    timeoutMs: 5_000,
+    cancellation: "Honors cancellation before and after the file copy.",
+    displayName: "Copy file",
+    displaySurface: "task",
+    defaultPermissionTitle: "Allow copying a file",
+  },
+  [AGENT_TOOL_NAMES.PATH_MOVE]: {
+    name: AGENT_TOOL_NAMES.PATH_MOVE,
+    riskClass: "mutate_workspace",
+    timeoutMs: 5_000,
+    cancellation: "Honors cancellation before and after the move or rename.",
+    displayName: "Move path",
+    displaySurface: "task",
+    defaultPermissionTitle: "Allow moving or renaming a path",
   },
 };
 

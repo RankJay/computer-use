@@ -71,11 +71,11 @@ export function describeRuntimeCapabilities(options: {
       : "UI automation tools (pointer_move, pointer_click, type_text, key_tap) are disabled in Settings—do not call them; ask the user to enable UI automation in Actuate.";
     return (
       `This run uses the Actuate desktop (Tauri) app on ${os}: terminal_run and display_capture can run after approval. ${uiLine} ` +
-      "workspace_inspect / read_file / write_file only work for paths relative to the configured workspace root; they cannot access arbitrary absolute paths—use terminal_run for those (e.g. list or count files under D:\\... on Windows)."
+      "workspace_inspect / read_file / write_file / copy_file / move_path only work for paths relative to the configured workspace root; they cannot access arbitrary absolute paths—use terminal_run for those (e.g. list or count files under D:\\... on Windows)."
     );
   }
   return (
     `This run is the Web build (no native bridge) on ${os}. terminal_run, display_capture, and UI tools cannot run—you must not claim local shell or screen capture ran. ` +
-    "workspace_inspect / read_file / write_file only apply to the sample or configured workspace root, not random disk paths."
+    "workspace_inspect / read_file / write_file / copy_file / move_path only apply to the sample or configured workspace root, not random disk paths."
   );
 }

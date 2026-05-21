@@ -18,6 +18,18 @@ describe("workspaceAdapter", () => {
     await expect(adapter.listDirectory("d:/project", "src")).rejects.toThrow(
       "Web build only lists the bundled sample workspace",
     );
+    await expect(
+      adapter.copyFile("d:/project", "src/main.ts", "src/copy.ts", {
+        overwrite: false,
+        createParents: true,
+      }),
+    ).rejects.toThrow("Copying workspace files requires the Tauri desktop app");
+    await expect(
+      adapter.movePath("d:/project", "src/main.ts", "src/moved.ts", {
+        overwrite: false,
+        createParents: true,
+      }),
+    ).rejects.toThrow("Moving workspace paths requires the Tauri desktop app");
   });
 
   test("browser sample workspace reads via static sample URL", async () => {
@@ -43,6 +55,8 @@ describe("workspaceAdapter", () => {
       calls.push({ command, args });
       if (command === TAURI_COMMAND.listWorkspaceDir) return ["src"];
       if (command === TAURI_COMMAND.writeWorkspaceFile) return "d:/project/src/main.ts";
+      if (command === TAURI_COMMAND.copyWorkspaceFile) return "d:/project/src/copy.ts";
+      if (command === TAURI_COMMAND.moveWorkspacePath) return "d:/project/src/moved.ts";
       return "file text";
     };
     const adapter = createWorkspaceAdapter({
@@ -56,11 +70,39 @@ describe("workspaceAdapter", () => {
     await expect(adapter.writeFile("d:/project", "src/main.ts", "content")).resolves.toBe(
       "d:/project/src/main.ts",
     );
+    await expect(
+      adapter.copyFile("d:/project", "src/main.ts", "src/copy.ts", {
+        overwrite: false,
+        createParents: true,
+      }),
+    ).resolves.toBe("d:/project/src/copy.ts");
+    await expect(
+      adapter.movePath("d:/project", "src/main.ts", "src/moved.ts", {
+        overwrite: true,
+        createParents: false,
+      }),
+    ).resolves.toBe("d:/project/src/moved.ts");
 
     expect(calls.map((call) => call.command)).toEqual([
       TAURI_COMMAND.readWorkspaceFile,
       TAURI_COMMAND.listWorkspaceDir,
       TAURI_COMMAND.writeWorkspaceFile,
+      TAURI_COMMAND.copyWorkspaceFile,
+      TAURI_COMMAND.moveWorkspacePath,
     ]);
+    expect(calls.at(-2)?.args).toEqual({
+      workspaceRoot: "d:/project",
+      sourceRelativePath: "src/main.ts",
+      destinationRelativePath: "src/copy.ts",
+      overwrite: false,
+      createParents: true,
+    });
+    expect(calls.at(-1)?.args).toEqual({
+      workspaceRoot: "d:/project",
+      sourceRelativePath: "src/main.ts",
+      destinationRelativePath: "src/moved.ts",
+      overwrite: true,
+      createParents: false,
+    });
   });
 });

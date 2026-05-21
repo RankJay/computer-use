@@ -20,6 +20,7 @@ describe("liveSystemPrompt", () => {
     expect(system).toContain("Actuate");
     expect(system).toContain("display_capture");
     expect(system).toContain("pointer_move");
+    expect(system).toContain("copy_file");
     expect(system).toContain("Never use emojis");
   });
 

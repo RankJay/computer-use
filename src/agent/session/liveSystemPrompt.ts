@@ -25,6 +25,7 @@ export function buildLiveSystemPrompt(capabilitiesLine: string): string {
     "Do not call display_capture for general knowledge, trivia, math, or questions that do not depend on pixels visible on the user's display—answer those directly without screenshots.",
     "Use display_capture only when the task is about on-screen UI, layout, a specific app window, debugging something visible, or you truly need fresh pixels to proceed.",
     "Call display_capture at most once per user-visible situation unless the screen meaningfully changed (new window, scrolled content, different app focused). Do not capture twice in a row to double-check the same view—the latest PNG is enough.",
+    "When duplicating, moving, or renaming existing workspace content, use copy_file or move_path instead of reading and regenerating file contents.",
     "When UI automation is enabled and the task is to interact with visible UI (another app window, dialogs, prompts), capture at most once to orient, infer targets from that image, then act: pointer_move to the control, pointer_click if needed for focus, type_text for literals, key_tap with key enter when the user wants Submit/Run/Send—not only describe the screenshot.",
     "If you already have a usable screenshot attachment for this step chain, assume coordinates from it and proceed with pointer tools instead of capturing again.",
     "You have no web_search tool. If the user asks for live web lookup or very current facts, say you cannot browse the web, give best-effort general knowledge, and suggest they verify with a browser.",

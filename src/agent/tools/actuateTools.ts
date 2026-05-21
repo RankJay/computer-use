@@ -9,6 +9,8 @@ import {
   createTypeTextTool,
 } from "@/agent/tools/uiAutomationTools";
 import {
+  createCopyFileTool,
+  createMovePathTool,
   createReadFileTool,
   createWorkspaceInspectTool,
   createWriteFileTool,
@@ -22,6 +24,8 @@ export function createActuateTools(ctx: LiveAgentToolContext) {
     [MODEL_TOOL_KEYS.DISPLAY_CAPTURE]: createDisplayCaptureTool(ctx),
     [MODEL_TOOL_KEYS.READ_FILE]: createReadFileTool(ctx),
     [MODEL_TOOL_KEYS.WRITE_FILE]: createWriteFileTool(ctx),
+    [MODEL_TOOL_KEYS.COPY_FILE]: createCopyFileTool(ctx),
+    [MODEL_TOOL_KEYS.MOVE_PATH]: createMovePathTool(ctx),
     [MODEL_TOOL_KEYS.POINTER_MOVE]: createPointerMoveTool(ctx),
     [MODEL_TOOL_KEYS.POINTER_CLICK]: createPointerClickTool(ctx),
     [MODEL_TOOL_KEYS.TYPE_TEXT]: createTypeTextTool(ctx),

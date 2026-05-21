@@ -3,7 +3,9 @@ import { invoke } from "@tauri-apps/api/core";
 import { hostRuntime } from "@/agent/host/hostRuntime";
 import {
   TAURI_COMMAND,
+  type CopyWorkspaceFileRequest,
   type ListWorkspaceDirRequest,
+  type MoveWorkspacePathRequest,
   type ReadWorkspaceFileRequest,
   type WriteWorkspaceFileRequest,
 } from "@/agent/native/tauriIpc";
@@ -19,6 +21,23 @@ export type WorkspaceAdapter = {
   readFile: (workspaceRoot: string, relativePath: string) => Promise<string>;
   listDirectory: (workspaceRoot: string, relativeDir: string) => Promise<string[]>;
   writeFile: (workspaceRoot: string, relativePath: string, content: string) => Promise<string>;
+  copyFile: (
+    workspaceRoot: string,
+    sourceRelativePath: string,
+    destinationRelativePath: string,
+    options: WorkspaceTransferOptions,
+  ) => Promise<string>;
+  movePath: (
+    workspaceRoot: string,
+    sourceRelativePath: string,
+    destinationRelativePath: string,
+    options: WorkspaceTransferOptions,
+  ) => Promise<string>;
+};
+
+export type WorkspaceTransferOptions = {
+  readonly overwrite: boolean;
+  readonly createParents: boolean;
 };
 
 export type WorkspaceAdapterDependencies = {
@@ -83,6 +102,34 @@ export function createWorkspaceAdapter(deps: WorkspaceAdapterDependencies): Work
       const result = await deps.invoke(TAURI_COMMAND.writeWorkspaceFile, request);
       return requireStringResult(result, TAURI_COMMAND.writeWorkspaceFile);
     },
+    copyFile: async (workspaceRoot, sourceRelativePath, destinationRelativePath, options) => {
+      if (!deps.isDesktop()) {
+        throw new Error("Copying workspace files requires the Tauri desktop app.");
+      }
+      const request: CopyWorkspaceFileRequest = {
+        workspaceRoot,
+        sourceRelativePath,
+        destinationRelativePath,
+        overwrite: options.overwrite,
+        createParents: options.createParents,
+      };
+      const result = await deps.invoke(TAURI_COMMAND.copyWorkspaceFile, request);
+      return requireStringResult(result, TAURI_COMMAND.copyWorkspaceFile);
+    },
+    movePath: async (workspaceRoot, sourceRelativePath, destinationRelativePath, options) => {
+      if (!deps.isDesktop()) {
+        throw new Error("Moving workspace paths requires the Tauri desktop app.");
+      }
+      const request: MoveWorkspacePathRequest = {
+        workspaceRoot,
+        sourceRelativePath,
+        destinationRelativePath,
+        overwrite: options.overwrite,
+        createParents: options.createParents,
+      };
+      const result = await deps.invoke(TAURI_COMMAND.moveWorkspacePath, request);
+      return requireStringResult(result, TAURI_COMMAND.moveWorkspacePath);
+    },
   };
 }
 
@@ -109,4 +156,32 @@ export function writeWorkspaceFile(
   content: string,
 ): Promise<string> {
   return workspaceAdapter.writeFile(workspaceRoot, relativePath, content);
+}
+
+export function copyWorkspaceFile(
+  workspaceRoot: string,
+  sourceRelativePath: string,
+  destinationRelativePath: string,
+  options: WorkspaceTransferOptions,
+): Promise<string> {
+  return workspaceAdapter.copyFile(
+    workspaceRoot,
+    sourceRelativePath,
+    destinationRelativePath,
+    options,
+  );
+}
+
+export function moveWorkspacePath(
+  workspaceRoot: string,
+  sourceRelativePath: string,
+  destinationRelativePath: string,
+  options: WorkspaceTransferOptions,
+): Promise<string> {
+  return workspaceAdapter.movePath(
+    workspaceRoot,
+    sourceRelativePath,
+    destinationRelativePath,
+    options,
+  );
 }

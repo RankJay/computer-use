@@ -29,6 +29,86 @@ fn write_workspace_file_at(
     Ok(path.to_string_lossy().into_owned())
 }
 
+fn prepare_workspace_destination(
+    workspace_root: &str,
+    relative_path: &str,
+    overwrite: bool,
+    create_parents: bool,
+) -> Result<std::path::PathBuf, String> {
+    let path = resolve_workspace_path(workspace_root, relative_path, false)?;
+    if path.exists() && !overwrite {
+        return Err(format!("destination already exists: {path:?}"));
+    }
+    if let Some(parent) = path.parent() {
+        if create_parents {
+            fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+        } else if !parent.exists() {
+            return Err(format!("destination parent not found: {parent:?}"));
+        }
+    }
+    Ok(path)
+}
+
+fn remove_existing_destination(path: &std::path::Path) -> Result<(), String> {
+    if !path.exists() {
+        return Ok(());
+    }
+    let metadata = fs::symlink_metadata(path).map_err(|e| e.to_string())?;
+    let file_type = metadata.file_type();
+    if file_type.is_dir() && !file_type.is_symlink() {
+        fs::remove_dir_all(path).map_err(|e| e.to_string())
+    } else {
+        fs::remove_file(path).map_err(|e| e.to_string())
+    }
+}
+
+fn copy_workspace_file_at(
+    workspace_root: &str,
+    source_relative_path: &str,
+    destination_relative_path: &str,
+    overwrite: bool,
+    create_parents: bool,
+) -> Result<String, String> {
+    let source = resolve_workspace_path(workspace_root, source_relative_path, true)?;
+    if !source.is_file() {
+        return Err(format!("source is not a file: {source:?}"));
+    }
+    let destination = prepare_workspace_destination(
+        workspace_root,
+        destination_relative_path,
+        overwrite,
+        create_parents,
+    )?;
+    if source == destination {
+        return Err("source and destination must be different".into());
+    }
+    remove_existing_destination(&destination)?;
+    fs::copy(&source, &destination).map_err(|e| e.to_string())?;
+    Ok(destination.to_string_lossy().into_owned())
+}
+
+fn move_workspace_path_at(
+    workspace_root: &str,
+    source_relative_path: &str,
+    destination_relative_path: &str,
+    overwrite: bool,
+    create_parents: bool,
+) -> Result<String, String> {
+    let source = resolve_workspace_path(workspace_root, source_relative_path, true)?;
+    let destination = prepare_workspace_destination(
+        workspace_root,
+        destination_relative_path,
+        overwrite,
+        create_parents,
+    )?;
+    if source == destination {
+        return Err("source and destination must be different".into());
+    }
+    remove_existing_destination(&destination)?;
+    fs::rename(&source, &destination).map_err(|e| e.to_string())?;
+    Ok(destination.to_string_lossy().into_owned())
+}
+
 fn list_workspace_dir_at(workspace_root: &str, relative_dir: &str) -> Result<Vec<String>, String> {
     let base = resolve_workspace_dir(workspace_root, relative_dir)?;
 
@@ -61,6 +141,42 @@ pub fn write_workspace_file(
 }
 
 #[tauri::command]
+pub fn copy_workspace_file(
+    _app: AppHandle,
+    workspace_root: String,
+    source_relative_path: String,
+    destination_relative_path: String,
+    overwrite: bool,
+    create_parents: bool,
+) -> Result<String, String> {
+    copy_workspace_file_at(
+        &workspace_root,
+        &source_relative_path,
+        &destination_relative_path,
+        overwrite,
+        create_parents,
+    )
+}
+
+#[tauri::command]
+pub fn move_workspace_path(
+    _app: AppHandle,
+    workspace_root: String,
+    source_relative_path: String,
+    destination_relative_path: String,
+    overwrite: bool,
+    create_parents: bool,
+) -> Result<String, String> {
+    move_workspace_path_at(
+        &workspace_root,
+        &source_relative_path,
+        &destination_relative_path,
+        overwrite,
+        create_parents,
+    )
+}
+
+#[tauri::command]
 pub fn list_workspace_dir(
     _app: AppHandle,
     workspace_root: String,
@@ -72,7 +188,8 @@ pub fn list_workspace_dir(
 #[cfg(test)]
 mod tests {
     use super::{
-        list_workspace_dir_at, read_workspace_file_at, write_workspace_file_at, MAX_READ_BYTES,
+        copy_workspace_file_at, list_workspace_dir_at, move_workspace_path_at,
+        read_workspace_file_at, write_workspace_file_at, MAX_READ_BYTES,
     };
     use std::fs;
     use std::path::PathBuf;
@@ -97,6 +214,76 @@ mod tests {
         let content = read_workspace_file_at(root, "nested/hello.txt").expect("read file");
 
         assert_eq!(content, "hello world");
+        let _ = fs::remove_dir_all(workspace);
+    }
+
+    #[test]
+    fn copy_workspace_file_copies_bytes_without_reading_text() {
+        let workspace = temp_workspace();
+        let root = workspace.to_str().expect("utf-8 path");
+        fs::write(workspace.join("source.bin"), [0xff, 0xfe]).expect("write binary");
+
+        let destination =
+            copy_workspace_file_at(root, "source.bin", "nested/copy.bin", false, true)
+                .expect("copy file");
+
+        assert_eq!(
+            PathBuf::from(destination),
+            workspace
+                .canonicalize()
+                .expect("canonical workspace")
+                .join("nested")
+                .join("copy.bin")
+        );
+        assert_eq!(
+            fs::read(workspace.join("nested").join("copy.bin")).expect("read copy"),
+            vec![0xff, 0xfe]
+        );
+        let _ = fs::remove_dir_all(workspace);
+    }
+
+    #[test]
+    fn copy_workspace_file_rejects_existing_destination_without_overwrite() {
+        let workspace = temp_workspace();
+        let root = workspace.to_str().expect("utf-8 path");
+        fs::write(workspace.join("source.txt"), "source").expect("write source");
+        fs::write(workspace.join("dest.txt"), "dest").expect("write dest");
+
+        let result = copy_workspace_file_at(root, "source.txt", "dest.txt", false, true);
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("destination already exists"));
+        assert_eq!(
+            fs::read_to_string(workspace.join("dest.txt")).expect("read dest"),
+            "dest"
+        );
+        let _ = fs::remove_dir_all(workspace);
+    }
+
+    #[test]
+    fn move_workspace_path_moves_directories() {
+        let workspace = temp_workspace();
+        let root = workspace.to_str().expect("utf-8 path");
+        fs::create_dir_all(workspace.join("source")).expect("create source dir");
+        fs::write(workspace.join("source").join("file.txt"), "content").expect("write file");
+
+        let destination = move_workspace_path_at(root, "source", "moved/source", false, true)
+            .expect("move directory");
+
+        assert_eq!(
+            PathBuf::from(destination),
+            workspace
+                .canonicalize()
+                .expect("canonical workspace")
+                .join("moved")
+                .join("source")
+        );
+        assert!(!workspace.join("source").exists());
+        assert_eq!(
+            fs::read_to_string(workspace.join("moved").join("source").join("file.txt"))
+                .expect("read moved file"),
+            "content"
+        );
         let _ = fs::remove_dir_all(workspace);
     }
 

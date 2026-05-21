@@ -21,6 +21,8 @@ function createTestContext(options?: {
       readFile: async () => "",
       listDirectory: async () => [],
       writeFile: async () => "",
+      copyFile: async () => "",
+      movePath: async () => "",
     },
     hostOs: "linux",
     workspaceRoot: "/workspace",

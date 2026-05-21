@@ -14,6 +14,11 @@ function workspaceRootOrThrow(ctx: LiveAgentToolContext): string {
   return root;
 }
 
+const transferOptionsSchema = {
+  overwrite: z.boolean().optional().default(false),
+  createParents: z.boolean().optional().default(true),
+};
+
 export function createWorkspaceInspectTool(ctx: LiveAgentToolContext) {
   return defineActuateTool(ctx, {
     toolName: AGENT_TOOL_NAMES.WORKSPACE_INSPECT,
@@ -49,6 +54,92 @@ export function createWorkspaceInspectTool(ctx: LiveAgentToolContext) {
       );
       const summary = `${entries.length} entr${entries.length === 1 ? "y" : "ies"}: ${entries.slice(0, 24).join(", ")}${entries.length > 24 ? "…" : ""}`;
       return { ok: true, value: { entries }, timelineSummary: summary };
+    },
+  });
+}
+
+export function createCopyFileTool(ctx: LiveAgentToolContext) {
+  return defineActuateTool(ctx, {
+    toolName: AGENT_TOOL_NAMES.FILE_COPY,
+    description:
+      "Copy an existing file to another workspace-relative path without reading or regenerating its contents. Use this instead of read_file plus write_file when duplicating existing content. Supports binary files.",
+    inputSchema: zodSchema(
+      z.object({
+        sourceRelativePath: z.string(),
+        destinationRelativePath: z.string(),
+        ...transferOptionsSchema,
+      }),
+    ),
+    nativeGate: "none",
+    preflight: () => {
+      const root = ctx.workspaceRoot;
+      if (!root) {
+        return { ok: false, error: "Workspace root is not set." };
+      }
+      return { ok: true };
+    },
+    permission: (input) => ({
+      summary: `Copy ${input.sourceRelativePath} to ${input.destinationRelativePath}`,
+      rationale: "The model will duplicate a workspace file without reading its contents.",
+      details: `workspace: ${ctx.workspaceRoot}\nsource: ${input.sourceRelativePath}\ndestination: ${input.destinationRelativePath}\noverwrite: ${input.overwrite ?? false}\ncreateParents: ${input.createParents ?? true}`,
+    }),
+    deniedError: "User denied file copy.",
+    describe: (input) =>
+      `${input.sourceRelativePath} -> ${input.destinationRelativePath}${input.overwrite ? " (overwrite)" : ""}`,
+    execute: async (input) => {
+      const path = await ctx.workspaceFiles.copyFile(
+        workspaceRootOrThrow(ctx),
+        input.sourceRelativePath,
+        input.destinationRelativePath,
+        {
+          overwrite: input.overwrite ?? false,
+          createParents: input.createParents ?? true,
+        },
+      );
+      return { ok: true, value: { path }, timelineSummary: `Copied to ${path}` };
+    },
+  });
+}
+
+export function createMovePathTool(ctx: LiveAgentToolContext) {
+  return defineActuateTool(ctx, {
+    toolName: AGENT_TOOL_NAMES.PATH_MOVE,
+    description:
+      "Move or rename an existing workspace-relative file or directory without reading or regenerating contents. Use this for renames and relocations inside the workspace.",
+    inputSchema: zodSchema(
+      z.object({
+        sourceRelativePath: z.string(),
+        destinationRelativePath: z.string(),
+        ...transferOptionsSchema,
+      }),
+    ),
+    nativeGate: "none",
+    preflight: () => {
+      const root = ctx.workspaceRoot;
+      if (!root) {
+        return { ok: false, error: "Workspace root is not set." };
+      }
+      return { ok: true };
+    },
+    permission: (input) => ({
+      summary: `Move ${input.sourceRelativePath} to ${input.destinationRelativePath}`,
+      rationale: "The model will move or rename a workspace path.",
+      details: `workspace: ${ctx.workspaceRoot}\nsource: ${input.sourceRelativePath}\ndestination: ${input.destinationRelativePath}\noverwrite: ${input.overwrite ?? false}\ncreateParents: ${input.createParents ?? true}`,
+    }),
+    deniedError: "User denied path move.",
+    describe: (input) =>
+      `${input.sourceRelativePath} -> ${input.destinationRelativePath}${input.overwrite ? " (overwrite)" : ""}`,
+    execute: async (input) => {
+      const path = await ctx.workspaceFiles.movePath(
+        workspaceRootOrThrow(ctx),
+        input.sourceRelativePath,
+        input.destinationRelativePath,
+        {
+          overwrite: input.overwrite ?? false,
+          createParents: input.createParents ?? true,
+        },
+      );
+      return { ok: true, value: { path }, timelineSummary: `Moved to ${path}` };
     },
   });
 }

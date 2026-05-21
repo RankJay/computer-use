@@ -130,6 +130,8 @@ pub fn run() {
             app_store::open_logs_folder,
             workspace_fs::read_workspace_file,
             workspace_fs::write_workspace_file,
+            workspace_fs::copy_workspace_file,
+            workspace_fs::move_workspace_path,
             workspace_fs::list_workspace_dir,
         ])
         .run(tauri::generate_context!())

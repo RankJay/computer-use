@@ -25,6 +25,8 @@ export const TAURI_COMMAND = {
   openLogsFolder: "open_logs_folder",
   readWorkspaceFile: "read_workspace_file",
   writeWorkspaceFile: "write_workspace_file",
+  copyWorkspaceFile: "copy_workspace_file",
+  moveWorkspacePath: "move_workspace_path",
   listWorkspaceDir: "list_workspace_dir",
 } as const;
 
@@ -113,6 +115,28 @@ export type WriteWorkspaceFileRequest = {
 
 /** Absolute path of the written file on disk. */
 export type WriteWorkspaceFileResponse = string;
+
+export type CopyWorkspaceFileRequest = {
+  workspaceRoot: string;
+  sourceRelativePath: string;
+  destinationRelativePath: string;
+  overwrite: boolean;
+  createParents: boolean;
+};
+
+/** Absolute path of the copied file on disk. */
+export type CopyWorkspaceFileResponse = string;
+
+export type MoveWorkspacePathRequest = {
+  workspaceRoot: string;
+  sourceRelativePath: string;
+  destinationRelativePath: string;
+  overwrite: boolean;
+  createParents: boolean;
+};
+
+/** Absolute destination path on disk. */
+export type MoveWorkspacePathResponse = string;
 
 export type ListWorkspaceDirRequest = {
   workspaceRoot: string;
