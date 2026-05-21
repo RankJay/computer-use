@@ -20,14 +20,34 @@ import { createEventId } from "@/agent/types";
 import type { AgentEvent, PermissionChoice, RunBudget } from "@/agent/types";
 import { useSettings } from "@/app/providers/SettingsProvider";
 
+export type ActiveRun = {
+  readonly taskId: string;
+  readonly controller: AbortController;
+  readonly native: AgentNativeBridge | null;
+};
+
+type ActiveRunRef = {
+  current: ActiveRun | null;
+};
+
+export function takeActiveRun(activeRunRef: ActiveRunRef): ActiveRun | null {
+  const activeRun = activeRunRef.current;
+  activeRunRef.current = null;
+  return activeRun;
+}
+
+function clearActiveRunIfCurrent(activeRunRef: ActiveRunRef, activeRun: ActiveRun): void {
+  if (activeRunRef.current === activeRun) {
+    activeRunRef.current = null;
+  }
+}
+
 export function useAgentSession() {
   const { settings, permissionMode, persistToolApproval, ready } = useSettings();
 
   const [projection, setProjection] = useState(createInitialAgentProjection);
   const permissionLifecycleRef = useRef(new PermissionResolverLifecycle());
-  const activeTaskRef = useRef<string | null>(null);
-  const activeAbortControllerRef = useRef<AbortController | null>(null);
-  const activeNativeRef = useRef<AgentNativeBridge | null>(null);
+  const activeRunRef = useRef<ActiveRun | null>(null);
   const runBusyRef = useRef(false);
 
   const waitForPermissionChoice = useCallback((permissionId: string) => {
@@ -53,10 +73,9 @@ export function useAgentSession() {
 
       const taskId = createEventId();
       const abortController = new AbortController();
-      activeTaskRef.current = taskId;
-      activeAbortControllerRef.current = abortController;
       const host = createAgentSessionRunnerHost();
-      activeNativeRef.current = host.native;
+      const activeRun: ActiveRun = { taskId, controller: abortController, native: host.native };
+      activeRunRef.current = activeRun;
 
       const echoUser = opts?.echoUserPrompt !== false;
       setProjection((prev) =>
@@ -88,7 +107,7 @@ export function useAgentSession() {
             native: host.native,
             runBudgetOverride: opts?.runBudgetOverride,
             emit: (event) => {
-              if (activeTaskRef.current !== taskId) return;
+              if (activeRunRef.current?.taskId !== taskId) return;
               ingestEvent(event);
             },
             waitForPermissionChoice,
@@ -98,13 +117,7 @@ export function useAgentSession() {
         );
       } finally {
         runBusyRef.current = false;
-        if (activeTaskRef.current === taskId) {
-          activeTaskRef.current = null;
-        }
-        if (activeAbortControllerRef.current === abortController) {
-          activeAbortControllerRef.current = null;
-          activeNativeRef.current = null;
-        }
+        clearActiveRunIfCurrent(activeRunRef, activeRun);
       }
     },
     [ingestEvent, permissionMode, persistToolApproval, ready, settings, waitForPermissionChoice],
@@ -123,24 +136,22 @@ export function useAgentSession() {
   }, [projection, ready, startRun]);
 
   const cancelRun = useCallback(() => {
-    const controller = activeAbortControllerRef.current;
-    if (controller === null || controller.signal.aborted) return;
+    const activeRun = activeRunRef.current;
+    if (activeRun === null || activeRun.controller.signal.aborted) return;
 
-    controller.abort();
+    activeRun.controller.abort();
     permissionLifecycleRef.current.cancelAll();
-    void activeNativeRef.current?.cancelPointerAutomation().catch(() => {
+    void activeRun.native?.cancelPointerAutomation().catch(() => {
       /** ignore stale IPC errors */
     });
   }, []);
 
   const resetSession = useCallback(() => {
-    activeAbortControllerRef.current?.abort();
-    void activeNativeRef.current?.cancelPointerAutomation().catch(() => {
+    const activeRun = takeActiveRun(activeRunRef);
+    activeRun?.controller.abort();
+    void activeRun?.native?.cancelPointerAutomation().catch(() => {
       /** ignore stale IPC errors */
     });
-    activeTaskRef.current = null;
-    activeAbortControllerRef.current = null;
-    activeNativeRef.current = null;
     runBusyRef.current = false;
     permissionLifecycleRef.current.cancelAll();
     setProjection(resetAgentProjection());
