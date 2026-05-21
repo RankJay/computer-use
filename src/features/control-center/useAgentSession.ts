@@ -134,6 +134,7 @@ export function useAgentSession() {
     timeline: projection.timeline,
     failureMessage: projection.failureMessage,
     budget: projection.budget,
+    usage: projection.usage,
     pendingPermission: projection.pendingPermission,
     capabilities,
     permissionMode,

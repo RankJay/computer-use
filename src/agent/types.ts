@@ -21,6 +21,16 @@ export type RunBudgetProgress = {
   readonly budget: RunBudget;
 };
 
+export type AgentUsageDelta = {
+  readonly inputTokens: number;
+  readonly outputTokens: number;
+  readonly cacheReadInputTokens: number;
+  readonly cacheWriteInputTokens: number;
+  readonly costUsd: number;
+};
+
+export type AgentUsageSummary = AgentUsageDelta;
+
 export function parsePermissionMode(value: string): PermissionMode {
   switch (value) {
     case "ask_risky":
@@ -161,6 +171,11 @@ export type AgentBudgetExceededEvent = AgentEventBase & {
   progress: RunBudgetProgress;
 };
 
+export type UsageDeltaEvent = AgentEventBase & {
+  type: "usage.delta";
+  delta: AgentUsageDelta;
+};
+
 export type AgentEvent =
   | TaskCreatedEvent
   | PlanUpdatedEvent
@@ -176,7 +191,8 @@ export type AgentEvent =
   | TaskCompletedEvent
   | TaskFailedEvent
   | AgentBudgetDeltaEvent
-  | AgentBudgetExceededEvent;
+  | AgentBudgetExceededEvent
+  | UsageDeltaEvent;
 
 /** Emit an agent event for the current task run (runner + tools). */
 export type EmitFn = (event: AgentEvent) => void;

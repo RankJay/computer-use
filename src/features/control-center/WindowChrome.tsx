@@ -12,7 +12,7 @@ import { chromeIconSvgClassName } from "@/features/control-center/windowFrameSty
 export function WindowChrome(): ReactElement {
   return (
     <div className="relative flex min-h-[44px] shrink-0 select-none items-center justify-between gap-3 px-2">
-      <TitleBarDragRegion className="flex w-fit max-w-[min(100%,16rem)] items-center px-2" />
+      <TitleBarDragRegion className="flex w-fit max-w-[min(100%,16rem)] items-center" />
       <div className="flex shrink-0 items-center gap-1">
         <ChromeIconButton asChild>
           <Link to="/settings" aria-label="Open settings">

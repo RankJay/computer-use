@@ -499,6 +499,42 @@ describe("sessionProjection", () => {
     expect(findLastUserPrompt(projection)).toBe("Original ask");
   });
 
+  test("reduces usage deltas into a running session summary", () => {
+    let projection = beginAgentRun(createInitialAgentProjection(), {
+      userTimelineItem: { id: "user-1", at: 900, kind: "user", text: "Track usage" },
+    });
+
+    projection = applyAgentEvent(projection, {
+      ...baseEvent("usage-1"),
+      type: "usage.delta",
+      delta: {
+        inputTokens: 1000,
+        outputTokens: 200,
+        cacheReadInputTokens: 400,
+        cacheWriteInputTokens: 100,
+        costUsd: 0.004995,
+      },
+    });
+
+    projection = applyAgentEvent(projection, {
+      ...baseEvent("usage-2"),
+      type: "usage.delta",
+      delta: {
+        inputTokens: 0,
+        outputTokens: 50,
+        cacheReadInputTokens: 0,
+        cacheWriteInputTokens: 0,
+        costUsd: 0.00075,
+      },
+    });
+
+    expect(projection.usage.inputTokens).toBe(1000);
+    expect(projection.usage.outputTokens).toBe(250);
+    expect(projection.usage.cacheReadInputTokens).toBe(400);
+    expect(projection.usage.cacheWriteInputTokens).toBe(100);
+    expect(projection.usage.costUsd).toBeCloseTo(0.005745);
+  });
+
   test("pointerAutomationBusy excludes type.text and key.tap", () => {
     let projection = beginAgentRun(createInitialAgentProjection(), {
       userTimelineItem: { id: "user-1", at: 900, kind: "user", text: "Type" },

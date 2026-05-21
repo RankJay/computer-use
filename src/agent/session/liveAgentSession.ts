@@ -12,7 +12,16 @@ import {
   emitAndPersistLiveSessionEvent,
   persistLiveSessionEvent,
 } from "@/agent/session/liveSessionLogPolicy";
-import { mapStreamChunkToAgentEvent } from "@/agent/session/liveStreamMapping";
+import {
+  addUsageSnapshots,
+  createEmptyUsageSnapshot,
+  extractUsageSnapshotFromStreamChunk,
+  mapStreamChunkToAgentEvent,
+  mapUsageDeltaToAgentEvent,
+  mergeUsageSnapshot,
+  type StreamUsageSnapshot,
+  usageSnapshotDelta,
+} from "@/agent/session/liveStreamMapping";
 import { buildLivePromptBundle } from "@/agent/session/liveSystemPrompt";
 import {
   buildLiveCompletionEvents,
@@ -63,6 +72,9 @@ export async function runLiveAgentSession(options: LiveAgentSessionOptions): Pro
   const budgetStartedAt = Date.now();
   let budgetExceededLimit: RunBudgetLimit | null = null;
   let finishedSteps: BudgetStep[] = [];
+  let committedUsage = createEmptyUsageSnapshot();
+  let currentStepUsage = createEmptyUsageSnapshot();
+  let emittedUsage = createEmptyUsageSnapshot();
 
   const ctx: LiveAgentToolContext = {
     taskId,
@@ -131,12 +143,53 @@ export async function runLiveAgentSession(options: LiveAgentSessionOptions): Pro
     return progress;
   }
 
+  function recordUsageSnapshot(usageSnapshot: StreamUsageSnapshot): void {
+    const nextUsage =
+      usageSnapshot.scope === "run"
+        ? mergeUsageSnapshot(emittedUsage, usageSnapshot.usage)
+        : addUsageSnapshots(
+            committedUsage,
+            mergeUsageSnapshot(currentStepUsage, usageSnapshot.usage),
+          );
+    const usageDelta = usageSnapshotDelta(nextUsage, emittedUsage);
+    const usageEvent = mapUsageDeltaToAgentEvent(
+      usageDelta,
+      taskId,
+      llmProvider,
+      liveModelId,
+      createMeta,
+    );
+
+    if (usageEvent !== null) {
+      emit(usageEvent);
+      emittedUsage = addUsageSnapshots(emittedUsage, usageDelta);
+    }
+
+    if (usageSnapshot.scope === "step") {
+      currentStepUsage = mergeUsageSnapshot(currentStepUsage, usageSnapshot.usage);
+    }
+  }
+
+  function commitCurrentStepUsage(): void {
+    committedUsage = addUsageSnapshots(committedUsage, currentStepUsage);
+    currentStepUsage = createEmptyUsageSnapshot();
+  }
+
   try {
     const result = streamText({
       model: languageModel,
       system,
       messages: [{ role: "user", content: userMessage }],
       tools,
+      includeRawChunks: true,
+      providerOptions:
+        llmProvider === "openai"
+          ? {
+              openai: {
+                streamOptions: { includeUsage: true },
+              },
+            }
+          : undefined,
       stopWhen: [
         ({ steps }) => {
           const progress = createRunBudgetProgress({
@@ -167,10 +220,24 @@ export async function runLiveAgentSession(options: LiveAgentSessionOptions): Pro
         if (ev) {
           emit(ev);
         }
+
+        const usageSnapshot = extractUsageSnapshotFromStreamChunk(chunk);
+        if (usageSnapshot !== null) {
+          recordUsageSnapshot(usageSnapshot);
+        }
       },
       onStepFinish: async (step) => {
         finishedSteps = [...finishedSteps, step];
         await recordBudgetProgress(finishedSteps);
+
+        const usageSnapshot = extractUsageSnapshotFromStreamChunk({
+          type: "finish-step",
+          usage: step.usage,
+        });
+        if (usageSnapshot !== null) {
+          recordUsageSnapshot(usageSnapshot);
+          commitCurrentStepUsage();
+        }
       },
     });
 

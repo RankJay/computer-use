@@ -1,6 +1,6 @@
 import type { ReactElement } from "react";
 
-import type { AgentTimelineItem } from "@/agent/types";
+import type { AgentTimelineItem, AgentUsageSummary } from "@/agent/types";
 import { buildTranscriptRenderItems } from "@/features/agent-chat/transcriptRender";
 import {
   TranscriptRenderRow,
@@ -12,6 +12,7 @@ import { useTranscriptCopyControl } from "@/features/agent-chat/useTranscriptCop
 
 export type AgentChatTranscriptProps = {
   readonly timeline: readonly AgentTimelineItem[];
+  readonly usage: AgentUsageSummary;
   readonly canRegenerateAssistant: boolean;
   readonly onRegenerateAssistant: () => void;
   readonly isRunActive: boolean;

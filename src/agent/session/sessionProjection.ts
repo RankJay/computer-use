@@ -13,6 +13,7 @@ import {
   type AgentPendingPermission,
   type AgentRunStatus,
   type AgentTimelineItem,
+  type AgentUsageSummary,
   type RunBudgetLimit,
   type RunBudgetProgress,
 } from "@/agent/types";
@@ -39,6 +40,7 @@ export type AgentSessionProjection = {
   readonly timeline: readonly AgentTimelineItem[];
   readonly failureMessage: string | null;
   readonly budget: AgentBudgetProjection;
+  readonly usage: AgentUsageSummary;
   readonly pendingPermission: AgentPendingPermission | null;
   readonly capabilities: AgentSessionCapabilities;
 };
@@ -49,6 +51,7 @@ type MutableProjection = {
   readonly timeline: readonly AgentTimelineItem[];
   readonly failureMessage: string | null;
   readonly budget: AgentBudgetProjection;
+  readonly usage: AgentUsageSummary;
   readonly pendingPermission: AgentPendingPermission | null;
 };
 
@@ -74,6 +77,7 @@ export function createInitialAgentProjection(): AgentSessionProjection {
     timeline: [],
     failureMessage: null,
     budget: { progress: null, exceededLimit: null },
+    usage: createEmptyUsageSummary(),
     pendingPermission: null,
   });
 }
@@ -93,6 +97,7 @@ export function beginAgentRun(
         : [...prev.timeline, options.userTimelineItem],
     failureMessage: null,
     budget: { progress: null, exceededLimit: null },
+    usage: createEmptyUsageSummary(),
     pendingPermission: null,
   });
 }
@@ -213,6 +218,19 @@ export function applyAgentEvent(
           exceededLimit: event.limit,
         },
       });
+    case "usage.delta":
+      return completeProjection({
+        ...prev,
+        currentRunEvents,
+        usage: {
+          inputTokens: prev.usage.inputTokens + event.delta.inputTokens,
+          outputTokens: prev.usage.outputTokens + event.delta.outputTokens,
+          cacheReadInputTokens: prev.usage.cacheReadInputTokens + event.delta.cacheReadInputTokens,
+          cacheWriteInputTokens:
+            prev.usage.cacheWriteInputTokens + event.delta.cacheWriteInputTokens,
+          costUsd: prev.usage.costUsd + event.delta.costUsd,
+        },
+      });
     default: {
       const _never: never = event;
       return _never;
@@ -241,6 +259,16 @@ export function findLastUserPrompt(projection: AgentSessionProjection): string |
   }
 
   return null;
+}
+
+function createEmptyUsageSummary(): AgentUsageSummary {
+  return {
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheReadInputTokens: 0,
+    cacheWriteInputTokens: 0,
+    costUsd: 0,
+  };
 }
 
 function completeProjection(state: MutableProjection): AgentSessionProjection {

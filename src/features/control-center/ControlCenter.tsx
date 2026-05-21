@@ -56,6 +56,7 @@ export function ControlCenter() {
               canRegenerateAssistant={agent.capabilities.canRegenerateAssistant}
               onRegenerateAssistant={agent.regenerateLastAssistant}
               timeline={agent.timeline}
+              usage={agent.usage}
               isRunActive={agent.capabilities.runActive}
             />
           )}

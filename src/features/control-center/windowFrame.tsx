@@ -1,4 +1,4 @@
-import { Minimize2 } from "lucide-react";
+import { GripVertical, Minimize2 } from "lucide-react";
 import type { ComponentProps, MouseEvent, ReactElement } from "react";
 import { useCallback } from "react";
 
@@ -40,7 +40,9 @@ export function TitleBarDragRegion(props: { className?: string }): ReactElement 
         "cursor-grab rounded-lg active:cursor-grabbing [-webkit-app-region:drag]",
         props.className,
       )}
-    />
+    >
+      <GripVertical className={cn(chromeIconSvgClassName)} strokeWidth={2} />
+    </div>
   );
 }
 
