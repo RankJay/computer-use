@@ -7,7 +7,7 @@ import {
   findLastUserPrompt,
   resetAgentProjection,
 } from "@/agent/session/sessionProjection";
-import { AGENT_TOOL_NAMES } from "@/agent/toolContract";
+import { AGENT_TOOL_NAMES, TOOL_CONTRACT } from "@/agent/toolContract";
 import type { AgentEvent, AgentTimelineItem, PermissionChoice } from "@/agent/types";
 
 const taskId = "task-1";
@@ -180,11 +180,29 @@ describe("sessionProjection", () => {
           expect.objectContaining({
             title: "Timed out terminal.run",
             detail: "Stopped after 120s.",
+            surface: "thought",
             tone: "timeout",
           }),
         ],
       }),
     );
+  });
+
+  test("tool rows use the display surface from TOOL_CONTRACT", () => {
+    for (const toolName of Object.values(AGENT_TOOL_NAMES)) {
+      let projection = applyAgentEvent(createInitialAgentProjection(), createdEvent());
+      projection = applyAgentEvent(projection, {
+        ...baseEvent(`started-${toolName}`),
+        type: "tool.started",
+        toolName,
+        inputSummary: "input",
+      });
+
+      const activity = projection.timeline.find((item) => item.kind === "activity");
+      expect(activity?.kind).toBe("activity");
+      if (activity?.kind !== "activity") throw new Error("expected activity");
+      expect(activity.rows[0]?.surface).toBe(TOOL_CONTRACT[toolName].displaySurface);
+    }
   });
 
   test("task.failed flushes streamed assistant text into the timeline", () => {
@@ -388,6 +406,7 @@ describe("sessionProjection", () => {
             id: "tool-started",
             title: "Running terminal.run",
             detail: "bun test",
+            surface: "thought",
           },
         ],
       },
@@ -410,6 +429,7 @@ describe("sessionProjection", () => {
     expect(activity.rows[0]).toMatchObject({
       title: "Captured screenshot",
       detail: "primary",
+      surface: "thought",
       screenshotDataUrl: "data:image/png;base64,AAA",
     });
   });

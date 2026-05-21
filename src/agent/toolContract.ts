@@ -3,7 +3,7 @@
  * Agent loop, UI copy, and IPC adapters should derive from these identifiers — not ad-hoc strings.
  */
 
-import type { PermissionChoice, PermissionMode } from "./types";
+import type { AgentActivitySurface, PermissionChoice, PermissionMode } from "./types";
 
 /** What could go wrong if the action runs without supervision (ADR 003). */
 export type ConsequenceRiskClass =
@@ -68,6 +68,8 @@ type ToolContractEntry = {
   cancellation: string;
   /** Short label for timeline / cards. */
   displayName: string;
+  /** UI surface used when this tool appears in the activity timeline. */
+  displaySurface: AgentActivitySurface;
   /** One line for permission drawer “what”. */
   defaultPermissionTitle: string;
 };
@@ -79,6 +81,7 @@ export const TOOL_CONTRACT: Record<AgentToolName, ToolContractEntry> = {
     timeoutMs: 5_000,
     cancellation: "Honors cancellation before and after the directory read.",
     displayName: "Workspace listing",
+    displaySurface: "task",
     defaultPermissionTitle: "List files in a workspace directory",
   },
   [AGENT_TOOL_NAMES.TERMINAL_RUN]: {
@@ -87,6 +90,7 @@ export const TOOL_CONTRACT: Record<AgentToolName, ToolContractEntry> = {
     timeoutMs: 120_000,
     cancellation: "Honors cancellation mid-command by killing the spawned child process.",
     displayName: "Terminal",
+    displaySurface: "thought",
     defaultPermissionTitle: "Allow a terminal command",
   },
   [AGENT_TOOL_NAMES.DISPLAY_CAPTURE]: {
@@ -95,6 +99,7 @@ export const TOOL_CONTRACT: Record<AgentToolName, ToolContractEntry> = {
     timeoutMs: 10_000,
     cancellation: "Honors cancellation before and after the native capture.",
     displayName: "Screenshot",
+    displaySurface: "thought",
     defaultPermissionTitle: "Allow screen capture",
   },
   [AGENT_TOOL_NAMES.POINTER_MOVE]: {
@@ -103,6 +108,7 @@ export const TOOL_CONTRACT: Record<AgentToolName, ToolContractEntry> = {
     timeoutMs: 10_000,
     cancellation: "Honors cancellation mid-move between pointer animation steps.",
     displayName: "Move pointer",
+    displaySurface: "thought",
     defaultPermissionTitle: "Allow moving the mouse pointer",
   },
   [AGENT_TOOL_NAMES.POINTER_CLICK]: {
@@ -111,6 +117,7 @@ export const TOOL_CONTRACT: Record<AgentToolName, ToolContractEntry> = {
     timeoutMs: 10_000,
     cancellation: "Honors cancellation before the click is synthesized.",
     displayName: "Click",
+    displaySurface: "thought",
     defaultPermissionTitle: "Allow a mouse click",
   },
   [AGENT_TOOL_NAMES.TYPE_TEXT]: {
@@ -119,6 +126,7 @@ export const TOOL_CONTRACT: Record<AgentToolName, ToolContractEntry> = {
     timeoutMs: 10_000,
     cancellation: "Honors cancellation before the typing burst starts.",
     displayName: "Type text",
+    displaySurface: "thought",
     defaultPermissionTitle: "Allow typing into the focused application",
   },
   [AGENT_TOOL_NAMES.KEY_TAP]: {
@@ -127,6 +135,7 @@ export const TOOL_CONTRACT: Record<AgentToolName, ToolContractEntry> = {
     timeoutMs: 10_000,
     cancellation: "Honors cancellation before the key press is synthesized.",
     displayName: "Key tap",
+    displaySurface: "thought",
     defaultPermissionTitle: "Allow a single key press (e.g. Enter)",
   },
   [AGENT_TOOL_NAMES.FILE_READ]: {
@@ -135,6 +144,7 @@ export const TOOL_CONTRACT: Record<AgentToolName, ToolContractEntry> = {
     timeoutMs: 5_000,
     cancellation: "Honors cancellation before and after the file read.",
     displayName: "Read file",
+    displaySurface: "task",
     defaultPermissionTitle: "Allow reading a file",
   },
   [AGENT_TOOL_NAMES.FILE_WRITE]: {
@@ -143,6 +153,7 @@ export const TOOL_CONTRACT: Record<AgentToolName, ToolContractEntry> = {
     timeoutMs: 5_000,
     cancellation: "Honors cancellation before and after the file write.",
     displayName: "Write file",
+    displaySurface: "task",
     defaultPermissionTitle: "Allow writing a file",
   },
 };

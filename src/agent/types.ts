@@ -27,11 +27,16 @@ export type RunBudgetProgress = {
   readonly budget: RunBudget;
 };
 
-export type AgentUsageDelta = {
+export type TokenUsage = {
   readonly inputTokens: number;
   readonly outputTokens: number;
   readonly cacheReadInputTokens: number;
   readonly cacheWriteInputTokens: number;
+};
+
+export type PartialTokenUsage = Partial<TokenUsage>;
+
+export type AgentUsageDelta = TokenUsage & {
   readonly costUsd: number;
 };
 
@@ -76,11 +81,13 @@ export type AgentTimelineItem =
       rows: readonly AgentActivityRow[];
     };
 
+export type AgentActivitySurface = "reasoning" | "task" | "thought";
+
 export type AgentActivityRow = {
   readonly id: string;
   readonly title: string;
   readonly detail?: string;
-  readonly surface?: "reasoning" | "task" | "thought";
+  readonly surface: AgentActivitySurface;
   readonly tone?: "timeout";
   /** Inline PNG preview for display capture rows (`data:image/png;base64,...`). */
   readonly screenshotDataUrl?: string;

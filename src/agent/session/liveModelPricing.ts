@@ -1,27 +1,12 @@
 import { ANTHROPIC_MODEL_OPTIONS, OPENAI_MODEL_OPTIONS } from "@/agent/llm/modelCatalog";
 import type { LlmApiProvider } from "@/agent/native/tauriIpc";
+import type { TokenUsage } from "@/agent/types";
 
 export type ModelTokenPrice = {
   readonly inputUsdPerMillion: number;
   readonly outputUsdPerMillion: number;
   readonly cacheReadUsdPerMillion?: number;
   readonly cacheWriteUsdPerMillion?: number;
-};
-
-export type PricedTokenUsage = {
-  readonly inputTokens?: number;
-  readonly inputTokenDetails?: {
-    readonly cacheReadTokens?: number;
-    readonly cacheWriteTokens?: number;
-  };
-  readonly outputTokens?: number;
-};
-
-export type LiveUsageTokens = {
-  readonly inputTokens: number;
-  readonly outputTokens: number;
-  readonly cacheReadInputTokens: number;
-  readonly cacheWriteInputTokens: number;
 };
 
 const ANTHROPIC_PRICES: Readonly<Record<string, ModelTokenPrice>> = {
@@ -65,8 +50,8 @@ export function liveModelIdsMissingPricing(): readonly string[] {
   return [...missingAnthropic, ...missingOpenAI];
 }
 
-export function estimatePricedTokenUsageCostUsd(
-  usage: PricedTokenUsage,
+export function estimateCostUsd(
+  usage: TokenUsage,
   provider: LlmApiProvider,
   modelId: string,
 ): number {
@@ -75,38 +60,23 @@ export function estimatePricedTokenUsageCostUsd(
     return 0;
   }
 
-  const cacheReadTokens = usage.inputTokenDetails?.cacheReadTokens;
-  const cacheWriteTokens = usage.inputTokenDetails?.cacheWriteTokens;
-  const cachedInputTokens = (cacheReadTokens ?? 0) + (cacheWriteTokens ?? 0);
-  const inputTokens = Math.max((usage.inputTokens ?? 0) - cachedInputTokens, 0);
+  const cachedInputTokens = usage.cacheReadInputTokens + usage.cacheWriteInputTokens;
+  const inputTokens = Math.max(usage.inputTokens - cachedInputTokens, 0);
 
   return (
     pricedTokens(inputTokens, price.inputUsdPerMillion) +
     pricedTokens(usage.outputTokens, price.outputUsdPerMillion) +
-    pricedTokens(cacheReadTokens, price.cacheReadUsdPerMillion ?? price.inputUsdPerMillion) +
-    pricedTokens(cacheWriteTokens, price.cacheWriteUsdPerMillion ?? price.inputUsdPerMillion)
+    pricedTokens(
+      usage.cacheReadInputTokens,
+      price.cacheReadUsdPerMillion ?? price.inputUsdPerMillion,
+    ) +
+    pricedTokens(
+      usage.cacheWriteInputTokens,
+      price.cacheWriteUsdPerMillion ?? price.inputUsdPerMillion,
+    )
   );
 }
 
-export function estimateLiveUsageCostUsd(
-  usage: LiveUsageTokens,
-  provider: LlmApiProvider,
-  modelId: string,
-): number {
-  return estimatePricedTokenUsageCostUsd(
-    {
-      inputTokens: usage.inputTokens,
-      inputTokenDetails: {
-        cacheReadTokens: usage.cacheReadInputTokens,
-        cacheWriteTokens: usage.cacheWriteInputTokens,
-      },
-      outputTokens: usage.outputTokens,
-    },
-    provider,
-    modelId,
-  );
-}
-
-function pricedTokens(tokens: number | undefined, usdPerMillion: number): number {
-  return ((tokens ?? 0) * usdPerMillion) / 1_000_000;
+function pricedTokens(tokens: number, usdPerMillion: number): number {
+  return (tokens * usdPerMillion) / 1_000_000;
 }

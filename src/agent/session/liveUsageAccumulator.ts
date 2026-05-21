@@ -1,6 +1,5 @@
 import type { LlmApiProvider } from "@/agent/native/tauriIpc";
-import type { LiveUsageTokens } from "@/agent/session/liveModelPricing";
-import { estimateLiveUsageCostUsd } from "@/agent/session/liveModelPricing";
+import { estimateCostUsd } from "@/agent/session/liveModelPricing";
 import {
   addUsageSnapshots,
   createEmptyUsageSnapshot,
@@ -9,14 +8,14 @@ import {
   type StreamUsageSnapshot,
   usageSnapshotDelta,
 } from "@/agent/session/liveStreamMapping";
-import type { AgentUsageDelta } from "@/agent/types";
+import type { AgentUsageDelta, TokenUsage } from "@/agent/types";
 
 export type UsageDeltaForEmit = AgentUsageDelta;
 
 export type LiveUsageAccumulator = {
   readonly ingest: (snapshot: StreamUsageSnapshot) => UsageDeltaForEmit | null;
   readonly commitStep: () => void;
-  readonly total: () => LiveUsageTokens;
+  readonly total: () => TokenUsage;
 };
 
 export function createLiveUsageAccumulator(options: {
@@ -49,7 +48,7 @@ export function createLiveUsageAccumulator(options: {
       emittedUsage = addUsageSnapshots(emittedUsage, usageDelta);
       return {
         ...usageDelta,
-        costUsd: estimateLiveUsageCostUsd(usageDelta, options.provider, options.modelId),
+        costUsd: estimateCostUsd(usageDelta, options.provider, options.modelId),
       };
     },
     commitStep: () => {

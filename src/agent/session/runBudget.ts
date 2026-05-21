@@ -1,12 +1,20 @@
 import type { LlmApiProvider } from "@/agent/native/tauriIpc";
-import {
-  estimatePricedTokenUsageCostUsd,
-  type PricedTokenUsage,
-} from "@/agent/session/liveModelPricing";
-import type { RunBudget, RunBudgetLimit, RunBudgetProgress } from "@/agent/types";
+import { estimateCostUsd } from "@/agent/session/liveModelPricing";
+import type {
+  PartialTokenUsage,
+  RunBudget,
+  RunBudgetLimit,
+  RunBudgetProgress,
+  TokenUsage,
+} from "@/agent/types";
 
 type BudgetStep = {
-  readonly usage?: PricedTokenUsage;
+  readonly usage?: PartialTokenUsage & {
+    readonly inputTokenDetails?: {
+      readonly cacheReadTokens?: number;
+      readonly cacheWriteTokens?: number;
+    };
+  };
 };
 
 export function estimateStepCostUsd(
@@ -17,7 +25,7 @@ export function estimateStepCostUsd(
   if (step.usage === undefined) {
     return 0;
   }
-  return estimatePricedTokenUsageCostUsd(step.usage, provider, modelId);
+  return estimateCostUsd(tokenUsageFromBudgetStepUsage(step.usage), provider, modelId);
 }
 
 export function estimateRunCostUsd(
@@ -55,4 +63,15 @@ export function exceededBudgetLimit(progress: RunBudgetProgress): RunBudgetLimit
     return "maxWallClockMs";
   }
   return null;
+}
+
+function tokenUsageFromBudgetStepUsage(stepUsage: NonNullable<BudgetStep["usage"]>): TokenUsage {
+  return {
+    inputTokens: stepUsage.inputTokens ?? 0,
+    outputTokens: stepUsage.outputTokens ?? 0,
+    cacheReadInputTokens:
+      stepUsage.cacheReadInputTokens ?? stepUsage.inputTokenDetails?.cacheReadTokens ?? 0,
+    cacheWriteInputTokens:
+      stepUsage.cacheWriteInputTokens ?? stepUsage.inputTokenDetails?.cacheWriteTokens ?? 0,
+  };
 }

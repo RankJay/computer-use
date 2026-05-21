@@ -1,6 +1,12 @@
 import type { LlmApiProvider } from "@/agent/native/tauriIpc";
-import { estimateLiveUsageCostUsd, type LiveUsageTokens } from "@/agent/session/liveModelPricing";
-import type { AgentEvent, AssistantTextDeltaEvent, UsageDeltaEvent } from "@/agent/types";
+import { estimateCostUsd } from "@/agent/session/liveModelPricing";
+import type {
+  AgentEvent,
+  AssistantTextDeltaEvent,
+  PartialTokenUsage,
+  TokenUsage,
+  UsageDeltaEvent,
+} from "@/agent/types";
 
 export type LiveStreamTextDeltaChunk = {
   readonly type: "text-delta";
@@ -9,18 +15,9 @@ export type LiveStreamTextDeltaChunk = {
 
 export type UsageSnapshotScope = "step" | "run";
 
-export type UsageSnapshot = LiveUsageTokens;
-
 export type StreamUsageSnapshot = {
   readonly scope: UsageSnapshotScope;
-  readonly usage: PartialUsageSnapshot;
-};
-
-export type PartialUsageSnapshot = {
-  readonly inputTokens?: number;
-  readonly outputTokens?: number;
-  readonly cacheReadInputTokens?: number;
-  readonly cacheWriteInputTokens?: number;
+  readonly usage: PartialTokenUsage;
 };
 
 type StreamChunk = {
@@ -63,7 +60,7 @@ export function mapStreamChunkToAgentEvent(
   );
 }
 
-export function createEmptyUsageSnapshot(): UsageSnapshot {
+export function createEmptyUsageSnapshot(): TokenUsage {
   return {
     inputTokens: 0,
     outputTokens: 0,
@@ -72,7 +69,7 @@ export function createEmptyUsageSnapshot(): UsageSnapshot {
   };
 }
 
-export function addUsageSnapshots(left: UsageSnapshot, right: UsageSnapshot): UsageSnapshot {
+export function addUsageSnapshots(left: TokenUsage, right: TokenUsage): TokenUsage {
   return {
     inputTokens: left.inputTokens + right.inputTokens,
     outputTokens: left.outputTokens + right.outputTokens,
@@ -82,9 +79,9 @@ export function addUsageSnapshots(left: UsageSnapshot, right: UsageSnapshot): Us
 }
 
 export function mergeUsageSnapshot(
-  current: UsageSnapshot,
-  next: PartialUsageSnapshot,
-): UsageSnapshot {
+  current: TokenUsage,
+  next: PartialTokenUsage,
+): TokenUsage {
   return {
     inputTokens: next.inputTokens ?? current.inputTokens,
     outputTokens: next.outputTokens ?? current.outputTokens,
@@ -93,7 +90,7 @@ export function mergeUsageSnapshot(
   };
 }
 
-export function usageSnapshotDelta(next: UsageSnapshot, prev: UsageSnapshot): UsageSnapshot {
+export function usageSnapshotDelta(next: TokenUsage, prev: TokenUsage): TokenUsage {
   return {
     inputTokens: positiveDelta(next.inputTokens, prev.inputTokens),
     outputTokens: positiveDelta(next.outputTokens, prev.outputTokens),
@@ -102,7 +99,7 @@ export function usageSnapshotDelta(next: UsageSnapshot, prev: UsageSnapshot): Us
   };
 }
 
-export function hasUsageDelta(delta: UsageSnapshot): boolean {
+export function hasUsageDelta(delta: TokenUsage): boolean {
   return (
     delta.inputTokens > 0 ||
     delta.outputTokens > 0 ||
@@ -112,7 +109,7 @@ export function hasUsageDelta(delta: UsageSnapshot): boolean {
 }
 
 export function mapUsageDeltaToAgentEvent(
-  delta: UsageSnapshot,
+  delta: TokenUsage,
   taskId: string,
   provider: LlmApiProvider,
   modelId: string,
@@ -129,7 +126,7 @@ export function mapUsageDeltaToAgentEvent(
     type: "usage.delta",
     delta: {
       ...delta,
-      costUsd: estimateLiveUsageCostUsd(delta, provider, modelId),
+      costUsd: estimateCostUsd(delta, provider, modelId),
     },
   };
 }
@@ -152,7 +149,7 @@ export function extractUsageSnapshotFromStreamChunk(
   return null;
 }
 
-function usageFromAiSdkUsage(usage: Readonly<Record<string, unknown>>): PartialUsageSnapshot {
+function usageFromAiSdkUsage(usage: Readonly<Record<string, unknown>>): PartialTokenUsage {
   const inputTokenDetails = recordProperty(usage, "inputTokenDetails");
   const cachedInputTokens = numberProperty(usage, "cachedInputTokens");
 
@@ -182,7 +179,7 @@ function usageFromRawProviderChunk(
 
 function usageFromAnthropicRawChunk(
   raw: Readonly<Record<string, unknown>>,
-): PartialUsageSnapshot | null {
+): PartialTokenUsage | null {
   const message = recordProperty(raw, "message");
   const usage = recordProperty(raw, "usage") ?? recordProperty(message, "usage");
 
@@ -201,7 +198,7 @@ function usageFromAnthropicRawChunk(
 
 function usageFromOpenAiRawChunk(
   raw: Readonly<Record<string, unknown>>,
-): PartialUsageSnapshot | null {
+): PartialTokenUsage | null {
   const usage = recordProperty(raw, "usage");
   if (usage === null) {
     return null;
@@ -225,7 +222,7 @@ function positiveDelta(next: number, prev: number): number {
   return Math.max(next - prev, 0);
 }
 
-function hasPartialUsage(usage: PartialUsageSnapshot): boolean {
+function hasPartialUsage(usage: PartialTokenUsage): boolean {
   return (
     usage.inputTokens !== undefined ||
     usage.outputTokens !== undefined ||

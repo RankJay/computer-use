@@ -43,7 +43,7 @@ describe("buildTranscriptRenderItems", () => {
         kind: "activity",
         taskId: "task-1",
         status: "completed",
-        rows: [{ id: "tool-1", title: "Running terminal.run" }],
+        rows: [{ id: "tool-1", title: "Running terminal.run", surface: "thought" }],
       },
       {
         id: "a-2",
@@ -77,7 +77,7 @@ describe("buildTranscriptRenderItems", () => {
       {
         kind: "activity",
         id: "activity-1",
-        rows: [{ id: "tool-1", title: "Running terminal.run" }],
+        rows: [{ id: "tool-1", title: "Running terminal.run", surface: "thought" }],
         status: "completed",
       },
       {
@@ -98,7 +98,7 @@ describe("buildTranscriptRenderItems", () => {
         kind: "activity",
         taskId: "task-1",
         status: "completed",
-        rows: [{ id: "tool-1", title: "Running terminal.run", detail: "pwd" }],
+        rows: [{ id: "tool-1", title: "Running terminal.run", detail: "pwd", surface: "thought" }],
       },
       { id: "a-2", at: 4, kind: "assistant", text: "Since we need a path.", status: "complete" },
     ];
@@ -113,7 +113,7 @@ describe("buildTranscriptRenderItems", () => {
       {
         kind: "activity",
         id: "activity-1",
-        rows: [{ id: "tool-1", title: "Running terminal.run", detail: "pwd" }],
+        rows: [{ id: "tool-1", title: "Running terminal.run", detail: "pwd", surface: "thought" }],
         status: "completed",
       },
       { kind: "text", text: "Since we need a path.", isStreaming: false },
@@ -130,7 +130,7 @@ describe("buildTranscriptRenderItems", () => {
         kind: "activity",
         taskId: "task-1",
         status: "completed",
-        rows: [{ id: "tool-1", title: "Running terminal.run", detail: "pwd" }],
+        rows: [{ id: "tool-1", title: "Running terminal.run", detail: "pwd", surface: "thought" }],
       },
       { id: "a-2", at: 4, kind: "assistant", text: "Now listing files.", status: "complete" },
       {
@@ -139,7 +139,7 @@ describe("buildTranscriptRenderItems", () => {
         kind: "activity",
         taskId: "task-1",
         status: "completed",
-        rows: [{ id: "tool-2", title: "Running terminal.run", detail: "ls" }],
+        rows: [{ id: "tool-2", title: "Running terminal.run", detail: "ls", surface: "thought" }],
       },
       { id: "a-3", at: 6, kind: "assistant", text: "Here is the summary.", status: "complete" },
     ];
@@ -169,7 +169,7 @@ describe("buildTranscriptRenderItems", () => {
         kind: "activity",
         taskId: "task-1",
         status: "active",
-        rows: [{ id: "tool-1", title: "Running terminal.run" }],
+        rows: [{ id: "tool-1", title: "Running terminal.run", surface: "thought" }],
       },
       { id: "a-2", at: 4, kind: "assistant", text: "rest", status: "streaming" },
     ];

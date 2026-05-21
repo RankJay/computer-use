@@ -25,7 +25,7 @@ import { Shimmer } from "@/components/ai-elements/shimmer";
 import { Task, TaskContent, TaskItem, TaskTrigger } from "@/components/ai-elements/task";
 import { cn } from "@/lib/utils";
 
-type ActivitySurface = NonNullable<AgentActivityRow["surface"]>;
+type ActivitySurface = AgentActivityRow["surface"];
 
 type ActivitySegment = {
   readonly surface: ActivitySurface;
@@ -121,6 +121,7 @@ function ThoughtActivitySegment(props: StatusActivitySegmentProps): ReactElement
     <ChainOfThought
       open={props.isOpen}
       onOpenChange={props.onOpenChange}
+      data-activity-surface="thought"
       className="w-full text-sm px-3 mb-4 text-[#B7C1CC]"
     >
       <ChainOfThoughtHeader className="text-[#7E7E7E] hover:text-[#cdcdcd]">
@@ -154,6 +155,7 @@ function ReasoningActivitySegment(props: ActivitySegmentProps): ReactElement {
       open={props.isOpen}
       onOpenChange={props.onOpenChange}
       isStreaming={props.isActive}
+      data-activity-surface="reasoning"
       className="w-full px-3 mb-4 text-sm text-[#B7C1CC]"
     >
       <ReasoningTrigger
@@ -172,6 +174,7 @@ function TaskActivitySegment(props: StatusActivitySegmentProps): ReactElement {
     <Task
       open={props.isOpen}
       onOpenChange={props.onOpenChange}
+      data-activity-surface="task"
       className="w-full px-3 mb-4 text-sm text-[#B7C1CC]"
     >
       <TaskTrigger title={props.heading}>
@@ -255,7 +258,7 @@ function activitySegments(rows: readonly AgentActivityRow[]): readonly ActivityS
   const segments: ActivitySegment[] = [];
 
   for (const row of rows) {
-    const surface = activitySurface(row);
+    const surface = row.surface;
     const last = segments[segments.length - 1];
 
     if (last?.surface === surface) {
@@ -267,21 +270,6 @@ function activitySegments(rows: readonly AgentActivityRow[]): readonly ActivityS
   }
 
   return segments;
-}
-
-function activitySurface(row: AgentActivityRow): ActivitySurface {
-  if (row.surface !== undefined) return row.surface;
-
-  const title = row.title.toLowerCase();
-  if (title.includes("reasoning")) return "reasoning";
-  if (
-    title.includes("workspace.inspect") ||
-    title.includes("file.read") ||
-    title.includes("file.write")
-  ) {
-    return "task";
-  }
-  return "thought";
 }
 
 function reasoningContent(rows: readonly AgentActivityRow[]): string {

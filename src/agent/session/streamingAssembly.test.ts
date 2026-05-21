@@ -163,7 +163,7 @@ describe("streamingAssembly", () => {
       kind: "activity",
       taskId: "task-1",
       status: "active",
-      rows: [{ id: "row-1", title: "Running terminal.run" }],
+      rows: [{ id: "row-1", title: "Running terminal.run", surface: "thought" }],
     };
 
     const timeline = applyAssistantStreamEvent([userItem, assistantItem, activityItem], {
@@ -196,7 +196,7 @@ describe("streamingAssembly", () => {
       kind: "activity",
       taskId,
       status: "completed",
-      rows: [{ id: "row-1", title: "Running terminal.run" }],
+      rows: [{ id: "row-1", title: "Running terminal.run", surface: "thought" }],
     };
     const assistantItem: AgentTimelineItem = {
       id: "assistant-1",

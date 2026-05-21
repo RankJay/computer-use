@@ -7,12 +7,7 @@ import {
   countOpenPointerTools,
   countOpenUiAutomationTools,
 } from "@/agent/session/uiAutomationDepth";
-import {
-  AGENT_TOOL_NAMES,
-  type AgentToolName,
-  isAgentToolName,
-  riskClassForTool,
-} from "@/agent/toolContract";
+import { TOOL_CONTRACT, isAgentToolName } from "@/agent/toolContract";
 import {
   type AgentActivityRow,
   type AgentEvent,
@@ -372,16 +367,19 @@ function activityRowFromEvent(event: ActivityEvent): AgentActivityRow {
         id: event.id,
         title: `Planned ${event.steps.length} ${event.steps.length === 1 ? "step" : "steps"}`,
         detail: event.steps.join("\n"),
+        surface: "thought",
       };
     case "step.started":
       return {
         id: event.id,
         title: `Started: ${event.title}`,
+        surface: "thought",
       };
     case "step.completed":
       return {
         id: event.id,
         title: `Completed step ${event.stepIndex + 1}`,
+        surface: "thought",
       };
     case "permission.requested":
       return {
@@ -394,6 +392,7 @@ function activityRowFromEvent(event: ActivityEvent): AgentActivityRow {
       return {
         id: event.id,
         title: `Permission ${event.choice.replace(/_/g, " ")}`,
+        surface: "thought",
       };
     case "tool.started":
       return {
@@ -429,6 +428,7 @@ function activityRowFromEvent(event: ActivityEvent): AgentActivityRow {
         id: event.id,
         title: "Captured screenshot",
         detail: event.label,
+        surface: "thought",
         screenshotDataUrl:
           event.imageBase64 !== undefined && event.imageBase64.length > 0
             ? `data:image/png;base64,${event.imageBase64}`
@@ -462,17 +462,9 @@ function formatDuration(ms: number): string {
 }
 
 function activitySurfaceForTool(toolName: string | undefined): AgentActivityRow["surface"] {
-  if (toolName === undefined || !isAgentToolName(toolName)) return undefined;
-  if (isWorkspaceIoTool(toolName)) return "task";
-  return undefined;
-}
-
-function isWorkspaceIoTool(toolName: AgentToolName): boolean {
-  return (
-    toolName === AGENT_TOOL_NAMES.WORKSPACE_INSPECT ||
-    toolName === AGENT_TOOL_NAMES.FILE_READ ||
-    riskClassForTool(toolName) === "mutate_workspace"
-  );
+  return toolName !== undefined && isAgentToolName(toolName)
+    ? TOOL_CONTRACT[toolName].displaySurface
+    : "thought";
 }
 
 function deriveCapabilities(state: MutableProjection): AgentSessionCapabilities {

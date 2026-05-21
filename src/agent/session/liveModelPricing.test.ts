@@ -1,9 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import {
-  estimateLiveUsageCostUsd,
-  liveModelIdsMissingPricing,
-} from "@/agent/session/liveModelPricing";
+import { estimateCostUsd, liveModelIdsMissingPricing } from "@/agent/session/liveModelPricing";
 
 describe("liveModelPricing", () => {
   test("covers every registered live model", () => {
@@ -12,7 +9,7 @@ describe("liveModelPricing", () => {
 
   test("prices live usage with cached input tokens", () => {
     expect(
-      estimateLiveUsageCostUsd(
+      estimateCostUsd(
         {
           inputTokens: 1000,
           outputTokens: 200,

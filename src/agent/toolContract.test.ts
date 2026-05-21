@@ -35,6 +35,16 @@ describe("toolContract", () => {
     }
   });
 
+  test("every tool has an explicit display surface", () => {
+    expect(TOOL_CONTRACT[AGENT_TOOL_NAMES.WORKSPACE_INSPECT].displaySurface).toBe("task");
+    expect(TOOL_CONTRACT[AGENT_TOOL_NAMES.FILE_READ].displaySurface).toBe("task");
+    expect(TOOL_CONTRACT[AGENT_TOOL_NAMES.FILE_WRITE].displaySurface).toBe("task");
+
+    for (const toolName of Object.values(AGENT_TOOL_NAMES)) {
+      expect(["reasoning", "task", "thought"]).toContain(TOOL_CONTRACT[toolName].displaySurface);
+    }
+  });
+
   test("normalizePersistedApprovals keeps dotted contract ids", () => {
     expect(normalizePersistedApprovals(["terminal.run", "file.read"])).toEqual([
       AGENT_TOOL_NAMES.TERMINAL_RUN,
