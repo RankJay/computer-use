@@ -1,5 +1,3 @@
-"use client";
-
 import { useControllableState } from "@radix-ui/react-use-controllable-state";
 import { BrainIcon, ChevronDownIcon } from "lucide-react";
 import type { ComponentProps, ReactElement, ReactNode } from "react";
@@ -15,10 +13,9 @@ import {
 } from "react";
 import { Streamdown } from "streamdown";
 
+import { Shimmer } from "@/components/ai-elements/shimmer";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
-
-import { Shimmer } from "./shimmer";
 
 type ReasoningContextValue = {
   readonly isStreaming: boolean;

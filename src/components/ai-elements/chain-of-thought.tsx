@@ -1,5 +1,3 @@
-"use client";
-
 import { useControllableState } from "@radix-ui/react-use-controllable-state";
 import type { LucideIcon } from "lucide-react";
 import { BrainIcon, ChevronDownIcon, DotIcon } from "lucide-react";
@@ -91,13 +89,7 @@ export type ChainOfThoughtStepProps = ComponentProps<"div"> & {
   iconClassName?: string;
   label: ReactNode;
   description?: ReactNode;
-  status?: "complete" | "active" | "pending";
-};
-
-const stepStatusStyles = {
-  active: "text-foreground",
-  complete: "text-muted-foreground",
-  pending: "text-muted-foreground/50",
+  statusClassName?: string;
 };
 
 export const ChainOfThoughtStep = memo(
@@ -107,14 +99,14 @@ export const ChainOfThoughtStep = memo(
     iconClassName,
     label,
     description,
-    status = "complete",
+    statusClassName,
     children,
     ...props
   }: ChainOfThoughtStepProps) => (
     <div
       className={cn(
         "flex gap-1.5 text-sm leading-snug",
-        stepStatusStyles[status],
+        statusClassName,
         "fade-in-0 slide-in-from-top-1 animate-in duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] motion-reduce:animate-none",
         className,
       )}

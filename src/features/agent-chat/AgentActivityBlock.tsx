@@ -142,22 +142,28 @@ function ThoughtActivitySegment(props: StatusActivitySegmentProps): ReactElement
         {activityHeadingContent(props.heading, props.isActive)}
       </ChainOfThoughtHeader>
       <ChainOfThoughtContent className="text-[#B7C1CC]">
-        {props.rows.map((row, index) => (
-          <ChainOfThoughtStep
-            key={row.id}
-            icon={activityStepIcon(row, props.isActive && index === props.rows.length - 1)}
-            iconClassName={
-              props.isActive && index === props.rows.length - 1 ? spinnerIconClassName : undefined
-            }
-            label={row.title}
-            description={activityStepDescription(row)}
-            status={activityStepStatus(props.status, index, props.rows.length)}
-            className={cn(
-              "**:[[class*='bg-border']]:bg-neutral-800",
-              activityRowClassName(row, props.status, index, props.rows.length),
-            )}
-          />
-        ))}
+        {props.rows.map((row, index) => {
+          const stepStatus = activityStepStatus(props.status, index, props.rows.length);
+
+          return (
+            <ChainOfThoughtStep
+              key={row.id}
+              icon={activityStepIcon(row, props.isActive && index === props.rows.length - 1)}
+              iconClassName={
+                props.isActive && index === props.rows.length - 1
+                  ? spinnerIconClassName
+                  : undefined
+              }
+              label={row.title}
+              description={activityStepDescription(row)}
+              statusClassName={stepStatusStyles[stepStatus]}
+              className={cn(
+                "**:[[class*='bg-border']]:bg-neutral-800",
+                activityRowClassName(row, props.status, index, props.rows.length),
+              )}
+            />
+          );
+        })}
       </ChainOfThoughtContent>
     </ChainOfThought>
   );
