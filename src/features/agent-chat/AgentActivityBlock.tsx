@@ -51,6 +51,20 @@ export function AgentActivityBlock(props: AgentActivityBlockProps): ReactElement
 
   const heading = agentActivityHeading(props.status);
   const segments = activitySegments(props.rows);
+  const hasMixedSurfaces = segments.length > 1;
+
+  if (hasMixedSurfaces) {
+    return (
+      <ThoughtActivitySegment
+        rows={props.rows}
+        heading={heading}
+        status={props.status}
+        isActive={isActive}
+        isOpen={isOpen}
+        onOpenChange={setIsOpen}
+      />
+    );
+  }
 
   return (
     <>
@@ -354,9 +368,7 @@ function activityStepDescription(row: AgentActivityRow): ReactElement | string |
     return (
       <div className="space-y-2 pt-0.5">
         {label !== "" && (
-          <span className="block whitespace-pre-wrap wrap-break-word text-[#9ca3af]">
-            {detail}
-          </span>
+          <span className="block whitespace-pre-wrap wrap-break-word text-[#9ca3af]">{detail}</span>
         )}
         <img
           src={src}

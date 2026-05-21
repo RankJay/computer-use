@@ -60,4 +60,21 @@ describe("AgentActivityBlock", () => {
 
     expect(html).toContain('src="data:image/png;base64,AAA"');
   });
+
+  test("renders mixed activity surfaces under one status header", () => {
+    const html = renderToStaticMarkup(
+      createElement(AgentActivityBlock, {
+        rows: [
+          { id: "thought", title: "Planned 3 steps", surface: "thought" },
+          { id: "reasoning", title: "Reasoned about workspace", surface: "reasoning" },
+          { id: "task", title: "Running terminal.run", surface: "task" },
+        ],
+        status: "cancelled",
+        collapse: true,
+      }),
+    );
+
+    expect(html.match(/Stopped/g)?.length).toBe(1);
+    expect(html.match(/data-activity-surface=/g)?.length).toBe(1);
+  });
 });
