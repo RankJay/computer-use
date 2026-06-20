@@ -7,6 +7,7 @@ import {
   createPointerClickTool,
   createPointerMoveTool,
   createTypeTextTool,
+  createUiFocusTypeTool,
 } from "@/agent/tools/uiAutomationTools";
 import {
   createCopyFileTool,
@@ -30,6 +31,7 @@ export function createActuateTools(ctx: LiveAgentToolContext) {
     [MODEL_TOOL_KEYS.POINTER_CLICK]: createPointerClickTool(ctx),
     [MODEL_TOOL_KEYS.TYPE_TEXT]: createTypeTextTool(ctx),
     [MODEL_TOOL_KEYS.KEY_TAP]: createKeyTapTool(ctx),
+    [MODEL_TOOL_KEYS.UI_FOCUS_TYPE]: createUiFocusTypeTool(ctx),
   };
 }
 

@@ -9,6 +9,7 @@ import type { AgentToolName } from "@/agent/toolContract";
 import {
   createEventId,
   type EmitFn,
+  type AgentTimelineItem,
   type PermissionChoice,
   type PermissionMode,
   type RunBudget,
@@ -18,6 +19,7 @@ import type { WorkspaceAdapter } from "@/agent/workspace/workspaceAdapter";
 export type AgentSessionRunnerOptions = {
   readonly taskId: string;
   readonly prompt: string;
+  readonly conversationTimeline: readonly AgentTimelineItem[];
   readonly settings: AppSettingsPayload;
   readonly workspaceRoot: string | null;
   readonly abortSignal: AbortSignal;

@@ -12,6 +12,7 @@ function createRunnerOptions(
   return {
     taskId: "task-1",
     prompt: "Demo the agent",
+    conversationTimeline: [{ id: "u1", at: 1, kind: "user", text: "Demo the agent" }],
     settings: {
       ...DEFAULT_APP_SETTINGS,
       persistedApprovals: [...DEFAULT_APP_SETTINGS.persistedApprovals],

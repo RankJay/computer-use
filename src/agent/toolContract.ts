@@ -20,6 +20,7 @@ export const AGENT_TOOL_NAMES = {
   POINTER_CLICK: "pointer.click",
   TYPE_TEXT: "type.text",
   KEY_TAP: "key.tap",
+  UI_FOCUS_TYPE: "ui.focusType",
   FILE_READ: "file.read",
   FILE_WRITE: "file.write",
   FILE_COPY: "file.copy",
@@ -41,6 +42,7 @@ export const MODEL_TOOL_KEYS = {
   POINTER_CLICK: "pointer_click",
   TYPE_TEXT: "type_text",
   KEY_TAP: "key_tap",
+  UI_FOCUS_TYPE: "ui_focus_type",
 } as const;
 
 export type ModelToolKey = (typeof MODEL_TOOL_KEYS)[keyof typeof MODEL_TOOL_KEYS];
@@ -58,6 +60,7 @@ export const MODEL_TOOL_TO_AGENT_TOOL: Record<ModelToolKey, AgentToolName> = {
   [MODEL_TOOL_KEYS.POINTER_CLICK]: AGENT_TOOL_NAMES.POINTER_CLICK,
   [MODEL_TOOL_KEYS.TYPE_TEXT]: AGENT_TOOL_NAMES.TYPE_TEXT,
   [MODEL_TOOL_KEYS.KEY_TAP]: AGENT_TOOL_NAMES.KEY_TAP,
+  [MODEL_TOOL_KEYS.UI_FOCUS_TYPE]: AGENT_TOOL_NAMES.UI_FOCUS_TYPE,
 };
 
 export function agentToolNameForModelToolKey(key: ModelToolKey): AgentToolName {
@@ -143,6 +146,15 @@ export const TOOL_CONTRACT: Record<AgentToolName, ToolContractEntry> = {
     displayName: "Key tap",
     displaySurface: "thought",
     defaultPermissionTitle: "Allow a single key press (e.g. Enter)",
+  },
+  [AGENT_TOOL_NAMES.UI_FOCUS_TYPE]: {
+    name: AGENT_TOOL_NAMES.UI_FOCUS_TYPE,
+    riskClass: "ui_automation",
+    timeoutMs: 15_000,
+    cancellation: "Honors cancellation before the focus-and-type sequence starts.",
+    displayName: "Focus and type",
+    displaySurface: "thought",
+    defaultPermissionTitle: "Allow focusing a control and typing into it",
   },
   [AGENT_TOOL_NAMES.FILE_READ]: {
     name: AGENT_TOOL_NAMES.FILE_READ,

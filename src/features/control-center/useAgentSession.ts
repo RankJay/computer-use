@@ -17,7 +17,7 @@ import {
   runSelectedAgentSession,
 } from "@/agent/session/sessionRunner";
 import { createEventId } from "@/agent/types";
-import type { AgentEvent, PermissionChoice, RunBudget } from "@/agent/types";
+import type { AgentEvent, AgentTimelineItem, PermissionChoice, RunBudget } from "@/agent/types";
 import { useSettings } from "@/app/providers/SettingsProvider";
 
 export type ActiveRun = {
@@ -25,6 +25,12 @@ export type ActiveRun = {
   readonly controller: AbortController;
   readonly native: AgentNativeBridge | null;
 };
+
+type StartRunOptions = Readonly<{
+  readonly echoUserPrompt?: boolean;
+  readonly runBudgetOverride?: RunBudget;
+  readonly conversationTimeline?: readonly AgentTimelineItem[];
+}>;
 
 type ActiveRunRef = {
   current: ActiveRun | null;
@@ -66,7 +72,7 @@ export function useAgentSession() {
     async (
       prompt: string,
       workspaceOverride: string | null,
-      opts?: Readonly<{ echoUserPrompt?: boolean; runBudgetOverride?: RunBudget }>,
+      opts?: StartRunOptions,
     ) => {
       if (!ready || runBusyRef.current) return;
       runBusyRef.current = true;
@@ -78,11 +84,15 @@ export function useAgentSession() {
       activeRunRef.current = activeRun;
 
       const echoUser = opts?.echoUserPrompt !== false;
+      const userTimelineItem: AgentTimelineItem | null = echoUser
+        ? { id: createEventId(), at: Date.now(), kind: "user", text: prompt }
+        : null;
+      const conversationTimeline =
+        opts?.conversationTimeline ??
+        (userTimelineItem === null ? projection.timeline : [...projection.timeline, userTimelineItem]);
       setProjection((prev) =>
         beginAgentRun(prev, {
-          userTimelineItem: echoUser
-            ? { id: createEventId(), at: Date.now(), kind: "user", text: prompt }
-            : null,
+          userTimelineItem,
         }),
       );
 
@@ -100,6 +110,7 @@ export function useAgentSession() {
           {
             taskId,
             prompt,
+            conversationTimeline,
             settings,
             workspaceRoot,
             abortSignal: abortController.signal,
@@ -132,7 +143,7 @@ export function useAgentSession() {
 
     setProjection(trimmed);
 
-    void startRun(lastPrompt, null, { echoUserPrompt: false });
+    void startRun(lastPrompt, null, { echoUserPrompt: false, conversationTimeline: trimmed.timeline });
   }, [projection, ready, startRun]);
 
   const cancelRun = useCallback(() => {

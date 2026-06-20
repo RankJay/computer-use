@@ -1,8 +1,13 @@
-import { streamText } from "ai";
+import { streamText, type ModelMessage } from "ai";
 
 import type { LiveAgentToolContext } from "@/agent/agentSessionContext";
 import { getHostOsKind } from "@/agent/hostEnvironment";
 import type { LlmApiProvider } from "@/agent/native/tauriIpc";
+import {
+  buildContinuationMessage,
+  MAX_COMPLETION_CONTINUATIONS,
+  verifyCompletion,
+} from "@/agent/session/liveCompletionVerifier";
 import { createLiveLanguageModel } from "@/agent/session/liveProviderModel";
 import {
   buildScreenshotAttachmentStep,
@@ -33,6 +38,7 @@ import {
   TOOL_CANCELLED_REASON,
   throwIfAborted,
 } from "@/agent/tools/toolCancellation";
+import { createUiAutomationRunState } from "@/agent/tools/uiAutomationState";
 import { createEventId, type RunBudgetLimit, type RunBudgetProgress } from "@/agent/types";
 import { workspaceAdapter as defaultWorkspaceAdapter } from "@/agent/workspace/workspaceAdapter";
 
@@ -48,10 +54,30 @@ function createMeta(): { readonly id: string; readonly at: number } {
   return { id: createEventId(), at: Date.now() };
 }
 
+function completionSummaryForVerifierResult(options: {
+  readonly assistantText: string;
+  readonly status: "complete" | "blocked" | "handoff" | "max_continuations";
+  readonly reason: string;
+}): string {
+  if (options.status === "complete") {
+    return options.assistantText;
+  }
+  const label =
+    options.status === "max_continuations"
+      ? "Stopped after continuation limit"
+      : options.status === "blocked"
+        ? "Blocked"
+        : "Ready for user handoff";
+  return options.assistantText.length > 0
+    ? `${options.assistantText}\n\n${label}: ${options.reason}`
+    : `${label}: ${options.reason}`;
+}
+
 export async function runLiveAgentSession(options: LiveAgentSessionOptions): Promise<void> {
   const {
     taskId,
     prompt,
+    conversationTimeline,
     apiKey,
     llmProvider,
     liveModelId,
@@ -90,7 +116,8 @@ export async function runLiveAgentSession(options: LiveAgentSessionOptions): Pro
     uiAutomationEnabled: settings.uiAutomationEnabled,
     persistedToolApprovals: persisted,
     sessionRiskApproved,
-    vision: { latestPng: null },
+    vision: { latestCapture: null },
+    uiAutomation: createUiAutomationRunState(),
     emit,
     waitForPermission: waitForPermissionChoice,
     persistAlwaysAllow,
@@ -109,12 +136,12 @@ export async function runLiveAgentSession(options: LiveAgentSessionOptions): Pro
   const taskEvent = buildTaskCreatedEvent(taskId, prompt, createMeta());
   await emitAndPersistLiveSessionEvent(emit, taskId, taskEvent);
 
-  const { system, userMessage } = buildLivePromptBundle({
+  const { system, messages: initialMessages } = buildLivePromptBundle({
     nativeBridge: native !== null,
     hostOs,
     uiAutomationEnabled: settings.uiAutomationEnabled,
     workspaceRoot,
-    prompt,
+    conversationTimeline,
   });
 
   async function recordBudgetProgress(steps: readonly BudgetStep[]): Promise<RunBudgetProgress> {
@@ -149,93 +176,140 @@ export async function runLiveAgentSession(options: LiveAgentSessionOptions): Pro
 
   try {
     throwIfAborted(abortSignal);
-    const result = streamText({
-      model: languageModel,
-      system,
-      messages: [{ role: "user", content: userMessage }],
-      tools,
-      abortSignal,
-      includeRawChunks: true,
-      providerOptions:
-        llmProvider === "openai"
-          ? {
-              openai: {
-                streamOptions: { includeUsage: true },
-              },
+    let messages: ModelMessage[] = [...initialMessages];
+    let completionText = "";
+    let continuationCount = 0;
+
+    while (true) {
+      const result = streamText({
+        model: languageModel,
+        system,
+        messages,
+        tools,
+        abortSignal,
+        includeRawChunks: true,
+        providerOptions:
+          llmProvider === "openai"
+            ? {
+                openai: {
+                  streamOptions: { includeUsage: true },
+                },
+              }
+            : undefined,
+        stopWhen: [
+          ({ steps }) => {
+            const progress = createRunBudgetProgress({
+              budget: runBudget,
+              steps,
+              provider: llmProvider,
+              modelId: liveModelId,
+              startedAt: budgetStartedAt,
+              now: Date.now(),
+            });
+            const limit = exceededBudgetLimit(progress);
+            if (limit !== null) {
+              return true;
             }
-          : undefined,
-      stopWhen: [
-        ({ steps }) => {
-          const progress = createRunBudgetProgress({
-            budget: runBudget,
-            steps,
-            provider: llmProvider,
-            modelId: liveModelId,
-            startedAt: budgetStartedAt,
-            now: Date.now(),
-          });
-          const limit = exceededBudgetLimit(progress);
-          if (limit !== null) {
-            return true;
+            return false;
+          },
+        ],
+        prepareStep: async ({ stepNumber }) => {
+          const capture = ctx.vision.latestCapture;
+          if (!shouldAttachLatestScreenshot(capture, stepNumber)) {
+            return {};
           }
-          return false;
+          ctx.vision.latestCapture = null;
+          return buildScreenshotAttachmentStep(capture);
         },
-      ],
-      prepareStep: async ({ stepNumber }) => {
-        const img = ctx.vision.latestPng;
-        if (!shouldAttachLatestScreenshot(img, stepNumber)) {
-          return {};
-        }
-        ctx.vision.latestPng = null;
-        return buildScreenshotAttachmentStep(img);
-      },
-      onChunk: async ({ chunk }) => {
-        const ev = mapStreamChunkToAgentEvent(chunk, taskId, createMeta);
-        if (ev) {
-          emit(ev);
-        }
-
-        const usageSnapshot = extractUsageSnapshotFromStreamChunk(chunk);
-        if (usageSnapshot !== null) {
-          const usageDelta = usageAccumulator.ingest(usageSnapshot);
-          if (usageDelta !== null) {
-            emit({
-              ...createMeta(),
-              taskId,
-              type: "usage.delta",
-              delta: usageDelta,
-            });
+        onChunk: async ({ chunk }) => {
+          const ev = mapStreamChunkToAgentEvent(chunk, taskId, createMeta);
+          if (ev) {
+            emit(ev);
           }
-        }
-      },
-      onStepFinish: async (step) => {
-        finishedSteps = [...finishedSteps, step];
-        await recordBudgetProgress(finishedSteps);
 
-        const usageSnapshot = extractUsageSnapshotFromStreamChunk({
-          type: "finish-step",
-          usage: step.usage,
+          const usageSnapshot = extractUsageSnapshotFromStreamChunk(chunk);
+          if (usageSnapshot !== null) {
+            const usageDelta = usageAccumulator.ingest(usageSnapshot);
+            if (usageDelta !== null) {
+              emit({
+                ...createMeta(),
+                taskId,
+                type: "usage.delta",
+                delta: usageDelta,
+              });
+            }
+          }
+        },
+        onStepFinish: async (step) => {
+          finishedSteps = [...finishedSteps, step];
+          await recordBudgetProgress(finishedSteps);
+
+          const usageSnapshot = extractUsageSnapshotFromStreamChunk({
+            type: "finish-step",
+            usage: step.usage,
+          });
+          if (usageSnapshot !== null) {
+            const usageDelta = usageAccumulator.ingest(usageSnapshot);
+            if (usageDelta !== null) {
+              emit({
+                ...createMeta(),
+                taskId,
+                type: "usage.delta",
+                delta: usageDelta,
+              });
+            }
+          }
+          usageAccumulator.commitStep();
+        },
+      });
+
+      await result.consumeStream();
+      throwIfAborted(abortSignal);
+      const text = (await result.text).trim();
+      const response = await result.response;
+      messages = [...messages, ...response.messages];
+
+      const verdict = await verifyCompletion({
+        model: languageModel,
+        messages,
+        objective: prompt,
+        assistantText: text,
+        continuationCount,
+        abortSignal,
+      });
+
+      if (verdict.status === "complete") {
+        completionText = completionSummaryForVerifierResult({
+          assistantText: text,
+          status: verdict.status,
+          reason: verdict.reason,
         });
-        if (usageSnapshot !== null) {
-          const usageDelta = usageAccumulator.ingest(usageSnapshot);
-          if (usageDelta !== null) {
-            emit({
-              ...createMeta(),
-              taskId,
-              type: "usage.delta",
-              delta: usageDelta,
-            });
-          }
-        }
-        usageAccumulator.commitStep();
-      },
-    });
+        break;
+      }
 
-    await result.consumeStream();
-    throwIfAborted(abortSignal);
-    const text = (await result.text).trim();
+      if (verdict.status === "blocked" || verdict.status === "handoff") {
+        completionText = completionSummaryForVerifierResult({
+          assistantText: text,
+          status: verdict.status,
+          reason: verdict.reason,
+        });
+        break;
+      }
 
-    const { done, completed } = buildLiveCompletionEvents(taskId, text, createMeta);
+      if (continuationCount >= MAX_COMPLETION_CONTINUATIONS || budgetExceededLimit !== null) {
+        completionText = completionSummaryForVerifierResult({
+          assistantText: text,
+          status: "max_continuations",
+          reason: verdict.reason,
+        });
+        break;
+      }
+
+      continuationCount += 1;
+      messages = [...messages, buildContinuationMessage(verdict)];
+    }
+
+    const { done, completed } = buildLiveCompletionEvents(taskId, completionText, createMeta);
     await emitAndPersistLiveSessionEvent(emit, taskId, done);
     await emitAndPersistLiveSessionEvent(emit, taskId, completed);
   } catch (err) {

@@ -66,7 +66,25 @@ export type RunCommandResponse = {
   stderr: string;
 };
 
+export type DisplayCaptureResponse = {
+  pngBase64: string;
+  imageWidth: number;
+  imageHeight: number;
+  displayX: number;
+  displayY: number;
+  displayWidth: number;
+  displayHeight: number;
+  scaleFactor: number;
+  cursorImageX: number | null;
+  cursorImageY: number | null;
+};
+
 export type PointerButton = "left" | "right" | "middle";
+
+export type PointerMoveResponse = {
+  cursorImageX: number | null;
+  cursorImageY: number | null;
+};
 
 export const KEY_TAP_LOGICAL_KEYS = ["enter", "tab", "escape", "backspace"] as const;
 export type KeyTapLogicalKey = (typeof KEY_TAP_LOGICAL_KEYS)[number];

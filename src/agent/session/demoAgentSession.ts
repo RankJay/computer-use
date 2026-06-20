@@ -145,7 +145,8 @@ export async function runDemoAgentSession(options: DemoAgentSessionOptions): Pro
     let screenshotB64: string | undefined;
     if (native) {
       try {
-        screenshotB64 = await abortable(abortSignal, native.capturePrimaryDisplayPngBase64());
+        const capture = await abortable(abortSignal, native.capturePrimaryDisplayPngBase64());
+        screenshotB64 = capture.pngBase64;
       } catch (err) {
         if (abortSignal.aborted || isCancellationError(err)) {
           throw err;

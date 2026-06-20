@@ -11,10 +11,21 @@ function createNativeBridgeSpy(): {
 
   return {
     native: {
-      capturePrimaryDisplayPngBase64: async () => "",
+      capturePrimaryDisplayPngBase64: async () => ({
+        pngBase64: "",
+        imageWidth: 1,
+        imageHeight: 1,
+        displayX: 0,
+        displayY: 0,
+        displayWidth: 1,
+        displayHeight: 1,
+        scaleFactor: 1,
+        cursorImageX: null,
+        cursorImageY: null,
+      }),
       runCommand: async () => ({ code: 0, stdout: "", stderr: "" }),
       cancelRunCommand: async () => {},
-      pointerMoveTo: async () => {},
+      pointerMoveTo: async () => ({ cursorImageX: null, cursorImageY: null }),
       pointerClick: async () => {},
       typeText: async () => {},
       keyTap: async () => {},

@@ -21,22 +21,27 @@ export function createDisplayCaptureTool(ctx: LiveAgentToolContext) {
     deniedError: "User denied screen capture.",
     describe: (input) => input.label ?? "screenshot",
     execute: async (input, _executeCtx, native) => {
-      const b64 = await native.capturePrimaryDisplayPngBase64();
-      ctx.vision.latestPng = b64;
+      const capture = await native.capturePrimaryDisplayPngBase64();
+      ctx.vision.latestCapture = capture;
       const ev = {
         id: createEventId(),
         at: Date.now(),
         taskId: ctx.taskId,
         type: "screenshot.keyframe" as const,
         label: input.label ?? "model capture",
-        imageBase64: b64,
+        imageBase64: capture.pngBase64,
       };
       ctx.emit(ev);
       await ctx.appendStructuredLog(ev);
       return {
         ok: true,
-        value: { bytes: b64.length },
-        timelineSummary: `Captured ${b64.length} base64 chars.`,
+        value: {
+          bytes: capture.pngBase64.length,
+          imageWidth: capture.imageWidth,
+          imageHeight: capture.imageHeight,
+          scaleFactor: capture.scaleFactor,
+        },
+        timelineSummary: `Captured ${capture.imageWidth}x${capture.imageHeight} image (${capture.pngBase64.length} base64 chars, scale ${capture.scaleFactor}).`,
       };
     },
   });

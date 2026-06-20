@@ -7,6 +7,7 @@ import type { LiveAgentToolContext } from "@/agent/agentSessionContext";
 import { AGENT_TOOL_NAMES } from "@/agent/toolContract";
 import { defineActuateTool } from "@/agent/tools/defineActuateTool";
 import { TOOL_CANCELLED_REASON, ToolTimeoutError } from "@/agent/tools/toolCancellation";
+import { createUiAutomationRunState } from "@/agent/tools/uiAutomationState";
 import type { AgentEvent, PermissionChoice } from "@/agent/types";
 
 function createTestContext(options?: {
@@ -31,7 +32,8 @@ function createTestContext(options?: {
     uiAutomationEnabled: true,
     persistedToolApprovals: new Set(),
     sessionRiskApproved: new Set(),
-    vision: { latestPng: null },
+    vision: { latestCapture: null },
+    uiAutomation: createUiAutomationRunState(),
     emit: (event) => {
       events.push(event);
     },

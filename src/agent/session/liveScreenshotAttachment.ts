@@ -1,23 +1,28 @@
+import type { ModelMessage } from "ai";
+
+import type { DisplayCaptureResult } from "@/agent/native/nativeBridge";
+
 export type ScreenshotAttachmentStep = {
-  readonly messages: readonly [
-    {
-      readonly role: "user";
-      readonly content: readonly [
-        { readonly type: "text"; readonly text: string },
-        { readonly type: "image"; readonly image: string },
-      ];
-    },
-  ];
+  readonly messages: ModelMessage[];
 };
 
 export function shouldAttachLatestScreenshot(
-  latestPng: string | null,
+  latestCapture: DisplayCaptureResult | null,
   stepNumber: number,
-): latestPng is string {
-  return latestPng !== null && stepNumber >= 2;
+): latestCapture is DisplayCaptureResult {
+  return latestCapture !== null && stepNumber >= 1;
 }
 
-export function buildScreenshotAttachmentStep(pngBase64: string): ScreenshotAttachmentStep {
+function formatCursorPosition(capture: DisplayCaptureResult): string {
+  if (capture.cursorImageX === null || capture.cursorImageY === null) {
+    return "Cursor position in image: unknown";
+  }
+  return `Cursor position in image: (${capture.cursorImageX}, ${capture.cursorImageY})`;
+}
+
+export function buildScreenshotAttachmentStep(
+  capture: DisplayCaptureResult,
+): ScreenshotAttachmentStep {
   return {
     messages: [
       {
@@ -25,11 +30,21 @@ export function buildScreenshotAttachmentStep(pngBase64: string): ScreenshotAtta
         content: [
           {
             type: "text",
-            text: "Attached: latest primary-display PNG for visual reasoning.",
+            text: `Attached: latest primary-display PNG. Use it to choose the next action, not to explain the image.
+
+Image coordinate frame:
+- Image size: ${capture.imageWidth}x${capture.imageHeight} pixels
+- Pointer coordinates must be image pixels from top-left (0, 0)
+- Display origin: (${capture.displayX}, ${capture.displayY})
+- Display capture size: ${capture.displayWidth}x${capture.displayHeight} physical pixels
+- Display scale factor: ${capture.scaleFactor}
+- ${formatCursorPosition(capture)}
+
+Use the center of the intended target. If a pointer move was inaccurate, compare the cursor position above to the target in this fresh image and correct from the latest image, not an older screenshot.`,
           },
           {
             type: "image",
-            image: `data:image/png;base64,${pngBase64}`,
+            image: `data:image/png;base64,${capture.pngBase64}`,
           },
         ],
       },

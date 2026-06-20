@@ -33,6 +33,7 @@ function createRunnerOptions(
   return {
     taskId: "task-1",
     prompt: "Summarize the workspace",
+    conversationTimeline: [{ id: "u1", at: 1, kind: "user", text: "Summarize the workspace" }],
     settings: createSettings(),
     workspaceRoot: null,
     abortSignal: new AbortController().signal,
