@@ -10,7 +10,7 @@ export function createDisplayCaptureTool(ctx: LiveAgentToolContext) {
   return defineActuateTool(ctx, {
     toolName: AGENT_TOOL_NAMES.DISPLAY_CAPTURE,
     description:
-      "Capture the primary display as PNG for vision (Actuate hides itself briefly while grabbing pixels). Use only when the answer depends on what is visibly on screen (UI, windows, layout). Do not call twice for the same unchanged view in one task. Do not use for general knowledge or tasks that do not require seeing the desktop.",
+      "Last resort: capture the primary display as PNG for vision (Actuate hides itself briefly while grabbing pixels). Use only when terminal_run and workspace tools cannot answer and the task requires visible pixels (UI layout, app windows, pointer coordinates). Do not use to read terminal text, file listings, or other output a command can print. Do not call twice for the same unchanged view in one task.",
     inputSchema: zodSchema(z.object({ label: z.string().optional() })),
     nativeGate: "displayCapture",
     permission: (input) => ({

@@ -18,7 +18,8 @@ describe("liveSystemPrompt", () => {
 
     expect(system).toContain(capabilitiesLine);
     expect(system).toContain("Actuate");
-    expect(system).toContain("display_capture");
+    expect(system).toContain("terminal_run returns exit code, stdout, and stderr");
+    expect(system).toContain("display_capture only as a last resort");
     expect(system).toContain("pointer_move");
     expect(system).toContain("copy_file");
     expect(system).toContain("do not rely on an earlier screenshot");

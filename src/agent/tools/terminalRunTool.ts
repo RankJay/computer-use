@@ -19,7 +19,7 @@ export function createTerminalRunTool(ctx: LiveAgentToolContext) {
   const hostShellHint = terminalRunGuidanceForOs(ctx.hostOs);
   return defineActuateTool(ctx, {
     toolName: AGENT_TOOL_NAMES.TERMINAL_RUN,
-    description: `Run a terminal command (subprocess). Prefer short, non-interactive commands. Use for absolute paths outside the workspace (file tools are workspace-relative only). ${hostShellHint}`,
+    description: `Run a terminal command (subprocess). Returns exit code plus full stdout and stderr in the tool result—read that output directly; do not screenshot a terminal to read text. Prefer this over display_capture for shell queries, git, versions, listings, and absolute paths (file tools are workspace-relative only). Prefer short, non-interactive commands. ${hostShellHint}`,
     inputSchema: zodSchema(
       z.object({
         program: z.string(),
