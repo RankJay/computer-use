@@ -25,7 +25,7 @@ describe("liveSystemPrompt", () => {
     expect(system).toContain("do not rely on an earlier screenshot");
     expect(system).toContain("until the requested end state is reached");
     expect(system).toContain("do not narrate or explain the screenshot");
-    expect(system).toContain("pixels from the top-left");
+    expect(system).toContain("never reuse cursorBlockX");
     expect(system).toContain("ui_focus_type");
     expect(system).toContain("Do not repeat the same ui_focus_type call");
     expect(system).toContain("Never use emojis");

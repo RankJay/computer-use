@@ -4,6 +4,7 @@
 pub fn composite_cursor_into_rgba(
     _img: &mut screenshots::image::RgbaImage,
     _display_info: &screenshots::display_info::DisplayInfo,
+    _scale_factor: f64,
 ) -> Result<(), String> {
     Ok(())
 }
@@ -12,6 +13,7 @@ pub fn composite_cursor_into_rgba(
 pub fn composite_cursor_into_rgba(
     img: &mut screenshots::image::RgbaImage,
     display_info: &screenshots::display_info::DisplayInfo,
+    scale_factor: f64,
 ) -> Result<(), String> {
     use std::mem::{size_of, zeroed};
     use std::slice;
@@ -41,8 +43,9 @@ pub fn composite_cursor_into_rgba(
     fn logical_monitor_rel_to_capture_px(
         di: &DisplayInfo,
         pt: windows::Win32::Foundation::POINT,
+        scale_factor: f64,
     ) -> (i32, i32) {
-        let fx = di.scale_factor as f64;
+        let fx = scale_factor;
         let ix = ((pt.x - di.x) as f64 * fx).round() as i32;
         let iy = ((pt.y - di.y) as f64 * fx).round() as i32;
         (ix, iy)
@@ -87,7 +90,8 @@ pub fn composite_cursor_into_rgba(
         return Ok(());
     }
 
-    let (tip_x, tip_y) = logical_monitor_rel_to_capture_px(display_info, ci.ptScreenPos);
+    let (tip_x, tip_y) =
+        logical_monitor_rel_to_capture_px(display_info, ci.ptScreenPos, scale_factor);
 
     let mut ii: ICONINFO = unsafe { zeroed() };
     unsafe {

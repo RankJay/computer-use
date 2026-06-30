@@ -1,6 +1,7 @@
 import type { ModelMessage } from "ai";
 
 import type { DisplayCaptureResult } from "@/agent/native/nativeBridge";
+import { BLOCK_PX } from "@/agent/tools/uiAutomationState";
 
 export type ScreenshotAttachmentStep = {
   readonly messages: ModelMessage[];
@@ -13,16 +14,14 @@ export function shouldAttachLatestScreenshot(
   return latestCapture !== null && stepNumber >= 1;
 }
 
-function formatCursorPosition(capture: DisplayCaptureResult): string {
-  if (capture.cursorImageX === null || capture.cursorImageY === null) {
-    return "Cursor position in image: unknown";
-  }
-  return `Cursor position in image: (${capture.cursorImageX}, ${capture.cursorImageY})`;
-}
-
 export function buildScreenshotAttachmentStep(
   capture: DisplayCaptureResult,
 ): ScreenshotAttachmentStep {
+  const cursorLine =
+    capture.cursorBlockX !== null && capture.cursorBlockY !== null
+      ? `Cursor block: (${capture.cursorBlockX}, ${capture.cursorBlockY})`
+      : "Cursor block: unknown";
+
   return {
     messages: [
       {
@@ -30,17 +29,12 @@ export function buildScreenshotAttachmentStep(
         content: [
           {
             type: "text",
-            text: `Attached: latest primary-display PNG. Use it to choose the next action, not to explain the image.
-
-Image coordinate frame:
-- Image size: ${capture.imageWidth}x${capture.imageHeight} pixels
-- Pointer coordinates must be image pixels from top-left (0, 0)
-- Display origin: (${capture.displayX}, ${capture.displayY})
-- Display capture size: ${capture.displayWidth}x${capture.displayHeight} physical pixels
-- Display scale factor: ${capture.scaleFactor}
-- ${formatCursorPosition(capture)}
-
-Use the center of the intended target. If a pointer move was inaccurate, compare the cursor position above to the target in this fresh image and correct from the latest image, not an older screenshot.`,
+            text: `Screenshot with pink block grid (${BLOCK_PX}×${BLOCK_PX}px blocks).
+Grid: ${capture.blockColumns} blocks wide × ${capture.blockRows} blocks tall.
+Use blockX and blockY only (1-based; top-left is 1,1). Yellow numbers on top label blockX; on the left label blockY. Ignore fine blue lines when picking.
+Pick the block that contains your target icon — NOT the cursor block below.
+Next: pointer_move(blockX, blockY) then pointer_click — do NOT call display_capture again unless the screen changed.
+${cursorLine} (informational only — do not move here unless that is your target)`,
           },
           {
             type: "image",

@@ -8,15 +8,19 @@ import type { DisplayCaptureResult } from "@/agent/native/nativeBridge";
 
 const capture: DisplayCaptureResult = {
   pngBase64: "base64png",
-  imageWidth: 2560,
-  imageHeight: 1440,
+  imageWidth: 800,
+  imageHeight: 960,
   displayX: 0,
   displayY: 0,
-  displayWidth: 2048,
-  displayHeight: 1152,
+  displayWidth: 640,
+  displayHeight: 768,
   scaleFactor: 1.25,
-  cursorImageX: 100,
-  cursorImageY: 200,
+  effectiveScaleFactor: 1.5,
+  gridCellPx: 16,
+  blockColumns: 5,
+  blockRows: 6,
+  cursorBlockX: 3,
+  cursorBlockY: 4,
 };
 
 describe("liveScreenshotAttachment", () => {
@@ -32,10 +36,10 @@ describe("liveScreenshotAttachment", () => {
     const imagePart = step.messages[0]?.content[1];
     expect(textPart?.type).toBe("text");
     if (textPart?.type === "text") {
-      expect(textPart.text).toContain("choose the next action");
-      expect(textPart.text).toContain("Image size: 2560x1440 pixels");
-      expect(textPart.text).toContain("Display capture size: 2048x1152 physical pixels");
-      expect(textPart.text).toContain("Cursor position in image: (100, 200)");
+      expect(textPart.text).toContain("5 blocks wide × 6 blocks tall");
+      expect(textPart.text).toContain("NOT the cursor block");
+      expect(textPart.text).toContain("informational only");
+      expect(textPart.text).toContain("Cursor block: (3, 4)");
     }
     expect(imagePart?.type).toBe("image");
     if (imagePart?.type === "image") {

@@ -75,15 +75,19 @@ export type DisplayCaptureResponse = {
   displayWidth: number;
   displayHeight: number;
   scaleFactor: number;
-  cursorImageX: number | null;
-  cursorImageY: number | null;
+  effectiveScaleFactor: number;
+  gridCellPx: number;
+  blockColumns: number;
+  blockRows: number;
+  cursorBlockX: number | null;
+  cursorBlockY: number | null;
 };
 
 export type PointerButton = "left" | "right" | "middle";
 
 export type PointerMoveResponse = {
-  cursorImageX: number | null;
-  cursorImageY: number | null;
+  cursorBlockX: number | null;
+  cursorBlockY: number | null;
 };
 
 export const KEY_TAP_LOGICAL_KEYS = ["enter", "tab", "escape", "backspace"] as const;

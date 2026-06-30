@@ -21,7 +21,7 @@ commands.allow = ["run_command"]
 [[permission]]
 identifier = "allow-pointer-move-to"
 description = """
-Enables pointer_move_to: moves the OS mouse cursor to absolute screen coordinates (UI automation).
+Enables pointer_move_to: moves the OS mouse to the center of a 1-based grid square on the latest capture (16px squares, DPI-safe logical mapping).
 """
 commands.allow = ["pointer_move_to"]
 

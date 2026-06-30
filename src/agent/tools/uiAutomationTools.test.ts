@@ -27,14 +27,18 @@ function createNativeSpy(): { readonly native: AgentNativeBridge; readonly calls
         displayWidth: 1,
         displayHeight: 1,
         scaleFactor: 1,
-        cursorImageX: null,
-        cursorImageY: null,
+        effectiveScaleFactor: 1,
+        gridCellPx: 16,
+        blockColumns: 1,
+        blockRows: 1,
+        cursorBlockX: null,
+        cursorBlockY: null,
       }),
       runCommand: async () => ({ code: 0, stdout: "", stderr: "" }),
       cancelRunCommand: async () => {},
-      pointerMoveTo: async (x, y) => {
-        calls.push(`pointerMoveTo:${x},${y}`);
-        return { cursorImageX: x + 2, cursorImageY: y - 1 };
+      pointerMoveTo: async (blockX, blockY) => {
+        calls.push(`pointerMoveTo:${blockX},${blockY}`);
+        return { cursorBlockX: blockX + 1, cursorBlockY: blockY - 1 };
       },
       pointerClick: async () => {
         calls.push("pointerClick");
@@ -116,18 +120,35 @@ describe("uiAutomationTools", () => {
     const ctx = createTestContext(native);
 
     const result = await createPointerMoveTool(ctx).execute(
-      { x: 100, y: 200 },
+      { blockX: 3, blockY: 4 },
       { toolCallId: "move-1", messages: [] },
     );
 
     expect(result).toMatchObject({
       ok: true,
-      targetX: 100,
-      targetY: 200,
-      cursorImageX: 102,
-      cursorImageY: 199,
-      deltaX: 2,
+      targetBlockX: 3,
+      targetBlockY: 4,
+      cursorBlockX: 4,
+      cursorBlockY: 3,
+      deltaX: 1,
       deltaY: -1,
+    });
+  });
+
+  test("pointer_move rejects target equal to cursor block from last capture", async () => {
+    const { native } = createNativeSpy();
+    const ctx = createTestContext(native);
+    ctx.uiAutomation.lastCaptureCursorBlockX = 16;
+    ctx.uiAutomation.lastCaptureCursorBlockY = 7;
+
+    const result = await createPointerMoveTool(ctx).execute(
+      { blockX: 16, blockY: 7 },
+      { toolCallId: "move-cursor", messages: [] },
+    );
+
+    expect(result).toEqual({
+      ok: false,
+      error: expect.stringContaining("where the mouse already is"),
     });
   });
 
@@ -135,7 +156,7 @@ describe("uiAutomationTools", () => {
     const { native, calls } = createNativeSpy();
     const ctx = createTestContext(native);
     const tool = createUiFocusTypeTool(ctx);
-    const input = { x: 500, y: 900, text: "hello world" };
+    const input = { blockX: 25, blockY: 30, text: "hello world" };
 
     const first = await tool.execute(input, { toolCallId: "focus-1", messages: [] });
     const second = await tool.execute(input, { toolCallId: "focus-2", messages: [] });
@@ -143,8 +164,8 @@ describe("uiAutomationTools", () => {
     expect(first).toMatchObject({
       ok: true,
       skipped: false,
-      targetX: 500,
-      targetY: 900,
+      targetBlockX: 25,
+      targetBlockY: 30,
       textLength: 11,
       submitted: false,
     });
@@ -155,7 +176,7 @@ describe("uiAutomationTools", () => {
     });
     expect(calls).toEqual([
       "resetPointerAutomationCancel",
-      "pointerMoveTo:500,900",
+      "pointerMoveTo:25,30",
       "pointerClick",
       "typeText",
     ]);
@@ -166,7 +187,7 @@ describe("uiAutomationTools", () => {
     const ctx = createTestContext(native);
 
     await createUiFocusTypeTool(ctx).execute(
-      { x: 10, y: 20, text: "go", submit: true },
+      { blockX: 1, blockY: 2, text: "go", submit: true },
       { toolCallId: "focus-submit", messages: [] },
     );
 

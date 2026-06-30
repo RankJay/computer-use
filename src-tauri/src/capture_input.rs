@@ -12,6 +12,8 @@ use std::time::Duration;
 use tauri::{AppHandle, Manager};
 
 use crate::cursor_overlay;
+use crate::display_metrics::{self, CaptureMetrics};
+use crate::grid_overlay;
 use crate::mouse_hook;
 
 fn capture_serial_lock() -> &'static Mutex<()> {
@@ -53,8 +55,12 @@ pub struct DisplayCaptureResponse {
     display_width: u32,
     display_height: u32,
     scale_factor: f32,
-    cursor_image_x: Option<i32>,
-    cursor_image_y: Option<i32>,
+    effective_scale_factor: f32,
+    grid_cell_px: u32,
+    block_columns: u32,
+    block_rows: u32,
+    cursor_block_x: Option<i32>,
+    cursor_block_y: Option<i32>,
 }
 
 fn pointer_cancel_requested() -> bool {
@@ -75,19 +81,26 @@ pub fn cancel_pointer_automation() -> Result<(), String> {
 
 fn cursor_position_in_capture_pixels(
     display_info: &screenshots::display_info::DisplayInfo,
+    metrics: &CaptureMetrics,
 ) -> Option<(i32, i32)> {
     let (cursor_x, cursor_y) = mouse_hook::cursor_position().ok()?;
-    let scale_factor = display_info.scale_factor as f64;
-    let image_x = ((cursor_x - display_info.x) as f64 * scale_factor).round() as i32;
-    let image_y = ((cursor_y - display_info.y) as f64 * scale_factor).round() as i32;
-    if image_x < 0
-        || image_y < 0
-        || image_x >= display_info.width as i32
-        || image_y >= display_info.height as i32
-    {
-        return None;
-    }
-    Some((image_x, image_y))
+    display_metrics::pointer_to_capture_pixel(cursor_x, cursor_y, display_info, metrics)
+}
+
+fn cursor_position_in_blocks(
+    display_info: &screenshots::display_info::DisplayInfo,
+    metrics: &CaptureMetrics,
+) -> Option<(i32, i32)> {
+    let (image_x, image_y) = cursor_position_in_capture_pixels(display_info, metrics)?;
+    Some(grid_overlay::capture_px_to_block(image_x, image_y))
+}
+
+fn metrics_for_primary_display() -> Result<CaptureMetrics, String> {
+    let screens = Screen::all().map_err(|e| e.to_string())?;
+    let screen = screens
+        .first()
+        .ok_or_else(|| "no displays found".to_string())?;
+    Ok(display_metrics::metrics_for_pointer_move(&screen.display_info))
 }
 
 fn capture_primary_display_inner() -> Result<DisplayCaptureResponse, String> {
@@ -98,8 +111,13 @@ fn capture_primary_display_inner() -> Result<DisplayCaptureResponse, String> {
     let mut rgba = screen.capture().map_err(|e| e.to_string())?;
     let image_width = rgba.width();
     let image_height = rgba.height();
-    let cursor_position = cursor_position_in_capture_pixels(&screen.display_info);
-    cursor_overlay::composite_cursor_into_rgba(&mut rgba, &screen.display_info)?;
+    let metrics =
+        display_metrics::metrics_from_capture(&screen.display_info, image_width, image_height);
+    cursor_overlay::composite_cursor_into_rgba(&mut rgba, &screen.display_info, metrics.effective_scale)?;
+    grid_overlay::composite_grid_overlay(&mut rgba);
+    let (block_columns, block_rows) = grid_overlay::block_dimensions(image_width, image_height);
+    display_metrics::remember_capture_metrics(metrics);
+    let cursor_position = cursor_position_in_blocks(&screen.display_info, &metrics);
     let image = DynamicImage::ImageRgba8(rgba);
     let mut png_bytes = Vec::new();
     let mut cursor = Cursor::new(&mut png_bytes);
@@ -115,8 +133,12 @@ fn capture_primary_display_inner() -> Result<DisplayCaptureResponse, String> {
         display_width: screen.display_info.width,
         display_height: screen.display_info.height,
         scale_factor: screen.display_info.scale_factor,
-        cursor_image_x: cursor_position.map(|(x, _)| x),
-        cursor_image_y: cursor_position.map(|(_, y)| y),
+        effective_scale_factor: metrics.effective_scale as f32,
+        grid_cell_px: grid_overlay::GRID_CELL_PX,
+        block_columns,
+        block_rows,
+        cursor_block_x: cursor_position.map(|(x, _)| x),
+        cursor_block_y: cursor_position.map(|(_, y)| y),
     })
 }
 
@@ -171,90 +193,36 @@ fn sleep_step_cancel_aware(step_ms: u64) {
     std::thread::sleep(Duration::from_millis(step_ms));
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct PointerBounds {
-    min_x: i32,
-    max_x: i32,
-    min_y: i32,
-    max_y: i32,
+fn clamp_pointer_target(x: i32, y: i32, min_x: i32, max_x: i32, min_y: i32, max_y: i32) -> (i32, i32) {
+    (x.clamp(min_x, max_x), y.clamp(min_y, max_y))
 }
 
-fn pointer_bounds_from_display(
-    display_info: &screenshots::display_info::DisplayInfo,
-) -> PointerBounds {
-    let scale_factor = display_info.scale_factor as f64;
-    let logical_width = ((display_info.width as f64) / scale_factor)
-        .round()
-        .max(1.0) as i32;
-    let logical_height = ((display_info.height as f64) / scale_factor)
-        .round()
-        .max(1.0) as i32;
-    let width_offset = logical_width.saturating_sub(1);
-    let height_offset = logical_height.saturating_sub(1);
-
-    PointerBounds {
-        min_x: display_info.x,
-        max_x: display_info.x.saturating_add(width_offset),
-        min_y: display_info.y,
-        max_y: display_info.y.saturating_add(height_offset),
-    }
-}
-
-fn clamp_pointer_target(x: i32, y: i32, bounds: PointerBounds) -> (i32, i32) {
-    (
-        x.clamp(bounds.min_x, bounds.max_x),
-        y.clamp(bounds.min_y, bounds.max_y),
-    )
-}
-
-fn screenshot_pixel_to_pointer_target(
-    x: i32,
-    y: i32,
-    display_info: &screenshots::display_info::DisplayInfo,
-) -> (i32, i32) {
-    screenshot_pixel_to_pointer_target_for_scale(
-        x,
-        y,
-        display_info.x,
-        display_info.y,
-        display_info.scale_factor as f64,
-    )
-}
-
-fn screenshot_pixel_to_pointer_target_for_scale(
-    x: i32,
-    y: i32,
-    origin_x: i32,
-    origin_y: i32,
-    scale_factor: f64,
-) -> (i32, i32) {
-    (
-        origin_x.saturating_add(((x as f64) / scale_factor).round() as i32),
-        origin_y.saturating_add(((y as f64) / scale_factor).round() as i32),
-    )
-}
-
-fn screenshot_pixel_to_pointer_target_on_primary_display(
-    x: i32,
-    y: i32,
+fn block_to_pointer_target_on_primary_display(
+    block_x: i32,
+    block_y: i32,
 ) -> Result<(i32, i32), String> {
     let screens = Screen::all().map_err(|e| e.to_string())?;
     let Some(screen) = screens.first() else {
-        return Ok((x, y));
+        let (image_x, image_y) = grid_overlay::block_center_px(block_x, block_y);
+        return Ok((image_x, image_y));
     };
-    let (target_x, target_y) = screenshot_pixel_to_pointer_target(x, y, &screen.display_info);
-    Ok(clamp_pointer_target(
-        target_x,
-        target_y,
-        pointer_bounds_from_display(&screen.display_info),
-    ))
+    let metrics = metrics_for_primary_display()?;
+    let (block_columns, block_rows) =
+        grid_overlay::block_dimensions(metrics.image_width, metrics.image_height);
+    let (block_x, block_y) =
+        grid_overlay::clamp_block(block_x, block_y, block_columns, block_rows);
+    let (image_x, image_y) = grid_overlay::block_center_px(block_x, block_y);
+    let (target_x, target_y) =
+        display_metrics::capture_pixel_to_pointer(image_x, image_y, &screen.display_info, &metrics);
+    let (min_x, min_y, max_x, max_y) = display_metrics::pointer_bounds(&screen.display_info, &metrics);
+    Ok(clamp_pointer_target(target_x, target_y, min_x, max_x, min_y, max_y))
 }
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PointerMoveResponse {
-    cursor_image_x: Option<i32>,
-    cursor_image_y: Option<i32>,
+    cursor_block_x: Option<i32>,
+    cursor_block_y: Option<i32>,
 }
 
 fn cursor_position_on_primary_display() -> Result<Option<(i32, i32)>, String> {
@@ -262,18 +230,15 @@ fn cursor_position_on_primary_display() -> Result<Option<(i32, i32)>, String> {
     let Some(screen) = screens.first() else {
         return Ok(None);
     };
-    Ok(cursor_position_in_capture_pixels(&screen.display_info))
+    let metrics = metrics_for_primary_display()?;
+    Ok(cursor_position_in_blocks(&screen.display_info, &metrics))
 }
 
-/// Input coordinates are primary-display screenshot pixels. Windows converts them to logical
-/// cursor coordinates for DPI-scaled displays before using `SetCursorPos` in small steps.
-/// Does not enable mouse swallow —
-/// swallowing low-level mouse messages can interfere with seeing the cursor move reliably.
-/// Other OS: enigo absolute move in steps from current position.
+/// Input is 1-based pink block indices (block 1 = top-left). Each block is 160×160 px.
 #[tauri::command]
-pub fn pointer_move_to(x: i32, y: i32) -> Result<PointerMoveResponse, String> {
+pub fn pointer_move_to(block_x: i32, block_y: i32) -> Result<PointerMoveResponse, String> {
     POINTER_CANCEL.store(false, Ordering::Release);
-    let (x, y) = screenshot_pixel_to_pointer_target_on_primary_display(x, y)?;
+    let (x, y) = block_to_pointer_target_on_primary_display(block_x, block_y)?;
 
     if pointer_cancel_requested() {
         return Err("Pointer automation cancelled.".to_string());
@@ -331,22 +296,31 @@ pub fn pointer_move_to(x: i32, y: i32) -> Result<PointerMoveResponse, String> {
 
     let cursor_position = cursor_position_on_primary_display()?;
     Ok(PointerMoveResponse {
-        cursor_image_x: cursor_position.map(|(x, _)| x),
-        cursor_image_y: cursor_position.map(|(_, y)| y),
+        cursor_block_x: cursor_position.map(|(x, _)| x),
+        cursor_block_y: cursor_position.map(|(_, y)| y),
     })
 }
 
 #[tauri::command]
-pub fn pointer_click(button: String) -> Result<(), String> {
+pub fn pointer_click(button: String, click_count: Option<u32>) -> Result<(), String> {
     if pointer_cancel_requested() {
         return Err("Pointer automation cancelled.".to_string());
     }
 
+    let clicks = click_count.unwrap_or(1).clamp(1, 2);
     let mut enigo = Enigo::new(&Settings::default()).map_err(|e| e.to_string())?;
     let b = parse_mouse_button(&button)?;
-    enigo
-        .button(b, Direction::Click)
-        .map_err(|e| e.to_string())?;
+    for i in 0..clicks {
+        if pointer_cancel_requested() {
+            return Err("Pointer automation cancelled.".to_string());
+        }
+        enigo
+            .button(b, Direction::Click)
+            .map_err(|e| e.to_string())?;
+        if i + 1 < clicks {
+            std::thread::sleep(Duration::from_millis(80));
+        }
+    }
     std::thread::sleep(Duration::from_millis(60));
     Ok(())
 }
@@ -387,10 +361,9 @@ pub fn key_tap(key: String) -> Result<(), String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        clamp_pointer_target, parse_logical_key, parse_mouse_button,
-        screenshot_pixel_to_pointer_target_for_scale, PointerBounds,
-    };
+    use super::{clamp_pointer_target, parse_logical_key, parse_mouse_button};
+    use crate::display_metrics;
+    use crate::grid_overlay;
     use enigo::{Button, Key};
 
     #[test]
@@ -444,23 +417,32 @@ mod tests {
 
     #[test]
     fn clamp_pointer_target_clamps_to_bounds() {
-        let bounds = PointerBounds {
-            min_x: -10,
-            max_x: 100,
-            min_y: 20,
-            max_y: 80,
-        };
-
-        assert_eq!(clamp_pointer_target(-20, 120, bounds), (-10, 80));
-        assert_eq!(clamp_pointer_target(50, 40, bounds), (50, 40));
-        assert_eq!(clamp_pointer_target(200, -100, bounds), (100, 20));
+        assert_eq!(clamp_pointer_target(-20, 120, -10, 100, 20, 80), (-10, 80));
+        assert_eq!(clamp_pointer_target(50, 40, -10, 100, 20, 80), (50, 40));
+        assert_eq!(clamp_pointer_target(200, -100, -10, 100, 20, 80), (100, 20));
     }
 
     #[test]
-    fn screenshot_pixel_to_pointer_target_accounts_for_display_scale() {
-        assert_eq!(
-            screenshot_pixel_to_pointer_target_for_scale(1280, 720, 100, 200, 1.25),
-            (1124, 776)
-        );
+    fn block_center_maps_through_effective_scale_to_logical_pointer() {
+        use screenshots::display_info::DisplayInfo;
+
+        let (image_x, image_y) = grid_overlay::block_center_px(1, 3);
+        assert_eq!((image_x, image_y), (80, 400));
+
+        let display = DisplayInfo {
+            id: 0,
+            raw_handle: Default::default(),
+            x: 0,
+            y: 0,
+            width: 1707,
+            height: 960,
+            scale_factor: 1.0,
+            rotation: 0.0,
+            frequency: 60.0,
+            is_primary: true,
+        };
+        let metrics = display_metrics::metrics_from_capture(&display, 2560, 1440);
+        let (tx, ty) = display_metrics::capture_pixel_to_pointer(image_x, image_y, &display, &metrics);
+        assert_eq!((tx, ty), (53, 267));
     }
 }

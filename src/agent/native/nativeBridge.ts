@@ -20,8 +20,8 @@ export type AgentNativeBridge = {
   capturePrimaryDisplayPngBase64: () => Promise<DisplayCaptureResult>;
   runCommand: (input: RunCommandRequest) => Promise<RunCommandResult>;
   cancelRunCommand: (cancelToken: number) => Promise<void>;
-  pointerMoveTo: (x: number, y: number) => Promise<PointerMoveResult>;
-  pointerClick: (button: PointerButton) => Promise<void>;
+  pointerMoveTo: (blockX: number, blockY: number) => Promise<PointerMoveResult>;
+  pointerClick: (button: PointerButton, clickCount?: number) => Promise<void>;
   typeText: (text: string) => Promise<void>;
   keyTap: (key: KeyTapLogicalKey) => Promise<void>;
   resetPointerAutomationCancel: () => Promise<void>;
@@ -50,8 +50,10 @@ export function createNativeBridge(): AgentNativeBridge | null {
       }),
     cancelRunCommand: (cancelToken) =>
       invoke<void>(TAURI_COMMAND.cancelRunCommand, { cancelToken }),
-    pointerMoveTo: (x, y) => invoke<PointerMoveResult>(TAURI_COMMAND.pointerMoveTo, { x, y }),
-    pointerClick: (button) => invoke<void>(TAURI_COMMAND.pointerClick, { button }),
+    pointerMoveTo: (blockX, blockY) =>
+      invoke<PointerMoveResult>(TAURI_COMMAND.pointerMoveTo, { blockX, blockY }),
+    pointerClick: (button, clickCount) =>
+      invoke<void>(TAURI_COMMAND.pointerClick, { button, clickCount: clickCount ?? 1 }),
     typeText: (text) => invoke<void>(TAURI_COMMAND.typeText, { text }),
     keyTap: (key) => invoke<void>(TAURI_COMMAND.keyTap, { key }),
     resetPointerAutomationCancel: () => invoke<void>(TAURI_COMMAND.resetPointerAutomationCancel),

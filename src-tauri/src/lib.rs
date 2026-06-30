@@ -3,6 +3,8 @@ mod app_store;
 mod capture_input;
 mod command_output;
 mod cursor_overlay;
+mod display_metrics;
+mod grid_overlay;
 mod mouse_hook;
 mod process_run;
 mod workspace_fs;
