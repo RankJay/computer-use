@@ -4,11 +4,11 @@ import { z } from "zod";
 import type { LiveAgentToolContext } from "@/agent/agentSessionContext";
 import { AGENT_TOOL_NAMES } from "@/agent/toolContract";
 import { defineActuateTool } from "@/agent/tools/defineActuateTool";
-import { createEventId } from "@/agent/types";
 import {
   isRepeatCaptureBlocked,
   rememberCaptureCursorBlock,
 } from "@/agent/tools/uiAutomationState";
+import { createEventId } from "@/agent/types";
 
 const REPEAT_CAPTURE_ERROR =
   "Blocked: you already have a screenshot for this view. Read the attached image, pick the icon's block (NOT cursorBlockX/Y), call pointer_move, then pointer_click. Only capture again after the screen changes.";
@@ -35,11 +35,7 @@ export function createDisplayCaptureTool(ctx: LiveAgentToolContext) {
     describe: (input) => input.label ?? "screenshot",
     execute: async (input, _executeCtx, native) => {
       const capture = await native.capturePrimaryDisplayPngBase64();
-      rememberCaptureCursorBlock(
-        ctx.uiAutomation,
-        capture.cursorBlockX,
-        capture.cursorBlockY,
-      );
+      rememberCaptureCursorBlock(ctx.uiAutomation, capture.cursorBlockX, capture.cursorBlockY);
       ctx.vision.latestCapture = capture;
       const ev = {
         id: createEventId(),

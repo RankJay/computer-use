@@ -13,9 +13,9 @@ import {
 
 describe("uiAutomationState", () => {
   test("focusTypeAttemptKey includes submit flag", () => {
-    expect(
-      focusTypeAttemptKey({ blockX: 10, blockY: 20, text: "hello", submit: false }),
-    ).toBe("10,20,hello,false");
+    expect(focusTypeAttemptKey({ blockX: 10, blockY: 20, text: "hello", submit: false })).toBe(
+      "10,20,hello,false",
+    );
     expect(focusTypeAttemptKey({ blockX: 10, blockY: 20, text: "hello", submit: true })).toBe(
       "10,20,hello,true",
     );

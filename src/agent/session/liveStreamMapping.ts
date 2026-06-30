@@ -78,10 +78,7 @@ export function addUsageSnapshots(left: TokenUsage, right: TokenUsage): TokenUsa
   };
 }
 
-export function mergeUsageSnapshot(
-  current: TokenUsage,
-  next: PartialTokenUsage,
-): TokenUsage {
+export function mergeUsageSnapshot(current: TokenUsage, next: PartialTokenUsage): TokenUsage {
   return {
     inputTokens: next.inputTokens ?? current.inputTokens,
     outputTokens: next.outputTokens ?? current.outputTokens,
@@ -196,9 +193,7 @@ function usageFromAnthropicRawChunk(
   return hasPartialUsage(usageSnapshot) ? usageSnapshot : null;
 }
 
-function usageFromOpenAiRawChunk(
-  raw: Readonly<Record<string, unknown>>,
-): PartialTokenUsage | null {
+function usageFromOpenAiRawChunk(raw: Readonly<Record<string, unknown>>): PartialTokenUsage | null {
   const usage = recordProperty(raw, "usage");
   if (usage === null) {
     return null;

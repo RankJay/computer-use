@@ -22,17 +22,16 @@ function delay(ms: number, signal: AbortSignal): Promise<void> {
   throwIfAborted(signal);
 
   return new Promise((resolve, reject) => {
-    let timeoutId: ReturnType<typeof globalThis.setTimeout>;
-    const abortListener = () => {
-      globalThis.clearTimeout(timeoutId);
-      signal.removeEventListener("abort", abortListener);
-      reject(new ToolCancelledError());
-    };
-    timeoutId = globalThis.setTimeout(() => {
-      signal.removeEventListener("abort", abortListener);
+    const timeoutId = globalThis.setTimeout(() => {
+      signal.removeEventListener("abort", onAbort);
       resolve();
     }, ms);
-    signal.addEventListener("abort", abortListener, { once: true });
+    function onAbort() {
+      globalThis.clearTimeout(timeoutId);
+      signal.removeEventListener("abort", onAbort);
+      reject(new ToolCancelledError());
+    }
+    signal.addEventListener("abort", onAbort, { once: true });
   });
 }
 

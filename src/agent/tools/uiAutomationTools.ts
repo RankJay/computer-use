@@ -6,7 +6,13 @@ import type { AgentNativeBridge } from "@/agent/native/nativeBridge";
 import { AGENT_TOOL_NAMES } from "@/agent/toolContract";
 import { defineActuateTool } from "@/agent/tools/defineActuateTool";
 import { shortenForTimeline } from "@/agent/tools/toolTimeline";
-import { focusTypeAttemptKey, pointerDeltaFromTarget, pointerMoveWasEffective, clearPendingCapture, isCursorBlockTarget } from "@/agent/tools/uiAutomationState";
+import {
+  focusTypeAttemptKey,
+  pointerDeltaFromTarget,
+  pointerMoveWasEffective,
+  clearPendingCapture,
+  isCursorBlockTarget,
+} from "@/agent/tools/uiAutomationState";
 
 const CURSOR_BLOCK_TARGET_ERROR =
   "That block is where the mouse already is (cursorBlock from the screenshot). Pick the block containing the target icon instead — desktop icons are usually top-left (low blockX and blockY, e.g. 1–2).";
@@ -117,8 +123,7 @@ export function createPointerClickTool(ctx: LiveAgentToolContext) {
       details: `button=${input.button} clickCount=${input.clickCount ?? 1}`,
     }),
     deniedError: "Denied (permission or UI automation disabled).",
-    describe: (input) =>
-      input.clickCount === 2 ? `${input.button}×2` : input.button,
+    describe: (input) => (input.clickCount === 2 ? `${input.button}×2` : input.button),
     execute: async (input, executeCtx, native) => {
       executeCtx.setNativeCancel(native.cancelPointerAutomation);
       await resetStalePointerCancel(native);

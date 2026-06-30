@@ -69,11 +69,7 @@ export function useAgentSession() {
   }, []);
 
   const startRun = useCallback(
-    async (
-      prompt: string,
-      workspaceOverride: string | null,
-      opts?: StartRunOptions,
-    ) => {
+    async (prompt: string, workspaceOverride: string | null, opts?: StartRunOptions) => {
       if (!ready || runBusyRef.current) return;
       runBusyRef.current = true;
 
@@ -87,14 +83,15 @@ export function useAgentSession() {
       const userTimelineItem: AgentTimelineItem | null = echoUser
         ? { id: createEventId(), at: Date.now(), kind: "user", text: prompt }
         : null;
-      const conversationTimeline =
-        opts?.conversationTimeline ??
-        (userTimelineItem === null ? projection.timeline : [...projection.timeline, userTimelineItem]);
-      setProjection((prev) =>
-        beginAgentRun(prev, {
+      let conversationTimeline: readonly AgentTimelineItem[];
+      setProjection((prev) => {
+        conversationTimeline =
+          opts?.conversationTimeline ??
+          (userTimelineItem === null ? prev.timeline : [...prev.timeline, userTimelineItem]);
+        return beginAgentRun(prev, {
           userTimelineItem,
-        }),
-      );
+        });
+      });
 
       const workspaceRoot = resolveAgentWorkspaceRoot(workspaceOverride, settings, host);
 
@@ -143,7 +140,10 @@ export function useAgentSession() {
 
     setProjection(trimmed);
 
-    void startRun(lastPrompt, null, { echoUserPrompt: false, conversationTimeline: trimmed.timeline });
+    void startRun(lastPrompt, null, {
+      echoUserPrompt: false,
+      conversationTimeline: trimmed.timeline,
+    });
   }, [projection, ready, startRun]);
 
   const cancelRun = useCallback(() => {

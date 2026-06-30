@@ -99,7 +99,7 @@ export async function runLiveAgentSession(options: LiveAgentSessionOptions): Pro
   const runBudget = options.runBudgetOverride ?? settings.runBudgetDefaults;
   const budgetStartedAt = Date.now();
   let budgetExceededLimit: RunBudgetLimit | null = null;
-  let finishedSteps: BudgetStep[] = [];
+  const finishedSteps: BudgetStep[] = [];
   const usageAccumulator = createLiveUsageAccumulator({
     provider: llmProvider,
     modelId: liveModelId,
@@ -176,7 +176,7 @@ export async function runLiveAgentSession(options: LiveAgentSessionOptions): Pro
 
   try {
     throwIfAborted(abortSignal);
-    let messages: ModelMessage[] = [...initialMessages];
+    const messages: ModelMessage[] = [...initialMessages];
     let completionText = "";
     let continuationCount = 0;
 
@@ -241,7 +241,7 @@ export async function runLiveAgentSession(options: LiveAgentSessionOptions): Pro
           }
         },
         onStepFinish: async (step) => {
-          finishedSteps = [...finishedSteps, step];
+          finishedSteps.push(step);
           await recordBudgetProgress(finishedSteps);
 
           const usageSnapshot = extractUsageSnapshotFromStreamChunk({
@@ -263,24 +263,27 @@ export async function runLiveAgentSession(options: LiveAgentSessionOptions): Pro
         },
       });
 
+      // eslint-disable-next-line no-await-in-loop -- Each agent turn must finish streaming before verification.
       await result.consumeStream();
       throwIfAborted(abortSignal);
-      const text = (await result.text).trim();
-      const response = await result.response;
-      messages = [...messages, ...response.messages];
+      // eslint-disable-next-line no-await-in-loop -- Result text/response resolve together after each sequential turn.
+      const [text, response] = await Promise.all([result.text, result.response]);
+      messages.push(...response.messages);
+      const assistantText = text.trim();
 
+      // eslint-disable-next-line no-await-in-loop -- Verifier runs only after the prior turn completes.
       const verdict = await verifyCompletion({
         model: languageModel,
         messages,
         objective: prompt,
-        assistantText: text,
+        assistantText,
         continuationCount,
         abortSignal,
       });
 
       if (verdict.status === "complete") {
         completionText = completionSummaryForVerifierResult({
-          assistantText: text,
+          assistantText,
           status: verdict.status,
           reason: verdict.reason,
         });
@@ -289,7 +292,7 @@ export async function runLiveAgentSession(options: LiveAgentSessionOptions): Pro
 
       if (verdict.status === "blocked" || verdict.status === "handoff") {
         completionText = completionSummaryForVerifierResult({
-          assistantText: text,
+          assistantText,
           status: verdict.status,
           reason: verdict.reason,
         });
@@ -298,7 +301,7 @@ export async function runLiveAgentSession(options: LiveAgentSessionOptions): Pro
 
       if (continuationCount >= MAX_COMPLETION_CONTINUATIONS || budgetExceededLimit !== null) {
         completionText = completionSummaryForVerifierResult({
-          assistantText: text,
+          assistantText,
           status: "max_continuations",
           reason: verdict.reason,
         });
@@ -306,7 +309,7 @@ export async function runLiveAgentSession(options: LiveAgentSessionOptions): Pro
       }
 
       continuationCount += 1;
-      messages = [...messages, buildContinuationMessage(verdict)];
+      messages.push(buildContinuationMessage(verdict));
     }
 
     const { done, completed } = buildLiveCompletionEvents(taskId, completionText, createMeta);

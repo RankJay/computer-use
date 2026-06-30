@@ -47,9 +47,7 @@ export function isCursorBlockTarget(
   blockX: number,
   blockY: number,
 ): boolean {
-  return (
-    state.lastCaptureCursorBlockX === blockX && state.lastCaptureCursorBlockY === blockY
-  );
+  return state.lastCaptureCursorBlockX === blockX && state.lastCaptureCursorBlockY === blockY;
 }
 
 export function focusTypeAttemptKey(input: {
@@ -76,9 +74,6 @@ export function pointerDeltaFromTarget(
   };
 }
 
-export function pointerMoveWasEffective(
-  deltaX: number | null,
-  deltaY: number | null,
-): boolean {
+export function pointerMoveWasEffective(deltaX: number | null, deltaY: number | null): boolean {
   return deltaX !== null && deltaY !== null && (deltaX !== 0 || deltaY !== 0);
 }

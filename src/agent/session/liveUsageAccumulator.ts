@@ -31,10 +31,7 @@ export function createLiveUsageAccumulator(options: {
       const nextUsage =
         snapshot.scope === "run"
           ? mergeUsageSnapshot(emittedUsage, snapshot.usage)
-          : addUsageSnapshots(
-              committedUsage,
-              mergeUsageSnapshot(currentStepUsage, snapshot.usage),
-            );
+          : addUsageSnapshots(committedUsage, mergeUsageSnapshot(currentStepUsage, snapshot.usage));
       const usageDelta = usageSnapshotDelta(nextUsage, emittedUsage);
 
       if (snapshot.scope === "step") {

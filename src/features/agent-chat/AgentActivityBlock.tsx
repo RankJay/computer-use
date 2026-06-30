@@ -150,9 +150,7 @@ function ThoughtActivitySegment(props: StatusActivitySegmentProps): ReactElement
               key={row.id}
               icon={activityStepIcon(row, props.isActive && index === props.rows.length - 1)}
               iconClassName={
-                props.isActive && index === props.rows.length - 1
-                  ? spinnerIconClassName
-                  : undefined
+                props.isActive && index === props.rows.length - 1 ? spinnerIconClassName : undefined
               }
               label={row.title}
               description={activityStepDescription(row)}

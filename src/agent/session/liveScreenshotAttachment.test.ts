@@ -1,10 +1,10 @@
 import { describe, expect, test } from "bun:test";
 
+import type { DisplayCaptureResult } from "@/agent/native/nativeBridge";
 import {
   buildScreenshotAttachmentStep,
   shouldAttachLatestScreenshot,
 } from "@/agent/session/liveScreenshotAttachment";
-import type { DisplayCaptureResult } from "@/agent/native/nativeBridge";
 
 const capture: DisplayCaptureResult = {
   pngBase64: "base64png",
