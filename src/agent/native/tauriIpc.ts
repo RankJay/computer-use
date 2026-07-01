@@ -28,6 +28,8 @@ export const TAURI_COMMAND = {
   copyWorkspaceFile: "copy_workspace_file",
   moveWorkspacePath: "move_workspace_path",
   listWorkspaceDir: "list_workspace_dir",
+  uiA11ySnapshot: "ui_a11y_snapshot",
+  uiA11yInteract: "ui_a11y_interact",
 } as const;
 
 export type LlmApiProvider = "anthropic" | "openai";
@@ -92,6 +94,45 @@ export type PointerMoveResponse = {
 
 export const KEY_TAP_LOGICAL_KEYS = ["enter", "tab", "escape", "backspace"] as const;
 export type KeyTapLogicalKey = (typeof KEY_TAP_LOGICAL_KEYS)[number];
+
+export type UiA11yInteractiveRef = {
+  id: string;
+  role: string;
+  name?: string;
+  value?: string;
+  enabled: boolean;
+};
+
+export type UiA11ySnapshotRequest = {
+  appName?: string | null;
+  foregroundOnly?: boolean | null;
+  maxDepth?: number | null;
+  interactiveOnly?: boolean | null;
+};
+
+export type UiA11ySnapshotResponse = {
+  platform: string;
+  app: string;
+  elementCount: number;
+  interactiveCount: number;
+  truncated: boolean;
+  treeText: string;
+  interactiveRefs: UiA11yInteractiveRef[];
+  nextStep: string;
+};
+
+export type UiA11yInteractRequest = {
+  elementId: string;
+  action: "click" | "double_click" | "set_value" | "focus";
+  text?: string | null;
+  clickCount?: number | null;
+};
+
+export type UiA11yInteractResponse = {
+  action: string;
+  elementId: string;
+  message: string;
+};
 
 export type SaveSettingsRequest = {
   settings: AppSettingsPayload;

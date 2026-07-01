@@ -52,3 +52,12 @@ description = """
 Allows reset_pointer_automation_cancel when starting a task and cancel_pointer_automation (Esc UI) to abort in-flight moves/clicks from the frontend.
 """
 commands.allow = ["reset_pointer_automation_cancel", "cancel_pointer_automation"]
+
+[[permission]]
+identifier = "allow-ui-a11y"
+description = """
+Enables ui_a11y_snapshot and ui_a11y_interact: reads the native accessibility tree for the
+foreground app (or a named app) and performs element-targeted clicks or text entry by element id (@eN).
+macOS requires Accessibility permission; Windows uses UI Automation; Linux uses AT-SPI2.
+"""
+commands.allow = ["ui_a11y_snapshot", "ui_a11y_interact"]

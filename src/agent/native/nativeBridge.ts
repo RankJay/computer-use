@@ -10,11 +10,17 @@ import {
   type PointerMoveResponse,
   type RunCommandRequest,
   type RunCommandResponse,
+  type UiA11yInteractRequest,
+  type UiA11yInteractResponse,
+  type UiA11ySnapshotRequest,
+  type UiA11ySnapshotResponse,
 } from "@/agent/native/tauriIpc";
 
 export type RunCommandResult = RunCommandResponse;
 export type DisplayCaptureResult = DisplayCaptureResponse;
 export type PointerMoveResult = PointerMoveResponse;
+export type UiA11ySnapshotResult = UiA11ySnapshotResponse;
+export type UiA11yInteractResult = UiA11yInteractResponse;
 
 export type AgentNativeBridge = {
   capturePrimaryDisplayPngBase64: () => Promise<DisplayCaptureResult>;
@@ -26,6 +32,8 @@ export type AgentNativeBridge = {
   keyTap: (key: KeyTapLogicalKey) => Promise<void>;
   resetPointerAutomationCancel: () => Promise<void>;
   cancelPointerAutomation: () => Promise<void>;
+  uiA11ySnapshot: (input: UiA11ySnapshotRequest) => Promise<UiA11ySnapshotResult>;
+  uiA11yInteract: (input: UiA11yInteractRequest) => Promise<UiA11yInteractResult>;
 };
 
 export function isTauriRuntime(): boolean {
@@ -58,6 +66,24 @@ export function createNativeBridge(): AgentNativeBridge | null {
     keyTap: (key) => invoke<void>(TAURI_COMMAND.keyTap, { key }),
     resetPointerAutomationCancel: () => invoke<void>(TAURI_COMMAND.resetPointerAutomationCancel),
     cancelPointerAutomation: () => invoke<void>(TAURI_COMMAND.cancelPointerAutomation),
+    uiA11ySnapshot: (input) =>
+      invoke<UiA11ySnapshotResult>(TAURI_COMMAND.uiA11ySnapshot, {
+        request: {
+          appName: input.appName ?? null,
+          foregroundOnly: input.foregroundOnly ?? null,
+          maxDepth: input.maxDepth ?? null,
+          interactiveOnly: input.interactiveOnly ?? null,
+        },
+      }),
+    uiA11yInteract: (input) =>
+      invoke<UiA11yInteractResult>(TAURI_COMMAND.uiA11yInteract, {
+        request: {
+          elementId: input.elementId,
+          action: input.action,
+          text: input.text ?? null,
+          clickCount: input.clickCount ?? null,
+        },
+      }),
   };
 }
 

@@ -19,16 +19,19 @@ describe("liveSystemPrompt", () => {
     expect(system).toContain(capabilitiesLine);
     expect(system).toContain("Actuate");
     expect(system).toContain("terminal_run returns exit code, stdout, and stderr");
+    expect(system).toContain("ui_a11y_snapshot");
+    expect(system).toContain("ui_a11y_interact");
     expect(system).toContain("display_capture only as a last resort");
     expect(system).toContain("pointer_move");
     expect(system).toContain("copy_file");
-    expect(system).toContain("do not rely on an earlier screenshot");
+    expect(system).toContain("fresh ui_a11y_snapshot");
     expect(system).toContain("until the requested end state is reached");
-    expect(system).toContain("do not narrate or explain the screenshot");
+    expect(system).toContain("never stop to narrate the screenshot");
     expect(system).toContain("never reuse cursorBlockX");
     expect(system).toContain("ui_focus_type");
-    expect(system).toContain("Do not repeat the same ui_focus_type call");
     expect(system).toContain("Never use emojis");
+    expect(system.indexOf("terminal_run")).toBeLessThan(system.indexOf("ui_a11y_snapshot"));
+    expect(system.indexOf("ui_a11y_snapshot")).toBeLessThan(system.indexOf("display_capture"));
   });
 
   test("prompt bundle wires capabilities into system and user messages", () => {

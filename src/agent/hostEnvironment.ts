@@ -67,15 +67,15 @@ export function describeRuntimeCapabilities(options: {
   const os = formatHostOsLabel(options.hostOs);
   if (options.nativeBridge) {
     const uiLine = options.uiAutomationEnabled
-      ? "pointer_move / pointer_click / type_text / key_tap run after user approval."
-      : "UI automation tools (pointer_move, pointer_click, type_text, key_tap) are disabled in Settings—do not call them; ask the user to enable UI automation in Actuate.";
+      ? "ui_a11y_snapshot (accessibility tree) and ui_a11y_interact (click/type by @eN element id) are preferred for UI tasks; pointer_move / pointer_click / type_text / key_tap are fallbacks when the tree is empty or insufficient."
+      : "UI automation tools (ui_a11y_interact, pointer_move, pointer_click, type_text, key_tap) are disabled in Settings—do not call them; ask the user to enable UI automation in Actuate. ui_a11y_snapshot may still run for observation.";
     return (
-      `This run uses the Actuate desktop (Tauri) app on ${os}: terminal_run and display_capture can run after approval. ${uiLine} ` +
+      `This run uses the Actuate desktop (Tauri) app on ${os}: terminal_run is the first choice for shell facts; ui_a11y_snapshot reads the native accessibility tree; display_capture is last resort only. ${uiLine} ` +
       "workspace_inspect / read_file / write_file / copy_file / move_path only work for paths relative to the configured workspace root; they cannot access arbitrary absolute paths—use terminal_run for those (e.g. list or count files under D:\\... on Windows)."
     );
   }
   return (
-    `This run is the Web build (no native bridge) on ${os}. terminal_run, display_capture, and UI tools cannot run—you must not claim local shell or screen capture ran. ` +
+    `This run is the Web build (no native bridge) on ${os}. terminal_run, ui_a11y_snapshot, display_capture, and UI tools cannot run—you must not claim local shell, accessibility, or screen capture ran. ` +
     "workspace_inspect / read_file / write_file / copy_file / move_path only apply to the sample or configured workspace root, not random disk paths."
   );
 }

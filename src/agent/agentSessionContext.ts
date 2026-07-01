@@ -1,5 +1,9 @@
 import type { HostOsKind } from "@/agent/hostEnvironment";
-import type { AgentNativeBridge, DisplayCaptureResult } from "@/agent/native/nativeBridge";
+import type {
+  AgentNativeBridge,
+  DisplayCaptureResult,
+  UiA11ySnapshotResult,
+} from "@/agent/native/nativeBridge";
 import type { AgentToolName, ConsequenceRiskClass } from "@/agent/toolContract";
 import type { UiAutomationRunState } from "@/agent/tools/uiAutomationState";
 import type { AgentEvent, EmitFn, PermissionChoice, PermissionMode } from "@/agent/types";
@@ -17,6 +21,7 @@ export type LiveAgentToolContext = {
   persistedToolApprovals: Set<string>;
   sessionRiskApproved: Set<ConsequenceRiskClass>;
   vision: { latestCapture: DisplayCaptureResult | null };
+  a11y: { latestSnapshot: UiA11ySnapshotResult | null };
   uiAutomation: UiAutomationRunState;
   emit: EmitFn;
   waitForPermission: (permissionId: string) => Promise<PermissionChoice>;

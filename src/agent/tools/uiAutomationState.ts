@@ -4,6 +4,8 @@ export type UiAutomationRunState = {
   capturesWithoutEffectiveMove: number;
   lastCaptureCursorBlockX: number | null;
   lastCaptureCursorBlockY: number | null;
+  /** 1 after an a11y snapshot until interact or pointer action clears it. */
+  a11ySnapshotsWithoutInteract: number;
 };
 
 /** Fine grid cell size in capture pixels (matches Rust GRID_CELL_PX). */
@@ -21,6 +23,7 @@ export function createUiAutomationRunState(): UiAutomationRunState {
     capturesWithoutEffectiveMove: 0,
     lastCaptureCursorBlockX: null,
     lastCaptureCursorBlockY: null,
+    a11ySnapshotsWithoutInteract: 0,
   };
 }
 
@@ -36,6 +39,19 @@ export function rememberCaptureCursorBlock(
 
 export function clearPendingCapture(state: UiAutomationRunState): void {
   state.capturesWithoutEffectiveMove = 0;
+  state.a11ySnapshotsWithoutInteract = 0;
+}
+
+export function rememberA11ySnapshot(state: UiAutomationRunState): void {
+  state.a11ySnapshotsWithoutInteract = 1;
+}
+
+export function isRepeatA11ySnapshotBlocked(state: UiAutomationRunState): boolean {
+  return state.a11ySnapshotsWithoutInteract >= 1;
+}
+
+export function isDisplayCaptureBlockedByA11y(state: UiAutomationRunState): boolean {
+  return state.a11ySnapshotsWithoutInteract >= 1;
 }
 
 export function isRepeatCaptureBlocked(state: UiAutomationRunState): boolean {

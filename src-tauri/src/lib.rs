@@ -7,6 +7,7 @@ mod display_metrics;
 mod grid_overlay;
 mod mouse_hook;
 mod process_run;
+mod ui_a11y;
 mod workspace_fs;
 
 use tauri::menu::{Menu, MenuItem};
@@ -121,6 +122,8 @@ pub fn run() {
             capture_input::key_tap,
             capture_input::reset_pointer_automation_cancel,
             capture_input::cancel_pointer_automation,
+            ui_a11y::ui_a11y_snapshot,
+            ui_a11y::ui_a11y_interact,
             app_store::load_settings,
             app_store::save_settings,
             app_store::load_secret,

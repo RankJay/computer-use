@@ -4,6 +4,10 @@ import type { LiveAgentToolContext } from "@/agent/agentSessionContext";
 import { getHostOsKind } from "@/agent/hostEnvironment";
 import type { LlmApiProvider } from "@/agent/native/tauriIpc";
 import {
+  buildA11yAttachmentStep,
+  shouldAttachLatestA11ySnapshot,
+} from "@/agent/session/liveA11yAttachment";
+import {
   buildContinuationMessage,
   MAX_COMPLETION_CONTINUATIONS,
   verifyCompletion,
@@ -117,6 +121,7 @@ export async function runLiveAgentSession(options: LiveAgentSessionOptions): Pro
     persistedToolApprovals: persisted,
     sessionRiskApproved,
     vision: { latestCapture: null },
+    a11y: { latestSnapshot: null },
     uiAutomation: createUiAutomationRunState(),
     emit,
     waitForPermission: waitForPermissionChoice,
@@ -214,12 +219,17 @@ export async function runLiveAgentSession(options: LiveAgentSessionOptions): Pro
           },
         ],
         prepareStep: async ({ stepNumber }) => {
+          const a11ySnapshot = ctx.a11y.latestSnapshot;
+          if (shouldAttachLatestA11ySnapshot(a11ySnapshot, stepNumber)) {
+            ctx.a11y.latestSnapshot = null;
+            return buildA11yAttachmentStep(a11ySnapshot, prompt);
+          }
           const capture = ctx.vision.latestCapture;
           if (!shouldAttachLatestScreenshot(capture, stepNumber)) {
             return {};
           }
           ctx.vision.latestCapture = null;
-          return buildScreenshotAttachmentStep(capture);
+          return buildScreenshotAttachmentStep(capture, prompt);
         },
         onChunk: async ({ chunk }) => {
           const ev = mapStreamChunkToAgentEvent(chunk, taskId, createMeta);

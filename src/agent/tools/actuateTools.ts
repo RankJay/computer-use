@@ -2,6 +2,7 @@ import type { LiveAgentToolContext } from "@/agent/agentSessionContext";
 import { MODEL_TOOL_KEYS } from "@/agent/toolContract";
 import { createDisplayCaptureTool } from "@/agent/tools/displayCaptureTool";
 import { createTerminalRunTool } from "@/agent/tools/terminalRunTool";
+import { createUiA11yInteractTool, createUiA11ySnapshotTool } from "@/agent/tools/uiA11yTools";
 import {
   createKeyTapTool,
   createPointerClickTool,
@@ -32,6 +33,8 @@ export function createActuateTools(ctx: LiveAgentToolContext) {
     [MODEL_TOOL_KEYS.TYPE_TEXT]: createTypeTextTool(ctx),
     [MODEL_TOOL_KEYS.KEY_TAP]: createKeyTapTool(ctx),
     [MODEL_TOOL_KEYS.UI_FOCUS_TYPE]: createUiFocusTypeTool(ctx),
+    [MODEL_TOOL_KEYS.UI_A11Y_SNAPSHOT]: createUiA11ySnapshotTool(ctx),
+    [MODEL_TOOL_KEYS.UI_A11Y_INTERACT]: createUiA11yInteractTool(ctx),
   };
 }
 

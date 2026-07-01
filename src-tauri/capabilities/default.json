@@ -15,6 +15,7 @@
     "allow-type-text",
     "allow-key-tap",
     "allow-pointer-automation-lifecycle",
+    "allow-ui-a11y",
     "allow-load-settings",
     "allow-save-settings",
     "allow-load-secret",

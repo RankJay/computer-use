@@ -33,6 +33,7 @@ function createTestContext(options?: {
     persistedToolApprovals: new Set(),
     sessionRiskApproved: new Set(),
     vision: { latestCapture: null },
+    a11y: { latestSnapshot: null },
     uiAutomation: createUiAutomationRunState(),
     emit: (event) => {
       events.push(event);

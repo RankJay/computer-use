@@ -31,13 +31,16 @@ describe("liveScreenshotAttachment", () => {
   });
 
   test("buildScreenshotAttachmentStep embeds base64 data url", () => {
-    const step = buildScreenshotAttachmentStep(capture);
+    const step = buildScreenshotAttachmentStep(capture, "open Chrome and visit Gmail");
     const textPart = step.messages[0]?.content[0];
     const imagePart = step.messages[0]?.content[1];
     expect(textPart?.type).toBe("text");
     if (textPart?.type === "text") {
+      expect(textPart.text).toContain("Original user task remains binding");
+      expect(textPart.text).toContain("open Chrome and visit Gmail");
       expect(textPart.text).toContain("5 blocks wide × 6 blocks tall");
       expect(textPart.text).toContain("NOT the cursor block");
+      expect(textPart.text).toContain("advances the original user task");
       expect(textPart.text).toContain("informational only");
       expect(textPart.text).toContain("Cursor block: (3, 4)");
     }

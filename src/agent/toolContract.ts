@@ -21,6 +21,8 @@ export const AGENT_TOOL_NAMES = {
   TYPE_TEXT: "type.text",
   KEY_TAP: "key.tap",
   UI_FOCUS_TYPE: "ui.focusType",
+  UI_A11Y_SNAPSHOT: "ui.a11y.snapshot",
+  UI_A11Y_INTERACT: "ui.a11y.interact",
   FILE_READ: "file.read",
   FILE_WRITE: "file.write",
   FILE_COPY: "file.copy",
@@ -43,6 +45,8 @@ export const MODEL_TOOL_KEYS = {
   TYPE_TEXT: "type_text",
   KEY_TAP: "key_tap",
   UI_FOCUS_TYPE: "ui_focus_type",
+  UI_A11Y_SNAPSHOT: "ui_a11y_snapshot",
+  UI_A11Y_INTERACT: "ui_a11y_interact",
 } as const;
 
 export type ModelToolKey = (typeof MODEL_TOOL_KEYS)[keyof typeof MODEL_TOOL_KEYS];
@@ -61,6 +65,8 @@ export const MODEL_TOOL_TO_AGENT_TOOL: Record<ModelToolKey, AgentToolName> = {
   [MODEL_TOOL_KEYS.TYPE_TEXT]: AGENT_TOOL_NAMES.TYPE_TEXT,
   [MODEL_TOOL_KEYS.KEY_TAP]: AGENT_TOOL_NAMES.KEY_TAP,
   [MODEL_TOOL_KEYS.UI_FOCUS_TYPE]: AGENT_TOOL_NAMES.UI_FOCUS_TYPE,
+  [MODEL_TOOL_KEYS.UI_A11Y_SNAPSHOT]: AGENT_TOOL_NAMES.UI_A11Y_SNAPSHOT,
+  [MODEL_TOOL_KEYS.UI_A11Y_INTERACT]: AGENT_TOOL_NAMES.UI_A11Y_INTERACT,
 };
 
 export function agentToolNameForModelToolKey(key: ModelToolKey): AgentToolName {
@@ -109,7 +115,25 @@ export const TOOL_CONTRACT: Record<AgentToolName, ToolContractEntry> = {
     cancellation: "Honors cancellation before and after the native capture.",
     displayName: "Screenshot",
     displaySurface: "thought",
-    defaultPermissionTitle: "Allow screen capture",
+    defaultPermissionTitle: "Allow screen capture (last resort)",
+  },
+  [AGENT_TOOL_NAMES.UI_A11Y_SNAPSHOT]: {
+    name: AGENT_TOOL_NAMES.UI_A11Y_SNAPSHOT,
+    riskClass: "observe",
+    timeoutMs: 15_000,
+    cancellation: "Honors cancellation before and after the accessibility tree walk.",
+    displayName: "UI tree",
+    displaySurface: "thought",
+    defaultPermissionTitle: "Allow accessibility tree snapshot",
+  },
+  [AGENT_TOOL_NAMES.UI_A11Y_INTERACT]: {
+    name: AGENT_TOOL_NAMES.UI_A11Y_INTERACT,
+    riskClass: "ui_automation",
+    timeoutMs: 15_000,
+    cancellation: "Honors cancellation before the accessibility interaction starts.",
+    displayName: "UI interact",
+    displaySurface: "thought",
+    defaultPermissionTitle: "Allow accessibility-driven UI interaction",
   },
   [AGENT_TOOL_NAMES.POINTER_MOVE]: {
     name: AGENT_TOOL_NAMES.POINTER_MOVE,
@@ -226,7 +250,7 @@ const RISK_CLASS_COPY: Record<
   observe: {
     taxonomyLabel: "Observation",
     userFacingRiskHint:
-      "Reads pixels or file content from your machine. Does not change files or run commands by itself. On macOS, screen capture may require Screen Recording permission.",
+      "Reads accessibility trees, pixels, or file content from your machine. Does not change files or run commands by itself. On macOS, screen capture may require Screen Recording permission; accessibility trees may require Accessibility permission.",
   },
   execute_local: {
     taxonomyLabel: "Local execution",

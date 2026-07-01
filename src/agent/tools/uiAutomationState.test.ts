@@ -6,8 +6,11 @@ import {
   focusTypeAttemptKey,
   isCursorBlockTarget,
   isRepeatCaptureBlocked,
+  isRepeatA11ySnapshotBlocked,
+  isDisplayCaptureBlockedByA11y,
   pointerDeltaFromTarget,
   pointerMoveWasEffective,
+  rememberA11ySnapshot,
   rememberCaptureCursorBlock,
 } from "@/agent/tools/uiAutomationState";
 
@@ -46,6 +49,16 @@ describe("uiAutomationState", () => {
     rememberCaptureCursorBlock(state, 16, 7);
     expect(isCursorBlockTarget(state, 16, 7)).toBe(true);
     expect(isCursorBlockTarget(state, 1, 3)).toBe(false);
+  });
+
+  test("repeat a11y snapshot blocked until interact", () => {
+    const state = createUiAutomationRunState();
+    expect(isRepeatA11ySnapshotBlocked(state)).toBe(false);
+    rememberA11ySnapshot(state);
+    expect(isRepeatA11ySnapshotBlocked(state)).toBe(true);
+    expect(isDisplayCaptureBlockedByA11y(state)).toBe(true);
+    clearPendingCapture(state);
+    expect(isRepeatA11ySnapshotBlocked(state)).toBe(false);
   });
 
   test("pointerMoveWasEffective requires non-zero delta", () => {

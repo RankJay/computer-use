@@ -5,6 +5,7 @@ import type { LiveAgentToolContext } from "@/agent/agentSessionContext";
 import { AGENT_TOOL_NAMES } from "@/agent/toolContract";
 import { defineActuateTool } from "@/agent/tools/defineActuateTool";
 import {
+  isDisplayCaptureBlockedByA11y,
   isRepeatCaptureBlocked,
   rememberCaptureCursorBlock,
 } from "@/agent/tools/uiAutomationState";
@@ -12,6 +13,9 @@ import { createEventId } from "@/agent/types";
 
 const REPEAT_CAPTURE_ERROR =
   "Blocked: you already have a screenshot for this view. Read the attached image, pick the icon's block (NOT cursorBlockX/Y), call pointer_move, then pointer_click. Only capture again after the screen changes.";
+
+const A11Y_BEFORE_CAPTURE_ERROR =
+  "Blocked: you have a fresh accessibility tree — use ui_a11y_interact with an element id (@eN) first. Call display_capture only if the tree is empty or interaction failed.";
 
 export function createDisplayCaptureTool(ctx: LiveAgentToolContext) {
   return defineActuateTool(ctx, {
@@ -21,6 +25,9 @@ export function createDisplayCaptureTool(ctx: LiveAgentToolContext) {
     inputSchema: zodSchema(z.object({ label: z.string().optional() })),
     nativeGate: "displayCapture",
     preflight: () => {
+      if (isDisplayCaptureBlockedByA11y(ctx.uiAutomation)) {
+        return { ok: false, error: A11Y_BEFORE_CAPTURE_ERROR };
+      }
       if (isRepeatCaptureBlocked(ctx.uiAutomation)) {
         return { ok: false, error: REPEAT_CAPTURE_ERROR };
       }
