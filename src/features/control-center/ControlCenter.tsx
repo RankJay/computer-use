@@ -5,6 +5,7 @@ import type { PermissionChoice } from "@/agent/types";
 import { Container, Item } from "@/components/motion/stagger";
 import { AgentChatTranscript } from "@/features/agent-chat/AgentChatTranscript";
 import {
+  DisplayNoticeToast,
   PointerAutomationEscBar,
   TaskBudgetBanner,
   TaskFailureBanner,
@@ -12,12 +13,15 @@ import {
 import { PermissionPrompt } from "@/features/agent-chat/PermissionPrompt";
 import { useAgentSessionContext } from "@/features/control-center/AgentSessionContext";
 import { TaskPromptComposer } from "@/features/control-center/TaskPromptComposer";
+import { dismissDisplayNotice, useDisplayNotice } from "@/features/control-center/useDisplayNotice";
 import { WindowChrome } from "@/features/control-center/WindowChrome";
 
 export function ControlCenter() {
   const agent = useAgentSessionContext();
   const { cancelRun, pendingPermission, resolvePermission, startRun } = agent;
   const [draft, setDraft] = useState(() => hostRuntime.defaultComposerDraft);
+  const displayNotice = useDisplayNotice();
+  const [displayNoticeVisible, setDisplayNoticeVisible] = useState(true);
 
   const canStart = agent.capabilities.canStartRun && draft.trim().length > 0;
 
@@ -68,6 +72,15 @@ export function ControlCenter() {
       </div>
 
       <div className="shrink-0 space-y-2 py-2">
+        {displayNotice !== null && displayNoticeVisible && (
+          <DisplayNoticeToast
+            displayCount={displayNotice.displayCount}
+            onDismiss={() => {
+              dismissDisplayNotice();
+              setDisplayNoticeVisible(false);
+            }}
+          />
+        )}
         {agent.budget.exceededLimit !== null && agent.budget.progress !== null && (
           <TaskBudgetBanner limit={agent.budget.exceededLimit} progress={agent.budget.progress} />
         )}

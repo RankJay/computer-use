@@ -46,4 +46,17 @@ describe("toolCancellation", () => {
       elapsedMs: 120_000,
     });
   });
+
+  test("toolTimeoutFromNativeError accepts native UIA timeout messages", () => {
+    const timeout = toolTimeoutFromNativeError(
+      "Windows UI Automation timed out after 28000 ms",
+      AGENT_TOOL_NAMES.UI_A11Y_SNAPSHOT,
+    );
+
+    expect(timeout?.payload).toEqual({
+      kind: "timeout",
+      timeoutMs: 28_000,
+      elapsedMs: 28_000,
+    });
+  });
 });

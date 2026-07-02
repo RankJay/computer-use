@@ -35,6 +35,8 @@ export function isUiAutomationTool(tool: AgentToolName): boolean {
     tool === AGENT_TOOL_NAMES.TYPE_TEXT ||
     tool === AGENT_TOOL_NAMES.KEY_TAP ||
     tool === AGENT_TOOL_NAMES.UI_FOCUS_TYPE ||
-    tool === AGENT_TOOL_NAMES.UI_A11Y_INTERACT
+    tool === AGENT_TOOL_NAMES.UI_A11Y_INTERACT ||
+    tool === AGENT_TOOL_NAMES.CLIPBOARD_WRITE ||
+    tool === AGENT_TOOL_NAMES.CLIPBOARD_PASTE
   );
 }

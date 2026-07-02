@@ -30,6 +30,10 @@ export const TAURI_COMMAND = {
   listWorkspaceDir: "list_workspace_dir",
   uiA11ySnapshot: "ui_a11y_snapshot",
   uiA11yInteract: "ui_a11y_interact",
+  getDisplayInfo: "get_display_info",
+  clipboardReadText: "clipboard_read_text",
+  clipboardWriteText: "clipboard_write_text",
+  clipboardPaste: "clipboard_paste",
 } as const;
 
 export type LlmApiProvider = "anthropic" | "openai";
@@ -132,6 +136,16 @@ export type UiA11yInteractResponse = {
   action: string;
   elementId: string;
   message: string;
+};
+
+export type DisplayInfoResponse = {
+  displayCount: number;
+  multiMonitor: boolean;
+  primaryOnly: boolean;
+};
+
+export type ClipboardReadResponse = {
+  text: string;
 };
 
 export type SaveSettingsRequest = {

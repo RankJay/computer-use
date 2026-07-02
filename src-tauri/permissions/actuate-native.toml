@@ -61,3 +61,18 @@ foreground app (or a named app) and performs element-targeted clicks or text ent
 macOS requires Accessibility permission; Windows uses UI Automation; Linux uses AT-SPI2.
 """
 commands.allow = ["ui_a11y_snapshot", "ui_a11y_interact"]
+
+[[permission]]
+identifier = "allow-display-info"
+description = """
+Enables get_display_info: reports how many displays are connected and whether capture/pointer
+automation is limited to the primary monitor.
+"""
+commands.allow = ["get_display_info"]
+
+[[permission]]
+identifier = "allow-clipboard"
+description = """
+Enables clipboard_read_text, clipboard_write_text, and clipboard_paste for agent clipboard tools.
+"""
+commands.allow = ["clipboard_read_text", "clipboard_write_text", "clipboard_paste"]

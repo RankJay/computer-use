@@ -1,8 +1,10 @@
 mod app_paths;
 mod app_store;
+mod clipboard;
 mod capture_input;
 mod command_output;
 mod cursor_overlay;
+mod display_info;
 mod display_metrics;
 mod grid_overlay;
 mod mouse_hook;
@@ -124,6 +126,10 @@ pub fn run() {
             capture_input::cancel_pointer_automation,
             ui_a11y::ui_a11y_snapshot,
             ui_a11y::ui_a11y_interact,
+            display_info::get_display_info,
+            clipboard::clipboard_read_text,
+            clipboard::clipboard_write_text,
+            clipboard::clipboard_paste,
             app_store::load_settings,
             app_store::save_settings,
             app_store::load_secret,

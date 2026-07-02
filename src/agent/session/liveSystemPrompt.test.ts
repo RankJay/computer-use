@@ -24,8 +24,14 @@ describe("liveSystemPrompt", () => {
     expect(system).toContain("display_capture only as a last resort");
     expect(system).toContain("pointer_move");
     expect(system).toContain("copy_file");
+    expect(system).toContain("rename_path");
+    expect(system).toContain("patch_file");
+    expect(system).toContain("clipboard_read");
     expect(system).toContain("fresh ui_a11y_snapshot");
     expect(system).toContain("until the requested end state is reached");
+    expect(system).toContain("--force-renderer-accessibility");
+    expect(system).toContain("foreground_only");
+    expect(system).toContain("re-resolves elements");
     expect(system).toContain("never stop to narrate the screenshot");
     expect(system).toContain("never reuse cursorBlockX");
     expect(system).toContain("ui_focus_type");

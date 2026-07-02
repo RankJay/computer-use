@@ -102,11 +102,21 @@ Blast-radius category for a tool: `observe`, `execute_local`, `ui_automation`, `
 
 ## Tool contract
 
-Frozen registry (`TOOL_CONTRACT`, `AGENT_TOOL_NAMES`) of model-callable tools: stable ids (`workspace.inspect`, `terminal.run`, `file.read`, …), risk class, display names, default permission copy. UI and IPC must not invent parallel tool strings.
+Frozen registry (`TOOL_CONTRACT`, `AGENT_TOOL_NAMES`) of model-callable tools: stable ids (`workspace.inspect`, `terminal.run`, `file.read`, `file.patch`, `path.rename`, `clipboard.read`, …), risk class, display names, default permission copy. UI and IPC must not invent parallel tool strings.
+
+**Workspace mutate:** `file.write`, `file.patch` (search/replace hunks), `path.copy`, `path.move`, `path.rename` — prefer patch and path tools over read/regenerate for existing content.
 
 ## UI automation
 
-Desktop-only pointer/keyboard tools (`pointer.move`, `pointer.click`, `type.text`, `key.tap`). Gated by Settings **UI automation enabled** (`uiAutomationEnabled`) before permission prompts run. When disabled, the orchestrator denies those tools without prompting.
+Desktop-only tools for driving the machine:
+
+- **Accessibility (preferred for UI):** `ui.a11y.snapshot`, `ui.a11y.interact` — native tree by element id (`@eN`). Snapshot is observe; interact is ui_automation.
+- **Vision fallback:** `display.capture`, then `pointer.move`, `pointer.click`, `ui.focusType`, `type.text`, `key.tap`.
+- **Clipboard:** `clipboard.read` (observe), `clipboard.write`, `clipboard.paste` (ui_automation).
+
+Gated by Settings **UI automation enabled** (`uiAutomationEnabled`) for interact, pointer, typing, and clipboard write/paste. `ui.a11y.snapshot` and `clipboard.read` can run without that toggle.
+
+**Display:** capture and pointer automation target the **primary monitor only** today. The app shows a notice when multiple monitors are detected.
 
 ## Workspace root
 

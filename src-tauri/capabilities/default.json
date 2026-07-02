@@ -16,6 +16,8 @@
     "allow-key-tap",
     "allow-pointer-automation-lifecycle",
     "allow-ui-a11y",
+    "allow-display-info",
+    "allow-clipboard",
     "allow-load-settings",
     "allow-save-settings",
     "allow-load-secret",

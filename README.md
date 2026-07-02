@@ -1,6 +1,6 @@
 # Actuate
 
-Local-first Tauri + Vite + React control center with a BYOK agent loop (Anthropic or OpenAI), native tools (shell, screen capture, workspace files, optional UI automation), OS keychain secret storage, and JSONL session logs under app data.
+Local-first Tauri + Vite + React control center with a BYOK agent loop (Anthropic or OpenAI), native tools (shell, accessibility tree, workspace files, clipboard, optional UI automation), OS keychain secret storage, and JSONL session logs under app data.
 
 ## Dev
 
@@ -28,7 +28,9 @@ bun run dev         # http://localhost:1420
 
 **Demo:** **Agent mode** → **Demo fixture** runs the offline scripted tour (no API key).
 
-**UI automation (desktop):** enable **Pointer / UI automation** in Settings before pointer/click/type tools can run; macOS may also require Screen Recording / Accessibility permissions for capture and input.
+**UI automation (desktop):** enable **Pointer / UI automation** in Settings before pointer/click/type/clipboard-paste tools can run; macOS may require Accessibility for `ui_a11y_*` and Screen Recording for screenshots.
+
+**UI task order (live):** `terminal_run` → `ui_a11y_snapshot` / `ui_a11y_interact` → pointer tools → `display_capture` last. Screen capture and pointer grid use the **primary display only**; a notice appears when multiple monitors are connected.
 
 ## Architecture
 
@@ -45,7 +47,7 @@ On **Windows, macOS, and Linux** (desktop build):
 1. **Demo fixture** — complete a run without API keys.
 2. **Live + BYOK** — submit a task that uses `workspace.inspect` and `file.read` under the configured workspace root.
 3. **Permissions** — confirm a risky tool shows the permission drawer; try **Allow once** and **Deny**.
-4. **Optional** — `terminal.run` and `display.capture` after approval; pointer tools only with **Pointer / UI automation** enabled.
+4. **Optional** — `terminal.run`, `ui_a11y_snapshot`, and `display.capture` after approval; pointer/clipboard paste tools only with **Pointer / UI automation** enabled.
 
 `bun test src` should pass before release.
 

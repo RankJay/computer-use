@@ -10,6 +10,8 @@ import {
   type PointerMoveResponse,
   type RunCommandRequest,
   type RunCommandResponse,
+  type ClipboardReadResponse,
+  type DisplayInfoResponse,
   type UiA11yInteractRequest,
   type UiA11yInteractResponse,
   type UiA11ySnapshotRequest,
@@ -21,6 +23,8 @@ export type DisplayCaptureResult = DisplayCaptureResponse;
 export type PointerMoveResult = PointerMoveResponse;
 export type UiA11ySnapshotResult = UiA11ySnapshotResponse;
 export type UiA11yInteractResult = UiA11yInteractResponse;
+export type DisplayInfoResult = DisplayInfoResponse;
+export type ClipboardReadResult = ClipboardReadResponse;
 
 export type AgentNativeBridge = {
   capturePrimaryDisplayPngBase64: () => Promise<DisplayCaptureResult>;
@@ -34,6 +38,10 @@ export type AgentNativeBridge = {
   cancelPointerAutomation: () => Promise<void>;
   uiA11ySnapshot: (input: UiA11ySnapshotRequest) => Promise<UiA11ySnapshotResult>;
   uiA11yInteract: (input: UiA11yInteractRequest) => Promise<UiA11yInteractResult>;
+  getDisplayInfo: () => Promise<DisplayInfoResult>;
+  clipboardReadText: () => Promise<ClipboardReadResult>;
+  clipboardWriteText: (text: string) => Promise<void>;
+  clipboardPaste: () => Promise<void>;
 };
 
 export function isTauriRuntime(): boolean {
@@ -84,6 +92,10 @@ export function createNativeBridge(): AgentNativeBridge | null {
           clickCount: input.clickCount ?? null,
         },
       }),
+    getDisplayInfo: () => invoke<DisplayInfoResult>(TAURI_COMMAND.getDisplayInfo),
+    clipboardReadText: () => invoke<ClipboardReadResult>(TAURI_COMMAND.clipboardReadText),
+    clipboardWriteText: (text) => invoke<void>(TAURI_COMMAND.clipboardWriteText, { text }),
+    clipboardPaste: () => invoke<void>(TAURI_COMMAND.clipboardPaste),
   };
 }
 

@@ -26,7 +26,7 @@ export function createUiA11ySnapshotTool(ctx: LiveAgentToolContext) {
   return defineActuateTool(ctx, {
     toolName: AGENT_TOOL_NAMES.UI_A11Y_SNAPSHOT,
     description:
-      "Preferred UI discovery: snapshot the native accessibility tree for the foreground app (or app_name). Returns element ids (@eN), roles, names, and values. Use before pointer_move or display_capture for standard desktop controls. Call once per stable UI state.",
+      "Preferred UI discovery: snapshot the native accessibility tree for the foreground app (or app_name). Returns element ids (@eN), roles, names, and values. Browser pages (Chrome, Edge) auto-scope to the tab Document and default interactive_only=true for dense sites like Gmail. Use before pointer_move or display_capture for standard desktop controls. Call once per stable UI state.",
     inputSchema: zodSchema(
       z.object({
         app_name: z.string().trim().min(1).optional(),
@@ -93,23 +93,29 @@ export function createUiA11yInteractTool(ctx: LiveAgentToolContext) {
     deniedError: "Denied (permission or UI automation disabled).",
     describe: (input) => `${input.action} ${input.element_id}`,
     execute: async (input, _executeCtx, native) => {
-      const result = await native.uiA11yInteract({
-        elementId: input.element_id,
-        action: input.action,
-        text: input.text ?? null,
-        clickCount: input.click_count ?? null,
-      });
-      clearPendingCapture(ctx.uiAutomation);
-      ctx.a11y.latestSnapshot = null;
-      return {
-        ok: true,
-        value: {
-          elementId: result.elementId,
-          action: result.action,
-          message: result.message,
-        },
-        timelineSummary: shortenForTimeline(result.message),
-      };
+      try {
+        const result = await native.uiA11yInteract({
+          elementId: input.element_id,
+          action: input.action,
+          text: input.text ?? null,
+          clickCount: input.click_count ?? null,
+        });
+        clearPendingCapture(ctx.uiAutomation);
+        ctx.a11y.latestSnapshot = null;
+        return {
+          ok: true,
+          value: {
+            elementId: result.elementId,
+            action: result.action,
+            message: result.message,
+          },
+          timelineSummary: shortenForTimeline(result.message),
+        };
+      } catch (error) {
+        clearPendingCapture(ctx.uiAutomation);
+        ctx.a11y.latestSnapshot = null;
+        throw error;
+      }
     },
   });
 }

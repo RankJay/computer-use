@@ -52,10 +52,11 @@ export function toolTimeoutFromNativeError(
     return err;
   }
   const message = err instanceof Error ? err.message : typeof err === "string" ? err : "";
-  const timeoutMs = timeoutMsForTool(toolName);
-  if (!message.includes(`timed out after ${timeoutMs} ms`)) {
+  const match = /timed out after (\d+) ms/.exec(message);
+  if (match === null) {
     return null;
   }
+  const timeoutMs = Number.parseInt(match[1], 10);
   return new ToolTimeoutError(toolName, timeoutMs, timeoutMs);
 }
 

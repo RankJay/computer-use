@@ -68,6 +68,36 @@ export function TaskFailureBanner(props: TaskFailureBannerProps): ReactElement {
   );
 }
 
+export type DisplayNoticeToastProps = {
+  readonly displayCount: number;
+  readonly onDismiss: () => void;
+};
+
+/** Shown once per session when multiple monitors are detected. */
+export function DisplayNoticeToast(props: DisplayNoticeToastProps): ReactElement {
+  return (
+    <div
+      className="flex items-start justify-between gap-3 rounded-xl border border-sky-900/45 bg-sky-950/30 px-3 py-2.5 text-[12px] leading-snug text-sky-100/95"
+      role="status"
+    >
+      <p>
+        <span className="font-medium text-sky-50/95">
+          Multiple monitors detected ({props.displayCount}).
+        </span>{" "}
+        Screen capture and pointer automation use the primary display only for now. Move target
+        windows to your main monitor for reliable UI tasks.
+      </p>
+      <button
+        type="button"
+        className="shrink-0 rounded-md border border-sky-800/60 bg-neutral-950/50 px-2 py-0.5 text-[11px] text-sky-100/90 hover:bg-neutral-900/80"
+        onClick={props.onDismiss}
+      >
+        Dismiss
+      </button>
+    </div>
+  );
+}
+
 export type TaskBudgetBannerProps = {
   readonly limit: RunBudgetLimit;
   readonly progress: RunBudgetProgress;

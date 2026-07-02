@@ -1,5 +1,10 @@
 import type { LiveAgentToolContext } from "@/agent/agentSessionContext";
 import { MODEL_TOOL_KEYS } from "@/agent/toolContract";
+import {
+  createClipboardPasteTool,
+  createClipboardReadTool,
+  createClipboardWriteTool,
+} from "@/agent/tools/clipboardTools";
 import { createDisplayCaptureTool } from "@/agent/tools/displayCaptureTool";
 import { createTerminalRunTool } from "@/agent/tools/terminalRunTool";
 import { createUiA11yInteractTool, createUiA11ySnapshotTool } from "@/agent/tools/uiA11yTools";
@@ -17,6 +22,7 @@ import {
   createWorkspaceInspectTool,
   createWriteFileTool,
 } from "@/agent/tools/workspaceTools";
+import { createPatchFileTool, createRenamePathTool } from "@/agent/tools/workspaceTransferTools";
 
 /** Model registry keys (MODEL_TOOL_KEYS) → tool factories bound to internal contract ids inside each factory. */
 export function createActuateTools(ctx: LiveAgentToolContext) {
@@ -28,6 +34,11 @@ export function createActuateTools(ctx: LiveAgentToolContext) {
     [MODEL_TOOL_KEYS.WRITE_FILE]: createWriteFileTool(ctx),
     [MODEL_TOOL_KEYS.COPY_FILE]: createCopyFileTool(ctx),
     [MODEL_TOOL_KEYS.MOVE_PATH]: createMovePathTool(ctx),
+    [MODEL_TOOL_KEYS.RENAME_PATH]: createRenamePathTool(ctx),
+    [MODEL_TOOL_KEYS.PATCH_FILE]: createPatchFileTool(ctx),
+    [MODEL_TOOL_KEYS.CLIPBOARD_READ]: createClipboardReadTool(ctx),
+    [MODEL_TOOL_KEYS.CLIPBOARD_WRITE]: createClipboardWriteTool(ctx),
+    [MODEL_TOOL_KEYS.CLIPBOARD_PASTE]: createClipboardPasteTool(ctx),
     [MODEL_TOOL_KEYS.POINTER_MOVE]: createPointerMoveTool(ctx),
     [MODEL_TOOL_KEYS.POINTER_CLICK]: createPointerClickTool(ctx),
     [MODEL_TOOL_KEYS.TYPE_TEXT]: createTypeTextTool(ctx),

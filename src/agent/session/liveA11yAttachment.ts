@@ -43,7 +43,7 @@ ${refsPreview}
 Full tree:
 ${snapshot.treeText}
 
-Next: ui_a11y_interact with element_id @eN — do NOT call ui_a11y_snapshot again unless the UI changed. Use display_capture only if the tree is empty or interaction fails.`,
+Next: ui_a11y_interact with element_id @eN from this snapshot only — element ids change every snapshot. After any ui_a11y_interact or UI change (dialogs, navigation), take a fresh ui_a11y_snapshot before the next interact. Use display_capture only if the tree is empty or interaction fails.`,
       },
     ],
   };

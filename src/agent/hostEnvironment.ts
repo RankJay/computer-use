@@ -25,7 +25,8 @@ export function terminalRunGuidanceForOs(os: HostOsKind): string {
       return (
         "On Windows use program powershell.exe with args like " +
         '["-NoProfile","-Command","<one line>"]. ' +
-        "Quote paths with spaces; prefer Get-ChildItem -LiteralPath. Do not assume bash or sh exist."
+        "Quote paths with spaces; prefer Get-ChildItem -LiteralPath. Do not assume bash or sh exist. " +
+        "To launch Chrome/Edge for UI automation: Start-Process chrome.exe '--force-renderer-accessibility <url>' (or msedge.exe with the same flag)."
       );
     case "darwin":
       return "On macOS you may use bash, zsh, or /bin/sh -c with a short script, or standard BSD/Unix utilities.";
@@ -67,8 +68,8 @@ export function describeRuntimeCapabilities(options: {
   const os = formatHostOsLabel(options.hostOs);
   if (options.nativeBridge) {
     const uiLine = options.uiAutomationEnabled
-      ? "ui_a11y_snapshot (accessibility tree) and ui_a11y_interact (click/type by @eN element id) are preferred for UI tasks; pointer_move / pointer_click / type_text / key_tap are fallbacks when the tree is empty or insufficient."
-      : "UI automation tools (ui_a11y_interact, pointer_move, pointer_click, type_text, key_tap) are disabled in Settings—do not call them; ask the user to enable UI automation in Actuate. ui_a11y_snapshot may still run for observation.";
+      ? "ui_a11y_snapshot (accessibility tree) and ui_a11y_interact (click/type by @eN element id) are preferred for UI tasks; pointer_move / pointer_click / type_text / key_tap are fallbacks when the tree is empty or insufficient. clipboard_read / clipboard_write / clipboard_paste are available on desktop."
+      : "UI automation tools (ui_a11y_interact, pointer_move, pointer_click, type_text, key_tap, clipboard_write, clipboard_paste) are disabled in Settings—do not call them; ask the user to enable UI automation in Actuate. ui_a11y_snapshot and clipboard_read may still run for observation.";
     return (
       `This run uses the Actuate desktop (Tauri) app on ${os}: terminal_run is the first choice for shell facts; ui_a11y_snapshot reads the native accessibility tree; display_capture is last resort only. ${uiLine} ` +
       "workspace_inspect / read_file / write_file / copy_file / move_path only work for paths relative to the configured workspace root; they cannot access arbitrary absolute paths—use terminal_run for those (e.g. list or count files under D:\\... on Windows)."

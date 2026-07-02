@@ -2,13 +2,19 @@ import type { AgentNativeBridge } from "@/agent/native/nativeBridge";
 
 export const NATIVE_TOOL_DESKTOP_ONLY_ERROR = "This tool requires the Tauri desktop app.";
 
-export type NativeToolKind = "terminal" | "uiAutomation" | "displayCapture" | "a11ySnapshot";
+export type NativeToolKind =
+  | "terminal"
+  | "uiAutomation"
+  | "displayCapture"
+  | "a11ySnapshot"
+  | "clipboard";
 
 const TIMELINE_SUMMARY: Record<NativeToolKind, string> = {
   terminal: "No native bridge (web build).",
   uiAutomation: "No native bridge.",
   displayCapture: "No native bridge.",
   a11ySnapshot: "No native bridge.",
+  clipboard: "No native bridge.",
 };
 
 export type NativeToolGateResult =
