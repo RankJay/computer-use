@@ -1,6 +1,6 @@
 import { ArrowUp, Square } from "lucide-react";
 import { useEffect, useRef } from "react";
-import type { FormEvent, KeyboardEvent, ReactElement } from "react";
+import type { KeyboardEvent, ReactElement, SubmitEvent } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -22,7 +22,7 @@ export function TaskPromptComposer(props: TaskPromptComposerProps): ReactElement
     textareaRef.current?.focus();
   }, []);
 
-  function handleSubmit(e: FormEvent<HTMLFormElement>): void {
+  function handleSubmit(e: SubmitEvent<HTMLFormElement>): void {
     e.preventDefault();
     props.onSubmit();
   }
