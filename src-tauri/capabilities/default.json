@@ -5,7 +5,10 @@
   "windows": ["main"],
   "permissions": [
     "core:default",
+    "core:window:allow-minimize",
     "opener:default",
-    "window-state:default"
+    "window-state:default",
+    "store:default",
+    "stronghold:default"
   ]
 }

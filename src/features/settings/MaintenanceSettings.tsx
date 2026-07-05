@@ -1,6 +1,7 @@
 import { FolderOpen } from "lucide-react";
 import type { ReactElement } from "react";
 
+import { useSettingsActions, useSettingsState } from "@/app/providers/SettingsProvider";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,13 +19,24 @@ import { SettingsRow } from "@/features/settings/SettingsRow";
 import { SettingsSection } from "@/features/settings/SettingsSection";
 
 export function MaintenanceSettings(): ReactElement {
+  const { settings } = useSettingsState();
+  const { revokePersistedApprovals } = useSettingsActions();
+  const hasPersistedApprovals = settings.persistedApprovals.length > 0;
+
   return (
     <SettingsSection title="Maintenance">
       <SettingsRow
         label="Persistent approvals"
         description="Revoke saved tool approvals stored on this device."
       >
-        <Button type="button" variant="outline" size="sm" className={settingsGhostButtonClassName}>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className={settingsGhostButtonClassName}
+          disabled={!hasPersistedApprovals}
+          onClick={() => void revokePersistedApprovals()}
+        >
           Revoke
         </Button>
       </SettingsRow>

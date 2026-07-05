@@ -4,6 +4,7 @@ import { AgentTranscript } from "@/features/ai-chat/AgentTranscript";
 import { getAvailableAgentModels, getDefaultAgentModelId } from "@/lib/agent-models";
 import { demoAgentTranscriptRows, demoContextUsage } from "@/lib/demo-agent-chat";
 
+import { ControlCenterHeader } from "./ControlCenterHeader";
 import { TaskPromptComposer } from "./TaskPromptComposer";
 
 export function ControlCenter() {
@@ -18,8 +19,9 @@ export function ControlCenter() {
   }, [canStart]);
 
   return (
-    <div className="box-border overscroll-contain flex h-full min-h-dvh w-full flex-col gap-2 overflow-hidden rounded-none border-0 bg-[#0E0E0E] p-2 text-white shadow-none ring-0">
-      <div className="flex min-h-0 flex-1 flex-col gap-2">
+    <div className="box-border overscroll-contain flex h-full min-h-dvh w-full flex-col gap-0 overflow-hidden rounded-none border-0 bg-[#0E0E0E] text-white shadow-none ring-0">
+      <ControlCenterHeader />
+      <div className="flex min-h-0 flex-1 flex-col gap-2 p-2 pt-0">
         <AgentTranscript rows={demoAgentTranscriptRows} />
       </div>
 

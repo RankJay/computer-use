@@ -1,13 +1,8 @@
 import { FolderOpen } from "lucide-react";
 import type { ReactElement } from "react";
 
-import { Input } from "@/components/ui/input";
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupButton,
-  InputGroupInput,
-} from "@/components/ui/input-group";
+import { useSettingsActions, useSettingsState } from "@/app/providers/SettingsProvider";
+import { InputGroup, InputGroupAddon, InputGroupButton } from "@/components/ui/input-group";
 import {
   Select,
   SelectContent,
@@ -22,10 +17,18 @@ import {
   settingsInputGroupInputClassName,
   settingsSelectTriggerClassName,
 } from "@/features/settings/settings-control-styles";
+import {
+  SettingsDraftNumberInput,
+  SettingsDraftTextInput,
+} from "@/features/settings/SettingsDraftInput";
 import { SettingsRow } from "@/features/settings/SettingsRow";
 import { SettingsSection } from "@/features/settings/SettingsSection";
+import { parsePermissionMode } from "@/lib/settings/parse-permission-mode";
 
 export function GeneralSettings(): ReactElement {
+  const { settings } = useSettingsState();
+  const { updateSettings } = useSettingsActions();
+
   return (
     <>
       <SettingsSection title="General">
@@ -35,10 +38,14 @@ export function GeneralSettings(): ReactElement {
           className="max-md:flex-col max-md:w-full max-md:gap-3 max-md:items-start"
         >
           <InputGroup className={`w-52 max-md:w-full ${settingsInputGroupClassName}`}>
-            <InputGroupInput
+            <SettingsDraftTextInput
               id="workspace-root"
+              variant="input-group"
               placeholder="C:\Users\...\Projects"
-              defaultValue=""
+              committedValue={settings.workspaceRoot}
+              onCommit={(value) => {
+                void updateSettings({ workspaceRoot: value });
+              }}
               className={settingsInputGroupInputClassName}
             />
             <InputGroupAddon align="inline-end">
@@ -50,11 +57,13 @@ export function GeneralSettings(): ReactElement {
         </SettingsRow>
 
         <SettingsRow label="Log retention" description="Days to keep local log files.">
-          <Input
+          <SettingsDraftNumberInput
             id="log-retention"
-            type="number"
             min={1}
-            defaultValue="30"
+            committedValue={settings.logRetentionDays}
+            onCommit={(value) => {
+              void updateSettings({ logRetentionDays: value });
+            }}
             className={settingsInputClassName}
           />
         </SettingsRow>
@@ -65,7 +74,14 @@ export function GeneralSettings(): ReactElement {
           label="Permission mode"
           description="How the agent requests approval before tool use."
         >
-          <Select defaultValue="risky">
+          <Select
+            value={settings.permissionMode}
+            onValueChange={(value) => {
+              if (value !== null) {
+                void updateSettings({ permissionMode: parsePermissionMode(value) });
+              }
+            }}
+          >
             <SelectTrigger className={settingsSelectTriggerClassName}>
               <SelectValue />
             </SelectTrigger>
@@ -81,7 +97,13 @@ export function GeneralSettings(): ReactElement {
           label="Pointer / UI automation"
           description="Allow pointer, click, and type tools."
         >
-          <Switch id="ui-automation" defaultChecked={false} />
+          <Switch
+            id="ui-automation"
+            checked={settings.uiAutomation}
+            onCheckedChange={(checked) => {
+              void updateSettings({ uiAutomation: checked });
+            }}
+          />
         </SettingsRow>
       </SettingsSection>
     </>

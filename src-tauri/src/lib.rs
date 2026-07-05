@@ -30,7 +30,9 @@ fn set_taskbar_visible(window: &tauri::WebviewWindow, visible: bool) {
 fn position_bottom_right(window: &tauri::WebviewWindow) -> tauri::Result<()> {
     let monitor = match window.primary_monitor()? {
         Some(monitor) => monitor,
-        None => window.current_monitor()?.ok_or(tauri::Error::WindowNotFound)?,
+        None => window
+            .current_monitor()?
+            .ok_or(tauri::Error::WindowNotFound)?,
     };
 
     let work_area = monitor.work_area();
@@ -83,10 +85,7 @@ fn setup_desktop(app: &mut tauri::App) -> tauri::Result<()> {
     let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&show, &hide, &quit])?;
 
-    let tray_icon = app
-        .default_window_icon()
-        .expect("missing app icon")
-        .clone();
+    let tray_icon = app.default_window_icon().expect("missing app icon").clone();
 
     TrayIconBuilder::with_id("main-tray")
         .icon(tray_icon)
@@ -155,7 +154,7 @@ pub fn run() {
     static SHOW_WINDOW: Once = Once::new();
 
     #[allow(unused_mut)]
-    let mut builder = tauri::Builder::default();
+    let mut builder = tauri::Builder::default().plugin(tauri_plugin_store::Builder::default().build());
 
     #[cfg(desktop)]
     {
@@ -179,6 +178,15 @@ pub fn run() {
     builder
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
+            let salt_path = app
+                .path()
+                .app_local_data_dir()
+                .expect("could not resolve app local data path")
+                .join("salt.txt");
+            app.handle().plugin(
+                tauri_plugin_stronghold::Builder::with_argon2(&salt_path).build(),
+            )?;
+
             #[cfg(desktop)]
             setup_desktop(app)?;
             Ok(())

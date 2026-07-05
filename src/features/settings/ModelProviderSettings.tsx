@@ -1,12 +1,7 @@
 import type { ReactElement } from "react";
 
-import { Input } from "@/components/ui/input";
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupInput,
-  InputGroupText,
-} from "@/components/ui/input-group";
+import { useSettingsActions, useSettingsState } from "@/app/providers/SettingsProvider";
+import { InputGroup, InputGroupAddon, InputGroupText } from "@/components/ui/input-group";
 import {
   Select,
   SelectContent,
@@ -20,10 +15,15 @@ import {
   settingsInputGroupInputClassName,
   settingsSelectTriggerClassName,
 } from "@/features/settings/settings-control-styles";
+import { SettingsDraftNumberInput } from "@/features/settings/SettingsDraftInput";
 import { SettingsRow } from "@/features/settings/SettingsRow";
 import { SettingsSection } from "@/features/settings/SettingsSection";
+import { parseAgentMode } from "@/lib/settings/parse-agent-mode";
 
 export function ModelProviderSettings(): ReactElement {
+  const { settings } = useSettingsState();
+  const { updateSettings } = useSettingsActions();
+
   return (
     <>
       <SettingsSection title="Model & provider">
@@ -31,7 +31,14 @@ export function ModelProviderSettings(): ReactElement {
           label="Agent mode"
           description="Live uses cloud API and tools. Demo runs offline fixtures."
         >
-          <Select defaultValue="live">
+          <Select
+            value={settings.agentMode}
+            onValueChange={(value) => {
+              if (value !== null) {
+                void updateSettings({ agentMode: parseAgentMode(value) });
+              }
+            }}
+          >
             <SelectTrigger className={settingsSelectTriggerClassName}>
               <SelectValue />
             </SelectTrigger>
@@ -42,11 +49,13 @@ export function ModelProviderSettings(): ReactElement {
           </Select>
         </SettingsRow>
         <SettingsRow label="Max steps" description="Maximum agent steps per run.">
-          <Input
+          <SettingsDraftNumberInput
             id="max-steps"
-            type="number"
             min={1}
-            defaultValue="50"
+            committedValue={settings.maxSteps}
+            onCommit={(value) => {
+              void updateSettings({ maxSteps: value });
+            }}
             className={settingsInputClassName}
           />
         </SettingsRow>
@@ -56,23 +65,29 @@ export function ModelProviderSettings(): ReactElement {
             <InputGroupAddon align="inline-start">
               <InputGroupText className="text-[#767676]">$</InputGroupText>
             </InputGroupAddon>
-            <InputGroupInput
+            <SettingsDraftNumberInput
               id="max-cost"
-              type="number"
+              variant="input-group"
+              format="float"
               min={0}
               step="0.01"
-              defaultValue="5.00"
+              committedValue={settings.maxCostUsd}
+              onCommit={(value) => {
+                void updateSettings({ maxCostUsd: value });
+              }}
               className={`${settingsInputGroupInputClassName} text-right tabular-nums`}
             />
           </InputGroup>
         </SettingsRow>
 
         <SettingsRow label="Max wall-clock" description="15 minutes (900000 ms).">
-          <Input
+          <SettingsDraftNumberInput
             id="max-wall-clock"
-            type="number"
             min={0}
-            defaultValue="900000"
+            committedValue={settings.maxWallClockMs}
+            onCommit={(value) => {
+              void updateSettings({ maxWallClockMs: value });
+            }}
             className={settingsInputClassName}
           />
         </SettingsRow>
