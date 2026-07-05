@@ -9,6 +9,16 @@ fn greet(name: &str) -> String {
 }
 
 #[cfg(desktop)]
+fn window_state_flags() -> StateFlags {
+    StateFlags::all().difference(StateFlags::DECORATIONS)
+}
+
+#[cfg(desktop)]
+fn apply_frameless_window(window: &tauri::WebviewWindow) {
+    let _ = window.set_decorations(false);
+}
+
+#[cfg(desktop)]
 fn set_taskbar_visible(window: &tauri::WebviewWindow, visible: bool) {
     #[cfg(target_os = "windows")]
     let _ = window.set_skip_taskbar(!visible);
@@ -45,10 +55,12 @@ fn show_main_window(app: &AppHandle) {
         .is_ok_and(|dir| dir.join(DEFAULT_FILENAME).exists());
 
     if has_state {
-        let _ = window.restore_state(StateFlags::all());
+        let _ = window.restore_state(window_state_flags());
     } else {
         let _ = position_bottom_right(&window);
     }
+
+    apply_frameless_window(&window);
 
     if !window.is_visible().unwrap_or(false) {
         let _ = window.show();
@@ -59,6 +71,8 @@ fn show_main_window(app: &AppHandle) {
 
 #[cfg(desktop)]
 fn setup_desktop(app: &mut tauri::App) -> tauri::Result<()> {
+    let _ = app.remove_menu();
+
     use tauri::{
         menu::{Menu, MenuItem},
         tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
@@ -122,6 +136,8 @@ fn setup_desktop(app: &mut tauri::App) -> tauri::Result<()> {
         .get_webview_window("main")
         .expect("main window not found");
 
+    apply_frameless_window(&window);
+
     let window_for_close = window.clone();
     window.on_window_event(move |event| {
         if let tauri::WindowEvent::CloseRequested { api, .. } = event {
@@ -155,6 +171,7 @@ pub fn run() {
             .plugin(
                 tauri_plugin_window_state::Builder::new()
                     .skip_initial_state("main")
+                    .with_state_flags(window_state_flags())
                     .build(),
             );
     }

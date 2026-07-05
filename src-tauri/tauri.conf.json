@@ -13,10 +13,13 @@
     "windows": [
       {
         "title": "actuate",
-        "width": 800,
-        "height": 600,
+        "width": 410,
+        "height": 720,
         "visible": false,
-        "skipTaskbar": true
+        "skipTaskbar": true,
+        "maximizable": false,
+        "minimizable": true,
+        "decorations": false
       }
     ],
     "security": {
