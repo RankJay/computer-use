@@ -11,6 +11,7 @@ import type { InvokeCapabilityDeps } from "@/lib/agent/capabilities";
 import { buildAgentTools } from "@/lib/agent/capabilities";
 import { mapAgentError, resolveLanguageModel } from "@/lib/agent/model-provider";
 import { buildSystemPrompt } from "@/lib/agent/prompts/system";
+import { formatToolStreamError } from "@/lib/agent/tool-errors";
 import type { RunAgentDeps, RunAgentResult } from "@/lib/agent/types";
 import {
   emitUsageAndBudget,
@@ -107,6 +108,7 @@ export async function runAgentLoop(deps: RunAgentDeps): Promise<RunAgentResult> 
       tools,
       sendReasoning: true,
       sendSources: true,
+      onError: formatToolStreamError,
     });
 
     const assistantMessageId = `assistant-${deps.taskId}`;

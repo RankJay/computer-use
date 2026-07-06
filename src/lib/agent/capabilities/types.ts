@@ -8,6 +8,8 @@ export type CapabilityRisk = "low" | "medium" | "high";
 export type CapabilityError = {
   code: string;
   message: string;
+  details?: string;
+  cause?: string;
 };
 
 export type CapabilityContext = {
@@ -25,6 +27,7 @@ export type CapabilityDefinition = {
   inputSchema: z.ZodType;
   parseInput: (input: unknown) => unknown;
   execute: (input: unknown, ctx: CapabilityContext) => Promise<unknown>;
+  enabledWhen?: (settings: AppSettings) => boolean;
 };
 
 export function defineCapability<S extends z.ZodType>(config: {
@@ -33,6 +36,7 @@ export function defineCapability<S extends z.ZodType>(config: {
   risk: CapabilityRisk;
   inputSchema: S;
   execute: (input: z.infer<S>, ctx: CapabilityContext) => Promise<unknown>;
+  enabledWhen?: (settings: AppSettings) => boolean;
 }): CapabilityDefinition {
   return {
     name: config.name,
@@ -41,6 +45,7 @@ export function defineCapability<S extends z.ZodType>(config: {
     inputSchema: config.inputSchema,
     parseInput: (input) => config.inputSchema.parse(input),
     execute: (input, ctx) => config.execute(config.inputSchema.parse(input), ctx),
+    enabledWhen: config.enabledWhen,
   };
 }
 

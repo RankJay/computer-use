@@ -3,8 +3,10 @@ mod capabilities;
 use std::sync::Once;
 
 use capabilities::{
-    delete_file, get_system_info, read_clipboard, read_file, run_shell, search_files,
-    write_clipboard, write_file,
+    accessibility_click, accessibility_expand_node, accessibility_find_element, accessibility_focus,
+    accessibility_list_windows, accessibility_send_keys, accessibility_set_value, accessibility_snapshot, delete_file,
+    get_system_info, read_clipboard, read_file, run_shell, search_files, write_clipboard,
+    write_file, SnapshotStore,
 };
 use tauri::{AppHandle, Manager, PhysicalPosition, RunEvent};
 use tauri_plugin_window_state::{StateFlags, WindowExt, DEFAULT_FILENAME};
@@ -194,6 +196,8 @@ pub fn run() {
             app.handle()
                 .plugin(tauri_plugin_stronghold::Builder::with_argon2(&salt_path).build())?;
 
+            app.manage(SnapshotStore::default());
+
             #[cfg(desktop)]
             setup_desktop(app)?;
             Ok(())
@@ -208,6 +212,14 @@ pub fn run() {
             read_clipboard,
             write_clipboard,
             get_system_info,
+            accessibility_list_windows,
+            accessibility_snapshot,
+            accessibility_find_element,
+            accessibility_expand_node,
+            accessibility_click,
+            accessibility_set_value,
+            accessibility_send_keys,
+            accessibility_focus,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

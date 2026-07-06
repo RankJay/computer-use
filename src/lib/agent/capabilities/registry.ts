@@ -1,12 +1,21 @@
 import { tool, zodSchema } from "ai";
 
+import { formatCapabilityError } from "@/lib/agent/tool-errors";
+
 import { getV1Capabilities } from "./catalog";
 import type { V1CapabilityName } from "./catalog";
 import { invokeCapability } from "./invoke";
-import type { CapabilityDefinition, InvokeCapabilityDeps } from "./types";
+import type { CapabilityDefinition, CapabilityError, InvokeCapabilityDeps } from "./types";
 
 export { getCapabilityDefinition, getV1Capabilities, isV1CapabilityName } from "./catalog";
 export type { V1CapabilityName } from "./catalog";
+
+function capabilityExecutionError(error: CapabilityError): Error {
+  const formatted = formatCapabilityError(error);
+  const executionError = new Error(formatted);
+  executionError.name = error.code;
+  return executionError;
+}
 
 async function executeViaInvoke(
   name: string,
@@ -25,7 +34,7 @@ async function executeViaInvoke(
   }
 
   if ("error" in result) {
-    throw new Error(result.error.message);
+    throw capabilityExecutionError(result.error);
   }
 
   throw new Error("Capability invocation failed.");
@@ -41,13 +50,17 @@ function makeAgentTool(capability: CapabilityDefinition, deps: InvokeCapabilityD
 }
 
 export function buildAgentTools(deps: InvokeCapabilityDeps) {
-  const entries = getV1Capabilities().map(
+  const enabledCapabilities = getV1Capabilities().filter(
+    (capability) => capability.enabledWhen?.(deps.settings) ?? true,
+  );
+
+  const entries = enabledCapabilities.map(
     (capability) => [capability.name, makeAgentTool(capability, deps)] as const,
   );
 
-  return Object.fromEntries(entries) as {
+  return Object.fromEntries(entries) as Partial<{
     [K in V1CapabilityName]: ReturnType<typeof makeAgentTool>;
-  };
+  }>;
 }
 
 export type AgentTools = ReturnType<typeof buildAgentTools>;

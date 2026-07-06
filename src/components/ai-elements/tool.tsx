@@ -149,7 +149,9 @@ export const ToolOutput = ({ className, output, errorText, ...props }: ToolOutpu
           errorText ? "bg-destructive/10 text-destructive" : "bg-muted/50 text-foreground",
         )}
       >
-        {errorText && <div>{errorText}</div>}
+        {errorText && (
+          <pre className="whitespace-pre-wrap break-words p-3 font-mono">{errorText}</pre>
+        )}
         {Output}
       </div>
     </div>

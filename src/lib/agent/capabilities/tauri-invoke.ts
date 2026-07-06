@@ -5,7 +5,47 @@ import type { CapabilityError } from "./types";
 export type TauriCommandError = {
   code: string;
   message: string;
+  details?: string;
+  cause?: string;
 };
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function readStringField(record: Record<string, unknown>, key: string): string | undefined {
+  const value = record[key];
+  return typeof value === "string" ? value : undefined;
+}
+
+function commandErrorFromRecord(record: Record<string, unknown>): CapabilityError | null {
+  const code = readStringField(record, "code");
+  const message = readStringField(record, "message");
+  if (!code || !message) {
+    return null;
+  }
+
+  return {
+    code,
+    message,
+    details: readStringField(record, "details"),
+    cause: readStringField(record, "cause"),
+  };
+}
+
+function tryParseJsonCommandError(value: string): CapabilityError | null {
+  const trimmed = value.trim();
+  if (!trimmed.startsWith("{")) {
+    return null;
+  }
+
+  try {
+    const parsed: unknown = JSON.parse(trimmed);
+    return isRecord(parsed) ? commandErrorFromRecord(parsed) : null;
+  } catch {
+    return null;
+  }
+}
 
 export function isTauriRuntime(): boolean {
   if (typeof window === "undefined") {
@@ -16,13 +56,51 @@ export function isTauriRuntime(): boolean {
 }
 
 export function mapInvokeError(error: unknown): CapabilityError {
-  if (typeof error === "object" && error !== null && "code" in error && "message" in error) {
-    const commandError = error as TauriCommandError;
-    return { code: commandError.code, message: commandError.message };
+  if (isRecord(error)) {
+    const direct = commandErrorFromRecord(error);
+    if (direct) {
+      return direct;
+    }
+
+    const nestedMessage = readStringField(error, "message");
+    if (nestedMessage) {
+      const parsed = tryParseJsonCommandError(nestedMessage);
+      if (parsed) {
+        return parsed;
+      }
+    }
+
+    const nestedError = error.error;
+    if (typeof nestedError === "string") {
+      const parsed = tryParseJsonCommandError(nestedError);
+      if (parsed) {
+        return parsed;
+      }
+      return { code: "invoke_failed", message: nestedError };
+    }
+
+    if (isRecord(nestedError)) {
+      const nested = commandErrorFromRecord(nestedError);
+      if (nested) {
+        return nested;
+      }
+    }
   }
 
   if (error instanceof Error) {
-    return { code: "invoke_failed", message: error.message };
+    const parsed = tryParseJsonCommandError(error.message);
+    if (parsed) {
+      return parsed;
+    }
+    return { code: "invoke_failed", message: error.message, cause: error.stack };
+  }
+
+  if (typeof error === "string") {
+    const parsed = tryParseJsonCommandError(error);
+    if (parsed) {
+      return parsed;
+    }
+    return { code: "invoke_failed", message: error };
   }
 
   return { code: "invoke_failed", message: "Unknown native command failure" };
@@ -72,6 +150,22 @@ export function createTauriCapabilityInvoker(workspaceRoot: string): CapabilityN
         return invokeCapabilityCommand("write_clipboard", payload);
       case "get_system_info":
         return invokeCapabilityCommand("get_system_info", payload);
+      case "accessibility_list_windows":
+        return invokeCapabilityCommand("accessibility_list_windows", payload);
+      case "accessibility_snapshot":
+        return invokeCapabilityCommand("accessibility_snapshot", payload);
+      case "accessibility_find_element":
+        return invokeCapabilityCommand("accessibility_find_element", payload);
+      case "accessibility_expand_node":
+        return invokeCapabilityCommand("accessibility_expand_node", payload);
+      case "accessibility_click":
+        return invokeCapabilityCommand("accessibility_click", payload);
+      case "accessibility_set_value":
+        return invokeCapabilityCommand("accessibility_set_value", payload);
+      case "accessibility_send_keys":
+        return invokeCapabilityCommand("accessibility_send_keys", payload);
+      case "accessibility_focus":
+        return invokeCapabilityCommand("accessibility_focus", payload);
       default:
         throw {
           code: "unknown_capability",

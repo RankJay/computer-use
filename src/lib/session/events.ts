@@ -96,7 +96,7 @@ export type CapabilityFailedEvent = RuntimeEventBase & {
   type: "capability.failed";
   callId: string;
   capability: string;
-  error: { code: string; message: string };
+  error: { code: string; message: string; details?: string; cause?: string };
 };
 
 export type PermissionRequestedEvent = RuntimeEventBase & {

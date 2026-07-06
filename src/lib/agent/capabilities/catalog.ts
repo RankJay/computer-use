@@ -1,3 +1,11 @@
+import { accessibilityClickCapability } from "./accessibility-click";
+import { accessibilityExpandNodeCapability } from "./accessibility-expand-node";
+import { accessibilityFindElementCapability } from "./accessibility-find-element";
+import { accessibilityFocusCapability } from "./accessibility-focus";
+import { accessibilityListWindowsCapability } from "./accessibility-list-windows";
+import { accessibilitySendKeysCapability } from "./accessibility-send-keys";
+import { accessibilitySetValueCapability } from "./accessibility-set-value";
+import { accessibilitySnapshotCapability } from "./accessibility-snapshot";
 import { deleteFileCapability } from "./delete-file";
 import { getSystemInfoCapability } from "./get-system-info";
 import { readClipboardCapability } from "./read-clipboard";
@@ -17,6 +25,14 @@ const V1_CAPABILITIES: CapabilityDefinition[] = [
   readClipboardCapability,
   writeClipboardCapability,
   getSystemInfoCapability,
+  accessibilityListWindowsCapability,
+  accessibilitySnapshotCapability,
+  accessibilityFindElementCapability,
+  accessibilityExpandNodeCapability,
+  accessibilityClickCapability,
+  accessibilitySetValueCapability,
+  accessibilitySendKeysCapability,
+  accessibilityFocusCapability,
 ];
 
 export type V1CapabilityName =
@@ -27,7 +43,15 @@ export type V1CapabilityName =
   | "run_shell"
   | "read_clipboard"
   | "write_clipboard"
-  | "get_system_info";
+  | "get_system_info"
+  | "accessibility_list_windows"
+  | "accessibility_snapshot"
+  | "accessibility_find_element"
+  | "accessibility_expand_node"
+  | "accessibility_click"
+  | "accessibility_set_value"
+  | "accessibility_send_keys"
+  | "accessibility_focus";
 
 const capabilityByName = new Map<string, CapabilityDefinition>(
   V1_CAPABILITIES.map((capability) => [capability.name, capability]),
