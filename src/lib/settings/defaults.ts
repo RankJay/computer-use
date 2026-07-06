@@ -1,3 +1,4 @@
+import { getDefaultAgentModelId } from "@/lib/agent-models";
 import type { AppSecrets, AppSettings, LoadedSettings } from "@/lib/settings/types";
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -6,6 +7,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   permissionMode: "risky",
   uiAutomation: false,
   agentMode: "live",
+  selectedModelId: getDefaultAgentModelId(),
   maxSteps: 50,
   maxCostUsd: 5,
   maxWallClockMs: 900_000,

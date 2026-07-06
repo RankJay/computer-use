@@ -8,6 +8,8 @@ import {
   MessageScrollerProvider,
   MessageScrollerViewport,
 } from "@/components/ui/message-scroller";
+import type { PermissionActionHandlers } from "@/features/ai-chat/permission-actions";
+import type { PendingPermission } from "@/lib/session/projection";
 
 import { AgentMessageRow } from "./AgentMessageRow";
 import { AgentSpecialRow } from "./AgentSpecialRow";
@@ -16,20 +18,52 @@ import type { AgentTranscriptRow } from "./types";
 
 export type AgentTranscriptProps = {
   readonly rows: readonly AgentTranscriptRow[];
+  readonly pendingPermission?: PendingPermission | null;
+  readonly onResolvePermission?: (
+    decision: "approved" | "denied",
+    persist?: boolean,
+  ) => void;
+  readonly isStreaming?: boolean;
 };
 
-function AgentTranscriptRowView({ row }: { readonly row: AgentTranscriptRow }): ReactElement {
+function AgentTranscriptRowView({
+  row,
+  permissionActions,
+  isStreaming,
+}: {
+  readonly row: AgentTranscriptRow;
+  readonly permissionActions?: PermissionActionHandlers;
+  readonly isStreaming?: boolean;
+}): ReactElement {
   switch (row.type) {
     case "marker":
       return <AgentTimelineMarker row={row} />;
     case "message":
-      return <AgentMessageRow row={row} />;
+      return (
+        <AgentMessageRow
+          row={row}
+          permissionActions={permissionActions}
+          isStreaming={isStreaming}
+        />
+      );
     default:
       return <AgentSpecialRow row={row} />;
   }
 }
 
-export function AgentTranscript({ rows }: AgentTranscriptProps): ReactElement {
+export function AgentTranscript({
+  rows,
+  pendingPermission = null,
+  onResolvePermission,
+  isStreaming = false,
+}: AgentTranscriptProps): ReactElement {
+  const permissionActions: PermissionActionHandlers | undefined = onResolvePermission
+    ? {
+        pendingPermission,
+        onResolvePermission,
+      }
+    : undefined;
+
   return (
     <MessageScrollerProvider autoScroll defaultScrollPosition="last-anchor">
       <MessageScroller className="min-h-0 flex-1">
@@ -41,7 +75,11 @@ export function AgentTranscript({ rows }: AgentTranscriptProps): ReactElement {
                 messageId={row.id}
                 scrollAnchor={row.type === "message" ? row.scrollAnchor : undefined}
               >
-                <AgentTranscriptRowView row={row} />
+                <AgentTranscriptRowView
+                  row={row}
+                  permissionActions={permissionActions}
+                  isStreaming={isStreaming}
+                />
               </MessageScrollerItem>
             ))}
           </MessageScrollerContent>

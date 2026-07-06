@@ -13,6 +13,11 @@ import { CheckIcon, XIcon } from "lucide-react";
 import type { ReactElement, ReactNode } from "react";
 
 import {
+  canResolveToolPermission,
+  type PermissionActionHandlers,
+} from "@/features/ai-chat/permission-actions";
+
+import {
   Confirmation,
   ConfirmationAccepted,
   ConfirmationAction,
@@ -40,9 +45,20 @@ type AgentMessagePartRendererProps = {
   readonly part: AgentMessagePart;
   readonly messageRole: UIMessage["role"];
   readonly isStreaming?: boolean;
+  readonly permissionActions?: PermissionActionHandlers;
 };
 
-function ToolBlock({ part }: { readonly part: ToolPart }): ReactElement {
+function ToolBlock({
+  part,
+  permissionActions,
+}: {
+  readonly part: ToolPart;
+  readonly permissionActions?: PermissionActionHandlers;
+}): ReactElement {
+  const toolCallId = isDynamicToolUIPart(part) ? part.toolCallId : undefined;
+  const canAct = permissionActions
+    ? canResolveToolPermission(toolCallId, permissionActions)
+    : false;
   const showApproval =
     part.state === "approval-requested" ||
     part.state === "approval-responded" ||
@@ -75,8 +91,19 @@ function ToolBlock({ part }: { readonly part: ToolPart }): ReactElement {
             </ConfirmationRejected>
           </ConfirmationTitle>
           <ConfirmationActions>
-            <ConfirmationAction variant="outline">Reject</ConfirmationAction>
-            <ConfirmationAction>Approve</ConfirmationAction>
+            <ConfirmationAction
+              variant="outline"
+              disabled={!canAct}
+              onClick={() => permissionActions?.onResolvePermission?.("denied")}
+            >
+              Reject
+            </ConfirmationAction>
+            <ConfirmationAction
+              disabled={!canAct}
+              onClick={() => permissionActions?.onResolvePermission?.("approved")}
+            >
+              Approve
+            </ConfirmationAction>
           </ConfirmationActions>
         </Confirmation>
       ) : null}
@@ -101,11 +128,12 @@ export function AgentMessagePartRenderer({
   part,
   messageRole,
   isStreaming = false,
+  permissionActions,
 }: AgentMessagePartRendererProps): ReactElement | null {
   if (isTextUIPart(part)) {
     if (messageRole === "user") {
       return (
-        <div className="text-sm bg-[#161616] px-3 py-2.5 mb-4 rounded-xl whitespace-pre-wrap text-[#cdcdcd]">
+        <div className="text-sm bg-[#161616] px-3 py-2.5 rounded-xl whitespace-pre-wrap text-[#cdcdcd]">
           {part.text}
         </div>
       );
@@ -132,7 +160,7 @@ export function AgentMessagePartRenderer({
   }
 
   if (isToolUIPart(part)) {
-    return <ToolBlock part={part} />;
+    return <ToolBlock part={part} permissionActions={permissionActions} />;
   }
 
   if (isFileUIPart(part)) {
@@ -191,11 +219,13 @@ export function AgentMessagePartRenderer({
 type RenderMessagePartsOptions = {
   readonly message: UIMessage;
   readonly isStreaming?: boolean;
+  readonly permissionActions?: PermissionActionHandlers;
 };
 
 export function renderAgentMessageParts({
   message,
   isStreaming = false,
+  permissionActions,
 }: RenderMessagePartsOptions): ReactNode[] {
   const elements: ReactNode[] = [];
   let index = 0;
@@ -244,6 +274,7 @@ export function renderAgentMessageParts({
         isStreaming={isStreaming}
         messageRole={message.role}
         part={part}
+        permissionActions={permissionActions}
       />,
     );
     index += 1;

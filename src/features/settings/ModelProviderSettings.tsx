@@ -60,7 +60,10 @@ export function ModelProviderSettings(): ReactElement {
           />
         </SettingsRow>
 
-        <SettingsRow label="Max cost" description="Spending cap per run in USD.">
+        <SettingsRow
+          label="Max cost"
+          description="Spending cap per run in USD. Set 0 for no limit."
+        >
           <InputGroup className={`w-28 ${settingsInputGroupClassName}`}>
             <InputGroupAddon align="inline-start">
               <InputGroupText className="text-[#767676]">$</InputGroupText>
@@ -80,7 +83,7 @@ export function ModelProviderSettings(): ReactElement {
           </InputGroup>
         </SettingsRow>
 
-        <SettingsRow label="Max wall-clock" description="15 minutes (900000 ms).">
+        <SettingsRow label="Max wall-clock" description="Run time limit in ms. Set 0 for no limit.">
           <SettingsDraftNumberInput
             id="max-wall-clock"
             min={0}

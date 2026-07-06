@@ -87,6 +87,7 @@ export function TaskPromptComposer(props: TaskPromptComposerProps): ReactElement
 
       <div className="flex items-center justify-between gap-2">
         <Select
+          disabled={props.inputDisabled}
           onValueChange={(value) => {
             if (value) props.onModelChange(value);
           }}

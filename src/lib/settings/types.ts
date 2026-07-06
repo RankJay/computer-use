@@ -8,6 +8,7 @@ export type AppSettings = {
   permissionMode: PermissionMode;
   uiAutomation: boolean;
   agentMode: AgentMode;
+  selectedModelId: string;
   maxSteps: number;
   maxCostUsd: number;
   maxWallClockMs: number;

@@ -9,6 +9,13 @@
     "opener:default",
     "window-state:default",
     "store:default",
-    "stronghold:default"
+    "stronghold:default",
+    {
+      "identifier": "http:default",
+      "allow": [
+        { "url": "https://api.anthropic.com/**" },
+        { "url": "https://api.openai.com/**" }
+      ]
+    }
   ]
 }

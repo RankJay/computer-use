@@ -1,5 +1,8 @@
+mod capabilities;
+
 use std::sync::Once;
 
+use capabilities::{delete_file, read_file, run_tests, search_files, write_file};
 use tauri::{AppHandle, Manager, PhysicalPosition, RunEvent};
 use tauri_plugin_window_state::{StateFlags, WindowExt, DEFAULT_FILENAME};
 
@@ -154,7 +157,9 @@ pub fn run() {
     static SHOW_WINDOW: Once = Once::new();
 
     #[allow(unused_mut)]
-    let mut builder = tauri::Builder::default().plugin(tauri_plugin_store::Builder::default().build());
+    let mut builder = tauri::Builder::default()
+        .plugin(tauri_plugin_http::init())
+        .plugin(tauri_plugin_store::Builder::default().build());
 
     #[cfg(desktop)]
     {
@@ -183,15 +188,21 @@ pub fn run() {
                 .app_local_data_dir()
                 .expect("could not resolve app local data path")
                 .join("salt.txt");
-            app.handle().plugin(
-                tauri_plugin_stronghold::Builder::with_argon2(&salt_path).build(),
-            )?;
+            app.handle()
+                .plugin(tauri_plugin_stronghold::Builder::with_argon2(&salt_path).build())?;
 
             #[cfg(desktop)]
             setup_desktop(app)?;
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![greet])
+        .invoke_handler(tauri::generate_handler![
+            greet,
+            read_file,
+            search_files,
+            write_file,
+            delete_file,
+            run_tests,
+        ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app_handle, event| {
