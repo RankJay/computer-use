@@ -1,6 +1,7 @@
 import type { DynamicToolUIPart, UIMessage } from "ai";
 
 import type { AgentMessageRowData, AgentTranscriptRow } from "@/features/ai-chat/types";
+import { formatBudgetExceededMessage } from "@/lib/session/control/budget";
 
 import type { RuntimeEvent, UIMessagePartSnapshot } from "./events";
 import {
@@ -109,7 +110,11 @@ function updateDynamicToolPartByCallId(
   }
 }
 
-function appendFailureMessage(state: InternalProjectionState, taskId: string, message: string): void {
+function appendFailureMessage(
+  state: InternalProjectionState,
+  taskId: string,
+  message: string,
+): void {
   const errorMessageId = `error-${taskId}`;
   const errorMessage: UIMessage = {
     id: errorMessageId,
@@ -187,7 +192,11 @@ export function reduceSession(
       break;
 
     case "task.completed":
-      state.status = "completed";
+      if (event.finishReason === "budget") {
+        state.status = "failed";
+      } else if (state.status !== "failed") {
+        state.status = "completed";
+      }
       state.pendingPermission = null;
       break;
 
@@ -302,7 +311,7 @@ export function reduceSession(
       break;
 
     case "budget.exceeded": {
-      const message = `Budget exceeded: ${event.dimension}`;
+      const message = formatBudgetExceededMessage(event.dimension);
       state.status = "failed";
       state.failure = {
         code: "budget_exceeded",

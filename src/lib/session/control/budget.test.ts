@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import { DEFAULT_SETTINGS } from "@/lib/settings/defaults";
 
-import { createBudgetTracker } from "./budget";
+import { createBudgetTracker, createBudgetGuard, formatBudgetExceededMessage } from "./budget";
 
 describe("budget", () => {
   test("detects step limit when over max", () => {
@@ -51,5 +51,27 @@ describe("budget", () => {
     );
 
     expect(tracker.checkBudget().ok).toBe(true);
+  });
+
+  test("formatBudgetExceededMessage uses readable copy", () => {
+    expect(formatBudgetExceededMessage("wall_clock")).toBe("Run stopped: time limit reached");
+    expect(formatBudgetExceededMessage("steps")).toBe("Run stopped: step limit reached");
+    expect(formatBudgetExceededMessage("cost")).toBe("Run stopped: cost limit reached");
+  });
+
+  test("createBudgetGuard emits once and latches", () => {
+    const tracker = createBudgetTracker(
+      { ...DEFAULT_SETTINGS, maxWallClockMs: 1 },
+      Date.now() - 10,
+    );
+    const emissions: string[] = [];
+
+    const guard = createBudgetGuard(tracker, (dimension) => {
+      emissions.push(dimension);
+    });
+
+    expect(guard.checkAndStop()).toBe(true);
+    expect(guard.checkAndStop()).toBe(true);
+    expect(emissions).toEqual(["wall_clock"]);
   });
 });

@@ -407,9 +407,7 @@ describe("project-session", () => {
     expect(projection.status).toBe("failed");
     expect(projection.failure?.code).toBe("auth");
 
-    const errorRow = projection.rows.find(
-      (row) => row.type === "message" && row.id === "error-t1",
-    );
+    const errorRow = projection.rows.find((row) => row.type === "message" && row.id === "error-t1");
     expect(errorRow?.type).toBe("message");
     if (errorRow?.type === "message") {
       expect(errorRow.message.parts[0]).toEqual({
@@ -504,21 +502,20 @@ describe("reduceSession", () => {
         taskId: "t1",
         timestamp: 2,
         type: "budget.exceeded",
-        dimension: "steps",
+        dimension: "wall_clock",
       },
     ]);
 
     expect(projection.status).toBe("failed");
     expect(projection.failure?.code).toBe("budget_exceeded");
+    expect(projection.failure?.message).toBe("Run stopped: time limit reached");
 
-    const errorRow = projection.rows.find(
-      (row) => row.type === "message" && row.id === "error-t1",
-    );
+    const errorRow = projection.rows.find((row) => row.type === "message" && row.id === "error-t1");
     expect(errorRow?.type).toBe("message");
     if (errorRow?.type === "message") {
       expect(errorRow.message.parts[0]).toEqual({
         type: "text",
-        text: "Error: Budget exceeded: steps",
+        text: "Error: Run stopped: time limit reached",
       });
     }
   });

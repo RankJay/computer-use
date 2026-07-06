@@ -1,7 +1,7 @@
 import type { RuntimeEvent, RuntimeEventPayload } from "@/lib/session/events";
 
-import { needsPermission } from "./permission";
 import { getCapabilityDefinition } from "./catalog";
+import { needsPermission } from "./permission";
 import { mapInvokeError } from "./tauri-invoke";
 import type {
   CapabilityContext,

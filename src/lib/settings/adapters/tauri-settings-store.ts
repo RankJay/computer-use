@@ -1,6 +1,6 @@
 import { LazyStore } from "@tauri-apps/plugin-store";
 
-import { DEFAULT_SETTINGS } from "@/lib/settings/defaults";
+import { DEFAULT_SETTINGS, settingsOrDefault } from "@/lib/settings/defaults";
 import type { AppSettings } from "@/lib/settings/types";
 
 const SETTINGS_STORE_PATH = "settings.json";
@@ -14,7 +14,7 @@ const settingsStore = new LazyStore(SETTINGS_STORE_PATH, {
 export async function readAppSettings(): Promise<AppSettings> {
   await settingsStore.init();
   const stored = await settingsStore.get<AppSettings>(SETTINGS_KEY);
-  return stored ?? DEFAULT_SETTINGS;
+  return settingsOrDefault(stored);
 }
 
 export async function writeAppSettings(settings: AppSettings): Promise<void> {

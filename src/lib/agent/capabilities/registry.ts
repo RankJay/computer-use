@@ -1,15 +1,11 @@
 import { tool, zodSchema } from "ai";
 
 import { getV1Capabilities } from "./catalog";
+import type { V1CapabilityName } from "./catalog";
 import { invokeCapability } from "./invoke";
 import type { CapabilityDefinition, InvokeCapabilityDeps } from "./types";
-import type { V1CapabilityName } from "./catalog";
 
-export {
-  getCapabilityDefinition,
-  getV1Capabilities,
-  isV1CapabilityName,
-} from "./catalog";
+export { getCapabilityDefinition, getV1Capabilities, isV1CapabilityName } from "./catalog";
 export type { V1CapabilityName } from "./catalog";
 
 async function executeViaInvoke(

@@ -18,7 +18,7 @@ import {
   syncAssistantMessage,
   type MessageSyncState,
 } from "@/lib/agent/ui-stream-sync";
-import { createBudgetTracker } from "@/lib/session/control/budget";
+import { createBudgetGuard, createBudgetTracker } from "@/lib/session/control/budget";
 import type { RuntimeEvent, RuntimeEventPayload } from "@/lib/session/events";
 
 function runtimeEventToPayload(event: RuntimeEvent): RuntimeEventPayload {
@@ -47,8 +47,14 @@ export async function runAgentLoop(deps: RunAgentDeps): Promise<RunAgentResult> 
     return { finishReason: "error" };
   }
 
-  const startedAt = Date.now();
-  const budget = createBudgetTracker(deps.settings, startedAt);
+  const budget = createBudgetTracker(deps.settings, deps.budgetStartedAt ?? Date.now());
+  const streamAbort = new AbortController();
+  deps.signal.addEventListener("abort", () => streamAbort.abort(), { once: true });
+
+  const budgetGuard = createBudgetGuard(budget, (dimension) => {
+    emit({ type: "budget.exceeded", dimension });
+    streamAbort.abort();
+  });
 
   const invokeDeps: InvokeCapabilityDeps = {
     taskId: deps.taskId,
@@ -67,6 +73,10 @@ export async function runAgentLoop(deps: RunAgentDeps): Promise<RunAgentResult> 
       ignoreIncompleteToolCalls: true,
     });
 
+    if (budgetGuard.checkAndStop()) {
+      return { finishReason: "budget" };
+    }
+
     let messageSync: MessageSyncState | null = null;
     let streamingStatusEmitted = false;
 
@@ -75,13 +85,20 @@ export async function runAgentLoop(deps: RunAgentDeps): Promise<RunAgentResult> 
       system,
       messages: modelMessages,
       tools,
-      abortSignal: deps.signal,
-      stopWhen: isStepCount(deps.settings.maxSteps),
+      abortSignal: streamAbort.signal,
+      stopWhen: (context) => {
+        if (budgetGuard.checkAndStop()) {
+          return true;
+        }
+
+        return isStepCount(deps.settings.maxSteps)(context);
+      },
       onStepFinish: ({ usage }) => {
         budget.incrementStep();
         emitUsageAndBudget(emit, deps.modelId, budget, usage);
         finishAssistantMessage(emit, messageSync);
         messageSync = null;
+        budgetGuard.checkAndStop();
       },
     });
 
@@ -98,6 +115,10 @@ export async function runAgentLoop(deps: RunAgentDeps): Promise<RunAgentResult> 
       stream: uiChunkStream,
       message: { id: assistantMessageId, role: "assistant", parts: [] },
     })) {
+      if (budgetGuard.checkAndStop()) {
+        break;
+      }
+
       if (!streamingStatusEmitted) {
         emit({ type: "task.status_changed", status: "streaming" });
         streamingStatusEmitted = true;
@@ -107,14 +128,12 @@ export async function runAgentLoop(deps: RunAgentDeps): Promise<RunAgentResult> 
 
     finishAssistantMessage(emit, messageSync);
 
-    if (deps.signal.aborted) {
-      return { finishReason: "cancelled" };
+    if (budgetGuard.exceeded()) {
+      return { finishReason: "budget" };
     }
 
-    const budgetCheck = budget.checkBudget();
-    if (!budgetCheck.ok) {
-      emit({ type: "budget.exceeded", dimension: budgetCheck.dimension });
-      return { finishReason: "budget" };
+    if (deps.signal.aborted) {
+      return { finishReason: "cancelled" };
     }
 
     const finishReason = await result.finishReason;
@@ -130,7 +149,11 @@ export async function runAgentLoop(deps: RunAgentDeps): Promise<RunAgentResult> 
 
     return { finishReason: "stop" };
   } catch (error) {
-    if (deps.signal.aborted) {
+    if (budgetGuard.exceeded()) {
+      return { finishReason: "budget" };
+    }
+
+    if (deps.signal.aborted || streamAbort.signal.aborted) {
       return { finishReason: "cancelled" };
     }
 

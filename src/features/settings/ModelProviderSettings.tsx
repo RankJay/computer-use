@@ -83,13 +83,16 @@ export function ModelProviderSettings(): ReactElement {
           </InputGroup>
         </SettingsRow>
 
-        <SettingsRow label="Max wall-clock" description="Run time limit in ms. Set 0 for no limit.">
+        <SettingsRow
+          label="Max wall-clock"
+          description="Run time limit in minutes. Set 0 for no limit."
+        >
           <SettingsDraftNumberInput
             id="max-wall-clock"
             min={0}
-            committedValue={settings.maxWallClockMs}
-            onCommit={(value) => {
-              void updateSettings({ maxWallClockMs: value });
+            committedValue={Math.round(settings.maxWallClockMs / 60_000)}
+            onCommit={(minutes) => {
+              void updateSettings({ maxWallClockMs: minutes * 60_000 });
             }}
             className={settingsInputClassName}
           />

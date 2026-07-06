@@ -202,11 +202,11 @@ Here's the split:
     partIndex: 4,
     part: {
       type: "dynamic-tool",
-      toolName: "run_tests",
-      toolCallId: "tool-tests-error",
+      toolName: "run_shell",
+      toolCallId: "tool-shell-error",
       state: "output-error",
-      input: { suite: "agent-transcript" },
-      errorText: "1 test failed: expected scroll anchor on user turn",
+      input: { program: "bun", args: ["test", "agent-transcript"] },
+      errorText: "Command exited with code 1: expected scroll anchor on user turn",
     },
   }),
   demoEvent({

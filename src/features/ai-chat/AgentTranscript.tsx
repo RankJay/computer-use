@@ -19,10 +19,7 @@ import type { AgentTranscriptRow } from "./types";
 export type AgentTranscriptProps = {
   readonly rows: readonly AgentTranscriptRow[];
   readonly pendingPermission?: PendingPermission | null;
-  readonly onResolvePermission?: (
-    decision: "approved" | "denied",
-    persist?: boolean,
-  ) => void;
+  readonly onResolvePermission?: (decision: "approved" | "denied", persist?: boolean) => void;
   readonly isStreaming?: boolean;
 };
 

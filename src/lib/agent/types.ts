@@ -23,6 +23,8 @@ export type RunAgentDeps = {
   executeNative?: (capability: string, input: unknown) => Promise<unknown>;
   /** Test hook — bypasses provider resolution when set. */
   modelOverride?: LanguageModel;
+  /** Test hook — simulates an already-elapsed run for budget enforcement. */
+  budgetStartedAt?: number;
 };
 
 export type RunAgentFinishReason = "stop" | "budget" | "cancelled" | "error";

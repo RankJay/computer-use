@@ -30,4 +30,7 @@ export { readFileCapability } from "./read-file";
 export { searchFilesCapability } from "./search-files";
 export { writeFileCapability } from "./write-file";
 export { deleteFileCapability } from "./delete-file";
-export { runTestsCapability } from "./run-tests";
+export { getSystemInfoCapability } from "./get-system-info";
+export { readClipboardCapability } from "./read-clipboard";
+export { runShellCapability } from "./run-shell";
+export { writeClipboardCapability } from "./write-clipboard";

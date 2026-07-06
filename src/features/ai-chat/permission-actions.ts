@@ -2,10 +2,7 @@ import type { PendingPermission } from "@/lib/session/projection";
 
 export type PermissionActionHandlers = {
   readonly pendingPermission: PendingPermission | null;
-  readonly onResolvePermission?: (
-    decision: "approved" | "denied",
-    persist?: boolean,
-  ) => void;
+  readonly onResolvePermission?: (decision: "approved" | "denied", persist?: boolean) => void;
 };
 
 export function canResolveToolPermission(

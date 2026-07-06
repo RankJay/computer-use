@@ -64,8 +64,14 @@ export function createTauriCapabilityInvoker(workspaceRoot: string): CapabilityN
         return invokeCapabilityCommand("write_file", payload);
       case "delete_file":
         return invokeCapabilityCommand("delete_file", payload);
-      case "run_tests":
-        return invokeCapabilityCommand("run_tests", payload);
+      case "run_shell":
+        return invokeCapabilityCommand("run_shell", payload);
+      case "read_clipboard":
+        return invokeCapabilityCommand("read_clipboard", payload);
+      case "write_clipboard":
+        return invokeCapabilityCommand("write_clipboard", payload);
+      case "get_system_info":
+        return invokeCapabilityCommand("get_system_info", payload);
       default:
         throw {
           code: "unknown_capability",

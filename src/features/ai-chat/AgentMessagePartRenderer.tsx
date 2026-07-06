@@ -13,11 +13,6 @@ import { CheckIcon, XIcon } from "lucide-react";
 import type { ReactElement, ReactNode } from "react";
 
 import {
-  canResolveToolPermission,
-  type PermissionActionHandlers,
-} from "@/features/ai-chat/permission-actions";
-
-import {
   Confirmation,
   ConfirmationAccepted,
   ConfirmationAction,
@@ -38,6 +33,10 @@ import {
   type ToolPart,
 } from "@/components/ai-elements/tool";
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
+import {
+  canResolveToolPermission,
+  type PermissionActionHandlers,
+} from "@/features/ai-chat/permission-actions";
 
 type AgentMessagePart = UIMessage["parts"][number];
 

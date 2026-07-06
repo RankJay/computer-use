@@ -121,6 +121,56 @@ describe("run-agent", () => {
     expect(firstId).not.toBe(secondId);
   });
 
+  test("stops during stream when wall clock budget is exceeded", async () => {
+    const events: RuntimeEvent[] = [];
+    const model = new MockLanguageModelV4({
+      doStream: async () => ({
+        stream: simulateReadableStream({
+          chunks: [
+            { type: "stream-start", warnings: [] },
+            { type: "text-start", id: "text-1" },
+            { type: "text-delta", id: "text-1", delta: "Hello" },
+            { type: "text-end", id: "text-1" },
+            {
+              type: "finish",
+              finishReason: "stop",
+              usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
+            },
+          ],
+        }),
+      }),
+    });
+
+    const result = await runAgentLoop({
+      taskId: "task-budget",
+      messages: [
+        {
+          id: "user-budget",
+          role: "user",
+          parts: [{ type: "text", text: "Say hello" }],
+        },
+      ],
+      modelId: "openai/gpt-4o-mini",
+      settings: { ...DEFAULT_SETTINGS, maxWallClockMs: 1_000 },
+      secrets: DEFAULT_SECRETS,
+      signal: new AbortController().signal,
+      modelOverride: model,
+      budgetStartedAt: Date.now() - 2_000,
+      emit: (payload) => {
+        events.push({
+          ...payload,
+          eventId: `evt-${events.length}`,
+          taskId: "task-budget",
+          timestamp: events.length,
+        } as RuntimeEvent);
+      },
+    });
+
+    expect(result.finishReason).toBe("budget");
+    expect(events.some((event) => event.type === "budget.exceeded")).toBe(true);
+    expect(events.some((event) => event.type === "task.failed")).toBe(false);
+  });
+
   test("emits auth failure when API key missing", async () => {
     const events: RuntimeEvent[] = [];
 

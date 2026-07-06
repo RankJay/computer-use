@@ -30,6 +30,51 @@ function isOverWallClock(startedAt: number, maxWallClockMs: number): boolean {
   return maxWallClockMs > 0 && Date.now() - startedAt >= maxWallClockMs;
 }
 
+export function formatBudgetExceededMessage(dimension: BudgetDimension): string {
+  switch (dimension) {
+    case "steps":
+      return "Run stopped: step limit reached";
+    case "cost":
+      return "Run stopped: cost limit reached";
+    case "wall_clock":
+      return "Run stopped: time limit reached";
+    default: {
+      const _exhaustive: never = dimension;
+      return _exhaustive;
+    }
+  }
+}
+
+export type BudgetGuard = {
+  exceeded: () => BudgetDimension | null;
+  checkAndStop: () => boolean;
+};
+
+export function createBudgetGuard(
+  budget: BudgetTracker,
+  onExceeded: (dimension: BudgetDimension) => void,
+): BudgetGuard {
+  let dimension: BudgetDimension | null = null;
+
+  return {
+    exceeded: () => dimension,
+    checkAndStop: () => {
+      if (dimension) {
+        return true;
+      }
+
+      const check = budget.checkBudget();
+      if (!check.ok) {
+        dimension = check.dimension;
+        onExceeded(check.dimension);
+        return true;
+      }
+
+      return false;
+    },
+  };
+}
+
 export function createBudgetTracker(
   settings: AppSettings,
   startedAt: number = Date.now(),

@@ -12,7 +12,7 @@ Workspace root: ${workspace}
 Rules:
 - Use tools for file operations; do not invent file contents.
 - Prefer narrow, purposeful tool calls — one task per tool invocation when possible.
-- read_file and search_files are safe; write_file, delete_file, and run_tests may require user approval.
+- read_file, search_files, and get_system_info are safe; write_file, delete_file, run_shell, read_clipboard, and write_clipboard may require user approval.
 - Keep responses concise and actionable.
 - If workspace root is not configured, explain that the user must set it in Settings before file tools work.`;
 }

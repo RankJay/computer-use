@@ -1,4 +1,5 @@
 import { createSettingsPersistence } from "@/lib/settings/create-persistence";
+import { settingsOrDefault } from "@/lib/settings/defaults";
 import type { SettingsPersistence } from "@/lib/settings/ports";
 import type { AppSecrets, AppSettings, LoadedSettings } from "@/lib/settings/types";
 
@@ -20,7 +21,11 @@ export function createSettingsService(persistence: SettingsPersistence): Setting
 
   return {
     async initSettings() {
-      cached = await persistence.load();
+      const loaded = await persistence.load();
+      cached = {
+        ...settingsOrDefault(loaded),
+        secrets: loaded.secrets,
+      };
       return cached;
     },
 
@@ -30,7 +35,7 @@ export function createSettingsService(persistence: SettingsPersistence): Setting
 
     async saveSettings(patch) {
       const current = cached ?? (await persistence.load());
-      const nextSettings: AppSettings = { ...stripSecrets(current), ...patch };
+      const nextSettings = settingsOrDefault({ ...stripSecrets(current), ...patch });
       await persistence.saveSettings(nextSettings);
       cached = { ...nextSettings, secrets: current.secrets };
       return cached;

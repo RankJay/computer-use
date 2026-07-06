@@ -32,7 +32,7 @@ describe("needsPermission", () => {
   test("medium-risk skips prompt in risky mode", () => {
     expect(
       needsPermission(
-        { name: "run_tests", risk: "medium" },
+        { name: "read_clipboard", risk: "medium" },
         {
           ...DEFAULT_SETTINGS,
           permissionMode: "risky",
@@ -44,10 +44,22 @@ describe("needsPermission", () => {
   test("every-meaningful prompts for medium and high risk", () => {
     expect(
       needsPermission(
-        { name: "run_tests", risk: "medium" },
+        { name: "read_clipboard", risk: "medium" },
         {
           ...DEFAULT_SETTINGS,
           permissionMode: "every-meaningful",
+        },
+      ),
+    ).toBe(true);
+  });
+
+  test("run_shell prompts in risky mode", () => {
+    expect(
+      needsPermission(
+        { name: "run_shell", risk: "high" },
+        {
+          ...DEFAULT_SETTINGS,
+          permissionMode: "risky",
         },
       ),
     ).toBe(true);

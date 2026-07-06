@@ -2,7 +2,10 @@ mod capabilities;
 
 use std::sync::Once;
 
-use capabilities::{delete_file, read_file, run_tests, search_files, write_file};
+use capabilities::{
+    delete_file, get_system_info, read_clipboard, read_file, run_shell, search_files,
+    write_clipboard, write_file,
+};
 use tauri::{AppHandle, Manager, PhysicalPosition, RunEvent};
 use tauri_plugin_window_state::{StateFlags, WindowExt, DEFAULT_FILENAME};
 
@@ -201,7 +204,10 @@ pub fn run() {
             search_files,
             write_file,
             delete_file,
-            run_tests,
+            run_shell,
+            read_clipboard,
+            write_clipboard,
+            get_system_info,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

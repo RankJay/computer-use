@@ -1,8 +1,11 @@
 import { deleteFileCapability } from "./delete-file";
+import { getSystemInfoCapability } from "./get-system-info";
+import { readClipboardCapability } from "./read-clipboard";
 import { readFileCapability } from "./read-file";
-import { runTestsCapability } from "./run-tests";
+import { runShellCapability } from "./run-shell";
 import { searchFilesCapability } from "./search-files";
 import type { CapabilityDefinition } from "./types";
+import { writeClipboardCapability } from "./write-clipboard";
 import { writeFileCapability } from "./write-file";
 
 const V1_CAPABILITIES: CapabilityDefinition[] = [
@@ -10,7 +13,10 @@ const V1_CAPABILITIES: CapabilityDefinition[] = [
   searchFilesCapability,
   writeFileCapability,
   deleteFileCapability,
-  runTestsCapability,
+  runShellCapability,
+  readClipboardCapability,
+  writeClipboardCapability,
+  getSystemInfoCapability,
 ];
 
 export type V1CapabilityName =
@@ -18,7 +24,10 @@ export type V1CapabilityName =
   | "search_files"
   | "write_file"
   | "delete_file"
-  | "run_tests";
+  | "run_shell"
+  | "read_clipboard"
+  | "write_clipboard"
+  | "get_system_info";
 
 const capabilityByName = new Map<string, CapabilityDefinition>(
   V1_CAPABILITIES.map((capability) => [capability.name, capability]),
