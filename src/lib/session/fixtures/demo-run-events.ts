@@ -147,7 +147,7 @@ Here's the split:
     partIndex: 0,
     part: {
       type: "dynamic-tool",
-      toolName: "delete_file",
+      toolName: "delete_path",
       toolCallId: "tool-delete-pending",
       state: "input-streaming",
       input: {},
@@ -159,7 +159,7 @@ Here's the split:
     partIndex: 1,
     part: {
       type: "dynamic-tool",
-      toolName: "delete_file",
+      toolName: "delete_path",
       toolCallId: "tool-delete-approval",
       state: "approval-requested",
       input: { filePath: "/tmp/example.txt", confirm: false },

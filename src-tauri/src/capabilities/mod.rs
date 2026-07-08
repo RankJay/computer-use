@@ -16,5 +16,9 @@ pub use accessibility::{
     SnapshotStore,
 };
 pub use clipboard::{read_clipboard, write_clipboard};
-pub use file_system::{delete_file, read_file, search_files, write_file};
+pub use file_system::{
+    create_directory, delete_path, duplicate_path, move_path, patch_file, read_directory, read_file,
+    search_files, stat_path, write_file,
+};
+pub use shared::wait;
 pub use shell::{get_system_info, run_shell};

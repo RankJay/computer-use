@@ -59,15 +59,15 @@ describe("invokeCapability", () => {
     let resolveDecision: ((value: "approved" | "denied") => void) | undefined;
 
     const resultPromise = invokeCapability(
-      "delete_file",
-      { filePath: "tmp/example.txt" },
+      "delete_path",
+      { path: "tmp/example.txt" },
       {
         emit: (event) => events.push(event),
         taskId: "task-1",
         settings: { ...DEFAULT_SETTINGS, permissionMode: "every-meaningful" },
         workspaceRoot: "D:/Projects/actuate-v2",
         executeNative: createMockCapabilityInvoker({
-          delete_file: async () => ({ filePath: "tmp/example.txt" }),
+          delete_path: async () => ({ path: "tmp/example.txt" }),
         }),
         createPermissionWaiter: () => ({
           waitForDecision: () =>
@@ -90,8 +90,8 @@ describe("invokeCapability", () => {
   test("denied permission returns without executing native handler", async () => {
     let nativeCalled = false;
     const result = await invokeCapability(
-      "delete_file",
-      { filePath: "tmp/example.txt" },
+      "delete_path",
+      { path: "tmp/example.txt" },
       {
         emit: () => {},
         taskId: "task-1",

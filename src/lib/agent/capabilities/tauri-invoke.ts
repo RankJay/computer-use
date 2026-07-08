@@ -136,12 +136,24 @@ export function createTauriCapabilityInvoker(workspaceRoot: string): CapabilityN
     switch (capability) {
       case "read_file":
         return invokeCapabilityCommand("read_file", payload);
+      case "read_directory":
+        return invokeCapabilityCommand("read_directory", payload);
       case "search_files":
         return invokeCapabilityCommand("search_files", payload);
       case "write_file":
         return invokeCapabilityCommand("write_file", payload);
-      case "delete_file":
-        return invokeCapabilityCommand("delete_file", payload);
+      case "create_directory":
+        return invokeCapabilityCommand("create_directory", payload);
+      case "patch_file":
+        return invokeCapabilityCommand("patch_file", payload);
+      case "delete_path":
+        return invokeCapabilityCommand("delete_path", payload);
+      case "move_path":
+        return invokeCapabilityCommand("move_path", payload);
+      case "duplicate_path":
+        return invokeCapabilityCommand("duplicate_path", payload);
+      case "stat_path":
+        return invokeCapabilityCommand("stat_path", payload);
       case "run_shell":
         return invokeCapabilityCommand("run_shell", payload);
       case "read_clipboard":
@@ -150,6 +162,8 @@ export function createTauriCapabilityInvoker(workspaceRoot: string): CapabilityN
         return invokeCapabilityCommand("write_clipboard", payload);
       case "get_system_info":
         return invokeCapabilityCommand("get_system_info", payload);
+      case "wait":
+        return invokeCapabilityCommand("wait", input as Record<string, unknown>);
       case "accessibility_list_windows":
         return invokeCapabilityCommand("accessibility_list_windows", payload);
       case "accessibility_snapshot":

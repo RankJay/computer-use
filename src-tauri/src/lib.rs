@@ -4,9 +4,10 @@ use std::sync::Once;
 
 use capabilities::{
     accessibility_click, accessibility_expand_node, accessibility_find_element, accessibility_focus,
-    accessibility_list_windows, accessibility_send_keys, accessibility_set_value, accessibility_snapshot, delete_file,
-    get_system_info, read_clipboard, read_file, run_shell, search_files, write_clipboard,
-    write_file, SnapshotStore,
+    accessibility_list_windows, accessibility_send_keys, accessibility_set_value, accessibility_snapshot,
+    create_directory, delete_path, duplicate_path, get_system_info, move_path, patch_file, read_clipboard,
+    read_directory, read_file, run_shell, search_files, stat_path, wait, write_clipboard, write_file,
+    SnapshotStore,
 };
 use tauri::{AppHandle, Manager, PhysicalPosition, RunEvent};
 use tauri_plugin_window_state::{StateFlags, WindowExt, DEFAULT_FILENAME};
@@ -205,13 +206,20 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             greet,
             read_file,
+            read_directory,
             search_files,
             write_file,
-            delete_file,
+            create_directory,
+            patch_file,
+            delete_path,
+            move_path,
+            duplicate_path,
+            stat_path,
             run_shell,
             read_clipboard,
             write_clipboard,
             get_system_info,
+            wait,
             accessibility_list_windows,
             accessibility_snapshot,
             accessibility_find_element,

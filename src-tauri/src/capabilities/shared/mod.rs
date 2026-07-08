@@ -1,3 +1,3 @@
-//! Shared utility toolset — cross-cutting helpers.
-//!
-//! Planned: wait.
+mod wait;
+
+pub use wait::wait;
