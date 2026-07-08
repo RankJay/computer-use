@@ -4,10 +4,11 @@ use std::sync::Once;
 
 use capabilities::{
     accessibility_click, accessibility_expand_node, accessibility_find_element, accessibility_focus,
-    accessibility_list_windows, accessibility_send_keys, accessibility_set_value, accessibility_snapshot,
-    create_directory, delete_path, duplicate_path, get_system_info, move_path, patch_file, read_clipboard,
-    read_directory, read_file, run_shell, search_files, stat_path, wait, write_clipboard, write_file,
-    SnapshotStore,
+    accessibility_send_keys, accessibility_set_value, accessibility_snapshot, create_directory,
+    delete_path, duplicate_path, get_active_window, get_env, get_system_info, launch, move_path,
+    patch_file, process_info, process_kill, process_list, read_clipboard, read_directory, read_file,
+    run_shell, search_files, set_env, stat_path, wait, window_focus, window_list, window_move,
+    window_resize, window_state, write_clipboard, write_file, SnapshotStore,
 };
 use tauri::{AppHandle, Manager, PhysicalPosition, RunEvent};
 use tauri_plugin_window_state::{StateFlags, WindowExt, DEFAULT_FILENAME};
@@ -220,7 +221,18 @@ pub fn run() {
             write_clipboard,
             get_system_info,
             wait,
-            accessibility_list_windows,
+            window_list,
+            window_focus,
+            window_state,
+            window_move,
+            window_resize,
+            get_active_window,
+            process_list,
+            process_info,
+            process_kill,
+            launch,
+            get_env,
+            set_env,
             accessibility_snapshot,
             accessibility_find_element,
             accessibility_expand_node,

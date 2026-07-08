@@ -5,7 +5,7 @@ import { defineCapability } from "../types";
 import { uiAutomationEnabled } from "./shared";
 
 export const accessibilitySnapshotInputSchema = z.object({
-  hwnd: z.number().int().describe("Native window handle from accessibility_list_windows"),
+  hwnd: z.number().int().describe("Native window handle from window_list"),
   maxDepth: z.number().int().min(1).max(20).optional().describe("Maximum tree depth"),
   maxElements: z
     .number()

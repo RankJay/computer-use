@@ -5,6 +5,7 @@ import { DEFAULT_SETTINGS } from "@/lib/settings/defaults";
 import { accessibilitySnapshotCapability } from "./accessibility/snapshot";
 import { needsPermission } from "./permission";
 import { buildAgentTools } from "./registry";
+import { windowListCapability } from "./window/list";
 
 describe("accessibility capabilities", () => {
   test("read capabilities require permission in risky mode", () => {
@@ -14,15 +15,6 @@ describe("accessibility capabilities", () => {
         { ...DEFAULT_SETTINGS, permissionMode: "risky" },
       ),
     ).toBe(true);
-  });
-
-  test("list windows is low risk", () => {
-    expect(
-      needsPermission(
-        { name: "accessibility_list_windows", risk: "low" },
-        { ...DEFAULT_SETTINGS, permissionMode: "every-meaningful" },
-      ),
-    ).toBe(false);
   });
 
   test("accessibility tools are omitted when uiAutomation is disabled", () => {
@@ -35,6 +27,7 @@ describe("accessibility capabilities", () => {
     });
 
     expect(tools.accessibility_snapshot).toBeUndefined();
+    expect(tools.window_list).toBeDefined();
     expect(tools.read_file).toBeDefined();
   });
 
@@ -51,5 +44,12 @@ describe("accessibility capabilities", () => {
     expect(
       accessibilitySnapshotCapability.enabledWhen?.({ ...DEFAULT_SETTINGS, uiAutomation: true }),
     ).toBe(true);
+  });
+
+  test("window tools are not gated by uiAutomation", () => {
+    expect(windowListCapability.enabledWhen).toBeUndefined();
+    expect(
+      windowListCapability.enabledWhen?.({ ...DEFAULT_SETTINGS, uiAutomation: false }),
+    ).toBeUndefined();
   });
 });

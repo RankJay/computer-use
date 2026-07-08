@@ -3,7 +3,7 @@ import { describe, expect, test } from "bun:test";
 import { getV1Capabilities } from "./catalog";
 
 describe("capability catalog", () => {
-  test("registers wait and full file-system toolset", () => {
+  test("registers wait, file-system, window, and shell toolsets", () => {
     const names = getV1Capabilities().map((capability) => capability.name);
 
     expect(names).toEqual(
@@ -19,8 +19,13 @@ describe("capability catalog", () => {
         "duplicate_path",
         "stat_path",
         "search_files",
+        "window_list",
+        "get_active_window",
+        "process_list",
+        "process_info",
+        "get_env",
       ]),
     );
-    expect(names).toHaveLength(23);
+    expect(names).toHaveLength(34);
   });
 });

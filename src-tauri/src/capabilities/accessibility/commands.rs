@@ -7,7 +7,6 @@ use crate::capabilities::path_utils::CommandError;
 use super::state::SnapshotStore;
 use super::types::{
     ActionResult, TextResult, TIMEOUT_ACTION_MS, TIMEOUT_EXPAND_MS, TIMEOUT_FIND_MS,
-    TIMEOUT_LIST_WINDOWS_MS,
 };
 use super::worker::{map_worker_outcome, run_with_timeout, WorkerOutcome};
 
@@ -38,27 +37,6 @@ where
             .with_details(format!("{error:?}")),
         ),
     }
-}
-
-#[tauri::command]
-pub async fn accessibility_list_windows() -> Result<TextResult, CommandError> {
-    #[cfg(target_os = "windows")]
-    {
-        return run_blocking(move || {
-            let outcome = run_with_timeout(Duration::from_millis(TIMEOUT_LIST_WINDOWS_MS), || {
-                windows_impl::list_windows_impl()
-            });
-            map_worker_outcome(
-                outcome,
-                "list_windows_timeout",
-                "Listing windows timed out",
-            )
-        })
-        .await;
-    }
-
-    #[cfg(not(target_os = "windows"))]
-    unsupported_platform()
 }
 
 #[tauri::command]

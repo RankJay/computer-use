@@ -37,7 +37,7 @@ tauri-plugin-window-state = "2"
 
 [target.'cfg(windows)'.dependencies]
 uiautomation = "0.25.0"
-windows = { version = "0.62.2", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging", "Win32_System_Threading", "Win32_System_ProcessStatus"] }
+windows = { version = "0.62.2", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging", "Win32_System_Threading", "Win32_System_ProcessStatus", "Win32_System_Diagnostics_ToolHelp"] }
 
 [profile.dev.package.scrypt]
 opt-level = 3

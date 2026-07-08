@@ -144,7 +144,6 @@ export function SettingsProvider(props: { children: ReactNode }) {
     </SettingsActionsContext.Provider>
   );
 }
-
 export function useSettingsState(): SettingsState {
   const ctx = useContext(SettingsStateContext);
   if (!ctx) {
@@ -164,3 +163,4 @@ export function useSettingsActions(): SettingsActions {
 export function useSettings(): SettingsContextValue {
   return { ...useSettingsState(), ...useSettingsActions() };
 }
+

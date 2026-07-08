@@ -18,10 +18,21 @@ import { searchFilesCapability } from "./file-system/search-files";
 import { statPathCapability } from "./file-system/stat-path";
 import { writeFileCapability } from "./file-system/write-file";
 import { waitCapability } from "./shared/wait";
+import { getEnvCapability } from "./shell/get-env";
 import { getSystemInfoCapability } from "./shell/get-system-info";
+import { launchCapability } from "./shell/launch";
+import { processInfoCapability } from "./shell/process-info";
+import { processKillCapability } from "./shell/process-kill";
+import { processListCapability } from "./shell/process-list";
 import { runShellCapability } from "./shell/run-shell";
+import { setEnvCapability } from "./shell/set-env";
 import type { CapabilityDefinition } from "./types";
-import { accessibilityListWindowsCapability } from "./window/list-windows";
+import { windowFocusCapability } from "./window/focus";
+import { getActiveWindowCapability } from "./window/get-active";
+import { windowListCapability } from "./window/list";
+import { windowMoveCapability } from "./window/move";
+import { windowResizeCapability } from "./window/resize";
+import { windowStateCapability } from "./window/state";
 
 const V1_CAPABILITIES: CapabilityDefinition[] = [
   readFileCapability,
@@ -35,11 +46,22 @@ const V1_CAPABILITIES: CapabilityDefinition[] = [
   duplicatePathCapability,
   statPathCapability,
   runShellCapability,
+  processListCapability,
+  processInfoCapability,
+  processKillCapability,
+  launchCapability,
+  getEnvCapability,
+  setEnvCapability,
   readClipboardCapability,
   writeClipboardCapability,
   getSystemInfoCapability,
   waitCapability,
-  accessibilityListWindowsCapability,
+  windowListCapability,
+  windowFocusCapability,
+  windowStateCapability,
+  windowMoveCapability,
+  windowResizeCapability,
+  getActiveWindowCapability,
   accessibilitySnapshotCapability,
   accessibilityFindElementCapability,
   accessibilityExpandNodeCapability,
@@ -61,11 +83,22 @@ export type V1CapabilityName =
   | "duplicate_path"
   | "stat_path"
   | "run_shell"
+  | "process_list"
+  | "process_info"
+  | "process_kill"
+  | "launch"
+  | "get_env"
+  | "set_env"
   | "read_clipboard"
   | "write_clipboard"
   | "get_system_info"
   | "wait"
-  | "accessibility_list_windows"
+  | "window_list"
+  | "window_focus"
+  | "window_state"
+  | "window_move"
+  | "window_resize"
+  | "get_active_window"
   | "accessibility_snapshot"
   | "accessibility_find_element"
   | "accessibility_expand_node"

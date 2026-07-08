@@ -12,8 +12,7 @@ mod window;
 
 pub use accessibility::{
     accessibility_click, accessibility_expand_node, accessibility_find_element, accessibility_focus,
-    accessibility_list_windows, accessibility_send_keys, accessibility_set_value, accessibility_snapshot,
-    SnapshotStore,
+    accessibility_send_keys, accessibility_set_value, accessibility_snapshot, SnapshotStore,
 };
 pub use clipboard::{read_clipboard, write_clipboard};
 pub use file_system::{
@@ -21,4 +20,7 @@ pub use file_system::{
     search_files, stat_path, write_file,
 };
 pub use shared::wait;
-pub use shell::{get_system_info, run_shell};
+pub use shell::{get_env, get_system_info, launch, process_info, process_kill, process_list, run_shell, set_env};
+pub use window::{
+    get_active_window, window_focus, window_list, window_move, window_resize, window_state,
+};

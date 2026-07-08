@@ -156,6 +156,18 @@ export function createTauriCapabilityInvoker(workspaceRoot: string): CapabilityN
         return invokeCapabilityCommand("stat_path", payload);
       case "run_shell":
         return invokeCapabilityCommand("run_shell", payload);
+      case "process_list":
+        return invokeCapabilityCommand("process_list", payload);
+      case "process_info":
+        return invokeCapabilityCommand("process_info", payload);
+      case "process_kill":
+        return invokeCapabilityCommand("process_kill", payload);
+      case "launch":
+        return invokeCapabilityCommand("launch", payload);
+      case "get_env":
+        return invokeCapabilityCommand("get_env", payload);
+      case "set_env":
+        return invokeCapabilityCommand("set_env", payload);
       case "read_clipboard":
         return invokeCapabilityCommand("read_clipboard", payload);
       case "write_clipboard":
@@ -164,8 +176,18 @@ export function createTauriCapabilityInvoker(workspaceRoot: string): CapabilityN
         return invokeCapabilityCommand("get_system_info", payload);
       case "wait":
         return invokeCapabilityCommand("wait", input as Record<string, unknown>);
-      case "accessibility_list_windows":
-        return invokeCapabilityCommand("accessibility_list_windows", payload);
+      case "window_list":
+        return invokeCapabilityCommand("window_list", payload);
+      case "window_focus":
+        return invokeCapabilityCommand("window_focus", payload);
+      case "window_state":
+        return invokeCapabilityCommand("window_state", payload);
+      case "window_move":
+        return invokeCapabilityCommand("window_move", payload);
+      case "window_resize":
+        return invokeCapabilityCommand("window_resize", payload);
+      case "get_active_window":
+        return invokeCapabilityCommand("get_active_window", payload);
       case "accessibility_snapshot":
         return invokeCapabilityCommand("accessibility_snapshot", payload);
       case "accessibility_find_element":

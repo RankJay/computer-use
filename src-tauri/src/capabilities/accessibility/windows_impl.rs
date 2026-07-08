@@ -1,4 +1,3 @@
-use std::path::Path;
 use std::thread;
 use std::time::Duration;
 
@@ -10,14 +9,8 @@ use uiautomation::patterns::{
     UIValuePattern, UIPatternType,
 };
 use uiautomation::types::{ControlType, Handle, UIProperty};
-use windows::core::BOOL;
-use windows::Win32::Foundation::{CloseHandle, HWND, LPARAM};
-use windows::Win32::System::Threading::{
-    OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION,
-};
-use windows::Win32::UI::WindowsAndMessaging::{
-    EnumWindows, GetWindowTextW, GetWindowThreadProcessId, IsWindowVisible,
-};
+use windows::Win32::Foundation::HWND;
+use windows::Win32::UI::WindowsAndMessaging::GetWindowThreadProcessId;
 
 use crate::capabilities::path_utils::CommandError;
 
@@ -63,73 +56,6 @@ const FIND_MAX_SIBLING_REPEAT: u32 = 64;
 const RESOLVE_MAX_DEPTH: u32 = 48;
 const RESOLVE_RETRY_ATTEMPTS: u32 = 3;
 const TRANSIENT_UIA_RETRY_MS: u64 = 120;
-const ENUM_CONTINUE: BOOL = BOOL(1);
-
-pub fn list_windows_impl() -> Result<TextResult, CommandError> {
-    let mut collector = WindowCollector {
-        lines: Vec::new(),
-    };
-    unsafe {
-        EnumWindows(
-            Some(enum_visible_window),
-            LPARAM(&mut collector as *mut WindowCollector as isize),
-        )
-        .map_err(|error| CommandError::new("window_enum_failed", error.to_string()))?;
-    }
-
-    Ok(TextResult {
-        text: collector.lines.join("\n"),
-        generation: None,
-    })
-}
-
-struct WindowCollector {
-    lines: Vec<String>,
-}
-
-unsafe extern "system" fn enum_visible_window(hwnd: HWND, lparam: LPARAM) -> BOOL {
-    let collector = &mut *(lparam.0 as *mut WindowCollector);
-    if !IsWindowVisible(hwnd).as_bool() {
-        return ENUM_CONTINUE;
-    }
-
-    let mut title_buffer = [0u16; 512];
-    let title_len = GetWindowTextW(hwnd, &mut title_buffer);
-    if title_len == 0 {
-        return ENUM_CONTINUE;
-    }
-
-    let title = String::from_utf16_lossy(&title_buffer[..title_len as usize]);
-    let mut process_id = 0u32;
-    unsafe { GetWindowThreadProcessId(hwnd, Some(&mut process_id)) };
-    let process_name = process_name_from_pid(process_id).unwrap_or_else(|| format!("pid:{process_id}"));
-
-    collector.lines.push(format!(
-        "{}  {}  \"{}\"",
-        hwnd.0 as i64, process_name, title
-    ));
-    ENUM_CONTINUE
-}
-
-fn process_name_from_pid(process_id: u32) -> Option<String> {
-    unsafe {
-        let process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, process_id).ok()?;
-        let mut buffer = [0u16; 1024];
-        let mut size = buffer.len() as u32;
-        QueryFullProcessImageNameW(
-            process,
-            PROCESS_NAME_WIN32,
-            windows::core::PWSTR(buffer.as_mut_ptr()),
-            &mut size,
-        )
-        .ok()?;
-        let path = String::from_utf16_lossy(&buffer[..size as usize]);
-        let _ = CloseHandle(process);
-        Path::new(&path)
-            .file_name()
-            .map(|name| name.to_string_lossy().into_owned())
-    }
-}
 
 pub fn snapshot_impl(
     store: &SnapshotStore,
