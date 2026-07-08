@@ -1,8 +1,8 @@
 import { z } from "zod";
 
-import { uiAutomationEnabled } from "./accessibility/shared";
-import { invokeCapabilityCommand } from "./tauri-invoke";
-import { defineCapability } from "./types";
+import { invokeCapabilityCommand } from "../tauri-invoke";
+import { defineCapability } from "../types";
+import { uiAutomationEnabled } from "./shared";
 
 export const accessibilityExpandNodeInputSchema = z.object({
   reference: z

@@ -2,7 +2,7 @@ use glob::Pattern;
 use serde::Serialize;
 use walkdir::WalkDir;
 
-use super::path_utils::{self, CommandError};
+use crate::capabilities::path_utils::{self, CommandError};
 
 const MAX_MATCHES: usize = 100;
 

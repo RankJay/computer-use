@@ -1,12 +1,11 @@
 import { z } from "zod";
 
-import { uiAutomationEnabled } from "./accessibility/shared";
-import { invokeCapabilityCommand } from "./tauri-invoke";
-import { defineCapability } from "./types";
+import { invokeCapabilityCommand } from "../tauri-invoke";
+import { defineCapability } from "../types";
+import { uiAutomationEnabled } from "./shared";
 
-export const accessibilitySetValueInputSchema = z.object({
+export const accessibilityFocusInputSchema = z.object({
   reference: z.string().min(1).describe("Element ref from snapshot or find_element"),
-  text: z.string().describe("Text to set in the target field"),
 });
 
 export type AccessibilityActionOutput = {
@@ -15,21 +14,20 @@ export type AccessibilityActionOutput = {
   foregrounded: boolean;
 };
 
-export const accessibilitySetValueCapability = defineCapability({
-  name: "accessibility_set_value",
+export const accessibilityFocusCapability = defineCapability({
+  name: "accessibility_focus",
   description:
-    "Set text in an accessibility element by ref using value pattern, legacy access, or send_keys.",
+    "Bring the target window to the foreground and focus an accessibility element by ref.",
   risk: "high",
-  inputSchema: accessibilitySetValueInputSchema,
+  inputSchema: accessibilityFocusInputSchema,
   enabledWhen: uiAutomationEnabled,
   execute: async (input) => {
     const result = await invokeCapabilityCommand<{
       ok: boolean;
       method: string;
       foregrounded: boolean;
-    }>("accessibility_set_value", {
+    }>("accessibility_focus", {
       reference: input.reference,
-      text: input.text,
     });
 
     return {

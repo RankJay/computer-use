@@ -1,7 +1,7 @@
 import { z } from "zod";
 
-import { invokeCapabilityCommand } from "./tauri-invoke";
-import { defineCapability } from "./types";
+import { invokeCapabilityCommand } from "../tauri-invoke";
+import { defineCapability } from "../types";
 
 export const getSystemInfoInputSchema = z.object({});
 

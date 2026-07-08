@@ -1,10 +1,10 @@
 import { z } from "zod";
 
-import { uiAutomationEnabled } from "./accessibility/shared";
-import { invokeCapabilityCommand } from "./tauri-invoke";
-import { defineCapability } from "./types";
+import { invokeCapabilityCommand } from "../tauri-invoke";
+import { defineCapability } from "../types";
+import { uiAutomationEnabled } from "./shared";
 
-export const accessibilityFocusInputSchema = z.object({
+export const accessibilityClickInputSchema = z.object({
   reference: z.string().min(1).describe("Element ref from snapshot or find_element"),
 });
 
@@ -14,19 +14,19 @@ export type AccessibilityActionOutput = {
   foregrounded: boolean;
 };
 
-export const accessibilityFocusCapability = defineCapability({
-  name: "accessibility_focus",
+export const accessibilityClickCapability = defineCapability({
+  name: "accessibility_click",
   description:
-    "Bring the target window to the foreground and focus an accessibility element by ref.",
+    "Click an accessibility element by ref. Scrolls into view, walks up to nearest Hyperlink for browser links, then tries legacy/invoke/enter/synthetic click.",
   risk: "high",
-  inputSchema: accessibilityFocusInputSchema,
+  inputSchema: accessibilityClickInputSchema,
   enabledWhen: uiAutomationEnabled,
   execute: async (input) => {
     const result = await invokeCapabilityCommand<{
       ok: boolean;
       method: string;
       foregrounded: boolean;
-    }>("accessibility_focus", {
+    }>("accessibility_click", {
       reference: input.reference,
     });
 

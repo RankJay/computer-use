@@ -1,7 +1,7 @@
 use arboard::Clipboard;
 use serde::Serialize;
 
-use super::path_utils::CommandError;
+use crate::capabilities::path_utils::CommandError;
 
 const MAX_CLIPBOARD_BYTES: usize = 512_000;
 

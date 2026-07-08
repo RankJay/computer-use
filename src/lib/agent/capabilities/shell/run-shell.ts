@@ -1,7 +1,7 @@
 import { z } from "zod";
 
-import { invokeCapabilityCommand } from "./tauri-invoke";
-import { defineCapability } from "./types";
+import { invokeCapabilityCommand } from "../tauri-invoke";
+import { defineCapability } from "../types";
 
 export const runShellInputSchema = z.object({
   program: z.string().min(1).describe("Executable or command to run"),

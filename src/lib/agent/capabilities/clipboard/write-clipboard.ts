@@ -1,7 +1,7 @@
 import { z } from "zod";
 
-import { invokeCapabilityCommand } from "./tauri-invoke";
-import { defineCapability } from "./types";
+import { invokeCapabilityCommand } from "../tauri-invoke";
+import { defineCapability } from "../types";
 
 export const writeClipboardInputSchema = z.object({
   text: z.string().describe("Plain text to copy to the system clipboard"),

@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import { DEFAULT_SETTINGS } from "@/lib/settings/defaults";
 
-import { accessibilitySnapshotCapability } from "./accessibility-snapshot";
+import { accessibilitySnapshotCapability } from "./accessibility/snapshot";
 import { needsPermission } from "./permission";
 import { buildAgentTools } from "./registry";
 

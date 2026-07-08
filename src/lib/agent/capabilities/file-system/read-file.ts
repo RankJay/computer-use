@@ -1,7 +1,7 @@
 import { z } from "zod";
 
-import { invokeCapabilityCommand } from "./tauri-invoke";
-import { defineCapability } from "./types";
+import { invokeCapabilityCommand } from "../tauri-invoke";
+import { defineCapability } from "../types";
 
 export const readFileInputSchema = z.object({
   path: z.string().min(1).describe("Relative path from workspace root"),

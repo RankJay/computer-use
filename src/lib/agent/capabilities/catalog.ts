@@ -1,20 +1,20 @@
-import { accessibilityClickCapability } from "./accessibility-click";
-import { accessibilityExpandNodeCapability } from "./accessibility-expand-node";
-import { accessibilityFindElementCapability } from "./accessibility-find-element";
-import { accessibilityFocusCapability } from "./accessibility-focus";
-import { accessibilityListWindowsCapability } from "./accessibility-list-windows";
-import { accessibilitySendKeysCapability } from "./accessibility-send-keys";
-import { accessibilitySetValueCapability } from "./accessibility-set-value";
-import { accessibilitySnapshotCapability } from "./accessibility-snapshot";
-import { deleteFileCapability } from "./delete-file";
-import { getSystemInfoCapability } from "./get-system-info";
-import { readClipboardCapability } from "./read-clipboard";
-import { readFileCapability } from "./read-file";
-import { runShellCapability } from "./run-shell";
-import { searchFilesCapability } from "./search-files";
+import { accessibilityClickCapability } from "./accessibility/click";
+import { accessibilityExpandNodeCapability } from "./accessibility/expand-node";
+import { accessibilityFindElementCapability } from "./accessibility/find-element";
+import { accessibilityFocusCapability } from "./accessibility/focus";
+import { accessibilitySendKeysCapability } from "./accessibility/send-keys";
+import { accessibilitySetValueCapability } from "./accessibility/set-value";
+import { accessibilitySnapshotCapability } from "./accessibility/snapshot";
+import { readClipboardCapability } from "./clipboard/read-clipboard";
+import { writeClipboardCapability } from "./clipboard/write-clipboard";
+import { deleteFileCapability } from "./file-system/delete-file";
+import { readFileCapability } from "./file-system/read-file";
+import { searchFilesCapability } from "./file-system/search-files";
+import { writeFileCapability } from "./file-system/write-file";
+import { getSystemInfoCapability } from "./shell/get-system-info";
+import { runShellCapability } from "./shell/run-shell";
 import type { CapabilityDefinition } from "./types";
-import { writeClipboardCapability } from "./write-clipboard";
-import { writeFileCapability } from "./write-file";
+import { accessibilityListWindowsCapability } from "./window/list-windows";
 
 const V1_CAPABILITIES: CapabilityDefinition[] = [
   readFileCapability,

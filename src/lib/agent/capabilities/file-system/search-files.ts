@@ -1,7 +1,7 @@
 import { z } from "zod";
 
-import { invokeCapabilityCommand } from "./tauri-invoke";
-import { defineCapability } from "./types";
+import { invokeCapabilityCommand } from "../tauri-invoke";
+import { defineCapability } from "../types";
 
 export const searchFilesInputSchema = z.object({
   query: z.string().describe("Text to match against file paths or contents"),

@@ -2,7 +2,7 @@ use std::fs;
 
 use serde::Serialize;
 
-use super::path_utils::{self, CommandError, MAX_READ_BYTES};
+use crate::capabilities::path_utils::{self, CommandError, MAX_READ_BYTES};
 
 #[derive(Debug, Serialize)]
 pub struct ReadFileResult {

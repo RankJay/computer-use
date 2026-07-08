@@ -1,6 +1,6 @@
 use std::fs;
 
-use super::path_utils::{self, CommandError};
+use crate::capabilities::path_utils::{self, CommandError};
 
 #[tauri::command]
 pub fn write_file(

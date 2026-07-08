@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 
 use serde::Serialize;
 
-use super::path_utils::CommandError;
+use crate::capabilities::path_utils::CommandError;
 
 const SHELL_TIMEOUT: Duration = Duration::from_secs(120);
 const MAX_CAPTURE_BYTES: usize = 512_000;

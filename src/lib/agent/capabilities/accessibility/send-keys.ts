@@ -1,8 +1,8 @@
 import { z } from "zod";
 
-import { uiAutomationEnabled } from "./accessibility/shared";
-import { invokeCapabilityCommand } from "./tauri-invoke";
-import { defineCapability } from "./types";
+import { invokeCapabilityCommand } from "../tauri-invoke";
+import { defineCapability } from "../types";
+import { uiAutomationEnabled } from "./shared";
 
 export const accessibilitySendKeysInputSchema = z.object({
   hwnd: z.number().int().describe("Native window handle from accessibility_list_windows"),
