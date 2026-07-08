@@ -3,7 +3,7 @@ import ReactDOM from "react-dom/client";
 import { scan } from "react-scan";
 
 if (import.meta.env.DEV) {
-  scan({ enabled: true });
+  scan({ enabled: true, animationSpeed: "slow" });
 }
 
 import App from "./app/App";

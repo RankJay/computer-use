@@ -10,6 +10,7 @@
     "window-state:default",
     "store:default",
     "stronghold:default",
+    "dialog:default",
     {
       "identifier": "http:default",
       "allow": [

@@ -1,5 +1,6 @@
 import { FolderOpen } from "lucide-react";
 import type { ReactElement } from "react";
+import { toast } from "sonner";
 
 import { Input } from "@/components/ui/input";
 import {
@@ -27,10 +28,22 @@ import {
 import { useSettingsSelector, useUpdateSettings } from "@/lib/settings/queries";
 import { selectGeneralSettings } from "@/lib/settings/selectors";
 import { parsePermissionMode, PERMISSION_MODE_OPTIONS } from "@/lib/settings/utils";
+import { pickWorkspaceFolder } from "@/lib/settings/workspace-picker";
 
 export function GeneralSettings(): ReactElement {
   const settings = useSettingsSelector(selectGeneralSettings);
   const updateSettings = useUpdateSettings();
+
+  async function handleBrowseWorkspace(): Promise<void> {
+    try {
+      const path = await pickWorkspaceFolder();
+      if (path !== null && path !== settings.workspaceRoot) {
+        updateSettings.mutate({ workspaceRoot: path });
+      }
+    } catch {
+      toast.error("Could not open folder picker. Try again.");
+    }
+  }
 
   return (
     <>
@@ -55,7 +68,14 @@ export function GeneralSettings(): ReactElement {
               className={`text-sm ${settingsInputGroupInputClassName}`}
             />
             <InputGroupAddon align="inline-end">
-              <InputGroupButton aria-label="Browse for workspace folder" size="icon-xs">
+              <InputGroupButton
+                aria-label="Browse for workspace folder"
+                size="icon-xs"
+                disabled={updateSettings.isPending}
+                onClick={() => {
+                  void handleBrowseWorkspace();
+                }}
+              >
                 <FolderOpen className="text-[#767676]" />
               </InputGroupButton>
             </InputGroupAddon>

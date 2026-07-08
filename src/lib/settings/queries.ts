@@ -1,11 +1,18 @@
 import { queryOptions, useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { useCallback } from "react";
+import { toast } from "sonner";
 
 import { loadedSettingsOrDefault, mergeSettingsPatch } from "@/lib/settings/defaults";
 import { createSettingsPersistence } from "@/lib/settings/persistence";
 import type { AppSecrets, AppSettings, LoadedSettings } from "@/lib/settings/types";
 
 const persistence = createSettingsPersistence();
+
+function settingsMutationError(scope: string) {
+  return () => {
+    toast.error(`Could not save ${scope}. Try again.`);
+  };
+}
 
 export const settingsKeys = {
   all: ["settings"] as const,
@@ -56,6 +63,7 @@ export function useUpdateSettings() {
     onSuccess: (next) => {
       queryClient.setQueryData(settingsKeys.loaded(), next);
     },
+    onError: settingsMutationError("settings"),
   });
 }
 
@@ -80,6 +88,7 @@ export function useUpdateSecret() {
     onSuccess: (next) => {
       queryClient.setQueryData(settingsKeys.loaded(), next);
     },
+    onError: settingsMutationError("API key"),
   });
 }
 

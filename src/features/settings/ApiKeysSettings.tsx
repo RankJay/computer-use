@@ -30,6 +30,20 @@ function ApiKeyRow({
   const updateSecret = useUpdateSecret();
   const [draft, setDraft] = useState("");
 
+  async function handleBlur(): Promise<void> {
+    const value = draft.trim();
+    if (value.length === 0) {
+      return;
+    }
+
+    try {
+      await updateSecret.mutateAsync({ key: secretKey, value });
+      setDraft("");
+    } catch {
+      // Error toast is handled by the mutation onError callback.
+    }
+  }
+
   return (
     <SettingsRow label={label} description={description}>
       <InputGroup className={`w-36 ${settingsInputGroupClassName}`}>
@@ -39,13 +53,10 @@ function ApiKeyRow({
           placeholder={saved ? "Enter new key to replace" : placeholder}
           autoComplete="off"
           value={draft}
+          disabled={updateSecret.isPending}
           onChange={(event) => setDraft(event.target.value)}
           onBlur={() => {
-            if (draft.trim().length > 0) {
-              void updateSecret.mutateAsync({ key: secretKey, value: draft.trim() }).then(() => {
-                setDraft("");
-              });
-            }
+            void handleBlur();
           }}
           className={`text-sm ${settingsInputGroupInputClassName}`}
         />

@@ -38,7 +38,7 @@ export function ModelProviderSettings(): ReactElement {
 
   return (
     <>
-      <SettingsSection title="Gaurdrails">
+      <SettingsSection title="Guardrails">
         <SettingsRow
           label="Agent mode"
           description="Live uses cloud API and tools. Demo runs offline fixtures."

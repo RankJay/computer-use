@@ -3,6 +3,8 @@ use std::sync::Once;
 use tauri::{AppHandle, Manager, PhysicalPosition, RunEvent};
 use tauri_plugin_window_state::{StateFlags, WindowExt, DEFAULT_FILENAME};
 
+mod commands;
+
 #[cfg(desktop)]
 fn window_state_flags() -> StateFlags {
     StateFlags::all().difference(StateFlags::DECORATIONS)
@@ -151,7 +153,13 @@ pub fn run() {
     #[allow(unused_mut)]
     let mut builder = tauri::Builder::default()
         .plugin(tauri_plugin_http::init())
-        .plugin(tauri_plugin_store::Builder::default().build());
+        .plugin(tauri_plugin_store::Builder::default().build())
+        .plugin(tauri_plugin_dialog::init())
+        .invoke_handler(tauri::generate_handler![
+            commands::maintenance::open_logs_folder,
+            commands::maintenance::clear_logs,
+            commands::maintenance::reset_session,
+        ]);
 
     #[cfg(desktop)]
     {

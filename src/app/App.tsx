@@ -1,9 +1,14 @@
+import { lazy, Suspense } from "react";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
+
+import { RouteErrorBoundary } from "@/components/boundaries/ErrorBoundary";
+import { SettingsPageSkeleton } from "@/features/settings/SettingsPageSkeleton";
 
 import HistoryPage from "./pages/history";
 import HomePage from "./pages/home";
-import SettingsPage from "./pages/settings";
 import { AppQueryProvider } from "./providers/QueryProvider";
+
+const SettingsPage = lazy(() => import("./pages/settings"));
 
 function App() {
   return (
@@ -11,7 +16,16 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<HomePage />} />
-          <Route path="/settings" element={<SettingsPage />} />
+          <Route
+            path="/settings"
+            element={
+              <RouteErrorBoundary>
+                <Suspense>
+                  <SettingsPage />
+                </Suspense>
+              </RouteErrorBoundary>
+            }
+          />
           <Route path="/history" element={<HistoryPage />} />
         </Routes>
       </BrowserRouter>
