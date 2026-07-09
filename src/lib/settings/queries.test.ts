@@ -8,10 +8,7 @@ function stripSecrets(settings: LoadedSettings): AppSettings {
   return appSettings;
 }
 
-function applySettingsPatch(
-  current: LoadedSettings,
-  patch: Partial<AppSettings>,
-): LoadedSettings {
+function applySettingsPatch(current: LoadedSettings, patch: Partial<AppSettings>): LoadedSettings {
   const nextSettings = mergeSettingsPatch(stripSecrets(current), patch);
   return { ...nextSettings, secrets: current.secrets };
 }

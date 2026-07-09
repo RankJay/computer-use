@@ -16,11 +16,7 @@ import { Button } from "@/components/ui/button";
 import { SettingsRow } from "@/features/settings/SettingsRow";
 import { SettingsSection } from "@/features/settings/SettingsSection";
 import { settingsGhostButtonClassName } from "@/features/settings/styles";
-import {
-  useClearLogs,
-  useOpenLogsFolder,
-  useResetSession,
-} from "@/lib/maintenance/queries";
+import { useClearLogs, useOpenLogsFolder, useResetSession } from "@/lib/maintenance/queries";
 import { useSettingsSelector, useUpdateSettings } from "@/lib/settings/queries";
 import { selectHasPersistedApprovals } from "@/lib/settings/selectors";
 

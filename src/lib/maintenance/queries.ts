@@ -1,11 +1,7 @@
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 
-import {
-  clearLogs,
-  openLogsFolder,
-  resetSession,
-} from "@/lib/maintenance/commands";
+import { clearLogs, openLogsFolder, resetSession } from "@/lib/maintenance/commands";
 
 function maintenanceMutationError(action: string) {
   return () => {
