@@ -4,11 +4,10 @@ import { runAgentLoop } from "@/lib/agent/run-agent";
 
 import type { ProduceRun } from "../control/run-controller";
 
-/** Live producer — empty tools until Phase 4 capabilities. */
+/** Live producer — wires tools via CapabilityRunner (Phase 3). */
 export function createLiveRunProducer(): ProduceRun {
-  return async ({ config, taskId, signal, append }) => {
+  return async ({ config, taskId, signal, append, createPermissionWaiter }) => {
     const workspaceRoot = config.settings.workspaceRoot;
-    void workspaceRoot;
 
     if (!config.isRetry) {
       append({
@@ -50,6 +49,8 @@ export function createLiveRunProducer(): ProduceRun {
       secrets: config.secrets,
       signal,
       append,
+      workspaceRoot,
+      createPermissionWaiter,
     });
 
     if (result.finishReason === "error") {

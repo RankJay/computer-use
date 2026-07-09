@@ -1,6 +1,16 @@
 use tauri::Manager;
 
+mod capabilities;
 mod commands;
+
+use capabilities::{
+    accessibility_click, accessibility_expand_node, accessibility_find_element, accessibility_focus,
+    accessibility_send_keys, accessibility_set_value, accessibility_snapshot, create_directory,
+    delete_path, duplicate_path, get_active_window, get_env, get_system_info, launch, move_path,
+    patch_file, process_info, process_kill, process_list, read_clipboard, read_directory, read_file,
+    run_shell, search_files, set_env, stat_path, wait, window_focus, window_list, window_move,
+    window_resize, window_state, write_clipboard, write_file, SnapshotStore,
+};
 
 #[cfg(desktop)]
 fn apply_frameless_window(window: &tauri::WebviewWindow) {
@@ -106,6 +116,40 @@ pub fn run() {
             commands::maintenance::clear_logs,
             commands::maintenance::reset_session,
             commands::window::app_ready,
+            read_file,
+            read_directory,
+            search_files,
+            write_file,
+            create_directory,
+            patch_file,
+            delete_path,
+            move_path,
+            duplicate_path,
+            stat_path,
+            run_shell,
+            read_clipboard,
+            write_clipboard,
+            get_system_info,
+            wait,
+            window_list,
+            window_focus,
+            window_state,
+            window_move,
+            window_resize,
+            get_active_window,
+            process_list,
+            process_info,
+            process_kill,
+            launch,
+            get_env,
+            set_env,
+            accessibility_snapshot,
+            accessibility_find_element,
+            accessibility_expand_node,
+            accessibility_click,
+            accessibility_set_value,
+            accessibility_send_keys,
+            accessibility_focus,
         ]);
 
     #[cfg(desktop)]
@@ -140,6 +184,8 @@ pub fn run() {
                 .join("salt.txt");
             app.handle()
                 .plugin(tauri_plugin_stronghold::Builder::with_argon2(&salt_path).build())?;
+
+            app.manage(SnapshotStore::default());
 
             #[cfg(desktop)]
             setup_desktop(app)?;

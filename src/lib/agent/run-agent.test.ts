@@ -48,6 +48,10 @@ describe("run-agent", () => {
       settings: DEFAULT_SETTINGS,
       secrets: DEFAULT_SECRETS,
       signal: new AbortController().signal,
+      workspaceRoot: "D:/Projects/actuate-v3",
+      createPermissionWaiter: () => ({
+        waitForDecision: async () => "approved" as const,
+      }),
       modelOverride: createMockModel(),
       append: (payload) => {
         payloads.push(payload);
@@ -81,6 +85,10 @@ describe("run-agent", () => {
       settings: DEFAULT_SETTINGS,
       secrets: { ...DEFAULT_SECRETS, openaiApiKey: "" },
       signal: new AbortController().signal,
+      workspaceRoot: "D:/Projects/actuate-v3",
+      createPermissionWaiter: () => ({
+        waitForDecision: async () => "approved" as const,
+      }),
       append: (payload) => {
         payloads.push(payload);
       },
@@ -111,6 +119,10 @@ describe("run-agent", () => {
       settings: { ...DEFAULT_SETTINGS, maxSteps: 0, maxWallClockMs: 1 },
       secrets: DEFAULT_SECRETS,
       signal: new AbortController().signal,
+      workspaceRoot: "D:/Projects/actuate-v3",
+      createPermissionWaiter: () => ({
+        waitForDecision: async () => "approved" as const,
+      }),
       modelOverride: createMockModel(),
       budgetStartedAt: Date.now() - 10_000,
       append: (payload) => {

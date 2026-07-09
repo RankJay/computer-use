@@ -1,6 +1,8 @@
 import type { LanguageModelV4 } from "@ai-sdk/provider";
 import {
   convertToModelMessages,
+  isDynamicToolUIPart,
+  isToolUIPart,
   readUIMessageStream,
   streamText,
   toUIMessageStream,
@@ -8,6 +10,11 @@ import {
   type UIMessage,
 } from "ai";
 
+import {
+  buildAgentTools,
+  type CapabilityRunnerDeps,
+  type ToolPartLocation,
+} from "@/lib/agent/capabilities";
 import { formatToolStreamError } from "@/lib/agent/tool-errors";
 import type { RunAgentFinishReason } from "@/lib/agent/types";
 import {
@@ -17,6 +24,7 @@ import {
   type MessageSyncState,
 } from "@/lib/agent/ui-stream-sync";
 import { createBudgetGuard, createBudgetTracker } from "@/lib/session/control/budget";
+import type { PermissionWaiter } from "@/lib/session/control/run-controller";
 import type { RuntimeEventPayload } from "@/lib/session/events";
 import type { AppSettings } from "@/lib/settings/types";
 
@@ -29,6 +37,8 @@ export type RunStreamCoordinatorDeps = {
   settings: AppSettings;
   signal: AbortSignal;
   append: (payload: RuntimeEventPayload) => unknown;
+  workspaceRoot: string;
+  createPermissionWaiter: (callId: string) => PermissionWaiter;
   budgetStartedAt?: number;
 };
 
@@ -52,7 +62,37 @@ export async function runStreamCoordinator(
     streamAbort.abort();
   });
 
-  const tools = {};
+  const toolPartIndex = new Map<string, ToolPartLocation>();
+  let latestMessage: UIMessage | null = null;
+
+  const resolveToolPart = (callId: string): ToolPartLocation | null => {
+    const cached = toolPartIndex.get(callId);
+    if (cached) return cached;
+    if (!latestMessage) return null;
+    for (let index = 0; index < latestMessage.parts.length; index += 1) {
+      const part = latestMessage.parts[index];
+      if (!part) continue;
+      if (isDynamicToolUIPart(part) || isToolUIPart(part)) {
+        if (part.toolCallId === callId) {
+          const location = { messageId: latestMessage.id, partIndex: index };
+          toolPartIndex.set(callId, location);
+          return location;
+        }
+      }
+    }
+    return null;
+  };
+
+  const runnerDeps: CapabilityRunnerDeps = {
+    append: deps.append,
+    taskId: deps.taskId,
+    settings: deps.settings,
+    workspaceRoot: deps.workspaceRoot,
+    createPermissionWaiter: deps.createPermissionWaiter,
+    resolveToolPart,
+  };
+
+  const tools = buildAgentTools(runnerDeps);
 
   try {
     const modelMessages = await convertToModelMessages(deps.messages, {
@@ -103,6 +143,14 @@ export async function runStreamCoordinator(
       if (!streamingStatusEmitted) {
         emit({ type: "task.status_changed", status: "streaming" });
         streamingStatusEmitted = true;
+      }
+      latestMessage = message;
+      for (let index = 0; index < message.parts.length; index += 1) {
+        const part = message.parts[index];
+        if (!part) continue;
+        if (isDynamicToolUIPart(part) || isToolUIPart(part)) {
+          toolPartIndex.set(part.toolCallId, { messageId: message.id, partIndex: index });
+        }
       }
       messageSync = syncAssistantMessage(emit, message, messageSync);
     }

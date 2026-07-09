@@ -1,6 +1,6 @@
 import { isDynamicToolUIPart, type DynamicToolUIPart, type ToolUIPart } from "ai";
 import { CheckIcon, XIcon } from "lucide-react";
-import { memo, type ReactElement } from "react";
+import { memo, useState, type ReactElement } from "react";
 
 import {
   Confirmation,
@@ -18,16 +18,38 @@ import {
   ToolInput,
   ToolOutput,
 } from "@/components/ai-elements/tool";
+import type { PendingPermission } from "@/lib/session";
+import type { PermissionMode } from "@/lib/settings/types";
 
 export type ToolPartProps = {
   readonly part: ToolUIPart | DynamicToolUIPart;
+  readonly pendingPermissions?: readonly PendingPermission[];
+  readonly permissionMode?: PermissionMode;
+  readonly onResolvePermission?: (
+    callId: string,
+    decision: "approved" | "denied",
+    persist?: boolean,
+  ) => void;
 };
 
-export const ToolPart = memo(function ToolPart({ part }: ToolPartProps): ReactElement {
+export const ToolPart = memo(function ToolPart({
+  part,
+  pendingPermissions = [],
+  permissionMode = "risky",
+  onResolvePermission,
+}: ToolPartProps): ReactElement {
+  const [persistAlways, setPersistAlways] = useState(false);
+
   const showApproval =
     part.state === "approval-requested" ||
     part.state === "approval-responded" ||
     part.state === "output-denied";
+
+  const toolCallId = part.toolCallId;
+  const isPending = pendingPermissions.some((entry) => entry.callId === toolCallId);
+  const canAct =
+    part.state === "approval-requested" && isPending && typeof onResolvePermission === "function";
+  const showAlwaysAllow = canAct && permissionMode === "once-per-class";
 
   const headerProps = isDynamicToolUIPart(part)
     ? { type: part.type, state: part.state, toolName: part.toolName }
@@ -65,11 +87,30 @@ export const ToolPart = memo(function ToolPart({ part }: ToolPartProps): ReactEl
               <span>You rejected this tool execution</span>
             </ConfirmationRejected>
           </ConfirmationTitle>
+          {showAlwaysAllow ? (
+            <label className="flex items-center gap-2 px-3 pb-1 text-xs text-muted-foreground">
+              <input
+                type="checkbox"
+                checked={persistAlways}
+                onChange={(event) => setPersistAlways(event.target.checked)}
+              />
+              Always allow this tool
+            </label>
+          ) : null}
           <ConfirmationActions>
-            <ConfirmationAction variant="outline" disabled>
+            <ConfirmationAction
+              variant="outline"
+              disabled={!canAct}
+              onClick={() => onResolvePermission?.(toolCallId, "denied")}
+            >
               Reject
             </ConfirmationAction>
-            <ConfirmationAction disabled>Approve</ConfirmationAction>
+            <ConfirmationAction
+              disabled={!canAct}
+              onClick={() => onResolvePermission?.(toolCallId, "approved", persistAlways)}
+            >
+              Approve
+            </ConfirmationAction>
           </ConfirmationActions>
         </Confirmation>
       ) : null}

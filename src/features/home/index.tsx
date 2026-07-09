@@ -53,20 +53,9 @@ const HomeChatComposer = memo(function HomeChatComposer({
   );
 });
 
-const HomeChatTranscript = memo(function HomeChatTranscript({
-  store,
-}: {
-  readonly store: ReturnType<typeof useAgentSessionStore>;
-}): ReactElement {
-  const { rows, streamingMessageId } = useAgentTranscript(store);
-  return <AgentTranscript rows={rows} streamingMessageId={streamingMessageId} />;
-});
-
-function HomeChatControls({
-  store,
-}: {
-  readonly store: ReturnType<typeof useAgentSessionStore>;
-}): ReactElement {
+function HomePageInner(): ReactElement {
+  const store = useAgentSessionStore();
+  const { rows, streamingMessageId, pendingPermissions } = useAgentTranscript(store);
   const controls = useAgentSessionControls(store);
 
   // Settings (incl. model id) are loaded before this mounts; reveal window after paint.
@@ -74,19 +63,21 @@ function HomeChatControls({
     signalAppReady();
   }, []);
 
-  return <HomeChatComposer controls={controls} />;
-}
-
-function HomePageInner(): ReactElement {
-  const store = useAgentSessionStore();
-
   return (
     <div className="flex flex-col h-full w-full gap-0 overflow-hidden box-border overscroll-contain">
       <div>
         <HomePageHeader />
       </div>
-      <HomeChatTranscript store={store} />
-      <HomeChatControls store={store} />
+      <AgentTranscript
+        rows={rows}
+        streamingMessageId={streamingMessageId}
+        pendingPermissions={pendingPermissions}
+        permissionMode={controls.permissionMode}
+        onResolvePermission={(callId, decision, persist) => {
+          void controls.resolvePermission(callId, decision, persist);
+        }}
+      />
+      <HomeChatComposer controls={controls} />
     </div>
   );
 }

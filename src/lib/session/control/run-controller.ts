@@ -19,6 +19,8 @@ export type RunConfig = {
   secrets: AppSecrets;
   /** When true, producers should omit appending a new user message row. */
   isRetry?: boolean;
+  /** Persist capability approval into settings (once-per-class). */
+  persistApproval?: (capability: string) => Promise<void>;
 };
 
 export type ProduceRunContext = {
@@ -114,10 +116,20 @@ export function createRunController(deps: RunControllerDeps): RunController {
 
     cancel,
 
-    async resolvePermission(callId, decision) {
+    async resolvePermission(callId, decision, persist) {
       const resolve = permissionResolvers.get(callId);
       if (!resolve) return;
       permissionResolvers.delete(callId);
+
+      if (decision === "approved" && persist && lastConfig?.persistApproval) {
+        const pending = deps
+          .getProjection()
+          .pendingPermissions.find((entry) => entry.callId === callId);
+        if (pending) {
+          await lastConfig.persistApproval(pending.capability);
+        }
+      }
+
       resolve(decision);
     },
 

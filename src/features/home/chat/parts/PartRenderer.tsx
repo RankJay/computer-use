@@ -12,6 +12,8 @@ import {
 import { memo, type ReactElement, type ReactNode } from "react";
 
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
+import type { PendingPermission } from "@/lib/session";
+import type { PermissionMode } from "@/lib/settings/types";
 
 import { ReasoningPart } from "./ReasoningPart";
 import { SourcesPart } from "./SourcesPart";
@@ -21,16 +23,46 @@ import { ToolPart } from "./ToolPart";
 export type PartRendererProps = {
   readonly message: UIMessage;
   readonly isStreaming?: boolean;
+  readonly pendingPermissions?: readonly PendingPermission[];
+  readonly permissionMode?: PermissionMode;
+  readonly onResolvePermission?: (
+    callId: string,
+    decision: "approved" | "denied",
+    persist?: boolean,
+  ) => void;
 };
 
 export const PartRenderer = memo(function PartRenderer({
   message,
   isStreaming = false,
+  pendingPermissions,
+  permissionMode,
+  onResolvePermission,
 }: PartRendererProps): ReactElement {
-  return <>{renderMessageParts(message, isStreaming)}</>;
+  return (
+    <>
+      {renderMessageParts(message, isStreaming, {
+        pendingPermissions,
+        permissionMode,
+        onResolvePermission,
+      })}
+    </>
+  );
 });
 
-function renderMessageParts(message: UIMessage, isStreaming: boolean): ReactNode[] {
+function renderMessageParts(
+  message: UIMessage,
+  isStreaming: boolean,
+  permission: {
+    pendingPermissions?: readonly PendingPermission[];
+    permissionMode?: PermissionMode;
+    onResolvePermission?: (
+      callId: string,
+      decision: "approved" | "denied",
+      persist?: boolean,
+    ) => void;
+  },
+): ReactNode[] {
   const elements: ReactNode[] = [];
   let index = 0;
 
@@ -90,7 +122,15 @@ function renderMessageParts(message: UIMessage, isStreaming: boolean): ReactNode
     }
 
     if (isToolUIPart(part) || isDynamicToolUIPart(part)) {
-      elements.push(<ToolPart key={`tool-${index}`} part={part} />);
+      elements.push(
+        <ToolPart
+          key={`tool-${index}`}
+          part={part}
+          pendingPermissions={permission.pendingPermissions}
+          permissionMode={permission.permissionMode}
+          onResolvePermission={permission.onResolvePermission}
+        />,
+      );
       index += 1;
       continue;
     }

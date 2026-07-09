@@ -5,11 +5,18 @@ import {
   createSessionEngine,
   deriveSessionControls,
   setActiveSessionEngine,
+  type PendingPermission,
+  type PermissionDecision,
   type SessionControls,
   type SessionEngine,
   type SessionProjection,
 } from "@/lib/session";
-import { useLoadedSettings, useUpdateSettings } from "@/lib/settings/queries";
+import {
+  useLoadedSettings,
+  usePersistToolApproval,
+  useUpdateSettings,
+} from "@/lib/settings/queries";
+import type { PermissionMode } from "@/lib/settings/types";
 
 type Listener = () => void;
 
@@ -61,6 +68,7 @@ function createBatchedEngine(): BatchedEngine {
 export type AgentTranscriptSlice = {
   rows: SessionProjection["rows"];
   streamingMessageId: string | null;
+  pendingPermissions: readonly PendingPermission[];
 };
 
 export type AgentSessionControls = SessionControls & {
@@ -69,8 +77,15 @@ export type AgentSessionControls = SessionControls & {
   start: (prompt: string) => Promise<void>;
   cancel: () => Promise<void>;
   retry: () => Promise<void>;
+  resolvePermission: (
+    callId: string,
+    decision: PermissionDecision,
+    persist?: boolean,
+  ) => Promise<void>;
   modelId: string;
   onModelChange: (modelId: string) => void;
+  permissionMode: PermissionMode;
+  pendingPermissions: readonly PendingPermission[];
 };
 
 /** Stable engine for the home chat session — create once per page mount. */
@@ -91,7 +106,7 @@ export function useAgentSessionStore(): BatchedEngine {
   return storeRef.current;
 }
 
-/** Hot path: only re-renders when rows / streamingMessageId change. */
+/** Hot path: only re-renders when rows / streamingMessageId / pendingPermissions change. */
 export function useAgentTranscript(store: BatchedEngine): AgentTranscriptSlice {
   const rows = useSyncExternalStore(
     store.subscribe,
@@ -103,13 +118,22 @@ export function useAgentTranscript(store: BatchedEngine): AgentTranscriptSlice {
     () => store.getSnapshot().streamingMessageId,
     () => store.getSnapshot().streamingMessageId,
   );
-  return useMemo(() => ({ rows, streamingMessageId }), [rows, streamingMessageId]);
+  const pendingPermissions = useSyncExternalStore(
+    store.subscribe,
+    () => store.getSnapshot().pendingPermissions,
+    () => store.getSnapshot().pendingPermissions,
+  );
+  return useMemo(
+    () => ({ rows, streamingMessageId, pendingPermissions }),
+    [rows, streamingMessageId, pendingPermissions],
+  );
 }
 
 /** Warm path: control flags, usage, submit/cancel/retry, model binding. */
 export function useAgentSessionControls(store: BatchedEngine): AgentSessionControls {
   const { data: settings } = useLoadedSettings();
   const updateSettings = useUpdateSettings();
+  const persistToolApproval = usePersistToolApproval();
 
   const status = useSyncExternalStore(
     store.subscribe,
@@ -153,13 +177,19 @@ export function useAgentSessionControls(store: BatchedEngine): AgentSessionContr
         chatMessages: projection.chatMessages,
         settings: appSettings,
         secrets,
+        persistApproval: persistToolApproval,
       });
     },
-    [store, settings],
+    [store, settings, persistToolApproval],
   );
 
   const cancel = useCallback(() => store.engine.cancel(), [store]);
   const retry = useCallback(() => store.engine.retry(), [store]);
+  const resolvePermission = useCallback(
+    (callId: string, decision: PermissionDecision, persist?: boolean) =>
+      store.engine.resolvePermission(callId, decision, persist),
+    [store],
+  );
 
   const onModelChange = useCallback(
     (modelId: string) => {
@@ -176,9 +206,24 @@ export function useAgentSessionControls(store: BatchedEngine): AgentSessionContr
       start,
       cancel,
       retry,
+      resolvePermission,
       modelId: settings.selectedModelId,
       onModelChange,
+      permissionMode: settings.permissionMode,
+      pendingPermissions,
     }),
-    [controls, status, usage, start, cancel, retry, settings.selectedModelId, onModelChange],
+    [
+      controls,
+      status,
+      usage,
+      start,
+      cancel,
+      retry,
+      resolvePermission,
+      settings.selectedModelId,
+      settings.permissionMode,
+      onModelChange,
+      pendingPermissions,
+    ],
   );
 }
