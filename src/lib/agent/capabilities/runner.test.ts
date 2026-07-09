@@ -54,7 +54,7 @@ describe("runCapability", () => {
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect("error" in result && result.error.code).toBe("invalid_input");
-    expect(payloads.at(-1)?.type).toBe("capability.failed");
+    expect(payloads[payloads.length - 1]?.type).toBe("capability.failed");
   });
 
   test("high-risk capability waits for permission and emits approval parts", async () => {

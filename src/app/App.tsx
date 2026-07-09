@@ -20,7 +20,7 @@ function App() {
             path="/settings"
             element={
               <RouteErrorBoundary>
-                <Suspense>
+                <Suspense fallback={<SettingsPageSkeleton />}>
                   <SettingsPage />
                 </Suspense>
               </RouteErrorBoundary>

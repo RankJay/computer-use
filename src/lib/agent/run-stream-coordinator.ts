@@ -1,8 +1,6 @@
 import type { LanguageModelV4 } from "@ai-sdk/provider";
 import {
   convertToModelMessages,
-  isDynamicToolUIPart,
-  isToolUIPart,
   readUIMessageStream,
   streamText,
   toUIMessageStream,
@@ -27,6 +25,13 @@ import { createBudgetGuard, createBudgetTracker } from "@/lib/session/control/bu
 import type { PermissionWaiter } from "@/lib/session/control/run-controller";
 import type { RuntimeEventPayload } from "@/lib/session/events";
 import type { AppSettings } from "@/lib/settings/types";
+
+/** Reads toolCallId without AI SDK guards (empty TOOLS generics collapse ToolUIPart to never). */
+function getPartToolCallId(part: object): string | null {
+  if (!("toolCallId" in part)) return null;
+  const id = Reflect.get(part, "toolCallId");
+  return typeof id === "string" ? id : null;
+}
 
 export type RunStreamCoordinatorDeps = {
   taskId: string;
@@ -72,12 +77,11 @@ export async function runStreamCoordinator(
     for (let index = 0; index < latestMessage.parts.length; index += 1) {
       const part = latestMessage.parts[index];
       if (!part) continue;
-      if (isDynamicToolUIPart(part) || isToolUIPart(part)) {
-        if (part.toolCallId === callId) {
-          const location = { messageId: latestMessage.id, partIndex: index };
-          toolPartIndex.set(callId, location);
-          return location;
-        }
+      const toolCallId = getPartToolCallId(part);
+      if (toolCallId === callId) {
+        const location = { messageId: latestMessage.id, partIndex: index };
+        toolPartIndex.set(callId, location);
+        return location;
       }
     }
     return null;
@@ -131,10 +135,15 @@ export async function runStreamCoordinator(
     });
 
     const assistantMessageId = `assistant-${deps.taskId}`;
+    const seedMessage: UIMessage = {
+      id: assistantMessageId,
+      role: "assistant",
+      parts: [],
+    };
 
     for await (const message of readUIMessageStream({
       stream: uiChunkStream,
-      message: { id: assistantMessageId, role: "assistant", parts: [] },
+      message: seedMessage,
     })) {
       if (budgetGuard.checkAndStop()) {
         break;
@@ -148,8 +157,9 @@ export async function runStreamCoordinator(
       for (let index = 0; index < message.parts.length; index += 1) {
         const part = message.parts[index];
         if (!part) continue;
-        if (isDynamicToolUIPart(part) || isToolUIPart(part)) {
-          toolPartIndex.set(part.toolCallId, { messageId: message.id, partIndex: index });
+        const toolCallId = getPartToolCallId(part);
+        if (toolCallId !== null) {
+          toolPartIndex.set(toolCallId, { messageId: message.id, partIndex: index });
         }
       }
       messageSync = syncAssistantMessage(emit, message, messageSync);
