@@ -11,6 +11,7 @@ import {
   useAgentTranscript,
   type AgentSessionControls,
 } from "./hooks/use-agent-session";
+import { SessionStatusBar } from "./SessionStatusBar";
 
 const HomeComposer = memo(function HomeComposer({
   controls,
@@ -48,6 +49,11 @@ const HomeChatComposer = memo(function HomeChatComposer({
 }): ReactElement {
   return (
     <div className="flex min-h-12 flex-col gap-2 p-2">
+      <SessionStatusBar
+        pendingPermissions={controls.pendingPermissions}
+        canResolvePermission={controls.canResolvePermission}
+        failure={controls.failure}
+      />
       <HomeComposer controls={controls} />
     </div>
   );

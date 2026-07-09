@@ -26,7 +26,7 @@ export const TextPart = memo(function TextPart({
   const bubbleVariant = part.text.startsWith("Error") ? "destructive" : "ghost";
 
   return (
-    <Bubble variant={bubbleVariant} align="start" className="text-foreground font-[350]">
+    <Bubble variant={bubbleVariant} align="start" className="text-foreground px-1 font-[350]">
       <BubbleContent>
         <MessageResponse isAnimating={isAnimating}>{part.text}</MessageResponse>
       </BubbleContent>

@@ -17,7 +17,15 @@ const streamdownPlugins = { cjk, code, math, mermaid };
 export const MessageResponse = memo(
   ({ className, ...props }: MessageResponseProps) => (
     <Streamdown
-      className={cn("size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0", className)}
+      className={cn(
+        "size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0",
+        // Streamdown defaults to list-inside; marker→text gap differs for disc vs decimal.
+        // list-outside + pl-1 on items keeps that gap consistent across both list types.
+        "**:data-[streamdown=unordered-list]:list-outside **:data-[streamdown=ordered-list]:list-outside",
+        "**:data-[streamdown=unordered-list]:pl-5 **:data-[streamdown=ordered-list]:pl-5",
+        "**:data-[streamdown=list-item]:pl-1",
+        className,
+      )}
       plugins={streamdownPlugins}
       {...props}
     />

@@ -86,7 +86,59 @@ describe("SessionEngine", () => {
     });
     expect(engine.getEventLog().length).toBeGreaterThan(0);
 
-    engine.reset();
+    await engine.reset();
+    expect(engine.getEventLog()).toEqual([]);
+    expect(engine.getProjection().status).toBe("idle");
+    expect(engine.getProjection().rows).toEqual([]);
+  });
+
+  test("reset mid-run cancels producer then clears", async () => {
+    let appendAfterAbort = 0;
+    const slowProducer: ProduceRun = async ({ signal, append, config, taskId }) => {
+      append({
+        type: "task.started",
+        prompt: config.prompt,
+        modelId: config.modelId,
+        agentMode: "demo",
+        userMessageId: `user-${taskId}`,
+      });
+      append({ type: "task.status_changed", status: "streaming" });
+
+      await new Promise<void>((resolve) => {
+        const onAbort = () => {
+          signal.removeEventListener("abort", onAbort);
+          resolve();
+        };
+        if (signal.aborted) {
+          resolve();
+          return;
+        }
+        signal.addEventListener("abort", onAbort);
+      });
+
+      if (!signal.aborted) {
+        appendAfterAbort += 1;
+        append({ type: "task.completed", finishReason: "stop" });
+      }
+    };
+
+    const engine = createSessionEngine({ produceRun: slowProducer });
+    const startPromise = engine.start({
+      prompt: "slow",
+      modelId: "openai/gpt-5.4",
+      settings: DEFAULT_SETTINGS,
+      secrets: DEFAULT_SECRETS,
+    });
+
+    // Let the producer emit started/streaming before reset.
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(engine.getProjection().status).toBe("streaming");
+
+    await engine.reset();
+    await startPromise;
+
+    expect(appendAfterAbort).toBe(0);
     expect(engine.getEventLog()).toEqual([]);
     expect(engine.getProjection().status).toBe("idle");
     expect(engine.getProjection().rows).toEqual([]);

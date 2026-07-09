@@ -3,12 +3,15 @@ import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from "r
 import {
   createProduceRun,
   createSessionEngine,
+  deriveDisplayRows,
   deriveSessionControls,
   setActiveSessionEngine,
+  type AgentTranscriptRow,
   type PendingPermission,
   type PermissionDecision,
   type SessionControls,
   type SessionEngine,
+  type SessionFailure,
   type SessionProjection,
 } from "@/lib/session";
 import {
@@ -66,13 +69,14 @@ function createBatchedEngine(): BatchedEngine {
 }
 
 export type AgentTranscriptSlice = {
-  rows: SessionProjection["rows"];
+  rows: readonly AgentTranscriptRow[];
   streamingMessageId: string | null;
   pendingPermissions: readonly PendingPermission[];
 };
 
 export type AgentSessionControls = SessionControls & {
   status: SessionProjection["status"];
+  failure: SessionFailure | null;
   usage: SessionProjection["usage"];
   start: (prompt: string) => Promise<void>;
   cancel: () => Promise<void>;
@@ -106,26 +110,21 @@ export function useAgentSessionStore(): BatchedEngine {
   return storeRef.current;
 }
 
-/** Hot path: only re-renders when rows / streamingMessageId / pendingPermissions change. */
+/** Hot path: display rows (presentation derive) + streaming / pending permission slices. */
 export function useAgentTranscript(store: BatchedEngine): AgentTranscriptSlice {
-  const rows = useSyncExternalStore(
+  const projection = useSyncExternalStore(
     store.subscribe,
-    () => store.getSnapshot().rows,
-    () => store.getSnapshot().rows,
+    () => store.getSnapshot(),
+    () => store.getSnapshot(),
   );
-  const streamingMessageId = useSyncExternalStore(
-    store.subscribe,
-    () => store.getSnapshot().streamingMessageId,
-    () => store.getSnapshot().streamingMessageId,
-  );
-  const pendingPermissions = useSyncExternalStore(
-    store.subscribe,
-    () => store.getSnapshot().pendingPermissions,
-    () => store.getSnapshot().pendingPermissions,
-  );
+  const rows = useMemo(() => deriveDisplayRows(projection), [projection]);
   return useMemo(
-    () => ({ rows, streamingMessageId, pendingPermissions }),
-    [rows, streamingMessageId, pendingPermissions],
+    () => ({
+      rows,
+      streamingMessageId: projection.streamingMessageId,
+      pendingPermissions: projection.pendingPermissions,
+    }),
+    [rows, projection.streamingMessageId, projection.pendingPermissions],
   );
 }
 
@@ -202,6 +201,7 @@ export function useAgentSessionControls(store: BatchedEngine): AgentSessionContr
     () => ({
       ...controls,
       status,
+      failure,
       usage,
       start,
       cancel,
@@ -215,6 +215,7 @@ export function useAgentSessionControls(store: BatchedEngine): AgentSessionContr
     [
       controls,
       status,
+      failure,
       usage,
       start,
       cancel,

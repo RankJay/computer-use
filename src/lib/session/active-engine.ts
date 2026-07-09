@@ -11,6 +11,6 @@ export function getActiveSessionEngine(): SessionEngine | null {
   return activeEngine;
 }
 
-export function resetActiveSessionEngine(): void {
-  activeEngine?.reset();
+export async function resetActiveSessionEngine(): Promise<void> {
+  await activeEngine?.reset();
 }

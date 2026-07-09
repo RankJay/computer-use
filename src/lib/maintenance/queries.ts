@@ -30,7 +30,7 @@ export function useClearLogs() {
 export function useResetSession() {
   return useMutation({
     mutationFn: async () => {
-      resetActiveSessionEngine();
+      await resetActiveSessionEngine();
       await resetSession();
     },
     onSuccess: () => {

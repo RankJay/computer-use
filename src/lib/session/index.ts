@@ -68,6 +68,8 @@ export {
 
 export { deriveSessionControls, type SessionControls } from "./control/derive-session-controls";
 
+export { deriveDisplayRows } from "./presentation/derive-display-rows";
+
 export { createDemoPayloads, createTestDemoProducer } from "./fixtures/demo-payloads";
 
 export { createDemoReplayProducer } from "./producers/demo-replay";

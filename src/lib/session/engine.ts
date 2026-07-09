@@ -20,7 +20,8 @@ export type SessionEngine = {
   getProjection: () => SessionProjection;
   getEventLog: () => readonly RuntimeEvent[];
   subscribe: (listener: SessionEngineListener) => () => void;
-  reset: () => void;
+  /** Cancel any in-flight run, then clear projection and event log. */
+  reset: () => Promise<void>;
   start: (config: RunConfig) => Promise<void>;
   cancel: () => Promise<void>;
   resolvePermission: (
@@ -100,7 +101,8 @@ export function createSessionEngine(deps: SessionEngineDeps): SessionEngine {
         listeners.delete(listener);
       };
     },
-    reset() {
+    async reset() {
+      await controller.cancel();
       fold = createFoldState();
       projection = createEmptySessionProjection();
       eventLog = [];
