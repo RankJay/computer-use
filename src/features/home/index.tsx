@@ -1,39 +1,42 @@
-﻿import { memo, useState, type ReactElement } from "react";
+﻿import { Suspense, memo, useEffect, type ReactElement } from "react";
 
-import { getDefaultAgentModelId } from "@/lib/agent-models";
+import { signalAppReady } from "@/lib/app-ready";
 
 import { AgentTranscript } from "./chat/AgentTranscript";
-import {
-  useMockAgentControls,
-  useMockAgentStreamStore,
-  useMockAgentTranscript,
-  type MockAgentStreamControls,
-} from "./chat/use-mock-agent-stream";
 import { TaskPromptComposer } from "./Composer";
 import { HomePageHeader } from "./header";
+import {
+  useAgentSessionControls,
+  useAgentSessionStore,
+  useAgentTranscript,
+  type AgentSessionControls,
+} from "./hooks/use-agent-session";
 
 const HomeComposer = memo(function HomeComposer({
-  inputDisabled,
-  cancelVisible,
-  onSubmit,
-  onCancel,
+  controls,
 }: {
-  readonly inputDisabled: boolean;
-  readonly cancelVisible: boolean;
-  readonly onSubmit: (prompt: string) => void;
-  readonly onCancel: () => void;
+  readonly controls: AgentSessionControls;
 }): ReactElement {
-  const [modelId, setModelId] = useState(getDefaultAgentModelId);
-
   return (
     <TaskPromptComposer
-      onSubmit={onSubmit}
-      onCancel={onCancel}
-      inputDisabled={inputDisabled}
-      cancelVisible={cancelVisible}
-      modelId={modelId}
-      onModelChange={setModelId}
-      models={[]}
+      onSubmit={(prompt) => {
+        void controls.start(prompt);
+      }}
+      onCancel={() => {
+        void controls.cancel();
+      }}
+      onRetry={
+        controls.canRetry
+          ? () => {
+              void controls.retry();
+            }
+          : undefined
+      }
+      inputDisabled={controls.inputDisabled}
+      cancelVisible={controls.cancelVisible}
+      canRetry={controls.canRetry}
+      modelId={controls.modelId}
+      onModelChange={controls.onModelChange}
     />
   );
 });
@@ -41,16 +44,11 @@ const HomeComposer = memo(function HomeComposer({
 const HomeChatComposer = memo(function HomeChatComposer({
   controls,
 }: {
-  readonly controls: MockAgentStreamControls;
+  readonly controls: AgentSessionControls;
 }): ReactElement {
   return (
     <div className="flex min-h-12 flex-col gap-2 p-2">
-      <HomeComposer
-        inputDisabled={controls.inputDisabled}
-        cancelVisible={controls.cancelVisible}
-        onSubmit={controls.start}
-        onCancel={controls.cancel}
-      />
+      <HomeComposer controls={controls} />
     </div>
   );
 });
@@ -58,23 +56,29 @@ const HomeChatComposer = memo(function HomeChatComposer({
 const HomeChatTranscript = memo(function HomeChatTranscript({
   store,
 }: {
-  readonly store: ReturnType<typeof useMockAgentStreamStore>;
+  readonly store: ReturnType<typeof useAgentSessionStore>;
 }): ReactElement {
-  const { rows, streamingMessageId } = useMockAgentTranscript(store);
+  const { rows, streamingMessageId } = useAgentTranscript(store);
   return <AgentTranscript rows={rows} streamingMessageId={streamingMessageId} />;
 });
 
 function HomeChatControls({
   store,
 }: {
-  readonly store: ReturnType<typeof useMockAgentStreamStore>;
+  readonly store: ReturnType<typeof useAgentSessionStore>;
 }): ReactElement {
-  const controls = useMockAgentControls(store);
+  const controls = useAgentSessionControls(store);
+
+  // Settings (incl. model id) are loaded before this mounts; reveal window after paint.
+  useEffect(() => {
+    signalAppReady();
+  }, []);
+
   return <HomeChatComposer controls={controls} />;
 }
 
-export function HomePageContent(): ReactElement {
-  const store = useMockAgentStreamStore();
+function HomePageInner(): ReactElement {
+  const store = useAgentSessionStore();
 
   return (
     <div className="flex flex-col h-full w-full gap-0 overflow-hidden box-border overscroll-contain">
@@ -84,5 +88,13 @@ export function HomePageContent(): ReactElement {
       <HomeChatTranscript store={store} />
       <HomeChatControls store={store} />
     </div>
+  );
+}
+
+export function HomePageContent(): ReactElement {
+  return (
+    <Suspense fallback={null}>
+      <HomePageInner />
+    </Suspense>
   );
 }

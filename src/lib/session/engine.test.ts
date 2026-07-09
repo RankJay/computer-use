@@ -2,10 +2,10 @@ import { describe, expect, test } from "bun:test";
 
 import { DEFAULT_SECRETS, DEFAULT_SETTINGS } from "@/lib/settings/defaults";
 
+import type { ProduceRun, PermissionDecision } from "./control/run-controller";
 import { createSessionEngine } from "./engine";
 import { createDemoPayloads, createTestDemoProducer } from "./fixtures/demo-payloads";
 import { projectSession } from "./project-session";
-import type { ProduceRun, PermissionDecision } from "./control/run-controller";
 
 describe("SessionEngine", () => {
   test("demo producer drives a completed projection", async () => {
@@ -224,7 +224,13 @@ describe("RunController via SessionEngine", () => {
   test("cancel denies pending permission waiters", async () => {
     let sawDecision: PermissionDecision | undefined;
 
-    const producer: ProduceRun = async ({ append, createPermissionWaiter, config, taskId, signal }) => {
+    const producer: ProduceRun = async ({
+      append,
+      createPermissionWaiter,
+      config,
+      taskId,
+      signal,
+    }) => {
       append({
         type: "task.started",
         prompt: config.prompt,

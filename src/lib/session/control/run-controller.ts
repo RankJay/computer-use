@@ -1,8 +1,9 @@
 import type { UIMessage } from "ai";
 
+import type { AppSecrets, AppSettings } from "@/lib/settings/types";
+
 import type { RuntimeEventPayload } from "../events";
 import type { SessionProjection } from "../projection";
-import type { AppSecrets, AppSettings } from "@/lib/settings/types";
 
 export type PermissionDecision = "approved" | "denied";
 

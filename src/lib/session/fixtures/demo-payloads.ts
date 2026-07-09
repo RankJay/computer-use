@@ -1,5 +1,5 @@
-import type { RuntimeEventPayload } from "../events";
 import type { ProduceRun } from "../control/run-controller";
+import type { RuntimeEventPayload } from "../events";
 
 /** Payload-only demo fixture for session-engine tests (no envelopes). */
 export function createDemoPayloads(prompt: string): RuntimeEventPayload[] {

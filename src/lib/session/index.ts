@@ -41,6 +41,12 @@ export {
 export { createSessionEngine, type SessionEngine, type SessionEngineDeps } from "./engine";
 
 export {
+  setActiveSessionEngine,
+  getActiveSessionEngine,
+  resetActiveSessionEngine,
+} from "./active-engine";
+
+export {
   createBudgetTracker,
   createBudgetGuard,
   formatBudgetExceededMessage,
@@ -60,4 +66,10 @@ export {
   type RunControllerDeps,
 } from "./control/run-controller";
 
+export { deriveSessionControls, type SessionControls } from "./control/derive-session-controls";
+
 export { createDemoPayloads, createTestDemoProducer } from "./fixtures/demo-payloads";
+
+export { createDemoReplayProducer } from "./producers/demo-replay";
+export { createLiveRunProducer } from "./producers/live-run";
+export { createProduceRun } from "./producers/select-producer";

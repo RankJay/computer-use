@@ -1,4 +1,4 @@
-import { ArrowUp, Square } from "lucide-react";
+import { ArrowUp, RotateCcw, Square } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { ChangeEvent, KeyboardEvent, ReactElement, SubmitEvent } from "react";
 
@@ -13,16 +13,17 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { getAvailableAgentModels, type AgentModelOption } from "@/lib/agent-models";
+import { getAvailableAgentModels } from "@/lib/agent-models";
 
 export type TaskPromptComposerProps = {
   readonly onSubmit: (prompt: string) => void;
   readonly onCancel: () => void;
+  readonly onRetry?: () => void;
   readonly inputDisabled: boolean;
   readonly cancelVisible: boolean;
+  readonly canRetry?: boolean;
   readonly modelId: string;
   readonly onModelChange: (modelId: string) => void;
-  readonly models: readonly AgentModelOption[];
 };
 
 export function TaskPromptComposer(props: TaskPromptComposerProps): ReactElement {
@@ -66,7 +67,6 @@ export function TaskPromptComposer(props: TaskPromptComposerProps): ReactElement
   }
 
   function handleChange(e: ChangeEvent<HTMLTextAreaElement>): void {
-    // React bails out when the boolean is unchanged — no re-render while typing.
     setCanSubmit(e.target.value.trim().length > 0);
   }
 
@@ -117,6 +117,17 @@ export function TaskPromptComposer(props: TaskPromptComposerProps): ReactElement
         </Select>
 
         <div className="flex shrink-0 items-center gap-0.5">
+          {props.canRetry && props.onRetry ? (
+            <Button
+              type="button"
+              size="icon"
+              aria-label="Retry task"
+              onClick={props.onRetry}
+              className="size-7 shrink-0 rounded-full border-0 bg-[#2b2b2b] text-white shadow-none hover:bg-[#363636] focus-visible:ring-2 focus-visible:ring-neutral-600"
+            >
+              <RotateCcw className="size-3.5" strokeWidth={2.5} />
+            </Button>
+          ) : null}
           <Button
             type={props.cancelVisible ? "button" : "submit"}
             size="icon"

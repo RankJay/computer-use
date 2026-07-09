@@ -22,7 +22,9 @@ export const MarkerRow = memo(function MarkerRow({ row }: MarkerRowProps): React
           <LoaderCircleIcon className="size-3.5 animate-spin" />
         </MarkerIcon>
       ) : null}
-      <MarkerContent className={cn(row.live && "shimmer text-muted-foreground font-medium tracking-tight")}>
+      <MarkerContent
+        className={cn(row.live && "shimmer text-muted-foreground font-medium tracking-tight")}
+      >
         {row.text}
       </MarkerContent>
     </Marker>
