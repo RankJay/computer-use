@@ -1,6 +1,7 @@
-﻿import { Suspense, memo, useEffect, type ReactElement } from "react";
+﻿import { Suspense, memo, useCallback, useEffect, type ReactElement } from "react";
 
 import { signalAppReady } from "@/lib/app-ready";
+import type { PermissionDecision } from "@/lib/session";
 
 import { AgentTranscript } from "./chat/AgentTranscript";
 import { TaskPromptComposer } from "./Composer";
@@ -38,6 +39,7 @@ const HomeComposer = memo(function HomeComposer({
       canRetry={controls.canRetry}
       modelId={controls.modelId}
       onModelChange={controls.onModelChange}
+      contextUsage={controls.contextUsage}
     />
   );
 });
@@ -64,6 +66,13 @@ function HomePageInner(): ReactElement {
   const { rows, streamingMessageId, pendingPermissions } = useAgentTranscript(store);
   const controls = useAgentSessionControls(store);
 
+  const onResolvePermission = useCallback(
+    (callId: string, decision: PermissionDecision, persist?: boolean) => {
+      void controls.resolvePermission(callId, decision, persist);
+    },
+    [controls.resolvePermission],
+  );
+
   // Settings (incl. model id) are loaded before this mounts; reveal window after paint.
   useEffect(() => {
     signalAppReady();
@@ -79,9 +88,7 @@ function HomePageInner(): ReactElement {
         streamingMessageId={streamingMessageId}
         pendingPermissions={pendingPermissions}
         permissionMode={controls.permissionMode}
-        onResolvePermission={(callId, decision, persist) => {
-          void controls.resolvePermission(callId, decision, persist);
-        }}
+        onResolvePermission={onResolvePermission}
       />
       <HomeChatComposer controls={controls} />
     </div>

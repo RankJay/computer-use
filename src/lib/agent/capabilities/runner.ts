@@ -112,7 +112,7 @@ export async function runCapability(
     return { ok: false, error: capabilityError };
   }
 
-  const toolPart = deps.resolveToolPart?.(callId) ?? null;
+  const resolveLocation = () => deps.resolveToolPart?.(callId) ?? null;
 
   if (needsPermission(definition, deps.settings)) {
     append({
@@ -122,7 +122,7 @@ export async function runCapability(
       input: parsedInput,
       risk: definition.risk,
     });
-    emitApprovalPart(deps, toolPart, name, callId, parsedInput, "approval-requested");
+    emitApprovalPart(deps, resolveLocation(), name, callId, parsedInput, "approval-requested");
 
     const waiter = deps.createPermissionWaiter(callId);
     const decision = await waiter.waitForDecision();
@@ -133,12 +133,21 @@ export async function runCapability(
       decision,
     });
 
+    // Re-resolve after the waiter — the tool part may have arrived mid-wait.
     if (decision === "denied") {
-      emitApprovalPart(deps, toolPart, name, callId, parsedInput, "output-denied", false);
+      emitApprovalPart(deps, resolveLocation(), name, callId, parsedInput, "output-denied", false);
       return { ok: false, denied: true };
     }
 
-    emitApprovalPart(deps, toolPart, name, callId, parsedInput, "approval-responded", true);
+    emitApprovalPart(
+      deps,
+      resolveLocation(),
+      name,
+      callId,
+      parsedInput,
+      "approval-responded",
+      true,
+    );
   }
 
   const invokeNative = deps.invokeNative ?? createDefaultNativeInvoker();

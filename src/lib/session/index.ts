@@ -70,6 +70,8 @@ export { deriveSessionControls, type SessionControls } from "./control/derive-se
 
 export { deriveDisplayRows } from "./presentation/derive-display-rows";
 
+export { isLiveWorkspaceReady } from "./live-workspace";
+
 export { createDemoPayloads, createTestDemoProducer } from "./fixtures/demo-payloads";
 
 export { createDemoReplayProducer } from "./producers/demo-replay";

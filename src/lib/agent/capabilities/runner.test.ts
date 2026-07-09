@@ -143,6 +143,61 @@ describe("runCapability", () => {
     ).toBe(true);
   });
 
+  test("re-resolves tool part after waiter when first resolve was null", async () => {
+    const payloads: RuntimeEventPayload[] = [];
+    let resolveDecision: ((value: "approved" | "denied") => void) | undefined;
+    let resolveCalls = 0;
+
+    const resultPromise = runCapability(
+      "delete_path",
+      { path: "tmp/late.txt" },
+      {
+        append: (payload) => payloads.push(payload),
+        taskId: "task-1",
+        settings: { ...DEFAULT_SETTINGS, permissionMode: "every-meaningful" },
+        workspaceRoot: "D:/Projects/actuate-v3",
+        invokeNative: createMockCapabilityInvoker({
+          delete_path: async () => ({ path: "tmp/late.txt" }),
+        }),
+        createPermissionWaiter: () => ({
+          waitForDecision: () =>
+            new Promise((resolve) => {
+              resolveDecision = resolve;
+            }),
+        }),
+        resolveToolPart: () => {
+          resolveCalls += 1;
+          // First emit (approval-requested) misses; post-decision emit finds the part.
+          if (resolveCalls === 1) return null;
+          return { messageId: "assistant-task-1", partIndex: 0 };
+        },
+      },
+      "call-late",
+    );
+
+    await Promise.resolve();
+    expect(
+      payloads.some(
+        (p) =>
+          p.type === "assistant.part_updated" &&
+          p.part.type === "dynamic-tool" &&
+          p.part.state === "approval-requested",
+      ),
+    ).toBe(false);
+
+    resolveDecision?.("approved");
+    const result = await resultPromise;
+    expect(result.ok).toBe(true);
+    expect(
+      payloads.some(
+        (p) =>
+          p.type === "assistant.part_updated" &&
+          p.part.type === "dynamic-tool" &&
+          p.part.state === "approval-responded",
+      ),
+    ).toBe(true);
+  });
+
   test("parallel callIds each await their own waiter", async () => {
     const resolvers = new Map<string, (value: "approved" | "denied") => void>();
 

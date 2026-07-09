@@ -1,10 +1,13 @@
+import type { LanguageModelUsage } from "ai";
 import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from "react";
+import { toast } from "sonner";
 
 import {
   createProduceRun,
   createSessionEngine,
   deriveDisplayRows,
   deriveSessionControls,
+  isLiveWorkspaceReady,
   setActiveSessionEngine,
   type AgentTranscriptRow,
   type PendingPermission,
@@ -20,6 +23,42 @@ import {
   useUpdateSettings,
 } from "@/lib/settings/queries";
 import type { PermissionMode } from "@/lib/settings/types";
+
+export type ComposerContextUsage = {
+  readonly usedTokens: number;
+  readonly maxTokens: number;
+  readonly modelId: string;
+  readonly usage: LanguageModelUsage;
+};
+
+function emptyLanguageModelUsage(): LanguageModelUsage {
+  return {
+    inputTokens: 0,
+    outputTokens: 0,
+    totalTokens: 0,
+    inputTokenDetails: {
+      noCacheTokens: 0,
+      cacheReadTokens: 0,
+      cacheWriteTokens: undefined,
+    },
+    outputTokenDetails: {
+      textTokens: 0,
+      reasoningTokens: 0,
+    },
+  };
+}
+
+function toContextUsage(
+  usage: SessionProjection["usage"],
+  fallbackModelId: string,
+): ComposerContextUsage {
+  return {
+    usedTokens: usage.usedTokens,
+    maxTokens: usage.maxTokens,
+    modelId: usage.modelId ?? fallbackModelId,
+    usage: (usage.usage as LanguageModelUsage | null) ?? emptyLanguageModelUsage(),
+  };
+}
 
 type Listener = () => void;
 
@@ -78,6 +117,7 @@ export type AgentSessionControls = SessionControls & {
   status: SessionProjection["status"];
   failure: SessionFailure | null;
   usage: SessionProjection["usage"];
+  contextUsage: ComposerContextUsage;
   start: (prompt: string) => Promise<void>;
   cancel: () => Promise<void>;
   retry: () => Promise<void>;
@@ -168,8 +208,12 @@ export function useAgentSessionControls(store: BatchedEngine): AgentSessionContr
 
   const start = useCallback(
     async (prompt: string) => {
-      const projection = store.engine.getProjection();
       const { secrets, ...appSettings } = settings;
+      if (!isLiveWorkspaceReady(appSettings)) {
+        toast.error("Set a workspace root in Settings before running live.");
+        return;
+      }
+      const projection = store.engine.getProjection();
       await store.engine.start({
         prompt,
         modelId: appSettings.selectedModelId,
@@ -197,12 +241,18 @@ export function useAgentSessionControls(store: BatchedEngine): AgentSessionContr
     [updateSettings],
   );
 
+  const contextUsage = useMemo(
+    () => toContextUsage(usage, settings.selectedModelId),
+    [usage, settings.selectedModelId],
+  );
+
   return useMemo(
     () => ({
       ...controls,
       status,
       failure,
       usage,
+      contextUsage,
       start,
       cancel,
       retry,
@@ -217,6 +267,7 @@ export function useAgentSessionControls(store: BatchedEngine): AgentSessionContr
       status,
       failure,
       usage,
+      contextUsage,
       start,
       cancel,
       retry,

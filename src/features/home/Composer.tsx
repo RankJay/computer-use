@@ -2,6 +2,18 @@ import { ArrowUp, RotateCcw, Square } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { ChangeEvent, KeyboardEvent, ReactElement, SubmitEvent } from "react";
 
+import {
+  Context,
+  ContextCacheUsage,
+  ContextContent,
+  ContextContentBody,
+  ContextContentFooter,
+  ContextContentHeader,
+  ContextInputUsage,
+  ContextOutputUsage,
+  ContextReasoningUsage,
+  ContextTrigger,
+} from "@/components/ai-elements/context";
 import { Anthropic } from "@/components/icons/anthropic";
 import { OpenAI } from "@/components/icons/openai";
 import { Button } from "@/components/ui/button";
@@ -15,6 +27,8 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { getAvailableAgentModels } from "@/lib/agent-models";
 
+import type { ComposerContextUsage } from "./hooks/use-agent-session";
+
 export type TaskPromptComposerProps = {
   readonly onSubmit: (prompt: string) => void;
   readonly onCancel: () => void;
@@ -24,6 +38,7 @@ export type TaskPromptComposerProps = {
   readonly canRetry?: boolean;
   readonly modelId: string;
   readonly onModelChange: (modelId: string) => void;
+  readonly contextUsage: ComposerContextUsage;
 };
 
 export function TaskPromptComposer(props: TaskPromptComposerProps): ReactElement {
@@ -117,6 +132,25 @@ export function TaskPromptComposer(props: TaskPromptComposerProps): ReactElement
         </Select>
 
         <div className="flex shrink-0 items-center gap-0.5">
+          <Context
+            maxTokens={props.contextUsage.maxTokens}
+            modelId={props.contextUsage.modelId}
+            usage={props.contextUsage.usage}
+            usedTokens={props.contextUsage.usedTokens}
+          >
+            <ContextTrigger className="h-7 px-1.5 text-xs text-[#767676] hover:bg-[#252525] hover:text-[#CDCDCD]" />
+            <ContextContent align="end" className="border-[#252525] bg-[#161616] text-[#CDCDCD]">
+              <ContextContentHeader />
+              <ContextContentBody className="space-y-2">
+                <ContextInputUsage />
+                <ContextOutputUsage />
+                <ContextReasoningUsage />
+                <ContextCacheUsage />
+              </ContextContentBody>
+              <ContextContentFooter />
+            </ContextContent>
+          </Context>
+
           {props.canRetry && props.onRetry ? (
             <Button
               type="button"

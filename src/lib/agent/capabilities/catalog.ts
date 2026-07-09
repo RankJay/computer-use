@@ -1,3 +1,5 @@
+import type { AppSettings } from "@/lib/settings/types";
+
 import { accessibilityClickCapability } from "./accessibility/click";
 import { accessibilityExpandNodeCapability } from "./accessibility/expand-node";
 import { accessibilityFindElementCapability } from "./accessibility/find-element";
@@ -94,10 +96,15 @@ export function isCapabilityName(name: string): name is CapabilityName {
   return capabilityByName.has(name);
 }
 
-/** Capability names grouped by risk for system-prompt generation. */
-export function getCapabilityNamesByRisk(): Record<CapabilityRisk, string[]> {
+/**
+ * Capability names grouped by risk for system-prompt generation.
+ * When settings are provided, skips tools whose `enabledWhen` predicate fails
+ * (same filter as `buildAgentTools`).
+ */
+export function getCapabilityNamesByRisk(settings?: AppSettings): Record<CapabilityRisk, string[]> {
   const groups: Record<CapabilityRisk, string[]> = { low: [], medium: [], high: [] };
   for (const capability of CAPABILITIES) {
+    if (settings && capability.enabledWhen?.(settings) === false) continue;
     groups[capability.risk].push(capability.name);
   }
   return groups;

@@ -323,6 +323,57 @@ describe("RunController via SessionEngine", () => {
     expect(engine.getProjection().status).toBe("cancelled");
   });
 
+  test("retry after recoverable failure omits duplicate user message", async () => {
+    let runs = 0;
+    const producer: ProduceRun = async ({ append, config, taskId }) => {
+      runs += 1;
+      append({
+        type: "task.started",
+        prompt: config.prompt,
+        modelId: config.modelId,
+        agentMode: "demo",
+        userMessageId: config.isRetry ? undefined : `user-${taskId}`,
+        omitUserMessage: config.isRetry === true,
+      });
+
+      if (runs === 1) {
+        append({
+          type: "task.failed",
+          code: "auth",
+          message: "missing key",
+          recoverable: true,
+        });
+        return;
+      }
+
+      append({ type: "task.completed", finishReason: "stop" });
+    };
+
+    const engine = createSessionEngine({ produceRun: producer });
+    await engine.start({
+      prompt: "retry me",
+      modelId: "openai/gpt-5.4",
+      settings: DEFAULT_SETTINGS,
+      secrets: DEFAULT_SECRETS,
+    });
+
+    expect(engine.getProjection().status).toBe("failed");
+    expect(engine.getProjection().failure?.recoverable).toBe(true);
+    const userRowsBefore = engine
+      .getProjection()
+      .rows.filter((row) => row.type === "message" && row.message.role === "user").length;
+    expect(userRowsBefore).toBe(1);
+
+    await engine.retry();
+
+    expect(runs).toBe(2);
+    expect(engine.getProjection().status).toBe("completed");
+    const userRowsAfter = engine
+      .getProjection()
+      .rows.filter((row) => row.type === "message" && row.message.role === "user").length;
+    expect(userRowsAfter).toBe(1);
+  });
+
   test("cancel-before-start replaces prior run", async () => {
     let runs = 0;
     const producer: ProduceRun = async ({ append, config, taskId, signal }) => {

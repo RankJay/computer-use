@@ -7,7 +7,7 @@ export function buildSystemPrompt(settings: AppSettings): string {
     settings.workspaceRoot.trim() ||
     "(not configured — ask the user to set workspace root in Settings)";
 
-  const byRisk = getCapabilityNamesByRisk();
+  const byRisk = getCapabilityNamesByRisk(settings);
   const low = byRisk.low.join(", ");
   const medium = byRisk.medium.join(", ");
   const high = byRisk.high.join(", ");

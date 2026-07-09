@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
+import { DEFAULT_SETTINGS } from "@/lib/settings/defaults";
+
 import { getCapabilities, getCapabilityNamesByRisk } from "./catalog";
 
 describe("capability catalog", () => {
@@ -34,6 +36,16 @@ describe("capability catalog", () => {
     expect(byRisk.low).toContain("read_file");
     expect(byRisk.high).toContain("run_shell");
     expect(byRisk.medium).toContain("read_clipboard");
+  });
+
+  test("filters accessibility tools when uiAutomation is off", () => {
+    const off = getCapabilityNamesByRisk({ ...DEFAULT_SETTINGS, uiAutomation: false });
+    const on = getCapabilityNamesByRisk({ ...DEFAULT_SETTINGS, uiAutomation: true });
+
+    expect(off.high).not.toContain("accessibility_snapshot");
+    expect(off.high).not.toContain("accessibility_click");
+    expect(on.high).toContain("accessibility_snapshot");
+    expect(on.high).toContain("accessibility_click");
   });
 
   test("workspace-root flag is set only on filesystem tools", () => {
