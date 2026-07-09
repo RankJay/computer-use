@@ -27,7 +27,7 @@ function SettingsSectionSkeleton({ rowCount }: SettingsSectionSkeletonProps): Re
 
 export function SettingsPageSkeleton(): ReactElement {
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-8 pt-1">
       <SettingsSectionSkeleton rowCount={2} />
       <SettingsSectionSkeleton rowCount={2} />
       <SettingsSectionSkeleton rowCount={4} />
