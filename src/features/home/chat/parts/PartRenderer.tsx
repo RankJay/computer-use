@@ -13,7 +13,7 @@ import { memo, type ReactElement, type ReactNode } from "react";
 
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
 
-import { ReasoningPart, reasoningTextFromParts } from "./ReasoningPart";
+import { ReasoningPart } from "./ReasoningPart";
 import { SourcesPart } from "./SourcesPart";
 import { TextPart } from "./TextPart";
 import { ToolPart } from "./ToolPart";
@@ -69,7 +69,7 @@ function renderMessageParts(message: UIMessage, isStreaming: boolean): ReactNode
       elements.push(
         <ReasoningPart
           key={`reasoning-${startIndex}`}
-          text={reasoningTextFromParts(reasoningParts)}
+          text={reasoningParts.map((part) => part.text).join("\n\n")}
           isStreaming={isStreaming && last?.state === "streaming"}
         />,
       );

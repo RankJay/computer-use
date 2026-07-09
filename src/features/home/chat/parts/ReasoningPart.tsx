@@ -1,4 +1,3 @@
-import type { ReasoningUIPart } from "ai";
 import { memo, type ReactElement } from "react";
 
 import { Reasoning, ReasoningContent, ReasoningTrigger } from "@/components/ai-elements/reasoning";
@@ -19,7 +18,3 @@ export const ReasoningPart = memo(function ReasoningPart({
     </Reasoning>
   );
 });
-
-export function reasoningTextFromParts(parts: readonly ReasoningUIPart[]): string {
-  return parts.map((part) => part.text).join("\n\n");
-}
