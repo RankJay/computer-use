@@ -21,8 +21,8 @@ export function HomePageHeader(): ReactElement {
   return (
     <header className="flex w-full relative shrink-0 select-none items-center justify-between p-4">
       <div className="flex items-baseline gap-2.5">
-      <h1 className="text-base font-[450] shrink-0 tracking-tight text-foreground">Actuate</h1>
-      <span className="text-[13px] text-foreground/50">0.1.0</span>
+        <h1 className="text-base font-[450] shrink-0 tracking-tight text-foreground">Actuate</h1>
+        <span className="text-[13px] text-foreground/50">0.1.0</span>
       </div>
       <div className="flex items-center gap-4">
         <Link

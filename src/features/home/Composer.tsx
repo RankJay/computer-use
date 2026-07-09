@@ -1,6 +1,6 @@
 import { ArrowUp, Square } from "lucide-react";
-import { useEffect, useRef } from "react";
-import type { KeyboardEvent, ReactElement, SubmitEvent } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { ChangeEvent, KeyboardEvent, ReactElement, SubmitEvent } from "react";
 
 import { Anthropic } from "@/components/icons/anthropic";
 import { OpenAI } from "@/components/icons/openai";
@@ -16,12 +16,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { getAvailableAgentModels, type AgentModelOption } from "@/lib/agent-models";
 
 export type TaskPromptComposerProps = {
-  readonly value: string;
-  readonly onChange: (value: string) => void;
-  readonly onSubmit: () => void;
+  readonly onSubmit: (prompt: string) => void;
   readonly onCancel: () => void;
   readonly inputDisabled: boolean;
-  readonly submitDisabled: boolean;
   readonly cancelVisible: boolean;
   readonly modelId: string;
   readonly onModelChange: (modelId: string) => void;
@@ -30,24 +27,47 @@ export type TaskPromptComposerProps = {
 
 export function TaskPromptComposer(props: TaskPromptComposerProps): ReactElement {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [canSubmit, setCanSubmit] = useState(false);
   const models = getAvailableAgentModels();
 
   useEffect(() => {
     textareaRef.current?.focus();
   }, []);
 
+  function readPrompt(): string {
+    return textareaRef.current?.value ?? "";
+  }
+
+  function clearPrompt(): void {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.value = "";
+    setCanSubmit(false);
+  }
+
+  function submitPrompt(): void {
+    if (props.inputDisabled || !canSubmit) return;
+    const prompt = readPrompt();
+    if (prompt.trim().length === 0) return;
+    clearPrompt();
+    props.onSubmit(prompt);
+  }
+
   function handleSubmit(e: SubmitEvent<HTMLFormElement>): void {
     e.preventDefault();
-    props.onSubmit();
+    submitPrompt();
   }
 
   function handleKeyDown(e: KeyboardEvent<HTMLTextAreaElement>): void {
     if (e.key !== "Enter" || e.shiftKey || e.nativeEvent.isComposing) return;
 
     e.preventDefault();
-    if (props.inputDisabled || props.submitDisabled) return;
+    submitPrompt();
+  }
 
-    props.onSubmit();
+  function handleChange(e: ChangeEvent<HTMLTextAreaElement>): void {
+    // React bails out when the boolean is unchanged — no re-render while typing.
+    setCanSubmit(e.target.value.trim().length > 0);
   }
 
   return (
@@ -57,7 +77,8 @@ export function TaskPromptComposer(props: TaskPromptComposerProps): ReactElement
     >
       <Textarea
         ref={textareaRef}
-        onChange={(e) => props.onChange(e.target.value)}
+        defaultValue=""
+        onChange={handleChange}
         onKeyDown={handleKeyDown}
         placeholder="How can I help you today?"
         disabled={props.inputDisabled}
@@ -99,7 +120,7 @@ export function TaskPromptComposer(props: TaskPromptComposerProps): ReactElement
           <Button
             type={props.cancelVisible ? "button" : "submit"}
             size="icon"
-            disabled={!props.cancelVisible && props.submitDisabled}
+            disabled={!props.cancelVisible && (!canSubmit || props.inputDisabled)}
             aria-label={props.cancelVisible ? "Stop task" : "Run task"}
             onClick={props.cancelVisible ? props.onCancel : undefined}
             className={
