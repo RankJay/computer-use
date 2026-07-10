@@ -1,13 +1,14 @@
 import type { UIMessage } from "ai";
 
-import type { AgentTranscriptRow } from "@/features/ai-chat/types";
 import { getDefaultAgentModel } from "@/lib/agent-models";
 
 import type { LanguageModelUsageSnapshot, RunStatus } from "./events";
+import type { AgentTranscriptRow } from "./rows";
 
 export type SessionFailure = {
   code: string;
   message: string;
+  recoverable: boolean;
 };
 
 export type PendingPermission = {
@@ -33,19 +34,17 @@ export type SessionBudget = {
   maxWallClockMs: number;
 };
 
+/** Canonical session read model. Control flags are derived elsewhere — never stored. */
 export type SessionProjection = {
   taskId: string | null;
   status: RunStatus;
   failure: SessionFailure | null;
   rows: AgentTranscriptRow[];
   chatMessages: UIMessage[];
-  pendingPermission: PendingPermission | null;
+  pendingPermissions: PendingPermission[];
   usage: SessionUsage;
   budget: SessionBudget;
-  canSubmit: boolean;
-  canCancel: boolean;
-  cancelVisible: boolean;
-  inputDisabled: boolean;
+  streamingMessageId: string | null;
 };
 
 export const EMPTY_SESSION_BUDGET: SessionBudget = {
@@ -71,28 +70,9 @@ export function createEmptySessionProjection(): SessionProjection {
     failure: null,
     rows: [],
     chatMessages: [],
-    pendingPermission: null,
+    pendingPermissions: [],
     usage: { ...EMPTY_SESSION_USAGE },
     budget: { ...EMPTY_SESSION_BUDGET },
-    canSubmit: true,
-    canCancel: false,
-    cancelVisible: false,
-    inputDisabled: false,
-  };
-}
-
-export function deriveControlFlags(status: RunStatus): {
-  canSubmit: boolean;
-  canCancel: boolean;
-  cancelVisible: boolean;
-  inputDisabled: boolean;
-} {
-  const active = status === "running" || status === "streaming" || status === "waiting_permission";
-
-  return {
-    canSubmit: !active,
-    canCancel: active,
-    cancelVisible: active,
-    inputDisabled: active,
+    streamingMessageId: null,
   };
 }

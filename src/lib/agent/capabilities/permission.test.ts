@@ -65,28 +65,6 @@ describe("needsPermission", () => {
     ).toBe(true);
   });
 
-  test("high-risk file-system capabilities prompt in every-meaningful mode", () => {
-    for (const name of ["create_directory", "patch_file", "move_path", "duplicate_path"] as const) {
-      expect(
-        needsPermission(
-          { name, risk: "high" },
-          { ...DEFAULT_SETTINGS, permissionMode: "every-meaningful" },
-        ),
-      ).toBe(true);
-    }
-  });
-
-  test("low-risk file-system capabilities skip prompts", () => {
-    for (const name of ["read_directory", "stat_path"] as const) {
-      expect(
-        needsPermission(
-          { name, risk: "low" },
-          { ...DEFAULT_SETTINGS, permissionMode: "every-meaningful" },
-        ),
-      ).toBe(false);
-    }
-  });
-
   test("persisted approvals bypass prompts", () => {
     expect(
       needsPermission(

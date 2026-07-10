@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import { DEFAULT_SETTINGS } from "@/lib/settings/defaults";
 
-import { createBudgetTracker, createBudgetGuard, formatBudgetExceededMessage } from "./budget";
+import { createBudgetGuard, createBudgetTracker, formatBudgetExceededMessage } from "./budget";
 
 describe("budget", () => {
   test("detects step limit when over max", () => {

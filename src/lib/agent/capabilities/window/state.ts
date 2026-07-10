@@ -1,6 +1,5 @@
 import { z } from "zod";
 
-import { invokeCapabilityCommand } from "../tauri-invoke";
 import { defineCapability } from "../types";
 
 export const windowStateInputSchema = z.object({
@@ -21,18 +20,4 @@ export const windowStateCapability = defineCapability({
   description: "Minimize, maximize, restore, or close a top-level window by handle.",
   risk: "high",
   inputSchema: windowStateInputSchema,
-  execute: async (input) => {
-    const result = await invokeCapabilityCommand<{ ok: boolean; hwnd: number; op: string }>(
-      "window_state",
-      {
-        hwnd: input.hwnd,
-        op: input.op,
-      },
-    );
-    return {
-      ok: result.ok,
-      hwnd: result.hwnd,
-      op: result.op,
-    } satisfies WindowStateOutput;
-  },
 });

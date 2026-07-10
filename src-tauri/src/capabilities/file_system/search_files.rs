@@ -7,6 +7,7 @@ use crate::capabilities::path_utils::{self, CommandError};
 const MAX_MATCHES: usize = 100;
 
 #[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SearchFilesResult {
     pub matches: Vec<String>,
 }

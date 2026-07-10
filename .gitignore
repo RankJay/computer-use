@@ -7,25 +7,14 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-*.env
-
-# AI-assisted Development
-.ai/
-.vscode/
-.cursor/
-
 node_modules
 dist
 dist-ssr
 *.local
 
-# Tauri build artifacts
-src-tauri/target/
-src-tauri/gen/
-
 # Editor directories and files
-.vscode/*
-!.vscode/extensions.json
+.ai/
+.vscode/
 .idea
 .DS_Store
 *.suo

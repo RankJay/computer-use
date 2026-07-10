@@ -1,6 +1,5 @@
 import { z } from "zod";
 
-import { invokeCapabilityCommand } from "../tauri-invoke";
 import { defineCapability } from "../types";
 
 export const movePathInputSchema = z.object({
@@ -19,17 +18,6 @@ export const movePathCapability = defineCapability({
   name: "move_path",
   description: "Move or rename a file or directory within the workspace",
   risk: "high",
+  needsWorkspaceRoot: true,
   inputSchema: movePathInputSchema,
-  execute: async (input, ctx) => {
-    const result = await invokeCapabilityCommand<{
-      from: string;
-      to: string;
-    }>("move_path", {
-      from: input.from,
-      to: input.to,
-      workspaceRoot: ctx.workspaceRoot,
-    });
-
-    return result satisfies MovePathOutput;
-  },
 });

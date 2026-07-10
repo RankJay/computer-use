@@ -14,6 +14,7 @@ const SHELL_TIMEOUT: Duration = Duration::from_secs(120);
 const MAX_CAPTURE_BYTES: usize = 512_000;
 
 #[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct RunShellResult {
     pub exit_code: i32,
     pub stdout: String,

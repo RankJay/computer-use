@@ -1,6 +1,6 @@
 import { readAppSecrets, writeAppSecret } from "@/lib/settings/adapters/tauri-secrets-store";
 import { readAppSettings, writeAppSettings } from "@/lib/settings/adapters/tauri-settings-store";
-import type { SettingsPersistence } from "@/lib/settings/ports";
+import type { SettingsPersistence } from "@/lib/settings/persistence";
 import type { AppSecrets, AppSettings, LoadedSettings } from "@/lib/settings/types";
 
 export class TauriSettingsPersistence implements SettingsPersistence {

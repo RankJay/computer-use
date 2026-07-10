@@ -1,6 +1,5 @@
 import { z } from "zod";
 
-import { invokeCapabilityCommand } from "../tauri-invoke";
 import { defineCapability } from "../types";
 
 export const runShellInputSchema = z.object({
@@ -29,26 +28,4 @@ export const runShellCapability = defineCapability({
     "Run a shell command or executable anywhere on the system. Returns stdout, stderr, and exit code.",
   risk: "high",
   inputSchema: runShellInputSchema,
-  execute: async (input) => {
-    const result = await invokeCapabilityCommand<{
-      exit_code: number;
-      stdout: string;
-      stderr: string;
-      timed_out: boolean;
-      cwd: string | null;
-    }>("run_shell", {
-      program: input.program,
-      args: input.args,
-      cwd: input.cwd,
-      env: input.env,
-    });
-
-    return {
-      exitCode: result.exit_code,
-      stdout: result.stdout,
-      stderr: result.stderr,
-      timedOut: result.timed_out,
-      cwd: result.cwd,
-    } satisfies RunShellOutput;
-  },
 });

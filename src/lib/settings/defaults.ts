@@ -40,6 +40,10 @@ export function settingsOrDefault(partial: Partial<AppSettings> | null | undefin
   };
 }
 
+export function mergeSettingsPatch(current: AppSettings, patch: Partial<AppSettings>): AppSettings {
+  return settingsOrDefault({ ...current, ...patch });
+}
+
 export function loadedSettingsOrDefault(
   partial: Partial<LoadedSettings> | null | undefined,
 ): LoadedSettings {

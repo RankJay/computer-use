@@ -3,11 +3,11 @@
 import type { LanguageModelUsage } from "ai";
 import type { ComponentProps } from "react";
 import { createContext, useContext, useMemo } from "react";
+import { getUsage } from "tokenlens";
 
 import { Button } from "@/components/ui/button";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { Progress } from "@/components/ui/progress";
-import { estimateLanguageModelUsageCostUsd, estimateUsageCostUsd } from "@/lib/agent/model-usage";
 import { cn } from "@/lib/utils";
 
 const PERCENT_MAX = 100;
@@ -176,8 +176,15 @@ export const ContextContentFooter = ({
   ...props
 }: ContextContentFooterProps) => {
   const { modelId, usage } = useContextValue();
-  const costUSD =
-    modelId && usage ? estimateLanguageModelUsageCostUsd(modelId, usage).totalUsd : undefined;
+  const costUSD = modelId
+    ? getUsage({
+        modelId,
+        usage: {
+          input: usage?.inputTokens ?? 0,
+          output: usage?.outputTokens ?? 0,
+        },
+      }).costUSD?.totalUSD
+    : undefined;
   const totalCost = new Intl.NumberFormat("en-US", {
     currency: "USD",
     style: "currency",
@@ -226,7 +233,12 @@ export const ContextInputUsage = ({ className, children, ...props }: ContextInpu
     return null;
   }
 
-  const inputCost = modelId ? estimateUsageCostUsd(modelId, { inputTokens }).inputUsd : undefined;
+  const inputCost = modelId
+    ? getUsage({
+        modelId,
+        usage: { input: inputTokens, output: 0 },
+      }).costUSD?.totalUSD
+    : undefined;
   const inputCostText = new Intl.NumberFormat("en-US", {
     currency: "USD",
     style: "currency",
@@ -255,7 +267,10 @@ export const ContextOutputUsage = ({ className, children, ...props }: ContextOut
   }
 
   const outputCost = modelId
-    ? estimateUsageCostUsd(modelId, { outputTokens }).outputUsd
+    ? getUsage({
+        modelId,
+        usage: { input: 0, output: outputTokens },
+      }).costUSD?.totalUSD
     : undefined;
   const outputCostText = new Intl.NumberFormat("en-US", {
     currency: "USD",
@@ -289,7 +304,10 @@ export const ContextReasoningUsage = ({
   }
 
   const reasoningCost = modelId
-    ? estimateUsageCostUsd(modelId, { reasoningTokens }).reasoningUsd
+    ? getUsage({
+        modelId,
+        usage: { reasoningTokens },
+      }).costUSD?.totalUSD
     : undefined;
   const reasoningCostText = new Intl.NumberFormat("en-US", {
     currency: "USD",
@@ -319,7 +337,10 @@ export const ContextCacheUsage = ({ className, children, ...props }: ContextCach
   }
 
   const cacheCost = modelId
-    ? estimateUsageCostUsd(modelId, { cacheReadTokens: cacheTokens }).cacheReadUsd
+    ? getUsage({
+        modelId,
+        usage: { cacheReads: cacheTokens, input: 0, output: 0 },
+      }).costUSD?.totalUSD
     : undefined;
   const cacheCostText = new Intl.NumberFormat("en-US", {
     currency: "USD",

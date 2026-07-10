@@ -70,12 +70,13 @@ function Field({
   className,
   orientation = "vertical",
   ...props
-}: React.ComponentProps<"fieldset"> & VariantProps<typeof fieldVariants>) {
+}: React.ComponentProps<"div"> & VariantProps<typeof fieldVariants>) {
   return (
-    <fieldset
+    <div
+      role="group"
       data-slot="field"
       data-orientation={orientation}
-      className={cn("m-0 min-w-0 border-0 p-0", fieldVariants({ orientation }), className)}
+      className={cn(fieldVariants({ orientation }), className)}
       {...props}
     />
   );
@@ -182,7 +183,7 @@ function FieldError({
 
     const uniqueErrors = [...new Map(errors.map((error) => [error?.message, error])).values()];
 
-    if (uniqueErrors?.length === 1) {
+    if (uniqueErrors?.length == 1) {
       return uniqueErrors[0]?.message;
     }
 

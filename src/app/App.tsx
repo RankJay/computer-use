@@ -1,21 +1,36 @@
-﻿import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { lazy, Suspense } from "react";
+import { BrowserRouter, Route, Routes } from "react-router-dom";
 
-import { AppQueryProvider } from "@/app/providers/QueryProvider";
-import { SettingsProvider } from "@/app/providers/SettingsProvider";
-import { ControlCenter } from "@/features/control-center/ControlCenter";
-import { SettingsPage } from "@/features/settings/SettingsPage";
+import { RouteErrorBoundary } from "@/components/boundaries/ErrorBoundary";
+import { SettingsPageSkeleton } from "@/features/settings/SettingsPageSkeleton";
 
-export default function App() {
+import HistoryPage from "./pages/history";
+import HomePage from "./pages/home";
+import { AppQueryProvider } from "./providers/QueryProvider";
+
+const SettingsPage = lazy(() => import("./pages/settings"));
+
+function App() {
   return (
     <AppQueryProvider>
-      <SettingsProvider>
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<ControlCenter />} />
-            <Route path="/settings" element={<SettingsPage />} />
-          </Routes>
-        </BrowserRouter>
-      </SettingsProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route
+            path="/settings"
+            element={
+              <RouteErrorBoundary>
+                <Suspense fallback={<SettingsPageSkeleton />}>
+                  <SettingsPage />
+                </Suspense>
+              </RouteErrorBoundary>
+            }
+          />
+          <Route path="/history" element={<HistoryPage />} />
+        </Routes>
+      </BrowserRouter>
     </AppQueryProvider>
   );
 }
+
+export default App;

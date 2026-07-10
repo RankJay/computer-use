@@ -5,6 +5,7 @@ use crate::capabilities::path_utils::CommandError;
 use super::process_list::process_list;
 
 #[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ProcessKillResult {
     pub pid: u32,
     pub name: Option<String>,

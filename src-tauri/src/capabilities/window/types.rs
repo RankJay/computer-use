@@ -1,11 +1,13 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct WindowListResult {
     pub text: String,
 }
 
 #[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct WindowActionResult {
     pub ok: bool,
     pub hwnd: i64,
@@ -21,6 +23,7 @@ pub enum WindowStateOp {
 }
 
 #[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct WindowStateResult {
     pub ok: bool,
     pub hwnd: i64,
@@ -28,6 +31,7 @@ pub struct WindowStateResult {
 }
 
 #[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct WindowMoveResult {
     pub ok: bool,
     pub hwnd: i64,
@@ -36,6 +40,7 @@ pub struct WindowMoveResult {
 }
 
 #[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct WindowResizeResult {
     pub ok: bool,
     pub hwnd: i64,

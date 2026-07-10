@@ -44,34 +44,6 @@ const DEFAULT_AGENT_MODELS: AgentModelOption[] = [
     pricing: { inputPerMillion: 0.75, outputPerMillion: 4.5, cachedInputPerMillion: 0.075 },
   },
   {
-    id: "openai/gpt-5.2",
-    name: "GPT-5.2",
-    provider: "OpenAI",
-    contextWindowTokens: 400_000,
-    pricing: { inputPerMillion: 1.75, outputPerMillion: 14, cachedInputPerMillion: 0.175 },
-  },
-  {
-    id: "openai/gpt-5.2-pro",
-    name: "GPT-5.2 Pro",
-    provider: "OpenAI",
-    contextWindowTokens: 400_000,
-    pricing: { inputPerMillion: 21, outputPerMillion: 168 },
-  },
-  {
-    id: "openai/o3",
-    name: "o3",
-    provider: "OpenAI",
-    contextWindowTokens: 200_000,
-    pricing: { inputPerMillion: 2, outputPerMillion: 8, cachedInputPerMillion: 0.5 },
-  },
-  {
-    id: "openai/o4-mini",
-    name: "o4 Mini",
-    provider: "OpenAI",
-    contextWindowTokens: 200_000,
-    pricing: { inputPerMillion: 1.1, outputPerMillion: 4.4, cachedInputPerMillion: 0.275 },
-  },
-  {
     id: "anthropic/claude-opus-4-5",
     name: "Claude Opus 4.5",
     provider: "Anthropic",
@@ -94,7 +66,7 @@ const DEFAULT_AGENT_MODELS: AgentModelOption[] = [
   },
 ];
 
-const DEFAULT_MODEL_ID = "openai/gpt-5.4-mini";
+const DEFAULT_MODEL_ID = "anthropic/claude-haiku-4-5";
 
 const MODEL_BY_ID = new Map(DEFAULT_AGENT_MODELS.map((model) => [model.id, model]));
 

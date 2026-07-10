@@ -1,6 +1,5 @@
 import { z } from "zod";
 
-import { invokeCapabilityCommand } from "../tauri-invoke";
 import { defineCapability } from "../types";
 
 export const windowFocusInputSchema = z.object({
@@ -17,10 +16,4 @@ export const windowFocusCapability = defineCapability({
   description: "Bring a top-level window to the foreground by handle.",
   risk: "medium",
   inputSchema: windowFocusInputSchema,
-  execute: async (input) => {
-    const result = await invokeCapabilityCommand<{ ok: boolean; hwnd: number }>("window_focus", {
-      hwnd: input.hwnd,
-    });
-    return { ok: result.ok, hwnd: result.hwnd } satisfies WindowFocusOutput;
-  },
 });

@@ -1,522 +1,286 @@
 import { describe, expect, test } from "bun:test";
 
-import { demoRunEvents, DEMO_TASK_ID } from "./fixtures/demo-run-events";
-import { projectSession, projectSessionIncremental } from "./project-session";
-import { createEmptySessionProjection, deriveControlFlags } from "./projection";
+import {
+  RUNTIME_EVENT_SCHEMA_VERSION,
+  type RuntimeEvent,
+  type RuntimeEventPayload,
+} from "./events";
+import { createFoldState, projectSession, reduceSession, toProjection } from "./project-session";
 
-const demoProjection = projectSession(demoRunEvents);
+const TASK_ID = "task-1";
+
+function evt(seq: number, payload: RuntimeEventPayload): RuntimeEvent {
+  return {
+    ...payload,
+    eventId: `${TASK_ID}-${seq}`,
+    taskId: TASK_ID,
+    timestamp: 1_000 + seq,
+    schemaVersion: RUNTIME_EVENT_SCHEMA_VERSION,
+  };
+}
 
 describe("project-session", () => {
-  test("demo events produce completed transcript with all block types", () => {
-    const projection = projectSession(demoRunEvents);
-
-    expect(projection.taskId).toBe(DEMO_TASK_ID);
-    expect(projection.status).toBe("completed");
-    expect(projection.usage.usedTokens).toBe(12_400);
-    expect(projection.usage.modelId).toBe("openai/gpt-4o");
-    expect(deriveControlFlags(projection.status).canSubmit).toBe(true);
-
-    expect(projection.rows.map((row) => row.type)).toEqual([
-      "marker",
-      "message",
-      "marker",
-      "chain-of-thought",
-      "task",
-      "message",
-      "message",
-      "marker",
-      "message",
-    ]);
-  });
-
-  test("projection is deterministic for the same event order", () => {
-    const first = projectSession(demoRunEvents);
-    const second = projectSession(demoRunEvents);
-    expect(first).toEqual(second);
-  });
-
-  test("duplicate event ids are ignored", () => {
-    const duplicated = [...demoRunEvents, demoRunEvents[0]!];
-    const projection = projectSession(duplicated);
-    expect(projection.rows).toEqual(demoProjection.rows);
-  });
-
-  test("incremental fold matches batch fold", () => {
-    let incremental = createEmptySessionProjection();
-
-    for (const event of demoRunEvents) {
-      incremental = projectSessionIncremental(incremental, event);
-    }
-
-    const batch = projectSession(demoRunEvents);
-
-    expect(incremental).toEqual(batch);
-  });
-
-  test("chatMessages tracks user and assistant turns in order", () => {
+  test("task.completed with cancelled finishReason sets status cancelled", () => {
     const projection = projectSession([
-      {
-        eventId: "e1",
-        taskId: "t1",
-        timestamp: 1,
+      evt(1, {
         type: "task.started",
-        prompt: "First question",
-        modelId: "openai/gpt-4o",
-        agentMode: "live",
-        userMessageId: "user-1",
-      },
-      {
-        eventId: "e2",
-        taskId: "t1",
-        timestamp: 2,
-        type: "assistant.message_started",
-        messageId: "assistant-1",
-        role: "assistant",
-      },
-      {
-        eventId: "e3",
-        taskId: "t1",
-        timestamp: 3,
-        type: "assistant.part_updated",
-        messageId: "assistant-1",
-        partIndex: 0,
-        part: { type: "text", text: "First answer" },
-      },
-      {
-        eventId: "e4",
-        taskId: "t2",
-        timestamp: 4,
-        type: "task.started",
-        prompt: "Second question",
-        modelId: "openai/gpt-4o",
-        agentMode: "live",
-        userMessageId: "user-2",
-      },
-      {
-        eventId: "e5",
-        taskId: "t1",
-        timestamp: 5,
-        type: "activity.marker",
-        markerId: "marker-1",
-        text: "Working",
-      },
+        prompt: "hi",
+        modelId: "openai/gpt-5.4",
+        agentMode: "demo",
+      }),
+      evt(2, { type: "task.status_changed", status: "cancelled" }),
+      evt(3, { type: "task.completed", finishReason: "cancelled" }),
     ]);
 
-    expect(projection.chatMessages).toHaveLength(3);
-    expect(projection.chatMessages[0]?.role).toBe("user");
-    expect(projection.chatMessages[0]?.parts[0]).toEqual({
-      type: "text",
-      text: "First question",
-    });
-    expect(projection.chatMessages[1]?.role).toBe("assistant");
-    expect(projection.chatMessages[2]?.role).toBe("user");
+    expect(projection.status).toBe("cancelled");
   });
 
-  test("accumulates distinct assistant messages across turns", () => {
+  test("task.completed with budget finishReason sets status failed", () => {
     const projection = projectSession([
-      {
-        eventId: "e1",
-        taskId: "t1",
-        timestamp: 1,
+      evt(1, {
         type: "task.started",
-        prompt: "Turn one",
-        modelId: "openai/gpt-4o",
+        prompt: "hi",
+        modelId: "openai/gpt-5.4",
         agentMode: "live",
-        userMessageId: "user-1",
-      },
-      {
-        eventId: "e2",
-        taskId: "t1",
-        timestamp: 2,
-        type: "assistant.message_started",
-        messageId: "assistant-t1",
-        role: "assistant",
-      },
-      {
-        eventId: "e3",
-        taskId: "t1",
-        timestamp: 3,
-        type: "assistant.part_updated",
-        messageId: "assistant-t1",
-        partIndex: 0,
-        part: { type: "text", text: "First answer" },
-      },
-      {
-        eventId: "e4",
-        taskId: "t2",
-        timestamp: 4,
-        type: "task.started",
-        prompt: "Turn two",
-        modelId: "openai/gpt-4o",
-        agentMode: "live",
-        userMessageId: "user-2",
-      },
-      {
-        eventId: "e5",
-        taskId: "t2",
-        timestamp: 5,
-        type: "assistant.message_started",
-        messageId: "assistant-t2",
-        role: "assistant",
-      },
-      {
-        eventId: "e6",
-        taskId: "t2",
-        timestamp: 6,
-        type: "assistant.part_updated",
-        messageId: "assistant-t2",
-        partIndex: 0,
-        part: { type: "text", text: "Second answer" },
-      },
+      }),
+      evt(2, { type: "task.completed", finishReason: "budget" }),
     ]);
 
-    const assistantRows = projection.rows.filter(
-      (row) => row.type === "message" && row.message.role === "assistant",
-    );
-
-    expect(assistantRows).toHaveLength(2);
-    expect(assistantRows[0]?.type).toBe("message");
-    expect(assistantRows[1]?.type).toBe("message");
-    if (assistantRows[0]?.type === "message" && assistantRows[1]?.type === "message") {
-      expect(assistantRows[0].message.parts[0]).toEqual({
-        type: "text",
-        text: "First answer",
-      });
-      expect(assistantRows[1].message.parts[0]).toEqual({
-        type: "text",
-        text: "Second answer",
-      });
-    }
+    expect(projection.status).toBe("failed");
   });
 
-  test("accumulates user rows across multiple task.started events", () => {
+  test("task.failed stores recoverable on failure", () => {
     const projection = projectSession([
-      {
-        eventId: "e1",
-        taskId: "t1",
-        timestamp: 1,
+      evt(1, {
         type: "task.started",
-        prompt: "Turn one",
-        modelId: "openai/gpt-4o",
+        prompt: "hi",
+        modelId: "openai/gpt-5.4",
         agentMode: "live",
-        userMessageId: "user-1",
-      },
-      {
-        eventId: "e2",
-        taskId: "t1",
-        timestamp: 2,
-        type: "task.completed",
-        finishReason: "stop",
-      },
-      {
-        eventId: "e3",
-        taskId: "t2",
-        timestamp: 3,
-        type: "task.started",
-        prompt: "Turn two",
-        modelId: "openai/gpt-4o",
-        agentMode: "live",
-        userMessageId: "user-2",
-      },
-    ]);
-
-    const userRows = projection.rows.filter(
-      (row) => row.type === "message" && row.message.role === "user",
-    );
-
-    expect(userRows).toHaveLength(2);
-  });
-
-  test("permission.requested sets waiting state", () => {
-    const events = [
-      ...demoRunEvents.slice(0, 15),
-      {
-        ...demoRunEvents[15]!,
-        eventId: "perm-req",
-        type: "permission.requested" as const,
-        callId: "tool-delete-approval",
-        capability: "delete_path",
-        input: { filePath: "/tmp/example.txt" },
-        risk: "high" as const,
-      },
-    ];
-
-    const projection = projectSession(events);
-    expect(projection.status).toBe("waiting_permission");
-    expect(projection.pendingPermission?.callId).toBe("tool-delete-approval");
-    expect(projection.inputDisabled).toBe(true);
-    expect(projection.cancelVisible).toBe(true);
-  });
-
-  test("permission.requested updates matching dynamic tool part", () => {
-    const projection = projectSession([
-      {
-        eventId: "e1",
-        taskId: "t1",
-        timestamp: 1,
-        type: "task.started",
-        prompt: "Delete a file",
-        modelId: "openai/gpt-4o",
-        agentMode: "live",
-        userMessageId: "user-1",
-      },
-      {
-        eventId: "e2",
-        taskId: "t1",
-        timestamp: 2,
-        type: "assistant.message_started",
-        messageId: "assistant-1",
-        role: "assistant",
-      },
-      {
-        eventId: "e3",
-        taskId: "t1",
-        timestamp: 3,
-        type: "assistant.part_updated",
-        messageId: "assistant-1",
-        partIndex: 0,
-        part: {
-          type: "dynamic-tool",
-          toolCallId: "call-delete",
-          toolName: "delete_path",
-          state: "input-available",
-          input: { filePath: "/tmp/example.txt" },
-        },
-      },
-      {
-        eventId: "e4",
-        taskId: "t1",
-        timestamp: 4,
-        type: "permission.requested",
-        callId: "call-delete",
-        capability: "delete_path",
-        input: { filePath: "/tmp/example.txt" },
-        risk: "high",
-      },
-    ]);
-
-    const assistantRow = projection.rows.find(
-      (row) => row.type === "message" && row.id === "assistant-1",
-    );
-    expect(assistantRow?.type).toBe("message");
-    if (assistantRow?.type === "message") {
-      expect(assistantRow.message.parts[0]).toEqual({
-        type: "dynamic-tool",
-        toolCallId: "call-delete",
-        toolName: "delete_path",
-        state: "approval-requested",
-        approval: { id: "call-delete" },
-        input: { filePath: "/tmp/example.txt" },
-      });
-    }
-  });
-
-  test("permission.resolved denied marks tool output error", () => {
-    const projection = projectSession([
-      {
-        eventId: "e1",
-        taskId: "t1",
-        timestamp: 1,
-        type: "task.started",
-        prompt: "Delete a file",
-        modelId: "openai/gpt-4o",
-        agentMode: "live",
-        userMessageId: "user-1",
-      },
-      {
-        eventId: "e2",
-        taskId: "t1",
-        timestamp: 2,
-        type: "assistant.message_started",
-        messageId: "assistant-1",
-        role: "assistant",
-      },
-      {
-        eventId: "e3",
-        taskId: "t1",
-        timestamp: 3,
-        type: "assistant.part_updated",
-        messageId: "assistant-1",
-        partIndex: 0,
-        part: {
-          type: "dynamic-tool",
-          toolCallId: "call-delete",
-          toolName: "delete_path",
-          state: "approval-requested",
-          approval: { id: "call-delete" },
-          input: { filePath: "/tmp/example.txt" },
-        },
-      },
-      {
-        eventId: "e4",
-        taskId: "t1",
-        timestamp: 4,
-        type: "permission.requested",
-        callId: "call-delete",
-        capability: "delete_path",
-        input: { filePath: "/tmp/example.txt" },
-        risk: "high",
-      },
-      {
-        eventId: "e5",
-        taskId: "t1",
-        timestamp: 5,
-        type: "permission.resolved",
-        callId: "call-delete",
-        decision: "denied",
-      },
-    ]);
-
-    expect(projection.pendingPermission).toBeNull();
-    expect(projection.status).toBe("running");
-
-    const assistantRow = projection.rows.find(
-      (row) => row.type === "message" && row.id === "assistant-1",
-    );
-    if (assistantRow?.type === "message") {
-      expect(assistantRow.message.parts[0]).toMatchObject({
-        state: "output-denied",
-        approval: { id: "call-delete", approved: false },
-      });
-    }
-  });
-
-  test("task.failed appends assistant error row", () => {
-    const projection = projectSession([
-      {
-        eventId: "e1",
-        taskId: "t1",
-        timestamp: 1,
-        type: "task.started",
-        prompt: "Hi",
-        modelId: "openai/gpt-4o",
-        agentMode: "live",
-        userMessageId: "user-1",
-      },
-      {
-        eventId: "e2",
-        taskId: "t1",
-        timestamp: 2,
+      }),
+      evt(2, {
         type: "task.failed",
         code: "auth",
-        message: "Missing API key",
+        message: "missing key",
         recoverable: true,
-      },
+      }),
     ]);
 
     expect(projection.status).toBe("failed");
-    expect(projection.failure?.code).toBe("auth");
-
-    const errorRow = projection.rows.find((row) => row.type === "message" && row.id === "error-t1");
-    expect(errorRow?.type).toBe("message");
-    if (errorRow?.type === "message") {
-      expect(errorRow.message.parts[0]).toEqual({
-        type: "text",
-        text: "Error: Missing API key",
-      });
-    }
+    expect(projection.failure).toEqual({
+      code: "auth",
+      message: "missing key",
+      recoverable: true,
+    });
   });
 
-  test("part snapshots replace message parts", () => {
+  test("pendingPermissions supports parallel callIds", () => {
     const projection = projectSession([
-      {
-        eventId: "e1",
-        taskId: "t1",
-        timestamp: 1,
+      evt(1, {
         type: "task.started",
-        prompt: "Hi",
-        modelId: "openai/gpt-4o",
-        agentMode: "demo",
-        userMessageId: "msg-user",
-      },
-      {
-        eventId: "e2",
-        taskId: "t1",
-        timestamp: 2,
-        type: "assistant.message_started",
-        messageId: "msg-a",
-        role: "assistant",
-      },
-      {
-        eventId: "e3",
-        taskId: "t1",
-        timestamp: 3,
-        type: "assistant.part_updated",
-        messageId: "msg-a",
-        partIndex: 0,
-        part: { type: "reasoning", text: "Thinking", state: "streaming" },
-      },
-      {
-        eventId: "e4",
-        taskId: "t1",
-        timestamp: 4,
-        type: "assistant.part_updated",
-        messageId: "msg-a",
-        partIndex: 0,
-        part: { type: "reasoning", text: "Thinking hard", state: "streaming" },
-      },
-      {
-        eventId: "e5",
-        taskId: "t1",
-        timestamp: 5,
-        type: "assistant.part_updated",
-        messageId: "msg-a",
-        partIndex: 1,
-        part: { type: "text", text: "Hello" },
-      },
-    ]);
-
-    const assistantRow = projection.rows.find(
-      (row) => row.type === "message" && row.id === "msg-a",
-    );
-    expect(assistantRow?.type).toBe("message");
-    if (assistantRow?.type === "message") {
-      expect(assistantRow.message.parts[0]).toEqual({
-        type: "reasoning",
-        text: "Thinking hard",
-        state: "streaming",
-      });
-      expect(assistantRow.message.parts[1]).toEqual({
-        type: "text",
-        text: "Hello",
-      });
-    }
-  });
-});
-
-describe("reduceSession", () => {
-  test("budget.exceeded marks session failed and appends error row", () => {
-    const projection = projectSession([
-      {
-        eventId: "e1",
-        taskId: "t1",
-        timestamp: 1,
-        type: "task.started",
-        prompt: "Hi",
-        modelId: "openai/gpt-4o",
+        prompt: "hi",
+        modelId: "openai/gpt-5.4",
         agentMode: "live",
+      }),
+      evt(2, {
+        type: "permission.requested",
+        callId: "call-a",
+        capability: "run_shell",
+        input: { command: "ls" },
+        risk: "high",
+      }),
+      evt(3, {
+        type: "permission.requested",
+        callId: "call-b",
+        capability: "write_file",
+        input: { path: "a.ts" },
+        risk: "medium",
+      }),
+    ]);
+
+    expect(projection.status).toBe("waiting_permission");
+    expect(projection.pendingPermissions).toHaveLength(2);
+    expect(projection.pendingPermissions.map((p) => p.callId)).toEqual(["call-a", "call-b"]);
+  });
+
+  test("permission.resolved removes only that callId", () => {
+    const projection = projectSession([
+      evt(1, {
+        type: "task.started",
+        prompt: "hi",
+        modelId: "openai/gpt-5.4",
+        agentMode: "live",
+      }),
+      evt(2, {
+        type: "permission.requested",
+        callId: "call-a",
+        capability: "run_shell",
+        input: {},
+        risk: "high",
+      }),
+      evt(3, {
+        type: "permission.requested",
+        callId: "call-b",
+        capability: "write_file",
+        input: {},
+        risk: "medium",
+      }),
+      evt(4, {
+        type: "permission.resolved",
+        callId: "call-a",
+        decision: "approved",
+      }),
+    ]);
+
+    expect(projection.pendingPermissions).toHaveLength(1);
+    expect(projection.pendingPermissions[0]?.callId).toBe("call-b");
+    expect(projection.status).toBe("waiting_permission");
+  });
+
+  test("resolving last permission returns status to running", () => {
+    const projection = projectSession([
+      evt(1, {
+        type: "task.started",
+        prompt: "hi",
+        modelId: "openai/gpt-5.4",
+        agentMode: "live",
+      }),
+      evt(2, {
+        type: "permission.requested",
+        callId: "call-a",
+        capability: "run_shell",
+        input: {},
+        risk: "high",
+      }),
+      evt(3, {
+        type: "permission.resolved",
+        callId: "call-a",
+        decision: "denied",
+      }),
+    ]);
+
+    expect(projection.pendingPermissions).toEqual([]);
+    expect(projection.status).toBe("running");
+  });
+
+  test("permission events do not invent dynamic-tool parts", () => {
+    const projection = projectSession([
+      evt(1, {
+        type: "task.started",
+        prompt: "hi",
+        modelId: "openai/gpt-5.4",
+        agentMode: "live",
+      }),
+      evt(2, {
+        type: "assistant.message_started",
+        messageId: "asst-1",
+        role: "assistant",
+      }),
+      evt(3, {
+        type: "permission.requested",
+        callId: "call-a",
+        capability: "run_shell",
+        input: { command: "ls" },
+        risk: "high",
+      }),
+    ]);
+
+    const assistant = projection.rows.find((r) => r.id === "asst-1");
+    expect(assistant?.type).toBe("message");
+    if (assistant?.type === "message") {
+      expect(assistant.message.parts).toEqual([]);
+    }
+  });
+
+  test("duplicate eventId is a no-op", () => {
+    const event = evt(1, {
+      type: "task.started",
+      prompt: "hi",
+      modelId: "openai/gpt-5.4",
+      agentMode: "demo",
+    });
+    let state = createFoldState();
+    state = reduceSession(state, event);
+    const afterFirst = toProjection(state);
+    state = reduceSession(state, event);
+    const afterDup = toProjection(state);
+
+    expect(afterDup.rows).toHaveLength(afterFirst.rows.length);
+    expect(afterDup.chatMessages).toEqual(afterFirst.chatMessages);
+  });
+
+  test("structural sharing preserves untouched row references", () => {
+    let state = createFoldState();
+    state = reduceSession(
+      state,
+      evt(1, {
+        type: "activity.marker",
+        markerId: "m1",
+        text: "Today",
+        variant: "separator",
+      }),
+    );
+    const markerRef = state.rows[0];
+    state = reduceSession(
+      state,
+      evt(2, {
+        type: "task.started",
+        prompt: "hi",
+        modelId: "openai/gpt-5.4",
+        agentMode: "demo",
+      }),
+    );
+    expect(state.rows[0]).toBe(markerRef);
+  });
+
+  test("activity and assistant events build transcript rows", () => {
+    const projection = projectSession([
+      evt(1, {
+        type: "activity.marker",
+        markerId: "m1",
+        text: "Today",
+        variant: "separator",
+      }),
+      evt(2, {
+        type: "task.started",
+        prompt: "Build it",
+        modelId: "openai/gpt-5.4",
+        agentMode: "demo",
         userMessageId: "user-1",
-      },
-      {
-        eventId: "e2",
-        taskId: "t1",
-        timestamp: 2,
-        type: "budget.exceeded",
-        dimension: "wall_clock",
-      },
+      }),
+      evt(3, {
+        type: "assistant.message_started",
+        messageId: "asst-1",
+        role: "assistant",
+      }),
+      evt(4, {
+        type: "assistant.part_updated",
+        messageId: "asst-1",
+        partIndex: 0,
+        part: { type: "text", text: "Done." },
+      }),
+      evt(5, { type: "assistant.message_finished", messageId: "asst-1" }),
+      evt(6, { type: "task.completed", finishReason: "stop" }),
+    ]);
+
+    expect(projection.status).toBe("completed");
+    expect(projection.rows.map((r) => r.type)).toEqual(["marker", "message", "message"]);
+    expect(projection.chatMessages).toHaveLength(2);
+    expect(projection.streamingMessageId).toBeNull();
+  });
+
+  test("budget.exceeded is recoverable failure", () => {
+    const projection = projectSession([
+      evt(1, {
+        type: "task.started",
+        prompt: "hi",
+        modelId: "openai/gpt-5.4",
+        agentMode: "live",
+      }),
+      evt(2, { type: "budget.exceeded", dimension: "steps" }),
     ]);
 
     expect(projection.status).toBe("failed");
+    expect(projection.failure?.recoverable).toBe(true);
     expect(projection.failure?.code).toBe("budget_exceeded");
-    expect(projection.failure?.message).toBe("Run stopped: time limit reached");
-
-    const errorRow = projection.rows.find((row) => row.type === "message" && row.id === "error-t1");
-    expect(errorRow?.type).toBe("message");
-    if (errorRow?.type === "message") {
-      expect(errorRow.message.parts[0]).toEqual({
-        type: "text",
-        text: "Error: Run stopped: time limit reached",
-      });
-    }
   });
 });

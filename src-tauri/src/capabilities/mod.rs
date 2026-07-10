@@ -1,11 +1,8 @@
-mod path_utils;
+﻿mod path_utils;
 
 mod accessibility;
 mod clipboard;
 mod file_system;
-mod keyboard;
-mod mouse;
-mod screenshot;
 mod shared;
 mod shell;
 mod window;

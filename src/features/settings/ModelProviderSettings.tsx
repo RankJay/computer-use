@@ -1,7 +1,12 @@
 import type { ReactElement } from "react";
 
-import { useSettingsActions, useSettingsState } from "@/app/providers/SettingsProvider";
-import { InputGroup, InputGroupAddon, InputGroupText } from "@/components/ui/input-group";
+import { Input } from "@/components/ui/input";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+  InputGroupText,
+} from "@/components/ui/input-group";
 import {
   Select,
   SelectContent,
@@ -9,33 +14,41 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { SettingsRow } from "@/features/settings/SettingsRow";
+import { SettingsSection } from "@/features/settings/SettingsSection";
 import {
   settingsInputClassName,
   settingsInputGroupClassName,
   settingsInputGroupInputClassName,
   settingsSelectTriggerClassName,
-} from "@/features/settings/settings-control-styles";
-import { SettingsDraftNumberInput } from "@/features/settings/SettingsDraftInput";
-import { SettingsRow } from "@/features/settings/SettingsRow";
-import { SettingsSection } from "@/features/settings/SettingsSection";
-import { parseAgentMode } from "@/lib/settings/parse-agent-mode";
+} from "@/features/settings/styles";
+import { useSettingsSelector, useUpdateSettings } from "@/lib/settings/queries";
+import { selectGuardrailSettings } from "@/lib/settings/selectors";
+import {
+  AGENT_MODE_OPTIONS,
+  parseAgentMode,
+  wallClockMinutesFromMs,
+  wallClockMsFromMinutes,
+} from "@/lib/settings/utils";
 
 export function ModelProviderSettings(): ReactElement {
-  const { settings } = useSettingsState();
-  const { updateSettings } = useSettingsActions();
+  const settings = useSettingsSelector(selectGuardrailSettings);
+  const updateSettings = useUpdateSettings();
+  const wallClockMinutes = wallClockMinutesFromMs(settings.maxWallClockMs);
 
   return (
     <>
-      <SettingsSection title="Model & provider">
+      <SettingsSection title="Guardrails">
         <SettingsRow
           label="Agent mode"
           description="Live uses cloud API and tools. Demo runs offline fixtures."
         >
           <Select
+            items={AGENT_MODE_OPTIONS}
             value={settings.agentMode}
             onValueChange={(value) => {
               if (value !== null) {
-                void updateSettings({ agentMode: parseAgentMode(value) });
+                updateSettings.mutate({ agentMode: parseAgentMode(value) });
               }
             }}
           >
@@ -43,20 +56,28 @@ export function ModelProviderSettings(): ReactElement {
               <SelectValue />
             </SelectTrigger>
             <SelectContent alignItemWithTrigger={false} align="end" className="p-0.5">
-              <SelectItem value="live">Live</SelectItem>
-              <SelectItem value="demo">Demo</SelectItem>
+              {AGENT_MODE_OPTIONS.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </SettingsRow>
         <SettingsRow label="Max steps" description="Maximum agent steps per run.">
-          <SettingsDraftNumberInput
+          <Input
             id="max-steps"
+            type="number"
             min={1}
-            committedValue={settings.maxSteps}
-            onCommit={(value) => {
-              void updateSettings({ maxSteps: value });
+            key={settings.maxSteps}
+            defaultValue={String(settings.maxSteps)}
+            onBlur={(event) => {
+              const next = Number.parseInt(event.target.value, 10);
+              if (!Number.isNaN(next) && next !== settings.maxSteps) {
+                updateSettings.mutate({ maxSteps: next });
+              }
             }}
-            className={settingsInputClassName}
+            className={`${settingsInputClassName} text-sm`}
           />
         </SettingsRow>
 
@@ -68,15 +89,18 @@ export function ModelProviderSettings(): ReactElement {
             <InputGroupAddon align="inline-start">
               <InputGroupText className="text-[#767676]">$</InputGroupText>
             </InputGroupAddon>
-            <SettingsDraftNumberInput
+            <InputGroupInput
               id="max-cost"
-              variant="input-group"
-              format="float"
+              type="number"
               min={0}
               step="0.01"
-              committedValue={settings.maxCostUsd}
-              onCommit={(value) => {
-                void updateSettings({ maxCostUsd: value });
+              key={settings.maxCostUsd}
+              defaultValue={String(settings.maxCostUsd)}
+              onBlur={(event) => {
+                const next = Number.parseFloat(event.target.value);
+                if (!Number.isNaN(next) && next !== settings.maxCostUsd) {
+                  updateSettings.mutate({ maxCostUsd: next });
+                }
               }}
               className={`${settingsInputGroupInputClassName} text-right tabular-nums`}
             />
@@ -87,14 +111,23 @@ export function ModelProviderSettings(): ReactElement {
           label="Max wall-clock"
           description="Run time limit in minutes. Set 0 for no limit."
         >
-          <SettingsDraftNumberInput
+          <Input
             id="max-wall-clock"
+            type="number"
             min={0}
-            committedValue={Math.round(settings.maxWallClockMs / 60_000)}
-            onCommit={(minutes) => {
-              void updateSettings({ maxWallClockMs: minutes * 60_000 });
+            key={wallClockMinutes}
+            defaultValue={wallClockMinutes}
+            onBlur={(event) => {
+              const minutes = Number.parseInt(event.target.value, 10);
+              if (Number.isNaN(minutes)) {
+                return;
+              }
+              const nextMs = wallClockMsFromMinutes(minutes);
+              if (nextMs !== settings.maxWallClockMs) {
+                updateSettings.mutate({ maxWallClockMs: nextMs });
+              }
             }}
-            className={settingsInputClassName}
+            className={`${settingsInputClassName} text-sm`}
           />
         </SettingsRow>
       </SettingsSection>

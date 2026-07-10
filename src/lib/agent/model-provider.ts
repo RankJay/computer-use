@@ -36,15 +36,6 @@ function parseModelId(modelId: string): { provider: string; model: string } {
 export function resolveLanguageModel(modelId: string, secrets: AppSecrets): LanguageModel {
   const { provider, model } = parseModelId(modelId);
 
-  let fetch: typeof globalThis.fetch;
-  try {
-    fetch = requireProviderFetch();
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Desktop runtime required for live mode.";
-    throw new ModelProviderError("desktop_required", message, false);
-  }
-
   switch (provider) {
     case "openai": {
       if (!secrets.openaiApiKey) {
@@ -54,7 +45,7 @@ export function resolveLanguageModel(modelId: string, secrets: AppSecrets): Lang
           true,
         );
       }
-      return createOpenAI({ apiKey: secrets.openaiApiKey, fetch })(model);
+      break;
     }
     case "anthropic": {
       if (!secrets.anthropicApiKey) {
@@ -64,13 +55,7 @@ export function resolveLanguageModel(modelId: string, secrets: AppSecrets): Lang
           true,
         );
       }
-      return createAnthropic({
-        apiKey: secrets.anthropicApiKey,
-        fetch,
-        headers: {
-          "anthropic-dangerous-direct-browser-access": "true",
-        },
-      })(model);
+      break;
     }
     default:
       throw new ModelProviderError(
@@ -79,6 +64,27 @@ export function resolveLanguageModel(modelId: string, secrets: AppSecrets): Lang
         false,
       );
   }
+
+  let fetch: typeof globalThis.fetch;
+  try {
+    fetch = requireProviderFetch();
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Desktop runtime required for live mode.";
+    throw new ModelProviderError("desktop_required", message, false);
+  }
+
+  if (provider === "openai") {
+    return createOpenAI({ apiKey: secrets.openaiApiKey, fetch })(model);
+  }
+
+  return createAnthropic({
+    apiKey: secrets.anthropicApiKey,
+    fetch,
+    headers: {
+      "anthropic-dangerous-direct-browser-access": "true",
+    },
+  })(model);
 }
 
 export function mapAgentError(error: unknown): ModelProviderError {

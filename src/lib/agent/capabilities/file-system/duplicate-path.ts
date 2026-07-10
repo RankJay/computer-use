@@ -1,6 +1,5 @@
 import { z } from "zod";
 
-import { invokeCapabilityCommand } from "../tauri-invoke";
 import { defineCapability } from "../types";
 
 export const duplicatePathInputSchema = z.object({
@@ -20,18 +19,6 @@ export const duplicatePathCapability = defineCapability({
   name: "duplicate_path",
   description: "Duplicate a file or directory within the workspace",
   risk: "high",
+  needsWorkspaceRoot: true,
   inputSchema: duplicatePathInputSchema,
-  execute: async (input, ctx) => {
-    const result = await invokeCapabilityCommand<{
-      from: string;
-      to: string;
-      kind: string;
-    }>("duplicate_path", {
-      from: input.from,
-      to: input.to,
-      workspaceRoot: ctx.workspaceRoot,
-    });
-
-    return result satisfies DuplicatePathOutput;
-  },
 });

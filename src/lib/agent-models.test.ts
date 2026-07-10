@@ -6,7 +6,7 @@ import {
   getModelContextWindow,
   resolveAgentModelId,
 } from "@/lib/agent-models";
-import { estimateUsageCostUsd } from "@/lib/agent/model-usage";
+import { estimateUsageCostUsd } from "@/lib/agent/mode-usage";
 
 describe("agent-models catalog", () => {
   test("every curated model has context window and pricing", () => {

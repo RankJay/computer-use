@@ -1,55 +1,28 @@
 export type {
-  CapabilityContext,
   CapabilityDefinition,
   CapabilityError,
+  CapabilityNativeInvoker,
   CapabilityRisk,
-  InvokeCapabilityDeps,
+  CapabilityRunnerDeps,
   InvokeCapabilityResult,
-  PermissionWaiter,
+  ToolPartLocation,
 } from "./types";
 
 export { defineCapability } from "./types";
 
-export { needsPermission } from "./permission";
+export { needsPermission, permissionRiskForCapability } from "./permission";
 export {
+  createDefaultNativeInvoker,
   createMockCapabilityInvoker,
-  createTauriCapabilityInvoker,
   invokeCapabilityCommand,
-  isTauriRuntime,
   mapInvokeError,
-} from "./tauri-invoke";
+} from "./native-invoke";
+export { runCapability } from "./runner";
 export {
-  getCapabilityDefinition,
-  getV1Capabilities,
-  isV1CapabilityName,
   buildAgentTools,
+  getCapabilityDefinition,
+  getCapabilityNamesByRisk,
+  getCapabilities,
+  isCapabilityName,
 } from "./registry";
-export type { V1CapabilityName, AgentTools } from "./registry";
-export { invokeCapability } from "./invoke";
-export { readFileCapability } from "./file-system/read-file";
-export { readDirectoryCapability } from "./file-system/read-directory";
-export { searchFilesCapability } from "./file-system/search-files";
-export { writeFileCapability } from "./file-system/write-file";
-export { createDirectoryCapability } from "./file-system/create-directory";
-export { patchFileCapability } from "./file-system/patch-file";
-export { deletePathCapability } from "./file-system/delete-path";
-export { movePathCapability } from "./file-system/move-path";
-export { duplicatePathCapability } from "./file-system/duplicate-path";
-export { statPathCapability } from "./file-system/stat-path";
-export { getSystemInfoCapability } from "./shell/get-system-info";
-export { processListCapability } from "./shell/process-list";
-export { processInfoCapability } from "./shell/process-info";
-export { processKillCapability } from "./shell/process-kill";
-export { launchCapability } from "./shell/launch";
-export { getEnvCapability } from "./shell/get-env";
-export { setEnvCapability } from "./shell/set-env";
-export { readClipboardCapability } from "./clipboard/read-clipboard";
-export { runShellCapability } from "./shell/run-shell";
-export { writeClipboardCapability } from "./clipboard/write-clipboard";
-export { waitCapability } from "./shared/wait";
-export { windowListCapability } from "./window/list";
-export { windowFocusCapability } from "./window/focus";
-export { windowStateCapability } from "./window/state";
-export { windowMoveCapability } from "./window/move";
-export { windowResizeCapability } from "./window/resize";
-export { getActiveWindowCapability } from "./window/get-active";
+export type { AgentTools, CapabilityName } from "./registry";

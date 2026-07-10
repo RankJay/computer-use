@@ -1,6 +1,5 @@
 import { z } from "zod";
 
-import { invokeCapabilityCommand } from "../tauri-invoke";
 import { defineCapability } from "../types";
 import { uiAutomationEnabled } from "./shared";
 
@@ -30,19 +29,4 @@ export const accessibilitySnapshotCapability = defineCapability({
   risk: "high",
   inputSchema: accessibilitySnapshotInputSchema,
   enabledWhen: uiAutomationEnabled,
-  execute: async (input) => {
-    const result = await invokeCapabilityCommand<{
-      text: string;
-      generation: number | null;
-    }>("accessibility_snapshot", {
-      hwnd: input.hwnd,
-      max_depth: input.maxDepth,
-      max_elements: input.maxElements,
-    });
-
-    return {
-      text: result.text,
-      generation: result.generation,
-    } satisfies AccessibilityTextOutput;
-  },
 });

@@ -1,4 +1,4 @@
-import { mapInvokeError } from "@/lib/agent/capabilities/tauri-invoke";
+import { mapInvokeError } from "@/lib/agent/capabilities/native-invoke";
 import type { CapabilityError } from "@/lib/agent/capabilities/types";
 
 export function formatCapabilityError(error: CapabilityError): string {

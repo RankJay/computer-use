@@ -1,8 +1,8 @@
 import type { AppSettings } from "@/lib/settings/types";
 
-import type { BudgetExceededEvent } from "../events";
+import type { BudgetExceededPayload } from "../events";
 
-export type BudgetDimension = BudgetExceededEvent["dimension"];
+export type BudgetDimension = BudgetExceededPayload["dimension"];
 
 export type BudgetTracker = {
   incrementStep: () => void;

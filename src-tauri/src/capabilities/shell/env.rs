@@ -13,6 +13,7 @@ pub struct GetEnvResult {
 }
 
 #[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SetEnvResult {
     pub name: String,
     pub set: bool,

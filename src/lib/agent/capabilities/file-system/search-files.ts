@@ -1,6 +1,5 @@
 import { z } from "zod";
 
-import { invokeCapabilityCommand } from "../tauri-invoke";
 import { defineCapability } from "../types";
 
 export const searchFilesInputSchema = z.object({
@@ -18,11 +17,6 @@ export const searchFilesCapability = defineCapability({
   name: "search_files",
   description: "Search workspace files by glob pattern and optional query",
   risk: "low",
+  needsWorkspaceRoot: true,
   inputSchema: searchFilesInputSchema,
-  execute: async (input, ctx) =>
-    invokeCapabilityCommand<SearchFilesOutput>("search_files", {
-      query: input.query,
-      glob: input.glob,
-      workspaceRoot: ctx.workspaceRoot,
-    }),
 });

@@ -1,8 +1,14 @@
 import { FolderOpen } from "lucide-react";
 import type { ReactElement } from "react";
+import { toast } from "sonner";
 
-import { useSettingsActions, useSettingsState } from "@/app/providers/SettingsProvider";
-import { InputGroup, InputGroupAddon, InputGroupButton } from "@/components/ui/input-group";
+import { Input } from "@/components/ui/input";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from "@/components/ui/input-group";
 import {
   Select,
   SelectContent,
@@ -11,23 +17,33 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { SettingsRow } from "@/features/settings/SettingsRow";
+import { SettingsSection } from "@/features/settings/SettingsSection";
 import {
   settingsInputClassName,
   settingsInputGroupClassName,
   settingsInputGroupInputClassName,
   settingsSelectTriggerClassName,
-} from "@/features/settings/settings-control-styles";
-import {
-  SettingsDraftNumberInput,
-  SettingsDraftTextInput,
-} from "@/features/settings/SettingsDraftInput";
-import { SettingsRow } from "@/features/settings/SettingsRow";
-import { SettingsSection } from "@/features/settings/SettingsSection";
-import { parsePermissionMode } from "@/lib/settings/parse-permission-mode";
+} from "@/features/settings/styles";
+import { useSettingsSelector, useUpdateSettings } from "@/lib/settings/queries";
+import { selectGeneralSettings } from "@/lib/settings/selectors";
+import { parsePermissionMode, PERMISSION_MODE_OPTIONS } from "@/lib/settings/utils";
+import { pickWorkspaceFolder } from "@/lib/settings/workspace-picker";
 
 export function GeneralSettings(): ReactElement {
-  const { settings } = useSettingsState();
-  const { updateSettings } = useSettingsActions();
+  const settings = useSettingsSelector(selectGeneralSettings);
+  const updateSettings = useUpdateSettings();
+
+  async function handleBrowseWorkspace(): Promise<void> {
+    try {
+      const path = await pickWorkspaceFolder();
+      if (path !== null && path !== settings.workspaceRoot) {
+        updateSettings.mutate({ workspaceRoot: path });
+      }
+    } catch {
+      toast.error("Could not open folder picker. Try again.");
+    }
+  }
 
   return (
     <>
@@ -35,21 +51,31 @@ export function GeneralSettings(): ReactElement {
         <SettingsRow
           label="Default workspace root"
           description="Starting directory for agent file operations."
-          className="max-md:flex-col max-md:w-full max-md:gap-3 max-md:items-start"
         >
-          <InputGroup className={`w-52 max-md:w-full ${settingsInputGroupClassName}`}>
-            <SettingsDraftTextInput
+          <InputGroup className={`w-40 ${settingsInputGroupClassName}`}>
+            <InputGroupInput
               id="workspace-root"
-              variant="input-group"
+              type="text"
               placeholder="C:\Users\...\Projects"
-              committedValue={settings.workspaceRoot}
-              onCommit={(value) => {
-                void updateSettings({ workspaceRoot: value });
+              key={settings.workspaceRoot}
+              defaultValue={settings.workspaceRoot}
+              onBlur={(event) => {
+                const next = event.target.value.trim();
+                if (next !== settings.workspaceRoot) {
+                  updateSettings.mutate({ workspaceRoot: next });
+                }
               }}
-              className={settingsInputGroupInputClassName}
+              className={`text-sm ${settingsInputGroupInputClassName}`}
             />
             <InputGroupAddon align="inline-end">
-              <InputGroupButton aria-label="Browse for workspace folder" size="icon-xs">
+              <InputGroupButton
+                aria-label="Browse for workspace folder"
+                size="icon-xs"
+                disabled={updateSettings.isPending}
+                onClick={() => {
+                  void handleBrowseWorkspace();
+                }}
+              >
                 <FolderOpen className="text-[#767676]" />
               </InputGroupButton>
             </InputGroupAddon>
@@ -57,14 +83,19 @@ export function GeneralSettings(): ReactElement {
         </SettingsRow>
 
         <SettingsRow label="Log retention" description="Days to keep local log files.">
-          <SettingsDraftNumberInput
+          <Input
             id="log-retention"
+            type="number"
             min={1}
-            committedValue={settings.logRetentionDays}
-            onCommit={(value) => {
-              void updateSettings({ logRetentionDays: value });
+            key={settings.logRetentionDays}
+            defaultValue={String(settings.logRetentionDays)}
+            onBlur={(event) => {
+              const next = Number.parseInt(event.target.value, 10);
+              if (!Number.isNaN(next) && next !== settings.logRetentionDays) {
+                updateSettings.mutate({ logRetentionDays: next });
+              }
             }}
-            className={settingsInputClassName}
+            className={`${settingsInputClassName} text-right text-sm tabular-nums`}
           />
         </SettingsRow>
       </SettingsSection>
@@ -75,20 +106,23 @@ export function GeneralSettings(): ReactElement {
           description="How the agent requests approval before tool use."
         >
           <Select
+            items={PERMISSION_MODE_OPTIONS}
             value={settings.permissionMode}
             onValueChange={(value) => {
               if (value !== null) {
-                void updateSettings({ permissionMode: parsePermissionMode(value) });
+                updateSettings.mutate({ permissionMode: parsePermissionMode(value) });
               }
             }}
           >
-            <SelectTrigger className={settingsSelectTriggerClassName}>
+            <SelectTrigger className={`w-30 ${settingsSelectTriggerClassName}`}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent alignItemWithTrigger={false} align="end" className="p-0.5">
-              <SelectItem value="risky">Ask before risky actions</SelectItem>
-              <SelectItem value="every-meaningful">Ask before every action</SelectItem>
-              <SelectItem value="once-per-class">Ask once per class</SelectItem>
+              {PERMISSION_MODE_OPTIONS.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </SettingsRow>
@@ -101,7 +135,7 @@ export function GeneralSettings(): ReactElement {
             id="ui-automation"
             checked={settings.uiAutomation}
             onCheckedChange={(checked) => {
-              void updateSettings({ uiAutomation: checked });
+              updateSettings.mutate({ uiAutomation: checked });
             }}
           />
         </SettingsRow>

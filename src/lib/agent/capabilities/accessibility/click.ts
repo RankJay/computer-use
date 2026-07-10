@@ -1,6 +1,5 @@
 import { z } from "zod";
 
-import { invokeCapabilityCommand } from "../tauri-invoke";
 import { defineCapability } from "../types";
 import { uiAutomationEnabled } from "./shared";
 
@@ -21,19 +20,4 @@ export const accessibilityClickCapability = defineCapability({
   risk: "high",
   inputSchema: accessibilityClickInputSchema,
   enabledWhen: uiAutomationEnabled,
-  execute: async (input) => {
-    const result = await invokeCapabilityCommand<{
-      ok: boolean;
-      method: string;
-      foregrounded: boolean;
-    }>("accessibility_click", {
-      reference: input.reference,
-    });
-
-    return {
-      ok: result.ok,
-      method: result.method,
-      foregrounded: result.foregrounded,
-    } satisfies AccessibilityActionOutput;
-  },
 });

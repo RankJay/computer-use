@@ -4,6 +4,7 @@ use std::process::Command;
 use serde::Serialize;
 
 #[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SystemInfoResult {
     pub os: String,
     pub arch: String,

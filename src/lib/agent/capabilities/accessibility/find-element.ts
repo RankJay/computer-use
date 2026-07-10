@@ -1,6 +1,5 @@
 import { z } from "zod";
 
-import { invokeCapabilityCommand } from "../tauri-invoke";
 import { defineCapability } from "../types";
 import { uiAutomationEnabled } from "./shared";
 
@@ -36,20 +35,4 @@ export const accessibilityFindElementCapability = defineCapability({
   risk: "high",
   inputSchema: accessibilityFindElementInputSchema,
   enabledWhen: uiAutomationEnabled,
-  execute: async (input) => {
-    const result = await invokeCapabilityCommand<{
-      text: string;
-      generation: number | null;
-    }>("accessibility_find_element", {
-      hwnd: input.hwnd,
-      name_contains: input.nameContains,
-      role: input.role,
-      wait_ms: input.waitMs,
-    });
-
-    return {
-      text: result.text,
-      generation: result.generation,
-    } satisfies AccessibilityTextOutput;
-  },
 });

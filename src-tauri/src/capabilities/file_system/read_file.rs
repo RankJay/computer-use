@@ -5,6 +5,7 @@ use serde::Serialize;
 use crate::capabilities::path_utils::{self, CommandError, MAX_READ_BYTES};
 
 #[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ReadFileResult {
     pub path: String,
     pub content: String,

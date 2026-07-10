@@ -1,6 +1,5 @@
 import { z } from "zod";
 
-import { invokeCapabilityCommand } from "../tauri-invoke";
 import { defineCapability } from "../types";
 
 export const launchInputSchema = z.object({
@@ -26,14 +25,4 @@ export const launchCapability = defineCapability({
     "Launch an executable without capturing stdout/stderr. Returns the spawned process id.",
   risk: "high",
   inputSchema: launchInputSchema,
-  execute: async (input) => {
-    const result = await invokeCapabilityCommand<{ pid: number; exe: string }>("launch", {
-      exe: input.exe,
-      args: input.args,
-      cwd: input.cwd,
-      env: input.env,
-    });
-
-    return { pid: result.pid, exe: result.exe } satisfies LaunchOutput;
-  },
 });

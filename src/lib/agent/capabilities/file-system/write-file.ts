@@ -1,6 +1,5 @@
 import { z } from "zod";
 
-import { invokeCapabilityCommand } from "../tauri-invoke";
 import { defineCapability } from "../types";
 
 export const writeFileInputSchema = z.object({
@@ -14,13 +13,6 @@ export const writeFileCapability = defineCapability({
   name: "write_file",
   description: "Create or overwrite a UTF-8 text file in the workspace",
   risk: "high",
+  needsWorkspaceRoot: true,
   inputSchema: writeFileInputSchema,
-  execute: async (input, ctx) => {
-    await invokeCapabilityCommand("write_file", {
-      path: input.path,
-      content: input.content,
-      workspaceRoot: ctx.workspaceRoot,
-    });
-    return { path: input.path };
-  },
 });

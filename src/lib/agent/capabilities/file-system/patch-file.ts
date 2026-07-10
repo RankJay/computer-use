@@ -1,6 +1,5 @@
 import { z } from "zod";
 
-import { invokeCapabilityCommand } from "../tauri-invoke";
 import { defineCapability } from "../types";
 
 export const patchFileInputSchema = z.object({
@@ -20,18 +19,6 @@ export const patchFileCapability = defineCapability({
   name: "patch_file",
   description: "Apply a unified diff patch to a workspace file",
   risk: "high",
+  needsWorkspaceRoot: true,
   inputSchema: patchFileInputSchema,
-  execute: async (input, ctx) => {
-    const result = await invokeCapabilityCommand<{
-      path: string;
-      bytesWritten: number;
-      hunksApplied: number;
-    }>("patch_file", {
-      path: input.path,
-      diff: input.diff,
-      workspaceRoot: ctx.workspaceRoot,
-    });
-
-    return result satisfies PatchFileOutput;
-  },
 });

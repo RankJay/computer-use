@@ -1,12 +1,14 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct TextResult {
     pub text: String,
     pub generation: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ActionResult {
     pub ok: bool,
     pub method: String,

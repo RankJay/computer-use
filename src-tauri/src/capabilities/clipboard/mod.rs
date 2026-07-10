@@ -6,12 +6,14 @@ use crate::capabilities::path_utils::CommandError;
 const MAX_CLIPBOARD_BYTES: usize = 512_000;
 
 #[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ReadClipboardResult {
     pub text: String,
     pub empty: bool,
 }
 
 #[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct WriteClipboardResult {
     pub bytes: usize,
 }

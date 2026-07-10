@@ -5,6 +5,7 @@ use crate::capabilities::path_utils::CommandError;
 const MAX_PROCESSES: usize = 200;
 
 #[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ProcessListResult {
     pub text: String,
     pub count: usize,

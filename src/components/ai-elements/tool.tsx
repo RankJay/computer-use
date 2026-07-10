@@ -62,7 +62,7 @@ const statusIcons: Record<ToolPart["state"], ReactNode> = {
 };
 
 export const getStatusBadge = (status: ToolPart["state"]) => (
-  <Badge className="gap-1.5 rounded-full text-xs" variant="secondary">
+  <Badge className="gap-1 rounded-full text-xs font-[350]" variant="secondary">
     {statusIcons[status]}
     {statusLabels[status]}
   </Badge>
@@ -146,12 +146,10 @@ export const ToolOutput = ({ className, output, errorText, ...props }: ToolOutpu
       <div
         className={cn(
           "overflow-x-auto rounded-md text-xs [&_table]:w-full",
-          errorText ? "bg-destructive/10 text-destructive" : "bg-muted/50 text-foreground",
+          errorText ? "bg-destructive/10 text-destructive p-2" : "bg-muted/50 text-foreground",
         )}
       >
-        {errorText && (
-          <pre className="whitespace-pre-wrap break-words p-3 font-mono">{errorText}</pre>
-        )}
+        {errorText && <div>{errorText}</div>}
         {Output}
       </div>
     </div>

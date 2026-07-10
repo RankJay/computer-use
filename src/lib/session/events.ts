@@ -1,19 +1,21 @@
 import type { UIMessage } from "ai";
 
+export const RUNTIME_EVENT_SCHEMA_VERSION = 1;
+
 export type RunStatus =
   | "idle"
   | "running"
   | "streaming"
   | "waiting_permission"
-  | "paused"
   | "completed"
   | "failed"
   | "cancelled";
 
-export type RuntimeEventBase = {
+export type RuntimeEventEnvelope = {
   eventId: string;
   taskId: string;
   timestamp: number;
+  schemaVersion: number;
 };
 
 /** JSON-serializable UI message part for event payloads. */
@@ -34,72 +36,74 @@ export type LanguageModelUsageSnapshot = {
   };
 };
 
-export type TaskStartedEvent = RuntimeEventBase & {
+export type TaskStartedPayload = {
   type: "task.started";
   prompt: string;
   modelId: string;
   agentMode: "live" | "demo";
   userMessageId?: string;
+  /** When true (e.g. retry), do not append a new user message row. */
+  omitUserMessage?: boolean;
 };
 
-export type TaskStatusChangedEvent = RuntimeEventBase & {
+export type TaskStatusChangedPayload = {
   type: "task.status_changed";
   status: RunStatus;
   reason?: string;
 };
 
-export type TaskCompletedEvent = RuntimeEventBase & {
+export type TaskCompletedPayload = {
   type: "task.completed";
   finishReason: "stop" | "budget" | "cancelled" | "error";
 };
 
-export type TaskFailedEvent = RuntimeEventBase & {
+export type TaskFailedPayload = {
   type: "task.failed";
   code: string;
   message: string;
   recoverable: boolean;
 };
 
-export type AssistantMessageStartedEvent = RuntimeEventBase & {
+export type AssistantMessageStartedPayload = {
   type: "assistant.message_started";
   messageId: string;
   role: "assistant";
 };
 
-export type AssistantPartUpdatedEvent = RuntimeEventBase & {
+export type AssistantPartUpdatedPayload = {
   type: "assistant.part_updated";
   messageId: string;
   partIndex: number;
   part: UIMessagePartSnapshot;
 };
 
-export type AssistantMessageFinishedEvent = RuntimeEventBase & {
+export type AssistantMessageFinishedPayload = {
   type: "assistant.message_finished";
   messageId: string;
 };
 
-export type CapabilityRequestedEvent = RuntimeEventBase & {
+export type CapabilityRequestedPayload = {
   type: "capability.requested";
   callId: string;
   capability: string;
   input: unknown;
 };
 
-export type CapabilityCompletedEvent = RuntimeEventBase & {
+export type CapabilityCompletedPayload = {
   type: "capability.completed";
   callId: string;
   capability: string;
   output: unknown;
 };
 
-export type CapabilityFailedEvent = RuntimeEventBase & {
+export type CapabilityFailedPayload = {
   type: "capability.failed";
   callId: string;
   capability: string;
   error: { code: string; message: string; details?: string; cause?: string };
 };
 
-export type PermissionRequestedEvent = RuntimeEventBase & {
+export type PermissionRequestedPayload = {
   type: "permission.requested";
   callId: string;
   capability: string;
@@ -107,22 +111,22 @@ export type PermissionRequestedEvent = RuntimeEventBase & {
   risk: "low" | "medium" | "high";
 };
 
-export type PermissionResolvedEvent = RuntimeEventBase & {
+export type PermissionResolvedPayload = {
   type: "permission.resolved";
   callId: string;
   decision: "approved" | "denied";
   persisted?: boolean;
 };
 
-export type UsageUpdatedEvent = RuntimeEventBase & {
+export type UsageUpdatedPayload = {
   type: "usage.updated";
   modelId: string;
-  usage: LanguageModelUsageSnapshot;
+  usage?: LanguageModelUsageSnapshot;
   usedTokens: number;
   maxTokens: number;
 };
 
-export type BudgetUpdatedEvent = RuntimeEventBase & {
+export type BudgetUpdatedPayload = {
   type: "budget.updated";
   stepsUsed: number;
   maxSteps: number;
@@ -132,12 +136,12 @@ export type BudgetUpdatedEvent = RuntimeEventBase & {
   maxWallClockMs: number;
 };
 
-export type BudgetExceededEvent = RuntimeEventBase & {
+export type BudgetExceededPayload = {
   type: "budget.exceeded";
   dimension: "steps" | "cost" | "wall_clock";
 };
 
-export type ActivityMarkerEvent = RuntimeEventBase & {
+export type ActivityMarkerPayload = {
   type: "activity.marker";
   markerId: string;
   variant?: "default" | "separator" | "border";
@@ -146,7 +150,7 @@ export type ActivityMarkerEvent = RuntimeEventBase & {
   status?: boolean;
 };
 
-export type ActivityChainUpdatedEvent = RuntimeEventBase & {
+export type ActivityChainUpdatedPayload = {
   type: "activity.chain_updated";
   chainId: string;
   steps: Array<{
@@ -157,40 +161,42 @@ export type ActivityChainUpdatedEvent = RuntimeEventBase & {
   }>;
 };
 
-export type ActivityTaskUpdatedEvent = RuntimeEventBase & {
+export type ActivityTaskUpdatedPayload = {
   type: "activity.task_updated";
   activityTaskId: string;
   title: string;
   items: Array<string | { text: string; file?: { name: string } }>;
 };
 
-export type RuntimeEvent =
-  | TaskStartedEvent
-  | TaskStatusChangedEvent
-  | TaskCompletedEvent
-  | TaskFailedEvent
-  | AssistantMessageStartedEvent
-  | AssistantPartUpdatedEvent
-  | AssistantMessageFinishedEvent
-  | CapabilityRequestedEvent
-  | CapabilityCompletedEvent
-  | CapabilityFailedEvent
-  | PermissionRequestedEvent
-  | PermissionResolvedEvent
-  | UsageUpdatedEvent
-  | BudgetUpdatedEvent
-  | BudgetExceededEvent
-  | ActivityMarkerEvent
-  | ActivityChainUpdatedEvent
-  | ActivityTaskUpdatedEvent;
+export type RuntimeEventPayload =
+  | TaskStartedPayload
+  | TaskStatusChangedPayload
+  | TaskCompletedPayload
+  | TaskFailedPayload
+  | AssistantMessageStartedPayload
+  | AssistantPartUpdatedPayload
+  | AssistantMessageFinishedPayload
+  | CapabilityRequestedPayload
+  | CapabilityCompletedPayload
+  | CapabilityFailedPayload
+  | PermissionRequestedPayload
+  | PermissionResolvedPayload
+  | UsageUpdatedPayload
+  | BudgetUpdatedPayload
+  | BudgetExceededPayload
+  | ActivityMarkerPayload
+  | ActivityChainUpdatedPayload
+  | ActivityTaskUpdatedPayload;
 
-export type RuntimeEventPayload = {
-  [Type in RuntimeEvent["type"]]: Omit<
-    Extract<RuntimeEvent, { type: Type }>,
-    "eventId" | "taskId" | "timestamp"
-  >;
-}[RuntimeEvent["type"]];
+export type RuntimeEvent = RuntimeEventEnvelope & RuntimeEventPayload;
 
 export function isRuntimeEvent(value: unknown): value is RuntimeEvent {
-  return typeof value === "object" && value !== null && "type" in value && "eventId" in value;
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "type" in value &&
+    "eventId" in value &&
+    "taskId" in value &&
+    "schemaVersion" in value
+  );
 }

@@ -1,6 +1,5 @@
 import { z } from "zod";
 
-import { invokeCapabilityCommand } from "../tauri-invoke";
 import { defineCapability } from "../types";
 
 export const createDirectoryInputSchema = z.object({
@@ -19,17 +18,6 @@ export const createDirectoryCapability = defineCapability({
   name: "create_directory",
   description: "Create an empty directory in the workspace",
   risk: "high",
+  needsWorkspaceRoot: true,
   inputSchema: createDirectoryInputSchema,
-  execute: async (input, ctx) => {
-    const result = await invokeCapabilityCommand<{
-      path: string;
-      created: boolean;
-    }>("create_directory", {
-      path: input.path,
-      recursive: input.recursive,
-      workspaceRoot: ctx.workspaceRoot,
-    });
-
-    return result satisfies CreateDirectoryOutput;
-  },
 });

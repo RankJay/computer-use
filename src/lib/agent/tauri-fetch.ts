@@ -1,6 +1,6 @@
 import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
 
-import { isTauriRuntime } from "@/lib/agent/capabilities/tauri-invoke";
+import { isTauriRuntime } from "@/lib/agent/is-tauri-runtime";
 
 const STRIP_HEADERS = [
   "referer",
@@ -14,7 +14,6 @@ function buildProviderHeaders(init?: RequestInit): Headers {
   const headers = new Headers(init?.headers);
 
   // Tauri plugin-http removes Origin when set to "" (requires unsafe-headers).
-  // Without this, the webview Origin leaks and Anthropic treats the call as browser CORS.
   headers.set("Origin", "");
 
   for (const name of STRIP_HEADERS) {
@@ -48,10 +47,10 @@ function resolveInputUrl(input: RequestInfo | URL): string {
 
 /** Rust-backed fetch for Tauri — strips webview Origin before reqwest. */
 export function createProviderFetch(): typeof fetch {
-  const providerFetch: typeof fetch = async (input, init) => {
+  const providerFetch = (async (input, init) => {
     const url = resolveInputUrl(input);
     return tauriFetch(url, toTauriRequestInit(input, init));
-  };
+  }) as typeof fetch;
 
   return providerFetch;
 }

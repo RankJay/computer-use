@@ -1,3 +1,5 @@
+import type { AppSettings } from "@/lib/settings/types";
+
 import { accessibilityClickCapability } from "./accessibility/click";
 import { accessibilityExpandNodeCapability } from "./accessibility/expand-node";
 import { accessibilityFindElementCapability } from "./accessibility/find-element";
@@ -26,7 +28,7 @@ import { processKillCapability } from "./shell/process-kill";
 import { processListCapability } from "./shell/process-list";
 import { runShellCapability } from "./shell/run-shell";
 import { setEnvCapability } from "./shell/set-env";
-import type { CapabilityDefinition } from "./types";
+import type { CapabilityDefinition, CapabilityRisk } from "./types";
 import { windowFocusCapability } from "./window/focus";
 import { getActiveWindowCapability } from "./window/get-active";
 import { windowListCapability } from "./window/list";
@@ -34,7 +36,8 @@ import { windowMoveCapability } from "./window/move";
 import { windowResizeCapability } from "./window/resize";
 import { windowStateCapability } from "./window/state";
 
-const V1_CAPABILITIES: CapabilityDefinition[] = [
+/** Single source of registered capabilities. Add new tools here + Rust command. */
+export const CAPABILITIES = [
   readFileCapability,
   readDirectoryCapability,
   searchFilesCapability,
@@ -69,50 +72,16 @@ const V1_CAPABILITIES: CapabilityDefinition[] = [
   accessibilitySetValueCapability,
   accessibilitySendKeysCapability,
   accessibilityFocusCapability,
-];
+] as const satisfies readonly CapabilityDefinition[];
 
-export type V1CapabilityName =
-  | "read_file"
-  | "read_directory"
-  | "search_files"
-  | "write_file"
-  | "create_directory"
-  | "patch_file"
-  | "delete_path"
-  | "move_path"
-  | "duplicate_path"
-  | "stat_path"
-  | "run_shell"
-  | "process_list"
-  | "process_info"
-  | "process_kill"
-  | "launch"
-  | "get_env"
-  | "set_env"
-  | "read_clipboard"
-  | "write_clipboard"
-  | "get_system_info"
-  | "wait"
-  | "window_list"
-  | "window_focus"
-  | "window_state"
-  | "window_move"
-  | "window_resize"
-  | "get_active_window"
-  | "accessibility_snapshot"
-  | "accessibility_find_element"
-  | "accessibility_expand_node"
-  | "accessibility_click"
-  | "accessibility_set_value"
-  | "accessibility_send_keys"
-  | "accessibility_focus";
+export type CapabilityName = (typeof CAPABILITIES)[number]["name"];
 
 const capabilityByName = new Map<string, CapabilityDefinition>(
-  V1_CAPABILITIES.map((capability) => [capability.name, capability]),
+  CAPABILITIES.map((capability) => [capability.name, capability]),
 );
 
-export function getV1Capabilities(): readonly CapabilityDefinition[] {
-  return V1_CAPABILITIES;
+export function getCapabilities(): readonly CapabilityDefinition[] {
+  return CAPABILITIES;
 }
 
 export function getCapabilityDefinition(name: string): CapabilityDefinition {
@@ -123,6 +92,20 @@ export function getCapabilityDefinition(name: string): CapabilityDefinition {
   return capability;
 }
 
-export function isV1CapabilityName(name: string): name is V1CapabilityName {
+export function isCapabilityName(name: string): name is CapabilityName {
   return capabilityByName.has(name);
+}
+
+/**
+ * Capability names grouped by risk for system-prompt generation.
+ * When settings are provided, skips tools whose `enabledWhen` predicate fails
+ * (same filter as `buildAgentTools`).
+ */
+export function getCapabilityNamesByRisk(settings?: AppSettings): Record<CapabilityRisk, string[]> {
+  const groups: Record<CapabilityRisk, string[]> = { low: [], medium: [], high: [] };
+  for (const capability of CAPABILITIES) {
+    if (settings && capability.enabledWhen?.(settings) === false) continue;
+    groups[capability.risk].push(capability.name);
+  }
+  return groups;
 }

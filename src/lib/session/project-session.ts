@@ -1,132 +1,143 @@
-import type { DynamicToolUIPart, UIMessage } from "ai";
-
-import type { AgentMessageRowData, AgentTranscriptRow } from "@/features/ai-chat/types";
-import { formatBudgetExceededMessage } from "@/lib/session/control/budget";
+import type { UIMessage } from "ai";
 
 import type { RuntimeEvent, UIMessagePartSnapshot } from "./events";
 import {
   createEmptySessionProjection,
-  deriveControlFlags,
+  type PendingPermission,
   type SessionProjection,
 } from "./projection";
+import type { AgentMessageRowData, AgentTranscriptRow } from "./rows";
 
-type InternalProjectionState = {
+export type FoldState = {
   taskId: string | null;
   status: SessionProjection["status"];
   failure: SessionProjection["failure"];
-  rowOrder: string[];
-  rowsById: Map<string, AgentTranscriptRow>;
-  messages: Map<string, UIMessage>;
-  pendingPermission: SessionProjection["pendingPermission"];
+  rows: AgentTranscriptRow[];
+  pendingPermissions: PendingPermission[];
   usage: SessionProjection["usage"];
   budget: SessionProjection["budget"];
-  seenEventIds: Set<string>;
+  streamingMessageId: string | null;
+  seenEventIds: ReadonlySet<string>;
 };
 
-function createInternalState(): InternalProjectionState {
-  const empty = createEmptySessionProjection();
+export function createFoldState(
+  previous: SessionProjection = createEmptySessionProjection(),
+  seenEventIds: ReadonlySet<string> = new Set(),
+): FoldState {
   return {
-    taskId: empty.taskId,
-    status: empty.status,
-    failure: empty.failure,
-    rowOrder: [],
-    rowsById: new Map(),
-    messages: new Map(),
-    pendingPermission: empty.pendingPermission,
-    usage: { ...empty.usage },
-    budget: { ...empty.budget },
-    seenEventIds: new Set(),
+    taskId: previous.taskId,
+    status: previous.status,
+    failure: previous.failure,
+    rows: previous.rows,
+    pendingPermissions: previous.pendingPermissions,
+    usage: { ...previous.usage },
+    budget: { ...previous.budget },
+    streamingMessageId: previous.streamingMessageId,
+    seenEventIds,
   };
 }
 
-function ensureRowOrder(state: InternalProjectionState, rowId: string): void {
-  if (!state.rowOrder.includes(rowId)) {
-    state.rowOrder.push(rowId);
+function findRowIndex(rows: readonly AgentTranscriptRow[], id: string): number {
+  return rows.findIndex((row) => row.id === id);
+}
+
+function upsertRow(rows: AgentTranscriptRow[], row: AgentTranscriptRow): AgentTranscriptRow[] {
+  const index = findRowIndex(rows, row.id);
+  if (index === -1) {
+    return [...rows, row];
   }
+  if (Object.is(rows[index], row)) {
+    return rows;
+  }
+  const next = rows.slice();
+  next[index] = row;
+  return next;
 }
 
-function upsertRow(state: InternalProjectionState, row: AgentTranscriptRow): void {
-  state.rowsById.set(row.id, row);
-  ensureRowOrder(state, row.id);
+function getMessageRow(
+  rows: readonly AgentTranscriptRow[],
+  messageId: string,
+): AgentMessageRowData | undefined {
+  const row = rows.find((candidate) => candidate.id === messageId);
+  return row?.type === "message" ? row : undefined;
 }
 
-function syncMessageRow(state: InternalProjectionState, messageId: string): void {
-  const message = state.messages.get(messageId);
-  if (!message) return;
-
-  const existing = state.rowsById.get(messageId);
-  const scrollAnchor = existing?.type === "message" ? existing.scrollAnchor : undefined;
-
-  upsertRow(state, {
-    type: "message",
-    id: messageId,
-    message,
-    scrollAnchor,
-  });
-}
-
-function getOrCreateAssistantMessage(state: InternalProjectionState, messageId: string): UIMessage {
-  const existing = state.messages.get(messageId);
-  if (existing) return existing;
+function ensureAssistantMessage(
+  state: FoldState,
+  messageId: string,
+): { state: FoldState; row: AgentMessageRowData } {
+  const existing = getMessageRow(state.rows, messageId);
+  if (existing) {
+    return { state, row: existing };
+  }
 
   const message: UIMessage = {
     id: messageId,
     role: "assistant",
     parts: [],
   };
-  state.messages.set(messageId, message);
-  syncMessageRow(state, messageId);
-  return message;
+  const row: AgentMessageRowData = {
+    type: "message",
+    id: messageId,
+    message,
+  };
+  return {
+    state: {
+      ...state,
+      rows: upsertRow(state.rows, row),
+      streamingMessageId: messageId,
+    },
+    row,
+  };
 }
 
 function setMessagePart(
-  state: InternalProjectionState,
+  state: FoldState,
   messageId: string,
   partIndex: number,
   part: UIMessagePartSnapshot,
-): void {
-  const message = getOrCreateAssistantMessage(state, messageId);
-  const parts = [...message.parts];
-  parts[partIndex] = part;
-  state.messages.set(messageId, { ...message, parts });
-  syncMessageRow(state, messageId);
-}
+): FoldState {
+  const ensured = ensureAssistantMessage(state, messageId);
+  const { row } = ensured;
+  const working = ensured.state;
 
-function updateDynamicToolPartByCallId(
-  state: InternalProjectionState,
-  callId: string,
-  update: (part: DynamicToolUIPart) => UIMessagePartSnapshot,
-): void {
-  for (const [messageId, message] of state.messages) {
-    if (message.role !== "assistant") continue;
-
-    for (let index = 0; index < message.parts.length; index += 1) {
-      const part = message.parts[index];
-      if (part?.type !== "dynamic-tool" || part.toolCallId !== callId) continue;
-
-      setMessagePart(state, messageId, index, update(part));
-      return;
-    }
+  const parts = row.message.parts.slice();
+  while (parts.length <= partIndex) {
+    parts.push({ type: "text", text: "" });
   }
+  parts[partIndex] = part;
+
+  const nextRow: AgentMessageRowData = {
+    ...row,
+    message: {
+      ...row.message,
+      parts,
+    },
+  };
+
+  return {
+    ...working,
+    rows: upsertRow(working.rows, nextRow),
+    streamingMessageId: messageId,
+  };
 }
 
-function appendFailureMessage(
-  state: InternalProjectionState,
-  taskId: string,
-  message: string,
-): void {
+function appendFailureMessage(state: FoldState, taskId: string, message: string): FoldState {
   const errorMessageId = `error-${taskId}`;
   const errorMessage: UIMessage = {
     id: errorMessageId,
     role: "assistant",
     parts: [{ type: "text", text: `Error: ${message}` }],
   };
-  state.messages.set(errorMessageId, errorMessage);
-  upsertRow(state, {
+  const row: AgentMessageRowData = {
     type: "message",
     id: errorMessageId,
     message: errorMessage,
-  });
+  };
+  return {
+    ...state,
+    rows: upsertRow(state.rows, row),
+  };
 }
 
 function chatMessagesFromRows(rows: readonly AgentTranscriptRow[]): UIMessage[] {
@@ -135,237 +146,277 @@ function chatMessagesFromRows(rows: readonly AgentTranscriptRow[]): UIMessage[] 
     .map((row) => row.message);
 }
 
-function toProjection(state: InternalProjectionState): SessionProjection {
-  const control = deriveControlFlags(state.status);
-  const rows = state.rowOrder
-    .map((id) => state.rowsById.get(id))
-    .filter((row): row is AgentTranscriptRow => row !== undefined);
-
-  return {
-    taskId: state.taskId,
-    status: state.status,
-    failure: state.failure,
-    rows,
-    chatMessages: chatMessagesFromRows(rows),
-    pendingPermission: state.pendingPermission,
-    usage: { ...state.usage },
-    budget: { ...state.budget },
-    ...control,
-  };
+function withSeen(state: FoldState, eventId: string): FoldState {
+  const seenEventIds = new Set(state.seenEventIds);
+  seenEventIds.add(eventId);
+  return { ...state, seenEventIds };
 }
 
-export function reduceSession(
-  state: InternalProjectionState,
-  event: RuntimeEvent,
-): InternalProjectionState {
+function formatBudgetExceededMessage(dimension: "steps" | "cost" | "wall_clock"): string {
+  switch (dimension) {
+    case "steps":
+      return "Run stopped: step limit reached";
+    case "cost":
+      return "Run stopped: cost limit reached";
+    case "wall_clock":
+      return "Run stopped: time limit reached";
+    default: {
+      const _exhaustive: never = dimension;
+      return _exhaustive;
+    }
+  }
+}
+
+const KNOWN_EVENT_TYPES = new Set<RuntimeEvent["type"]>([
+  "task.started",
+  "task.status_changed",
+  "task.completed",
+  "task.failed",
+  "assistant.message_started",
+  "assistant.part_updated",
+  "assistant.message_finished",
+  "capability.requested",
+  "capability.completed",
+  "capability.failed",
+  "permission.requested",
+  "permission.resolved",
+  "usage.updated",
+  "budget.updated",
+  "budget.exceeded",
+  "activity.marker",
+  "activity.chain_updated",
+  "activity.task_updated",
+]);
+
+export function isKnownRuntimeEvent(event: { type: string }): boolean {
+  return KNOWN_EVENT_TYPES.has(event.type as RuntimeEvent["type"]);
+}
+
+/**
+ * Pure immutable reducer with structural sharing.
+ * Permission events update pendingPermissions only — they never patch tool parts.
+ */
+export function reduceSession(state: FoldState, event: RuntimeEvent): FoldState {
   if (state.seenEventIds.has(event.eventId)) {
     return state;
   }
-  state.seenEventIds.add(event.eventId);
+
+  const base = withSeen(state, event.eventId);
 
   switch (event.type) {
     case "task.started": {
-      state.taskId = event.taskId;
-      state.status = "running";
-      state.failure = null;
-      state.pendingPermission = null;
-      state.usage.modelId = event.modelId;
-
+      const next: FoldState = {
+        ...base,
+        taskId: event.taskId,
+        status: "running",
+        failure: null,
+        pendingPermissions: [],
+        streamingMessageId: null,
+        usage: { ...base.usage, modelId: event.modelId },
+      };
+      if (event.omitUserMessage) {
+        return next;
+      }
       const userMessageId = event.userMessageId ?? `user-${event.taskId}`;
       const userMessage: UIMessage = {
         id: userMessageId,
         role: "user",
         parts: [{ type: "text", text: event.prompt }],
       };
-      state.messages.set(userMessageId, userMessage);
-      upsertRow(state, {
+      const row: AgentMessageRowData = {
         type: "message",
         id: userMessageId,
         message: userMessage,
         scrollAnchor: true,
-      });
-      break;
+      };
+      return {
+        ...next,
+        rows: upsertRow(base.rows, row),
+      };
     }
 
     case "task.status_changed":
-      state.status = event.status;
-      break;
+      return { ...base, status: event.status };
 
-    case "task.completed":
-      if (event.finishReason === "budget") {
-        state.status = "failed";
-      } else if (state.status !== "failed") {
-        state.status = "completed";
+    case "task.completed": {
+      let status: SessionProjection["status"] = base.status;
+      if (event.finishReason === "cancelled") {
+        status = "cancelled";
+      } else if (event.finishReason === "budget" || event.finishReason === "error") {
+        status = "failed";
+      } else if (base.status !== "failed") {
+        status = "completed";
       }
-      state.pendingPermission = null;
-      break;
+      return {
+        ...base,
+        status,
+        pendingPermissions: [],
+        streamingMessageId: null,
+      };
+    }
 
-    case "task.failed":
-      state.status = "failed";
-      state.failure = { code: event.code, message: event.message };
-      state.pendingPermission = null;
-      appendFailureMessage(state, event.taskId, event.message);
-      break;
+    case "task.failed": {
+      const withFailure: FoldState = {
+        ...base,
+        status: "failed",
+        failure: {
+          code: event.code,
+          message: event.message,
+          recoverable: event.recoverable,
+        },
+        pendingPermissions: [],
+        streamingMessageId: null,
+      };
+      return appendFailureMessage(withFailure, event.taskId, event.message);
+    }
 
     case "assistant.message_started":
-      getOrCreateAssistantMessage(state, event.messageId);
-      break;
+      return ensureAssistantMessage(base, event.messageId).state;
 
     case "assistant.part_updated":
-      setMessagePart(state, event.messageId, event.partIndex, event.part);
-      break;
+      return setMessagePart(base, event.messageId, event.partIndex, event.part);
 
     case "assistant.message_finished":
-      break;
+      return {
+        ...base,
+        streamingMessageId:
+          base.streamingMessageId === event.messageId ? null : base.streamingMessageId,
+      };
 
-    case "activity.marker":
-      upsertRow(state, {
+    case "activity.marker": {
+      const row: AgentTranscriptRow = {
         type: "marker",
         id: event.markerId,
         variant: event.variant,
         text: event.text,
         live: event.live,
         status: event.status,
-      });
-      break;
+      };
+      return { ...base, rows: upsertRow(base.rows, row) };
+    }
 
-    case "activity.chain_updated":
-      upsertRow(state, {
+    case "activity.chain_updated": {
+      const row: AgentTranscriptRow = {
         type: "chain-of-thought",
         id: event.chainId,
         steps: event.steps,
-      });
-      break;
+      };
+      return { ...base, rows: upsertRow(base.rows, row) };
+    }
 
-    case "activity.task_updated":
-      upsertRow(state, {
+    case "activity.task_updated": {
+      const row: AgentTranscriptRow = {
         type: "task",
         id: event.activityTaskId,
         title: event.title,
         items: event.items,
-      });
-      break;
+      };
+      return { ...base, rows: upsertRow(base.rows, row) };
+    }
 
-    case "permission.requested":
-      state.status = "waiting_permission";
-      state.pendingPermission = {
+    case "permission.requested": {
+      const next: PendingPermission = {
         callId: event.callId,
         capability: event.capability,
         input: event.input,
         risk: event.risk,
       };
-      updateDynamicToolPartByCallId(state, event.callId, (part) => ({
-        type: "dynamic-tool",
-        toolName: part.toolName,
-        toolCallId: part.toolCallId,
-        state: "approval-requested",
-        input: event.input,
-        approval: { id: event.callId },
-      }));
-      break;
+      const withoutDup = base.pendingPermissions.filter((p) => p.callId !== event.callId);
+      return {
+        ...base,
+        status: "waiting_permission",
+        pendingPermissions: [...withoutDup, next],
+      };
+    }
 
-    case "permission.resolved":
-      state.pendingPermission = null;
-      if (state.status === "waiting_permission") {
-        state.status = "running";
-      }
-      if (event.decision === "denied") {
-        updateDynamicToolPartByCallId(state, event.callId, (part) => ({
-          type: "dynamic-tool",
-          toolName: part.toolName,
-          toolCallId: part.toolCallId,
-          state: "output-denied",
-          input: part.input,
-          approval: { id: event.callId, approved: false },
-        }));
-      } else {
-        updateDynamicToolPartByCallId(state, event.callId, (part) => ({
-          type: "dynamic-tool",
-          toolName: part.toolName,
-          toolCallId: part.toolCallId,
-          state: "approval-responded",
-          input: part.input,
-          approval: { id: event.callId, approved: true },
-        }));
-      }
-      break;
+    case "permission.resolved": {
+      const pendingPermissions = base.pendingPermissions.filter((p) => p.callId !== event.callId);
+      return {
+        ...base,
+        pendingPermissions,
+        status:
+          pendingPermissions.length > 0
+            ? "waiting_permission"
+            : base.status === "waiting_permission"
+              ? "running"
+              : base.status,
+      };
+    }
 
     case "usage.updated":
-      state.usage = {
-        modelId: event.modelId,
-        usage: event.usage,
-        usedTokens: event.usedTokens,
-        maxTokens: event.maxTokens,
+      return {
+        ...base,
+        usage: {
+          modelId: event.modelId,
+          usage: event.usage ?? null,
+          usedTokens: event.usedTokens,
+          maxTokens: event.maxTokens,
+        },
       };
-      break;
 
     case "budget.updated":
-      state.budget = {
-        stepsUsed: event.stepsUsed,
-        maxSteps: event.maxSteps,
-        costUsd: event.costUsd,
-        maxCostUsd: event.maxCostUsd,
-        elapsedMs: event.elapsedMs,
-        maxWallClockMs: event.maxWallClockMs,
+      return {
+        ...base,
+        budget: {
+          stepsUsed: event.stepsUsed,
+          maxSteps: event.maxSteps,
+          costUsd: event.costUsd,
+          maxCostUsd: event.maxCostUsd,
+          elapsedMs: event.elapsedMs,
+          maxWallClockMs: event.maxWallClockMs,
+        },
       };
-      break;
 
     case "budget.exceeded": {
       const message = formatBudgetExceededMessage(event.dimension);
-      state.status = "failed";
-      state.failure = {
-        code: "budget_exceeded",
-        message,
+      let next: FoldState = {
+        ...base,
+        status: "failed",
+        failure: {
+          code: "budget_exceeded",
+          message,
+          recoverable: true,
+        },
+        pendingPermissions: [],
+        streamingMessageId: null,
       };
-      if (state.taskId) {
-        appendFailureMessage(state, state.taskId, message);
+      if (base.taskId) {
+        next = appendFailureMessage(next, base.taskId, message);
       }
-      break;
+      return next;
     }
 
     case "capability.requested":
     case "capability.completed":
     case "capability.failed":
-      break;
+      return base;
 
     default: {
       const _exhaustive: never = event;
       return _exhaustive;
     }
   }
-
-  return state;
 }
 
+export function toProjection(state: FoldState): SessionProjection {
+  return {
+    taskId: state.taskId,
+    status: state.status,
+    failure: state.failure,
+    rows: state.rows,
+    chatMessages: chatMessagesFromRows(state.rows),
+    pendingPermissions: state.pendingPermissions,
+    usage: { ...state.usage },
+    budget: { ...state.budget },
+    streamingMessageId: state.streamingMessageId,
+  };
+}
+
+/** Batch fold for tests and replay. Rebuilds internal seenEventIds from scratch. */
 export function projectSession(events: readonly RuntimeEvent[]): SessionProjection {
-  const state = createInternalState();
-
+  let state = createFoldState();
   for (const event of events) {
-    reduceSession(state, event);
+    state = reduceSession(state, event);
   }
-
-  return toProjection(state);
-}
-
-export function projectSessionIncremental(
-  previous: SessionProjection,
-  event: RuntimeEvent,
-): SessionProjection {
-  const state = createInternalState();
-  state.taskId = previous.taskId;
-  state.status = previous.status;
-  state.failure = previous.failure;
-  state.pendingPermission = previous.pendingPermission;
-  state.usage = { ...previous.usage };
-  state.budget = { ...previous.budget };
-
-  for (const row of previous.rows) {
-    upsertRow(state, row);
-    if (row.type === "message") {
-      state.messages.set(row.id, row.message);
-    }
-  }
-
-  reduceSession(state, event);
   return toProjection(state);
 }

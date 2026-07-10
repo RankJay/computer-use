@@ -1,6 +1,5 @@
 import { z } from "zod";
 
-import { invokeCapabilityCommand } from "../tauri-invoke";
 import { defineCapability } from "../types";
 
 export const windowResizeInputSchema = z.object({
@@ -21,22 +20,4 @@ export const windowResizeCapability = defineCapability({
   description: "Resize a top-level window to the given width and height.",
   risk: "medium",
   inputSchema: windowResizeInputSchema,
-  execute: async (input) => {
-    const result = await invokeCapabilityCommand<{
-      ok: boolean;
-      hwnd: number;
-      width: number;
-      height: number;
-    }>("window_resize", {
-      hwnd: input.hwnd,
-      width: input.width,
-      height: input.height,
-    });
-    return {
-      ok: result.ok,
-      hwnd: result.hwnd,
-      width: result.width,
-      height: result.height,
-    } satisfies WindowResizeOutput;
-  },
 });

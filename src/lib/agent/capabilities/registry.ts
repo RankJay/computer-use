@@ -2,13 +2,17 @@ import { tool, zodSchema } from "ai";
 
 import { formatCapabilityError } from "@/lib/agent/tool-errors";
 
-import { getV1Capabilities } from "./catalog";
-import type { V1CapabilityName } from "./catalog";
-import { invokeCapability } from "./invoke";
-import type { CapabilityDefinition, CapabilityError, InvokeCapabilityDeps } from "./types";
+import { getCapabilities, type CapabilityName } from "./catalog";
+import { runCapability } from "./runner";
+import type { CapabilityDefinition, CapabilityError, CapabilityRunnerDeps } from "./types";
 
-export { getCapabilityDefinition, getV1Capabilities, isV1CapabilityName } from "./catalog";
-export type { V1CapabilityName } from "./catalog";
+export {
+  getCapabilityDefinition,
+  getCapabilityNamesByRisk,
+  getCapabilities,
+  isCapabilityName,
+} from "./catalog";
+export type { CapabilityName } from "./catalog";
 
 function capabilityExecutionError(error: CapabilityError): Error {
   const formatted = formatCapabilityError(error);
@@ -17,13 +21,13 @@ function capabilityExecutionError(error: CapabilityError): Error {
   return executionError;
 }
 
-async function executeViaInvoke(
+async function executeViaRunner(
   name: string,
   input: unknown,
-  deps: InvokeCapabilityDeps,
+  deps: CapabilityRunnerDeps,
   toolCallId: string,
 ): Promise<unknown> {
-  const result = await invokeCapability(name, input, deps, toolCallId);
+  const result = await runCapability(name, input, deps, toolCallId);
 
   if (result.ok) {
     return result.output;
@@ -40,17 +44,17 @@ async function executeViaInvoke(
   throw new Error("Capability invocation failed.");
 }
 
-function makeAgentTool(capability: CapabilityDefinition, deps: InvokeCapabilityDeps) {
+function makeAgentTool(capability: CapabilityDefinition, deps: CapabilityRunnerDeps) {
   return tool({
     description: capability.description,
     inputSchema: zodSchema(capability.inputSchema),
     execute: async (input, { toolCallId }) =>
-      executeViaInvoke(capability.name, input, deps, toolCallId),
+      executeViaRunner(capability.name, input, deps, toolCallId),
   });
 }
 
-export function buildAgentTools(deps: InvokeCapabilityDeps) {
-  const enabledCapabilities = getV1Capabilities().filter(
+export function buildAgentTools(deps: CapabilityRunnerDeps) {
+  const enabledCapabilities = getCapabilities().filter(
     (capability) => capability.enabledWhen?.(deps.settings) ?? true,
   );
 
@@ -59,7 +63,7 @@ export function buildAgentTools(deps: InvokeCapabilityDeps) {
   );
 
   return Object.fromEntries(entries) as Partial<{
-    [K in V1CapabilityName]: ReturnType<typeof makeAgentTool>;
+    [K in CapabilityName]: ReturnType<typeof makeAgentTool>;
   }>;
 }
 

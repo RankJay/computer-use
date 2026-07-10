@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 export type SourcesProps = ComponentProps<"div">;
 
 export const Sources = ({ className, ...props }: SourcesProps) => (
-  <Collapsible className={cn("group not-prose mb-4 text-primary text-xs", className)} {...props} />
+  <Collapsible className={cn("not-prose mb-4 text-primary text-xs", className)} {...props} />
 );
 
 export type SourcesTriggerProps = ComponentProps<typeof CollapsibleTrigger> & {
@@ -21,7 +21,7 @@ export const SourcesTrigger = ({ className, count, children, ...props }: Sources
     {children ?? (
       <>
         <p className="font-medium">Used {count} sources</p>
-        <ChevronDownIcon className="size-4 transition-transform group-data-open:rotate-180" />
+        <ChevronDownIcon className="h-4 w-4" />
       </>
     )}
   </CollapsibleTrigger>
