@@ -15,11 +15,15 @@ export type StatPathOutput = {
   modifiedAt: string;
   createdAt?: string;
   readonly: boolean;
+  mode: string | null;
+  executable: boolean;
+  symlinkTarget?: string;
 };
 
 export const statPathCapability = defineCapability({
   name: "stat_path",
-  description: "Get file or directory metadata from the workspace",
+  description:
+    "Get file or directory metadata from the workspace (size, timestamps, permissions, symlink target)",
   risk: "low",
   needsWorkspaceRoot: true,
   inputSchema: statPathInputSchema,

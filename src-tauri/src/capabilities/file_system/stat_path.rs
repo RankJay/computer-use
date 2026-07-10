@@ -1,4 +1,6 @@
 use std::fs;
+use std::io::ErrorKind;
+use std::path::Path;
 use std::time::SystemTime;
 
 use serde::Serialize;
@@ -17,6 +19,10 @@ pub struct StatPathResult {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub created_at: Option<String>,
     pub readonly: bool,
+    pub mode: Option<String>,
+    pub executable: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub symlink_target: Option<String>,
 }
 
 fn format_timestamp(time: SystemTime) -> Option<String> {
@@ -25,12 +31,55 @@ fn format_timestamp(time: SystemTime) -> Option<String> {
 }
 
 fn path_kind(metadata: &fs::Metadata) -> &'static str {
-    if metadata.is_dir() {
-        "directory"
-    } else if metadata.is_symlink() {
+    if metadata.is_symlink() {
         "symlink"
+    } else if metadata.is_dir() {
+        "directory"
     } else {
         "file"
+    }
+}
+
+fn unix_mode(metadata: &fs::Metadata) -> Option<String> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        Some(format!("{:04o}", metadata.permissions().mode() & 0o7777))
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = metadata;
+        None
+    }
+}
+
+fn is_executable(path: &Path, metadata: &fs::Metadata) -> bool {
+    if metadata.is_dir() || metadata.is_symlink() {
+        return false;
+    }
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        return metadata.permissions().mode() & 0o100 != 0;
+    }
+
+    #[cfg(windows)]
+    {
+        let _ = metadata;
+        matches!(
+            path.extension()
+                .and_then(|ext| ext.to_str())
+                .map(|ext| ext.to_ascii_lowercase())
+                .as_deref(),
+            Some("exe" | "bat" | "cmd" | "ps1" | "com")
+        )
+    }
+
+    #[cfg(not(any(unix, windows)))]
+    {
+        let _ = (path, metadata);
+        false
     }
 }
 
@@ -38,31 +87,48 @@ fn path_kind(metadata: &fs::Metadata) -> &'static str {
 pub fn stat_path(path: String, workspace_root: String) -> Result<StatPathResult, CommandError> {
     let resolved = path_utils::resolve_workspace_path(&workspace_root, &path)?;
 
-    if !resolved.exists() {
-        return Err(CommandError::new("not_found", "Path does not exist"));
-    }
-
-    let metadata = fs::metadata(&resolved).map_err(|error| {
-        CommandError::new("io_error", format!("Failed to read path metadata: {error}"))
+    let metadata = fs::symlink_metadata(&resolved).map_err(|error| {
+        if error.kind() == ErrorKind::NotFound {
+            CommandError::new("not_found", "Path does not exist")
+        } else {
+            CommandError::new("io_error", format!("Failed to read path metadata: {error}"))
+        }
     })?;
+
+    let kind = path_kind(&metadata);
+    let symlink_target = if metadata.is_symlink() {
+        Some(
+            fs::read_link(&resolved)
+                .map_err(|error| {
+                    CommandError::new(
+                        "io_error",
+                        format!("Failed to read symlink target: {error}"),
+                    )
+                })?
+                .to_string_lossy()
+                .into_owned(),
+        )
+    } else {
+        None
+    };
 
     let modified_at = format_timestamp(metadata.modified().map_err(|error| {
         CommandError::new("io_error", format!("Failed to read modified time: {error}"))
     })?)
     .ok_or_else(|| CommandError::new("io_error", "Failed to format modified timestamp"))?;
 
-    let created_at = metadata
-        .created()
-        .ok()
-        .and_then(format_timestamp);
+    let created_at = metadata.created().ok().and_then(format_timestamp);
 
     Ok(StatPathResult {
         path,
-        kind: path_kind(&metadata).to_string(),
+        kind: kind.to_string(),
         size_bytes: if metadata.is_dir() { 0 } else { metadata.len() },
         modified_at,
         created_at,
         readonly: metadata.permissions().readonly(),
+        mode: unix_mode(&metadata),
+        executable: is_executable(&resolved, &metadata),
+        symlink_target,
     })
 }
 
@@ -84,6 +150,12 @@ mod tests {
         assert_eq!(result.kind, "file");
         assert_eq!(result.size_bytes, 5);
         assert!(!result.modified_at.is_empty());
+        assert!(!result.executable);
+        assert!(result.symlink_target.is_none());
+        #[cfg(unix)]
+        assert!(result.mode.is_some());
+        #[cfg(windows)]
+        assert!(result.mode.is_none());
         cleanup_workspace(&cleanup);
     }
 
@@ -96,6 +168,68 @@ mod tests {
 
         assert_eq!(result.kind, "directory");
         assert_eq!(result.size_bytes, 0);
+        assert!(!result.executable);
+        cleanup_workspace(&cleanup);
+    }
+
+    #[test]
+    fn stats_executable_extension_on_windows_or_unix_bit() {
+        let (root, cleanup) = temp_workspace();
+
+        #[cfg(windows)]
+        {
+            fs::write(root.join("tool.exe"), "mz").expect("write exe");
+            let result =
+                stat_path("tool.exe".to_string(), root.to_string_lossy().to_string()).expect("stat");
+            assert!(result.executable);
+        }
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            fs::write(root.join("tool"), "#!/bin/sh\n").expect("write tool");
+            let mut perms = fs::metadata(root.join("tool"))
+                .expect("metadata")
+                .permissions();
+            perms.set_mode(0o755);
+            fs::set_permissions(root.join("tool"), perms).expect("chmod");
+            let result =
+                stat_path("tool".to_string(), root.to_string_lossy().to_string()).expect("stat");
+            assert!(result.executable);
+            assert_eq!(result.mode.as_deref(), Some("0755"));
+        }
+
+        cleanup_workspace(&cleanup);
+    }
+
+    #[test]
+    fn stats_symlink() {
+        let (root, cleanup) = temp_workspace();
+        fs::write(root.join("target.txt"), "data").expect("write target");
+
+        #[cfg(unix)]
+        std::os::unix::fs::symlink("target.txt", root.join("link.txt")).expect("symlink");
+
+        #[cfg(windows)]
+        {
+            if std::os::windows::fs::symlink_file("target.txt", root.join("link.txt")).is_err() {
+                cleanup_workspace(&cleanup);
+                return;
+            }
+        }
+
+        #[cfg(not(any(unix, windows)))]
+        {
+            cleanup_workspace(&cleanup);
+            return;
+        }
+
+        let result =
+            stat_path("link.txt".to_string(), root.to_string_lossy().to_string()).expect("stat");
+
+        assert_eq!(result.kind, "symlink");
+        assert_eq!(result.symlink_target.as_deref(), Some("target.txt"));
+        assert!(!result.executable);
         cleanup_workspace(&cleanup);
     }
 }

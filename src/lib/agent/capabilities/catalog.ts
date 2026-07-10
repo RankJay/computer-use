@@ -8,7 +8,11 @@ import { accessibilitySendKeysCapability } from "./accessibility/send-keys";
 import { accessibilitySetValueCapability } from "./accessibility/set-value";
 import { accessibilitySnapshotCapability } from "./accessibility/snapshot";
 import { readClipboardCapability } from "./clipboard/read-clipboard";
+import { readClipboardHtmlCapability } from "./clipboard/read-clipboard-html";
+import { readClipboardImageCapability } from "./clipboard/read-clipboard-image";
 import { writeClipboardCapability } from "./clipboard/write-clipboard";
+import { writeClipboardHtmlCapability } from "./clipboard/write-clipboard-html";
+import { writeClipboardImageCapability } from "./clipboard/write-clipboard-image";
 import { createDirectoryCapability } from "./file-system/create-directory";
 import { deletePathCapability } from "./file-system/delete-path";
 import { duplicatePathCapability } from "./file-system/duplicate-path";
@@ -57,6 +61,10 @@ export const CAPABILITIES = [
   setEnvCapability,
   readClipboardCapability,
   writeClipboardCapability,
+  readClipboardHtmlCapability,
+  writeClipboardHtmlCapability,
+  readClipboardImageCapability,
+  writeClipboardImageCapability,
   getSystemInfoCapability,
   waitCapability,
   windowListCapability,
@@ -97,7 +105,7 @@ export function isCapabilityName(name: string): name is CapabilityName {
 }
 
 /**
- * Capability names grouped by risk for system-prompt generation.
+ * Capability names grouped by risk.
  * When settings are provided, skips tools whose `enabledWhen` predicate fails
  * (same filter as `buildAgentTools`).
  */

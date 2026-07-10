@@ -24,10 +24,10 @@ export function SessionStatusBar({
   const capabilityNames = [...new Set(pendingPermissions.map((entry) => entry.capability))];
 
   return (
-    <div className="flex flex-col gap-1.5 px-2 pb-0 pt-1">
+    <div className="flex flex-col gap-1.5 pb-0 pt-1">
       {showBanner ? (
         <div
-          className="rounded-xl border border-border/60 bg-muted/40 px-3 py-2 text-xs text-muted-foreground"
+          className="rounded-xl ring-1 ring-border/60 bg-muted/40 px-3 py-2 text-xs text-muted-foreground"
           role="status"
           data-testid="multi-pending-banner"
         >
@@ -40,7 +40,7 @@ export function SessionStatusBar({
       ) : null}
       {showFailure ? (
         <div
-          className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive"
+          className="rounded-xl ring-1 ring-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive"
           role="alert"
           data-testid="session-failure-line"
         >

@@ -26,16 +26,22 @@ describe("capability catalog", () => {
         "process_list",
         "run_shell",
         "accessibility_snapshot",
+        "read_clipboard_html",
+        "write_clipboard_html",
+        "read_clipboard_image",
+        "write_clipboard_image",
       ]),
     );
-    expect(names).toHaveLength(34);
+    expect(names).toHaveLength(38);
   });
 
-  test("groups names by risk for system prompt", () => {
+  test("groups names by risk", () => {
     const byRisk = getCapabilityNamesByRisk();
     expect(byRisk.low).toContain("read_file");
     expect(byRisk.high).toContain("run_shell");
     expect(byRisk.medium).toContain("read_clipboard");
+    expect(byRisk.medium).toContain("read_clipboard_image");
+    expect(byRisk.medium).toContain("write_clipboard_html");
   });
 
   test("filters accessibility tools when uiAutomation is off", () => {

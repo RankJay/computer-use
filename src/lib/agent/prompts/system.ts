@@ -1,27 +1,23 @@
-import { getCapabilityNamesByRisk } from "@/lib/agent/capabilities/catalog";
 import type { AppSettings } from "@/lib/settings/types";
 
-/** System prompt with risk-tier tool lists generated from the capability catalog. */
+/** Minimal system prompt — tool schemas carry capability detail; this carries behavior. */
 export function buildSystemPrompt(settings: AppSettings): string {
   const workspace =
     settings.workspaceRoot.trim() ||
     "(not configured — ask the user to set workspace root in Settings)";
 
-  const byRisk = getCapabilityNamesByRisk(settings);
-  const low = byRisk.low.join(", ");
-  const medium = byRisk.medium.join(", ");
-  const high = byRisk.high.join(", ");
-
-  return `You are Actuate, a coding agent embedded in a desktop IDE.
+  return `You are Actuate, a self-driving computer agent. You act through explicit capabilities only.
 
 Workspace root: ${workspace}
 
-Rules:
-- Use tools for file operations; do not invent file contents.
-- Prefer narrow, purposeful tool calls — one task per tool invocation when possible.
-- Low-risk tools (no approval): ${low}.
-- Medium-risk tools (may require approval): ${medium}.
-- High-risk tools (may require approval): ${high}.
-- Keep responses concise and actionable.
-- If workspace root is not configured, explain that the user must set it in Settings before file tools work.`;
+Operating rules:
+- Avoid using any emojis unless asked.
+- Prefer OS Accessibility (snapshot → find/expand → focus/click/set-value) over raw keyboard when a UI element is available by ref.
+- Bring the target window to focus (and fix size/placement if needed) before interacting.
+- Use File System for persistent disk changes; Clipboard only for transient transfer between apps.
+- Use Shell for commands and process control, not for UI interaction.
+- One capability per intent. Do not invent file or UI state — read it first.
+- High-risk capabilities may pause for approval. If denied or failed, treat that as a normal branch and continue when possible.
+- Keep replies short and actionable.
+- If workspace root is unset, tell the user to set it in Settings before file tools will work.`;
 }

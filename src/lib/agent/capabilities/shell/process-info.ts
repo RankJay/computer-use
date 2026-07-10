@@ -15,7 +15,8 @@ export type ProcessInfoOutput = {
 
 export const processInfoCapability = defineCapability({
   name: "process_info",
-  description: "Get memory usage and process name for a running process.",
+  description:
+    "Get memory usage, process name, and CPU percent (averaged over a short ~150ms sample) for a running process.",
   risk: "low",
   inputSchema: processInfoInputSchema,
 });

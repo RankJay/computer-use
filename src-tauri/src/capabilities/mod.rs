@@ -11,7 +11,10 @@ pub use accessibility::{
     accessibility_click, accessibility_expand_node, accessibility_find_element, accessibility_focus,
     accessibility_send_keys, accessibility_set_value, accessibility_snapshot, SnapshotStore,
 };
-pub use clipboard::{read_clipboard, write_clipboard};
+pub use clipboard::{
+    read_clipboard, read_clipboard_html, read_clipboard_image, write_clipboard,
+    write_clipboard_html, write_clipboard_image,
+};
 pub use file_system::{
     create_directory, delete_path, duplicate_path, move_path, patch_file, read_directory, read_file,
     search_files, stat_path, write_file,
