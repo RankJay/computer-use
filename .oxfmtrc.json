@@ -1,0 +1,65 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+
+  // Project defaults: keep close to Oxfmt defaults, but make every choice visible.
+  "printWidth": 100,
+  "tabWidth": 2,
+  "useTabs": false,
+  "semi": true,
+  "singleQuote": false,
+  "jsxSingleQuote": false,
+  "quoteProps": "as-needed",
+  "trailingComma": "all",
+  "bracketSpacing": true,
+  "bracketSameLine": false,
+  "arrowParens": "always",
+  "endOfLine": "lf",
+  "insertFinalNewline": true,
+  "objectWrap": "preserve",
+  "proseWrap": "preserve",
+  "singleAttributePerLine": false,
+  "embeddedLanguageFormatting": "auto",
+  "htmlWhitespaceSensitivity": "css",
+
+  "sortImports": true,
+  "sortPackageJson": true,
+  "sortTailwindcss": false,
+
+  "ignorePatterns": [
+    "node_modules/**",
+    "dist/**",
+    "dist-ssr/**",
+    "coverage/**",
+    "src-tauri/target/**",
+    ".git/**",
+    ".cursor/**",
+    ".vscode/**",
+    ".idea/**",
+    "public/browser-samples/**",
+    "bun.lock",
+    "*.min.*"
+  ],
+
+  "overrides": [
+    {
+      "files": ["*.md", "**/*.md"],
+      "options": {
+        "proseWrap": "preserve"
+      }
+    },
+    {
+      "files": ["*.css", "**/*.css"],
+      "options": {
+        "printWidth": 120
+      }
+    },
+    {
+      "files": ["*.json", "**/*.json"],
+      "excludeFiles": ["package.json"],
+      "options": {
+        "sortPackageJson": false
+      }
+    }
+  ]
+}
+
