@@ -33,7 +33,7 @@ function mockCtx(overrides: Partial<LiveAgentToolContext> = {}): LiveAgentToolCo
     persistedToolApprovals: new Set(),
     sessionRiskApproved: new Set(),
     vision: { latestCapture: null },
-    a11y: { latestSnapshot: null },
+    a11y: { latestSnapshot: null, treeAttached: false },
     uiAutomation: createUiAutomationRunState(),
     emit: () => {},
     waitForPermission: async () => "allow_once",

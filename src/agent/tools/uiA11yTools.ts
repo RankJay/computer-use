@@ -69,7 +69,7 @@ export function createUiA11yInteractTool(ctx: LiveAgentToolContext) {
   return defineActuateTool(ctx, {
     toolName: AGENT_TOOL_NAMES.UI_A11Y_INTERACT,
     description:
-      "Act on a control from the latest ui_a11y_snapshot using its element id (@eN). Actions: click, double_click (desktop icons), set_value (text fields), focus. Prefer this over pointer_move / ui_focus_type when the tree exposes the target.",
+      "Act on a control from the latest ui_a11y_snapshot using its element id (@eN). Actions: click, double_click (desktop icons), set_value (text fields and sliders — use 50 or 50% for volume/range controls), focus. Prefer this over pointer_move / ui_focus_type when the tree exposes the target.",
     inputSchema: zodSchema(
       z.object({
         element_id: elementIdSchema,
@@ -93,6 +93,25 @@ export function createUiA11yInteractTool(ctx: LiveAgentToolContext) {
     deniedError: "Denied (permission or UI automation disabled).",
     describe: (input) => `${input.action} ${input.element_id}`,
     execute: async (input, _executeCtx, native) => {
+      // #region agent log
+      fetch("http://127.0.0.1:7246/ingest/5951659f-418a-41a2-a6a4-3f6a984abf0f", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "ddec70" },
+        body: JSON.stringify({
+          sessionId: "ddec70",
+          location: "uiA11yTools.ts:execute",
+          message: "ui_a11y_interact invoked",
+          hypothesisId: "E",
+          data: {
+            elementId: input.element_id,
+            action: input.action,
+            textPreview: input.text?.slice(0, 40) ?? null,
+            clickCount: input.click_count ?? null,
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
       try {
         const result = await native.uiA11yInteract({
           elementId: input.element_id,
@@ -102,6 +121,24 @@ export function createUiA11yInteractTool(ctx: LiveAgentToolContext) {
         });
         clearPendingCapture(ctx.uiAutomation);
         ctx.a11y.latestSnapshot = null;
+        // #region agent log
+        fetch("http://127.0.0.1:7246/ingest/5951659f-418a-41a2-a6a4-3f6a984abf0f", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "ddec70" },
+          body: JSON.stringify({
+            sessionId: "ddec70",
+            location: "uiA11yTools.ts:execute",
+            message: "ui_a11y_interact succeeded",
+            hypothesisId: "E",
+            data: {
+              elementId: result.elementId,
+              action: result.action,
+              message: result.message,
+            },
+            timestamp: Date.now(),
+          }),
+        }).catch(() => {});
+        // #endregion
         return {
           ok: true,
           value: {
@@ -112,6 +149,24 @@ export function createUiA11yInteractTool(ctx: LiveAgentToolContext) {
           timelineSummary: shortenForTimeline(result.message),
         };
       } catch (error) {
+        // #region agent log
+        fetch("http://127.0.0.1:7246/ingest/5951659f-418a-41a2-a6a4-3f6a984abf0f", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "ddec70" },
+          body: JSON.stringify({
+            sessionId: "ddec70",
+            location: "uiA11yTools.ts:execute",
+            message: "ui_a11y_interact failed",
+            hypothesisId: "E",
+            data: {
+              elementId: input.element_id,
+              action: input.action,
+              error: error instanceof Error ? error.message : String(error),
+            },
+            timestamp: Date.now(),
+          }),
+        }).catch(() => {});
+        // #endregion
         clearPendingCapture(ctx.uiAutomation);
         ctx.a11y.latestSnapshot = null;
         throw error;

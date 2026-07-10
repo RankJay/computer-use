@@ -37,7 +37,7 @@ export function buildLiveSystemPrompt(capabilitiesLine: string): string {
     'When launching Chrome, Chromium, or Edge for a browser UI task, pass --force-renderer-accessibility so page controls appear in the native tree. Example (Windows): terminal_run program powershell.exe args ["-NoProfile","-Command","Start-Process chrome.exe \'--force-renderer-accessibility https://mail.google.com\'"].',
     'After the tab loads, ui_a11y_snapshot with foreground_only (default) — avoid app_name "Chrome" during compose/dialog flows; browser pages auto-scope to the tab Document.',
     "After ui_a11y_interact on a control that changes the UI (navigation, dialogs, send/submit), take a fresh ui_a11y_snapshot before the next interact — interact re-resolves elements but stale ids fail when the tree structure changed.",
-    "When ui_a11y_interact is available, prefer set_value for text fields and click/double_click for buttons and desktop icons (match by name in the tree).",
+    "When ui_a11y_interact is available, prefer set_value for text fields and click/double_click for buttons and desktop icons (match by name in the tree). For sliders (e.g. volume), set_value with 50 or 50% — not click.",
     "When using pointer_move (vision fallback), return blockX and blockY for the target from the screenshot — never reuse cursorBlockX/cursorBlockY from display_capture.",
     "For desktop icons when the tree lacks them, use the icon name from the user's task in the screenshot, then pointer_move and pointer_click with clickCount 2.",
     "When duplicating, moving, or renaming existing workspace content, use copy_file, rename_path, or move_path instead of reading and regenerating file contents.",

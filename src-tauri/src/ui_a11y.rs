@@ -32,7 +32,9 @@ use forepaw::platform::linux::LinuxProvider as PlatformProvider;
 use std::collections::HashMap;
 
 #[cfg(target_os = "windows")]
-use uiautomation::patterns::{UILegacyIAccessiblePattern, UIInvokePattern, UIValuePattern};
+use uiautomation::patterns::{
+    UILegacyIAccessiblePattern, UIInvokePattern, UIRangeValuePattern, UIValuePattern,
+};
 #[cfg(target_os = "windows")]
 use uiautomation::types::{ControlType, Handle, Point as UiaPoint};
 #[cfg(target_os = "windows")]
@@ -53,6 +55,35 @@ const WINDOWS_DOCUMENT_SCAN_BUDGET: usize = 180;
 const WINDOWS_RESOLVE_SCAN_BUDGET: usize = 400;
 #[cfg(target_os = "windows")]
 const UI_ACTION_SETTLE_MS: u64 = 200;
+const AGENT_DEBUG_LOG: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../debug-ddec70.log");
+
+fn agent_debug_log(
+    location: &str,
+    message: &str,
+    hypothesis_id: &str,
+    data: serde_json::Value,
+) {
+    use std::io::Write;
+
+    let payload = serde_json::json!({
+        "sessionId": "ddec70",
+        "timestamp": std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|duration| duration.as_millis())
+            .unwrap_or(0),
+        "location": location,
+        "message": message,
+        "hypothesisId": hypothesis_id,
+        "data": data,
+    });
+    if let Ok(mut file) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(AGENT_DEBUG_LOG)
+    {
+        let _ = writeln!(file, "{payload}");
+    }
+}
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -469,6 +500,8 @@ fn is_interactive_control_type(control_type: ControlType) -> bool {
             | ControlType::ListItem
             | ControlType::MenuItem
             | ControlType::RadioButton
+            | ControlType::ScrollBar
+            | ControlType::Slider
             | ControlType::SplitButton
             | ControlType::TabItem
             | ControlType::TreeItem
@@ -617,6 +650,65 @@ fn bounds_center(bounds: Rect) -> (i32, i32) {
 }
 
 #[cfg(target_os = "windows")]
+fn element_bounds_area(element: &UIElement) -> f64 {
+    element
+        .get_bounding_rectangle()
+        .ok()
+        .and_then(|rect| rect_from_uia(rect))
+        .map(|bounds| bounds.width * bounds.height)
+        .unwrap_or(f64::MAX)
+}
+
+#[cfg(target_os = "windows")]
+fn element_matches_fingerprint(element: &UIElement, fingerprint: &ElementFingerprint) -> bool {
+    element.get_control_type().ok() == Some(fingerprint.control_type)
+        && fingerprint_name_matches(element, fingerprint)
+}
+
+#[cfg(target_os = "windows")]
+fn find_deepest_fingerprint_match_in_subtree(
+    walker: &UITreeWalker,
+    root: &UIElement,
+    fingerprint: &ElementFingerprint,
+    expected_bounds: Rect,
+    scan_budget: usize,
+) -> Option<UIElement> {
+    let mut stack = vec![root.clone()];
+    let mut remaining = scan_budget;
+    let mut best: Option<(UIElement, f64)> = None;
+
+    while let Some(element) = stack.pop() {
+        if remaining == 0 {
+            break;
+        }
+        remaining -= 1;
+
+        if element_matches_fingerprint(&element, fingerprint) {
+            if element
+                .get_bounding_rectangle()
+                .ok()
+                .and_then(|rect| rect_from_uia(rect))
+                .is_some_and(|actual| bounds_overlap(expected_bounds, actual))
+            {
+                let area = element_bounds_area(&element);
+                if best.as_ref().map_or(f64::MAX, |(_, score)| *score) > area {
+                    best = Some((element.clone(), area));
+                }
+            }
+        }
+
+        let Some(children) = walker.get_children(&element) else {
+            continue;
+        };
+        for child in children.into_iter().rev() {
+            stack.push(child);
+        }
+    }
+
+    best.map(|(element, _)| element)
+}
+
+#[cfg(target_os = "windows")]
 fn find_element_by_fingerprint(
     walker: &UITreeWalker,
     root: &UIElement,
@@ -635,7 +727,7 @@ fn find_element_by_fingerprint(
         }
     }
     if let Some(bounds) = fingerprint.bounds {
-        if let Ok(element) = find_element_by_bounds_overlap(walker, root, bounds) {
+        if let Ok(element) = find_element_by_bounds_overlap(walker, root, bounds, fingerprint) {
             return Ok(element);
         }
     }
@@ -714,6 +806,7 @@ fn find_element_by_bounds_overlap(
     walker: &UITreeWalker,
     root: &UIElement,
     expected_bounds: Rect,
+    fingerprint: &ElementFingerprint,
 ) -> Result<UIElement, String> {
     let mut scan_budget = WINDOWS_RESOLVE_SCAN_BUDGET;
     let mut stack = vec![root.clone()];
@@ -725,12 +818,14 @@ fn find_element_by_bounds_overlap(
         }
         scan_budget -= 1;
 
-        if let Ok(rect) = element.get_bounding_rectangle() {
-            if let Some(actual) = rect_from_uia(rect) {
-                if bounds_overlap(expected_bounds, actual) {
-                    let overlap_score = actual.width * actual.height;
-                    if best.as_ref().map_or(0.0, |(_, score)| *score) < overlap_score {
-                        best = Some((element.clone(), overlap_score));
+        if element_matches_fingerprint(&element, fingerprint) {
+            if let Ok(rect) = element.get_bounding_rectangle() {
+                if let Some(actual) = rect_from_uia(rect) {
+                    if bounds_overlap(expected_bounds, actual) {
+                        let area = actual.width * actual.height;
+                        if best.as_ref().map_or(f64::MAX, |(_, score)| *score) > area {
+                            best = Some((element.clone(), area));
+                        }
                     }
                 }
             }
@@ -783,6 +878,27 @@ fn pick_fingerprint_candidate(
         return Ok(candidates.remove(0));
     }
 
+    if let Some(expected_bounds) = fingerprint.bounds {
+        let mut overlapping: Vec<UIElement> = candidates
+            .into_iter()
+            .filter(|candidate| {
+                candidate
+                    .get_bounding_rectangle()
+                    .ok()
+                    .and_then(|rect| rect_from_uia(rect))
+                    .is_some_and(|actual| bounds_overlap(expected_bounds, actual))
+            })
+            .collect();
+        if !overlapping.is_empty() {
+            overlapping.sort_by(|left, right| {
+                element_bounds_area(left)
+                    .partial_cmp(&element_bounds_area(right))
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
+            return Ok(overlapping.remove(0));
+        }
+    }
+
     Err(format!(
         "ambiguous element match for {:?}",
         fingerprint.name
@@ -795,33 +911,32 @@ fn resolve_uia_element_at_bounds(
     fingerprint: &ElementFingerprint,
     bounds: Rect,
 ) -> Result<UIElement, String> {
+    let walker = automation
+        .get_control_view_walker()
+        .map_err(|error| format!("ControlViewWalker failed: {error}"))?;
     let (cx, cy) = bounds_center(bounds);
     let element = automation
         .element_from_point(UiaPoint::new(cx, cy))
         .map_err(|error| format!("element_from_point at snapshot bounds failed: {error}"))?;
 
-    if fingerprint_name_matches(&element, fingerprint) {
+    if element_matches_fingerprint(&element, fingerprint) {
         return Ok(element);
     }
 
-    if let Ok(control_type) = element.get_control_type() {
-        if control_type == fingerprint.control_type {
-            return Ok(element);
-        }
+    if let Some(found) = find_deepest_fingerprint_match_in_subtree(
+        &walker,
+        &element,
+        fingerprint,
+        bounds,
+        WINDOWS_RESOLVE_SCAN_BUDGET,
+    ) {
+        return Ok(found);
     }
 
-    if let Some(expected_bounds) = fingerprint.bounds {
-        if element
-            .get_bounding_rectangle()
-            .ok()
-            .and_then(|rect| rect_from_uia(rect))
-            .is_some_and(|actual| bounds_overlap(expected_bounds, actual))
-        {
-            return Ok(element);
-        }
-    }
-
-    Ok(element)
+    Err(format!(
+        "element at snapshot bounds did not match control {:?} name {:?}",
+        fingerprint.control_type, fingerprint.name
+    ))
 }
 
 #[cfg(target_os = "windows")]
@@ -928,6 +1043,30 @@ fn rect_from_uia(rect: uiautomation::types::Rect) -> Option<Rect> {
 }
 
 #[cfg(target_os = "windows")]
+fn read_uia_value(element: &UIElement) -> Option<String> {
+    if let Ok(pattern) = element.get_pattern::<UIValuePattern>() {
+        if let Ok(value) = pattern.get_value() {
+            if !value.is_empty() {
+                return Some(value);
+            }
+        }
+    }
+    if let Ok(pattern) = element.get_pattern::<UIRangeValuePattern>() {
+        if let Ok(value) = pattern.get_value() {
+            return Some(format!("{value}"));
+        }
+    }
+    if let Ok(pattern) = element.get_pattern::<UILegacyIAccessiblePattern>() {
+        if let Ok(value) = pattern.get_value() {
+            if !value.is_empty() {
+                return Some(value);
+            }
+        }
+    }
+    None
+}
+
+#[cfg(target_os = "windows")]
 fn node_from_uia(element: &UIElement) -> ElementNode {
     let control_type = element
         .get_control_type()
@@ -936,10 +1075,14 @@ fn node_from_uia(element: &UIElement) -> ElementNode {
     let name = element.get_name().ok().filter(|name| !name.is_empty());
     let bounds = element.get_bounding_rectangle().ok().and_then(rect_from_uia);
     let enabled = element.is_enabled().ok();
+    let value = read_uia_value(element);
     let mut data = ElementData::new(role)
         .with_name_opt(name)
         .with_bounds_opt(bounds)
         .with_native_role(format!("uia:{control_type:?}"));
+    if let Some(value) = value {
+        data = data.with_value(value);
+    }
     data.enabled = enabled;
     ElementNode::new(data)
 }
@@ -1198,24 +1341,144 @@ fn windows_perform_uia_action(
         }
         "set_value" => {
             let value = text.ok_or("text is required for set_value")?;
-            if let Ok(pattern) = element.get_pattern::<UIValuePattern>() {
-                pattern
-                    .set_value(value)
-                    .map_err(|error| format!("ValuePattern.set_value failed: {error}"))?;
-                wait_for_ui_settle();
-                return Ok(format!("set value on {label}"));
+            let control_type = element.get_control_type().ok();
+            let prefer_keyboard_typing = matches!(control_type, Some(ControlType::Document));
+            // #region agent log
+            agent_debug_log(
+                "ui_a11y.rs:set_value_entry",
+                "set_value started",
+                "A",
+                serde_json::json!({
+                    "label": label,
+                    "valuePreview": value.chars().take(40).collect::<String>(),
+                    "controlType": format!("{control_type:?}"),
+                    "preferKeyboardTyping": prefer_keyboard_typing,
+                }),
+            );
+            // #endregion
+
+            if let Ok(pattern) = element.get_pattern::<UIRangeValuePattern>() {
+                let readonly = pattern.is_readonly().unwrap_or(true);
+                let min = pattern.get_minimum().ok();
+                let max = pattern.get_maximum().ok();
+                let current = pattern.get_value().ok();
+                let target = min
+                    .zip(max)
+                    .and_then(|(min, max)| resolve_range_value(value, min, max));
+                // #region agent log
+                agent_debug_log(
+                    "ui_a11y.rs:range_value_probe",
+                    "RangeValuePattern probe",
+                    "C",
+                    serde_json::json!({
+                        "label": label,
+                        "readonly": readonly,
+                        "min": min,
+                        "max": max,
+                        "current": current,
+                        "target": target,
+                        "input": value,
+                    }),
+                );
+                // #endregion
+                if !readonly {
+                    if let Some(target) = target {
+                        match pattern.set_value(target) {
+                            Ok(()) => {
+                                wait_for_ui_settle();
+                                // #region agent log
+                                agent_debug_log(
+                                    "ui_a11y.rs:range_value_applied",
+                                    "RangeValuePattern.set_value succeeded",
+                                    "C",
+                                    serde_json::json!({ "label": label, "target": target }),
+                                );
+                                // #endregion
+                                return Ok(format!("set range value {target} on {label}"));
+                            }
+                            Err(error) => {
+                                // #region agent log
+                                agent_debug_log(
+                                    "ui_a11y.rs:range_value_failed",
+                                    "RangeValuePattern.set_value failed",
+                                    "C",
+                                    serde_json::json!({
+                                        "label": label,
+                                        "target": target,
+                                        "error": error.to_string(),
+                                    }),
+                                );
+                                // #endregion
+                            }
+                        }
+                    }
+                }
             }
-            if let Ok(pattern) = element.get_pattern::<UILegacyIAccessiblePattern>() {
-                pattern
-                    .set_value(value)
-                    .map_err(|error| format!("LegacyIAccessible.SetValue failed: {error}"))?;
-                wait_for_ui_settle();
-                return Ok(format!("set value on {label}"));
+
+            if !prefer_keyboard_typing {
+                if let Ok(pattern) = element.get_pattern::<UIValuePattern>() {
+                    let readonly = pattern.is_readonly().unwrap_or(true);
+                    let set_ok = !readonly && pattern.set_value(value).is_ok();
+                    let current = pattern.get_value().ok();
+                    let applied = set_ok
+                        && current
+                            .as_ref()
+                            .is_some_and(|current| current.contains(value));
+                    // #region agent log
+                    agent_debug_log(
+                        "ui_a11y.rs:value_pattern_probe",
+                        "UIValuePattern probe",
+                        "A",
+                        serde_json::json!({
+                            "label": label,
+                            "readonly": readonly,
+                            "setOk": set_ok,
+                            "current": current,
+                            "applied": applied,
+                        }),
+                    );
+                    // #endregion
+                    if applied {
+                        wait_for_ui_settle();
+                        return Ok(format!("set value on {label}"));
+                    }
+                }
+                if let Ok(pattern) = element.get_pattern::<UILegacyIAccessiblePattern>() {
+                    let set_ok = pattern.set_value(value).is_ok();
+                    let current = pattern.get_value().ok();
+                    let applied = set_ok
+                        && current
+                            .as_ref()
+                            .is_some_and(|current| current.contains(value));
+                    // #region agent log
+                    agent_debug_log(
+                        "ui_a11y.rs:legacy_value_probe",
+                        "LegacyIAccessible set_value probe",
+                        "A",
+                        serde_json::json!({
+                            "label": label,
+                            "setOk": set_ok,
+                            "current": current,
+                            "applied": applied,
+                        }),
+                    );
+                    // #endregion
+                    if applied {
+                        wait_for_ui_settle();
+                        return Ok(format!("set value on {label}"));
+                    }
+                }
             }
-            element
-                .set_focus()
-                .map_err(|error| format!("focus failed: {error}"))?;
-            type_text_enigo(value)?;
+
+            // #region agent log
+            agent_debug_log(
+                "ui_a11y.rs:set_value_keyboard_fallback",
+                "falling back to keyboard typing",
+                "B",
+                serde_json::json!({ "label": label }),
+            );
+            // #endregion
+            windows_type_into_element(element, value)?;
             wait_for_ui_settle();
             Ok(format!("typed into {label}"))
         }
@@ -1253,6 +1516,55 @@ fn click_bounds_enigo(bounds: forepaw::core::types::Rect, click_count: u8) -> Re
 fn type_text_enigo(text: &str) -> Result<(), String> {
     let mut enigo = Enigo::new(&Settings::default()).map_err(|e| e.to_string())?;
     enigo.text(text).map_err(|e| e.to_string())
+}
+
+/// Map user text like `50`, `50%`, or `0.5` onto a UIA range min..max.
+fn resolve_range_value(text: &str, min: f64, max: f64) -> Option<f64> {
+    let trimmed = text.trim();
+    if trimmed.is_empty() || !min.is_finite() || !max.is_finite() || max <= min {
+        return None;
+    }
+    let is_percent = trimmed.ends_with('%');
+    let numeric_str = trimmed.trim_end_matches('%').trim();
+    let numeric: f64 = numeric_str.parse().ok()?;
+    if !numeric.is_finite() {
+        return None;
+    }
+
+    let target = if is_percent {
+        let fraction = (numeric / 100.0).clamp(0.0, 1.0);
+        min + (max - min) * fraction
+    } else if max <= 1.0 && numeric > 1.0 {
+        // Common for browser sliders: range 0..1 but users say "50" meaning 50%.
+        let fraction = (numeric / 100.0).clamp(0.0, 1.0);
+        min + (max - min) * fraction
+    } else {
+        numeric.clamp(min, max)
+    };
+    Some(target)
+}
+
+#[cfg(target_os = "windows")]
+fn windows_type_into_element(element: &UIElement, value: &str) -> Result<(), String> {
+    let focus_ok = element.set_focus().is_ok();
+    wait_for_ui_settle();
+    let click_ok = element.click().is_ok();
+    if click_ok {
+        wait_for_ui_settle();
+    }
+    // #region agent log
+    agent_debug_log(
+        "ui_a11y.rs:windows_type_into_element",
+        "keyboard typing after focus/click",
+        "B",
+        serde_json::json!({
+            "focusOk": focus_ok,
+            "clickOk": click_ok,
+            "valueLen": value.len(),
+        }),
+    );
+    // #endregion
+    type_text_enigo(value)
 }
 
 #[cfg(not(target_os = "windows"))]
@@ -1501,6 +1813,26 @@ fn ui_a11y_interact_impl(
             drop(cache);
             let automation = windows_automation()?;
             let element = resolve_uia_element(&automation, &app, &anchor, &fingerprint)?;
+            // #region agent log
+            agent_debug_log(
+                "ui_a11y.rs:interact_resolved",
+                "element resolved for interact",
+                "D",
+                serde_json::json!({
+                    "elementId": request.element_id,
+                    "action": action,
+                    "textPreview": request.text.as_deref().map(|text| {
+                        text.chars().take(40).collect::<String>()
+                    }),
+                    "fingerprintRole": format!("{:?}", fingerprint.role),
+                    "fingerprintControlType": format!("{:?}", fingerprint.control_type),
+                    "fingerprintName": fingerprint.name,
+                    "resolvedControlType": format!("{:?}", element.get_control_type().ok()),
+                    "resolvedName": element.get_name().ok(),
+                    "resolutionMatched": element_matches_fingerprint(&element, &fingerprint),
+                }),
+            );
+            // #endregion
             windows_perform_uia_action(&element, action, request.text.as_deref(), click_count)
         }
 
@@ -1572,5 +1904,13 @@ mod tests {
             parse_uia_control_type_label("Edit"),
             Some(ControlType::Edit)
         );
+    }
+
+    #[test]
+    fn resolve_range_value_maps_percent_and_zero_to_one_sliders() {
+        assert_eq!(resolve_range_value("50%", 0.0, 1.0), Some(0.5));
+        assert_eq!(resolve_range_value("50", 0.0, 1.0), Some(0.5));
+        assert_eq!(resolve_range_value("75", 0.0, 100.0), Some(75.0));
+        assert_eq!(resolve_range_value("150%", 0.0, 1.0), Some(1.0));
     }
 }
