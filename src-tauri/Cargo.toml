@@ -22,18 +22,23 @@ tauri = { version = "2", features = ["tray-icon"] }
 tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-screenshots = "0.8.10"
-base64 = "0.22.1"
-enigo = "0.6.1"
-# Platform stores must be enabled explicitly — without these, keyring uses an in-memory mock
-# and secrets do not reliably persist or round-trip (see keyring-rs README).
-keyring = { version = "3", features = ["windows-native", "apple-native", "linux-native"] }
-wait-timeout = "0.2"
-tauri-plugin-http = "2"
-forepaw = "0.4.0"
+tauri-plugin-store = "2"
+tauri-plugin-stronghold = "2"
+walkdir = "2.5.0"
+glob = "0.3.3"
+tauri-plugin-http = { version = "2", features = ["unsafe-headers"] }
 arboard = "3.6.1"
+diffy = "0.5.0"
+time = { version = "0.3.53", features = ["formatting"] }
+
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-single-instance = "2"
+tauri-plugin-window-state = "2"
 
 [target.'cfg(windows)'.dependencies]
-windows = { version = "0.62.2", features = ["Win32_Foundation", "Win32_Graphics_Dwm", "Win32_Graphics_Gdi", "Win32_UI_WindowsAndMessaging", "Win32_System_LibraryLoader", "Win32_UI_Input_KeyboardAndMouse"] }
-uiautomation = { version = "0.25.0", features = ["control", "pattern", "input"] }
+uiautomation = "0.25.0"
+windows = { version = "0.62.2", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging", "Win32_System_Threading", "Win32_System_ProcessStatus", "Win32_System_Diagnostics_ToolHelp"] }
+
+[profile.dev.package.scrypt]
+opt-level = 3
 

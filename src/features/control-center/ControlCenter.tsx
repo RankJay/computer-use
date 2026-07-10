@@ -1,103 +1,82 @@
 ﻿import { useCallback, useState } from "react";
 
-import { hostRuntime } from "@/agent/host/hostRuntime";
-import type { PermissionChoice } from "@/agent/types";
-import { Container, Item } from "@/components/motion/stagger";
-import { AgentChatTranscript } from "@/features/agent-chat/AgentChatTranscript";
-import {
-  DisplayNoticeToast,
-  PointerAutomationEscBar,
-  TaskBudgetBanner,
-  TaskFailureBanner,
-} from "@/features/agent-chat/AgentSessionPanels";
-import { PermissionPrompt } from "@/features/agent-chat/PermissionPrompt";
-import { useAgentSessionContext } from "@/features/control-center/AgentSessionContext";
-import { TaskPromptComposer } from "@/features/control-center/TaskPromptComposer";
-import { dismissDisplayNotice, useDisplayNotice } from "@/features/control-center/useDisplayNotice";
-import { WindowChrome } from "@/features/control-center/WindowChrome";
+import { useSettingsActions, useSettingsState } from "@/app/providers/SettingsProvider";
+import { AgentTranscript } from "@/features/ai-chat/AgentTranscript";
+import { getAvailableAgentModels, resolveAgentModelId } from "@/lib/agent-models";
+
+import { ControlCenterHeader } from "./ControlCenterHeader";
+import { useAgentRun } from "./hooks/useAgentRun";
+import { PermissionPrompt } from "./PermissionPrompt";
+import { TaskPromptComposer } from "./TaskPromptComposer";
 
 export function ControlCenter() {
-  const agent = useAgentSessionContext();
-  const { cancelRun, pendingPermission, resolvePermission, startRun } = agent;
-  const [draft, setDraft] = useState(() => hostRuntime.defaultComposerDraft);
-  const displayNotice = useDisplayNotice();
-  const [displayNoticeVisible, setDisplayNoticeVisible] = useState(true);
+  const [draft, setDraft] = useState("");
+  const { settings } = useSettingsState();
+  const { updateSettings } = useSettingsActions();
+  const models = getAvailableAgentModels();
+  const modelId = resolveAgentModelId(settings.selectedModelId);
+  const { projection, contextUsage, submit, cancel, resolvePermission, ready } =
+    useAgentRun(modelId);
 
-  const canStart = agent.capabilities.canStartRun && draft.trim().length > 0;
+  const canStart = draft.trim().length > 0 && projection.canSubmit && ready;
+  const pendingPermission = projection.pendingPermission;
+  const showPersistOption = settings.permissionMode === "once-per-class";
+  const isStreaming = projection.status === "streaming";
 
-  const submitTask = useCallback((): void => {
+  const submitTask = useCallback(async (): Promise<void> => {
     if (!canStart) return;
-    void startRun(draft.trim(), null);
+    const prompt = draft.trim();
     setDraft("");
-  }, [canStart, draft, startRun]);
+    await submit(prompt, modelId);
+  }, [canStart, draft, modelId, submit]);
 
-  const handlePermissionResolve = useCallback(
-    (choice: PermissionChoice): void => {
-      if (pendingPermission === null) return;
-      resolvePermission(pendingPermission.permissionId, choice);
+  const handleResolvePermission = useCallback(
+    (decision: "approved" | "denied", persist?: boolean) => {
+      void resolvePermission(decision, persist);
     },
-    [pendingPermission, resolvePermission],
+    [resolvePermission],
   );
 
   return (
-    <div className="box-border overscroll-contain flex h-full min-h-dvh w-full flex-col gap-0 overflow-hidden rounded-none border-0 bg-[#0E0E0E] p-2 shadow-none ring-0">
-      <WindowChrome />
-
-      <div className="flex min-h-0 flex-1 flex-col gap-2">
-        <Container className="flex min-h-0 flex-1 flex-col gap-2 scrollbar-none">
-          {!agent.capabilities.hasConversation && (
-            <div className="flex flex-col flex-1 pt-48 px-4">
-              <Item className="max-w-sm text-2xl mb-2 text-[#414141] tracking-tight">
-                Welcome to actuate.
-              </Item>
-              <Item className="max-w-xs text-2xl tracking-tight text-[#CDCDCD]">
-                Ready to break some big tasks today?
-              </Item>
-            </div>
-          )}
-          {agent.capabilities.hasConversation && (
-            <AgentChatTranscript
-              canRegenerateAssistant={agent.capabilities.canRegenerateAssistant}
-              onRegenerateAssistant={agent.regenerateLastAssistant}
-              timeline={agent.timeline}
-              usage={agent.usage}
-              isRunActive={agent.capabilities.runActive}
-            />
-          )}
-        </Container>
-        <PointerAutomationEscBar
-          escArmActive={hostRuntime.isDesktop && agent.capabilities.uiAutomationBusy}
-          pointerBusy={agent.capabilities.pointerAutomationBusy}
+    <div className="box-border overscroll-contain flex h-full min-h-dvh w-full flex-col gap-0 overflow-hidden rounded-none border-0 bg-[#0E0E0E] text-white shadow-none ring-0">
+      <ControlCenterHeader />
+      <div className="flex min-h-0 flex-1 flex-col gap-2 p-2 pt-0">
+        <AgentTranscript
+          rows={projection.rows}
+          pendingPermission={pendingPermission}
+          onResolvePermission={handleResolvePermission}
+          isStreaming={isStreaming}
         />
       </div>
 
-      <div className="shrink-0 space-y-2 py-2">
-        {displayNotice !== null && displayNoticeVisible && (
-          <DisplayNoticeToast
-            displayCount={displayNotice.displayCount}
-            onDismiss={() => {
-              dismissDisplayNotice();
-              setDisplayNoticeVisible(false);
-            }}
+      <div className="flex flex-col gap-2 p-2">
+        {pendingPermission ? (
+          <PermissionPrompt
+            pending={pendingPermission}
+            showPersistOption={showPersistOption}
+            onApprove={(persist) => handleResolvePermission("approved", persist)}
+            onDeny={() => handleResolvePermission("denied")}
           />
-        )}
-        {agent.budget.exceededLimit !== null && agent.budget.progress !== null && (
-          <TaskBudgetBanner limit={agent.budget.exceededLimit} progress={agent.budget.progress} />
-        )}
-        {agent.failureMessage !== null && agent.failureMessage !== "" && (
-          <TaskFailureBanner message={agent.failureMessage} />
-        )}
-        {agent.pendingPermission !== null && (
-          <PermissionPrompt pending={agent.pendingPermission} onResolve={handlePermissionResolve} />
-        )}
+        ) : null}
+
         <TaskPromptComposer
-          value={draft}
+          cancelVisible={projection.cancelVisible}
+          contextUsage={contextUsage}
+          inputDisabled={projection.inputDisabled}
+          modelId={modelId}
+          models={models}
+          onCancel={() => {
+            void cancel();
+          }}
           onChange={setDraft}
-          onSubmit={submitTask}
-          onCancel={cancelRun}
-          inputDisabled={agent.capabilities.taskInputDisabled}
+          onModelChange={(id) => {
+            void updateSettings({ selectedModelId: id });
+          }}
+          onSubmit={() => {
+            void submitTask();
+          }}
           submitDisabled={!canStart}
-          cancelVisible={agent.capabilities.runActive}
+          value={draft}
         />
       </div>
     </div>

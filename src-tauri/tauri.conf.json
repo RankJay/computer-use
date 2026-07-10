@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Actuate",
+  "productName": "actuate",
   "version": "0.1.0",
   "identifier": "com.rankj.actuate",
   "build": {
@@ -12,17 +12,14 @@
   "app": {
     "windows": [
       {
-        "label": "main",
-        "title": "Actuate",
+        "title": "actuate",
         "width": 410,
         "height": 720,
-        "resizable": true,
+        "visible": false,
+        "skipTaskbar": true,
         "maximizable": false,
         "minimizable": true,
-        "closable": true,
-        "decorations": false,
-        "shadow": true,
-        "alwaysOnTop": false
+        "decorations": false
       }
     ],
     "security": {

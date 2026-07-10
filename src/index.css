@@ -122,17 +122,16 @@
   * {
     @apply border-border outline-ring/50;
   }
-  html {
-    @apply font-sans;
-  }
   html,
   body,
   #root {
-    min-height: 100%;
-    height: 100%;
+    @apply h-full overflow-hidden;
   }
   body {
-    @apply bg-card text-card-foreground;
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
   }
 
   .shadow-layered {
@@ -152,9 +151,5 @@
 
   .scrollbar-none::-webkit-scrollbar {
     display: none !important;
-  }
-
-  .agent-stream-markdown [data-streamdown="code-block"] {
-    @apply mb-4 overflow-x-auto rounded-xl border border-neutral-700/80 bg-[#151515] text-[13px] leading-relaxed last:mb-0;
   }
 }

@@ -1,0 +1,75 @@
+import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
+
+import { isTauriRuntime } from "@/lib/agent/capabilities/tauri-invoke";
+
+const STRIP_HEADERS = [
+  "referer",
+  "sec-fetch-mode",
+  "sec-fetch-site",
+  "sec-fetch-dest",
+  "sec-fetch-user",
+];
+
+function buildProviderHeaders(init?: RequestInit): Headers {
+  const headers = new Headers(init?.headers);
+
+  // Tauri plugin-http removes Origin when set to "" (requires unsafe-headers).
+  // Without this, the webview Origin leaks and Anthropic treats the call as browser CORS.
+  headers.set("Origin", "");
+
+  for (const name of STRIP_HEADERS) {
+    headers.delete(name);
+  }
+
+  return headers;
+}
+
+function toTauriRequestInit(input: RequestInfo | URL, init?: RequestInit): RequestInit {
+  const headers = buildProviderHeaders(init);
+
+  if (input instanceof Request) {
+    return {
+      method: init?.method ?? input.method,
+      headers,
+      body: init?.body ?? input.body,
+      signal: init?.signal ?? input.signal,
+      ...init,
+    };
+  }
+
+  return { ...init, headers };
+}
+
+function resolveInputUrl(input: RequestInfo | URL): string {
+  if (typeof input === "string") return input;
+  if (input instanceof URL) return input.toString();
+  return input.url;
+}
+
+/** Rust-backed fetch for Tauri — strips webview Origin before reqwest. */
+export function createProviderFetch(): typeof fetch {
+  const providerFetch: typeof fetch = async (input, init) => {
+    const url = resolveInputUrl(input);
+    return tauriFetch(url, toTauriRequestInit(input, init));
+  };
+
+  return providerFetch;
+}
+
+export function getProviderFetch(): typeof fetch | undefined {
+  if (!isTauriRuntime()) {
+    return undefined;
+  }
+
+  return createProviderFetch();
+}
+
+export function requireProviderFetch(): typeof fetch {
+  const providerFetch = getProviderFetch();
+  if (!providerFetch) {
+    throw new Error(
+      "Provider HTTP requires the Actuate desktop runtime. Run with `bun run tauri dev`, not Vite alone.",
+    );
+  }
+  return providerFetch;
+}

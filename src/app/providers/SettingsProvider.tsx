@@ -8,112 +8,159 @@ import {
   type ReactNode,
 } from "react";
 
-import { hostRuntime } from "@/agent/host/hostRuntime";
-import type { AppSettingsPayload } from "@/agent/native/tauriIpc";
-import {
-  loadAppSettings,
-  saveAppSettings,
-  settingsForRuntime,
-  settingsOrDefault,
-} from "@/agent/persistence/settingsPersistence";
-import type { AgentToolName } from "@/agent/toolContract";
-import { parsePermissionMode, type PermissionMode } from "@/agent/types";
+import { loadedSettingsOrDefault } from "@/lib/settings/defaults";
+import { settingsService } from "@/lib/settings/settings-service";
+import type { AppSecrets, AppSettings, LoadedSettings } from "@/lib/settings/types";
 
-type SettingsContextValue = {
+export type SettingsState = {
   ready: boolean;
-  settings: AppSettingsPayload;
-  permissionMode: PermissionMode;
-  setPermissionMode: (mode: PermissionMode) => void;
-  updateSettings: (patch: Partial<AppSettingsPayload>) => Promise<void>;
+  error: string | null;
+  settings: LoadedSettings;
+};
+
+export type SettingsActions = {
+  updateSettings: (patch: Partial<AppSettings>) => Promise<void>;
+  updateSecret: (key: keyof AppSecrets, value: string) => Promise<void>;
   refresh: () => Promise<void>;
-  persistToolApproval: (tool: AgentToolName) => Promise<void>;
+  persistToolApproval: (tool: string) => Promise<void>;
   revokePersistedApprovals: () => Promise<void>;
 };
 
-const SettingsContext = createContext<SettingsContextValue | null>(null);
+export type SettingsContextValue = SettingsState & SettingsActions;
+
+const SettingsStateContext = createContext<SettingsState | null>(null);
+const SettingsActionsContext = createContext<SettingsActions | null>(null);
 
 export function SettingsProvider(props: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
-  const [settings, setSettingsState] = useState<AppSettingsPayload>(() => settingsOrDefault(null));
+  const [error, setError] = useState<string | null>(null);
+  const [settings, setSettings] = useState<LoadedSettings>(() => loadedSettingsOrDefault(null));
 
   const refresh = useCallback(async () => {
-    const loaded = await loadAppSettings();
-    setSettingsState(settingsForRuntime(loaded, hostRuntime));
-    setReady(true);
+    const loaded = await settingsService.refreshSettings();
+    setSettings(loaded);
+    setError(null);
   }, []);
 
   useEffect(() => {
-    void refresh();
-  }, [refresh]);
+    let cancelled = false;
 
-  const updateSettings = useCallback(async (patch: Partial<AppSettingsPayload>) => {
-    setSettingsState((prev) => {
-      const next = { ...prev, ...patch };
-      void saveAppSettings(next);
-      return next;
-    });
+    void settingsService
+      .initSettings()
+      .then((loaded: LoadedSettings) => {
+        if (!cancelled) {
+          setSettings(loaded);
+          setError(null);
+        }
+        return loaded;
+      })
+      .catch((cause: unknown) => {
+        if (!cancelled) {
+          const message = cause instanceof Error ? cause.message : "Failed to load settings";
+          setError(message);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setReady(true);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const setPermissionMode = useCallback(
-    async (mode: PermissionMode) => {
-      await updateSettings({ permissionMode: mode });
+  const updateSettings = useCallback(
+    async (patch: Partial<AppSettings>) => {
+      try {
+        const next = await settingsService.saveSettings(patch);
+        setSettings(next);
+        setError(null);
+      } catch (cause: unknown) {
+        const message = cause instanceof Error ? cause.message : "Failed to save settings";
+        setError(message);
+        await refresh();
+        throw cause;
+      }
+    },
+    [refresh],
+  );
+
+  const updateSecret = useCallback(
+    async (key: keyof AppSecrets, value: string) => {
+      try {
+        const next = await settingsService.saveSecret(key, value);
+        setSettings(next);
+        setError(null);
+      } catch (cause: unknown) {
+        const message = cause instanceof Error ? cause.message : "Failed to save secret";
+        setError(message);
+        await refresh();
+        throw cause;
+      }
+    },
+    [refresh],
+  );
+
+  const persistToolApproval = useCallback(
+    async (tool: string) => {
+      const current = settingsService.getCachedSettings();
+      if (!current || current.persistedApprovals.includes(tool)) {
+        return;
+      }
+      await updateSettings({
+        persistedApprovals: [...current.persistedApprovals, tool],
+      });
     },
     [updateSettings],
   );
-
-  const persistToolApproval = useCallback(async (tool: AgentToolName) => {
-    setSettingsState((prev) => {
-      if (prev.persistedApprovals.includes(tool)) {
-        return prev;
-      }
-      const next = {
-        ...prev,
-        persistedApprovals: [...prev.persistedApprovals, tool],
-      };
-      void saveAppSettings(next);
-      return next;
-    });
-  }, []);
 
   const revokePersistedApprovals = useCallback(async () => {
     await updateSettings({ persistedApprovals: [] });
   }, [updateSettings]);
 
-  const permissionMode = useMemo(
-    () => parsePermissionMode(settings.permissionMode),
-    [settings.permissionMode],
+  const stateValue = useMemo<SettingsState>(
+    () => ({ ready, error, settings }),
+    [ready, error, settings],
   );
 
-  const value = useMemo<SettingsContextValue>(
+  const actionsValue = useMemo<SettingsActions>(
     () => ({
-      ready,
-      settings,
-      permissionMode,
-      setPermissionMode,
       updateSettings,
+      updateSecret,
       refresh,
       persistToolApproval,
       revokePersistedApprovals,
     }),
-    [
-      ready,
-      settings,
-      permissionMode,
-      setPermissionMode,
-      updateSettings,
-      refresh,
-      persistToolApproval,
-      revokePersistedApprovals,
-    ],
+    [updateSettings, updateSecret, refresh, persistToolApproval, revokePersistedApprovals],
   );
 
-  return <SettingsContext.Provider value={value}>{props.children}</SettingsContext.Provider>;
+  return (
+    <SettingsActionsContext.Provider value={actionsValue}>
+      <SettingsStateContext.Provider value={stateValue}>
+        {props.children}
+      </SettingsStateContext.Provider>
+    </SettingsActionsContext.Provider>
+  );
 }
-
-export function useSettings(): SettingsContextValue {
-  const ctx = useContext(SettingsContext);
+export function useSettingsState(): SettingsState {
+  const ctx = useContext(SettingsStateContext);
   if (!ctx) {
-    throw new Error("useSettings must be used within SettingsProvider");
+    throw new Error("useSettingsState must be used within SettingsProvider");
   }
   return ctx;
 }
+
+export function useSettingsActions(): SettingsActions {
+  const ctx = useContext(SettingsActionsContext);
+  if (!ctx) {
+    throw new Error("useSettingsActions must be used within SettingsProvider");
+  }
+  return ctx;
+}
+
+export function useSettings(): SettingsContextValue {
+  return { ...useSettingsState(), ...useSettingsActions() };
+}
+

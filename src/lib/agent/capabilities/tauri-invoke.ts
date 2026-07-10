@@ -1,0 +1,227 @@
+import { invoke } from "@tauri-apps/api/core";
+
+import type { CapabilityError } from "./types";
+
+export type TauriCommandError = {
+  code: string;
+  message: string;
+  details?: string;
+  cause?: string;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function readStringField(record: Record<string, unknown>, key: string): string | undefined {
+  const value = record[key];
+  return typeof value === "string" ? value : undefined;
+}
+
+function commandErrorFromRecord(record: Record<string, unknown>): CapabilityError | null {
+  const code = readStringField(record, "code");
+  const message = readStringField(record, "message");
+  if (!code || !message) {
+    return null;
+  }
+
+  return {
+    code,
+    message,
+    details: readStringField(record, "details"),
+    cause: readStringField(record, "cause"),
+  };
+}
+
+function tryParseJsonCommandError(value: string): CapabilityError | null {
+  const trimmed = value.trim();
+  if (!trimmed.startsWith("{")) {
+    return null;
+  }
+
+  try {
+    const parsed: unknown = JSON.parse(trimmed);
+    return isRecord(parsed) ? commandErrorFromRecord(parsed) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function isTauriRuntime(): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  return "__TAURI_INTERNALS__" in window || "__TAURI__" in window;
+}
+
+export function mapInvokeError(error: unknown): CapabilityError {
+  if (isRecord(error)) {
+    const direct = commandErrorFromRecord(error);
+    if (direct) {
+      return direct;
+    }
+
+    const nestedMessage = readStringField(error, "message");
+    if (nestedMessage) {
+      const parsed = tryParseJsonCommandError(nestedMessage);
+      if (parsed) {
+        return parsed;
+      }
+    }
+
+    const nestedError = error.error;
+    if (typeof nestedError === "string") {
+      const parsed = tryParseJsonCommandError(nestedError);
+      if (parsed) {
+        return parsed;
+      }
+      return { code: "invoke_failed", message: nestedError };
+    }
+
+    if (isRecord(nestedError)) {
+      const nested = commandErrorFromRecord(nestedError);
+      if (nested) {
+        return nested;
+      }
+    }
+  }
+
+  if (error instanceof Error) {
+    const parsed = tryParseJsonCommandError(error.message);
+    if (parsed) {
+      return parsed;
+    }
+    return { code: "invoke_failed", message: error.message, cause: error.stack };
+  }
+
+  if (typeof error === "string") {
+    const parsed = tryParseJsonCommandError(error);
+    if (parsed) {
+      return parsed;
+    }
+    return { code: "invoke_failed", message: error };
+  }
+
+  return { code: "invoke_failed", message: "Unknown native command failure" };
+}
+
+export async function invokeCapabilityCommand<T>(
+  command: string,
+  args: Record<string, unknown>,
+): Promise<T> {
+  if (!isTauriRuntime()) {
+    throw {
+      code: "tauri_unavailable",
+      message: `${command} requires the Actuate desktop runtime`,
+    } satisfies CapabilityError;
+  }
+
+  try {
+    return await invoke<T>(command, args);
+  } catch (error) {
+    throw mapInvokeError(error);
+  }
+}
+
+export type CapabilityNativeInvoker = (capability: string, input: unknown) => Promise<unknown>;
+
+export function createTauriCapabilityInvoker(workspaceRoot: string): CapabilityNativeInvoker {
+  return async (capability, input) => {
+    const payload = {
+      workspaceRoot,
+      ...(typeof input === "object" && input !== null ? input : {}),
+    };
+
+    switch (capability) {
+      case "read_file":
+        return invokeCapabilityCommand("read_file", payload);
+      case "read_directory":
+        return invokeCapabilityCommand("read_directory", payload);
+      case "search_files":
+        return invokeCapabilityCommand("search_files", payload);
+      case "write_file":
+        return invokeCapabilityCommand("write_file", payload);
+      case "create_directory":
+        return invokeCapabilityCommand("create_directory", payload);
+      case "patch_file":
+        return invokeCapabilityCommand("patch_file", payload);
+      case "delete_path":
+        return invokeCapabilityCommand("delete_path", payload);
+      case "move_path":
+        return invokeCapabilityCommand("move_path", payload);
+      case "duplicate_path":
+        return invokeCapabilityCommand("duplicate_path", payload);
+      case "stat_path":
+        return invokeCapabilityCommand("stat_path", payload);
+      case "run_shell":
+        return invokeCapabilityCommand("run_shell", payload);
+      case "process_list":
+        return invokeCapabilityCommand("process_list", payload);
+      case "process_info":
+        return invokeCapabilityCommand("process_info", payload);
+      case "process_kill":
+        return invokeCapabilityCommand("process_kill", payload);
+      case "launch":
+        return invokeCapabilityCommand("launch", payload);
+      case "get_env":
+        return invokeCapabilityCommand("get_env", payload);
+      case "set_env":
+        return invokeCapabilityCommand("set_env", payload);
+      case "read_clipboard":
+        return invokeCapabilityCommand("read_clipboard", payload);
+      case "write_clipboard":
+        return invokeCapabilityCommand("write_clipboard", payload);
+      case "get_system_info":
+        return invokeCapabilityCommand("get_system_info", payload);
+      case "wait":
+        return invokeCapabilityCommand("wait", input as Record<string, unknown>);
+      case "window_list":
+        return invokeCapabilityCommand("window_list", payload);
+      case "window_focus":
+        return invokeCapabilityCommand("window_focus", payload);
+      case "window_state":
+        return invokeCapabilityCommand("window_state", payload);
+      case "window_move":
+        return invokeCapabilityCommand("window_move", payload);
+      case "window_resize":
+        return invokeCapabilityCommand("window_resize", payload);
+      case "get_active_window":
+        return invokeCapabilityCommand("get_active_window", payload);
+      case "accessibility_snapshot":
+        return invokeCapabilityCommand("accessibility_snapshot", payload);
+      case "accessibility_find_element":
+        return invokeCapabilityCommand("accessibility_find_element", payload);
+      case "accessibility_expand_node":
+        return invokeCapabilityCommand("accessibility_expand_node", payload);
+      case "accessibility_click":
+        return invokeCapabilityCommand("accessibility_click", payload);
+      case "accessibility_set_value":
+        return invokeCapabilityCommand("accessibility_set_value", payload);
+      case "accessibility_send_keys":
+        return invokeCapabilityCommand("accessibility_send_keys", payload);
+      case "accessibility_focus":
+        return invokeCapabilityCommand("accessibility_focus", payload);
+      default:
+        throw {
+          code: "unknown_capability",
+          message: `Unknown capability: ${capability}`,
+        } satisfies CapabilityError;
+    }
+  };
+}
+
+export function createMockCapabilityInvoker(
+  handlers: Partial<Record<string, (input: unknown) => Promise<unknown> | unknown>>,
+): CapabilityNativeInvoker {
+  return async (capability, input) => {
+    const handler = handlers[capability];
+    if (!handler) {
+      throw {
+        code: "mock_unconfigured",
+        message: `No mock handler for ${capability}`,
+      } satisfies CapabilityError;
+    }
+    return handler(input);
+  };
+}
