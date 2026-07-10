@@ -1,0 +1,146 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+
+  // Keep this list explicit: setting plugins replaces Oxlint's default plugin set.
+  "plugins": [
+    "eslint",
+    "typescript",
+    "unicorn",
+    "oxc",
+    "import",
+    "react",
+    "jsx-a11y",
+    "promise"
+  ],
+
+  "env": {
+    "browser": true,
+    "es2020": true
+  },
+
+  "settings": {
+    "react": {
+      "version": "19.1.0"
+    },
+    "jsx-a11y": {
+      "components": {
+        "Button": "button"
+      }
+    }
+  },
+
+  "ignorePatterns": [
+    "node_modules/**",
+    "dist/**",
+    "dist-ssr/**",
+    "coverage/**",
+    "src-tauri/target/**",
+    ".git/**",
+    ".cursor/**",
+    ".vscode/**",
+    ".idea/**",
+    "public/browser-samples/**",
+    "*.min.*"
+  ],
+
+  "options": {
+    "denyWarnings": false,
+    "reportUnusedDisableDirectives": "error",
+    "respectEslintDisableDirectives": true
+  },
+
+  "categories": {
+    "correctness": "warn",
+    "suspicious": "warn",
+    "perf": "warn",
+    "style": "off",
+    "pedantic": "off",
+    "restriction": "off",
+    "nursery": "off"
+  },
+
+  "rules": {
+    "curly": "off",
+    "eqeqeq": "warn",
+    "no-alert": "warn",
+    "no-console": "warn",
+    "no-debugger": "error",
+    "no-underscore-dangle": "off",
+    "no-var": "error",
+    "object-shorthand": "warn",
+    "prefer-const": "warn",
+    "prefer-template": "warn",
+
+    "import/first": "warn",
+    "import/no-cycle": "error",
+    "import/no-duplicates": "error",
+    "import/no-self-import": "error",
+    "import/no-unassigned-import": "off",
+
+    "jsx-a11y/alt-text": "warn",
+    "jsx-a11y/anchor-has-content": "warn",
+    "jsx-a11y/anchor-is-valid": "warn",
+    "jsx-a11y/aria-props": "warn",
+    "jsx-a11y/aria-proptypes": "warn",
+    "jsx-a11y/aria-role": "warn",
+    "jsx-a11y/click-events-have-key-events": "warn",
+    "jsx-a11y/control-has-associated-label": "warn",
+    "jsx-a11y/no-autofocus": "warn",
+    "jsx-a11y/no-static-element-interactions": "warn",
+    "jsx-a11y/prefer-tag-over-role": "warn",
+
+    "promise/no-new-statics": "error",
+    "promise/no-return-wrap": "error",
+    "promise/valid-params": "error",
+
+    "react/button-has-type": "error",
+    "react/exhaustive-deps": "warn",
+    "react/jsx-key": "error",
+    "react/no-array-index-key": "off",
+    "react/no-danger": "warn",
+    "react/no-unknown-property": "error",
+    "react/react-in-jsx-scope": "off",
+    "react/rules-of-hooks": "error",
+    "react/self-closing-comp": "warn",
+
+    "typescript/consistent-type-imports": "warn",
+    "typescript/no-explicit-any": "error",
+    "typescript/no-non-null-assertion": "warn",
+    "typescript/no-require-imports": "error",
+    "typescript/no-unnecessary-type-assertion": "warn",
+
+    "unicorn/filename-case": "off",
+    "unicorn/no-array-sort": "off",
+    "unicorn/no-null": "off",
+    "unicorn/prefer-add-event-listener": "off",
+    "unicorn/prefer-top-level-await": "off"
+  },
+
+  "overrides": [
+    {
+      "files": ["vite.config.ts", "tsconfig.node.json"],
+      "env": {
+        "browser": false,
+        "node": true,
+        "es2020": true
+      }
+    },
+    {
+      "files": ["**/*.test.ts", "**/*.test.tsx", "**/*.spec.ts", "**/*.spec.tsx"],
+      "env": {
+        "browser": true,
+        "node": true,
+        "es2020": true
+      },
+      "rules": {
+        "no-console": "off"
+      }
+    },
+    {
+      "files": ["src/components/ui/**/*.{ts,tsx}"],
+      "rules": {
+        "react/no-array-index-key": "off"
+      }
+    }
+  ]
+}
