@@ -34,15 +34,28 @@ describe("capability catalog", () => {
         "write_clipboard_html",
         "read_clipboard_image",
         "write_clipboard_image",
+        "mouse_move",
+        "mouse_click",
+        "mouse_scroll",
+        "mouse_drag",
+        "mouse_hover",
+        "mouse_down",
+        "mouse_up",
+        "hotkey",
+        "key_down",
+        "key_up",
+        "key_press",
       ]),
     );
-    expect(names).toHaveLength(42);
+    expect(names).toHaveLength(53);
   });
 
   test("groups names by risk", () => {
     const byRisk = getCapabilityNamesByRisk();
     expect(byRisk.low).toContain("read_file");
     expect(byRisk.high).toContain("run_shell");
+    expect(byRisk.high).toContain("mouse_click");
+    expect(byRisk.high).toContain("hotkey");
     expect(byRisk.medium).toContain("read_clipboard");
     expect(byRisk.medium).toContain("read_clipboard_image");
     expect(byRisk.medium).toContain("write_clipboard_html");
@@ -56,12 +69,19 @@ describe("capability catalog", () => {
     expect(off.high).not.toContain("accessibility_click");
     expect(off.high).not.toContain("accessibility_get_value");
     expect(off.high).not.toContain("accessibility_invoke_action");
+    expect(off.high).not.toContain("mouse_move");
+    expect(off.high).not.toContain("hotkey");
+    expect(off.high).not.toContain("key_press");
     expect(on.high).toContain("accessibility_snapshot");
     expect(on.high).toContain("accessibility_click");
     expect(on.high).toContain("accessibility_get_value");
     expect(on.high).toContain("accessibility_scroll_element");
     expect(on.high).toContain("accessibility_right_click_element");
     expect(on.high).toContain("accessibility_invoke_action");
+    expect(on.high).toContain("mouse_click");
+    expect(on.high).toContain("mouse_drag");
+    expect(on.high).toContain("hotkey");
+    expect(on.high).toContain("key_down");
   });
 
   test("workspace-root flag is set only on filesystem tools", () => {

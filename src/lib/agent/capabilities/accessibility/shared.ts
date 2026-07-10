@@ -1,3 +1,1 @@
-const uiAutomationEnabled = (settings: { uiAutomation: boolean }) => settings.uiAutomation;
-
-export { uiAutomationEnabled };
+export { uiAutomationEnabled } from "../shared/ui-automation";

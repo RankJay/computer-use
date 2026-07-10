@@ -27,6 +27,17 @@ import { readFileCapability } from "./file-system/read-file";
 import { searchFilesCapability } from "./file-system/search-files";
 import { statPathCapability } from "./file-system/stat-path";
 import { writeFileCapability } from "./file-system/write-file";
+import { hotkeyCapability } from "./keyboard/hotkey";
+import { keyDownCapability } from "./keyboard/key-down";
+import { keyPressCapability } from "./keyboard/key-press";
+import { keyUpCapability } from "./keyboard/key-up";
+import { mouseClickCapability } from "./mouse/click";
+import { mouseDownCapability } from "./mouse/down";
+import { mouseDragCapability } from "./mouse/drag";
+import { mouseHoverCapability } from "./mouse/hover";
+import { mouseMoveCapability } from "./mouse/move";
+import { mouseScrollCapability } from "./mouse/scroll";
+import { mouseUpCapability } from "./mouse/up";
 import { waitCapability } from "./shared/wait";
 import { getEnvCapability } from "./shell/get-env";
 import { getSystemInfoCapability } from "./shell/get-system-info";
@@ -88,6 +99,17 @@ export const CAPABILITIES = [
   accessibilityInvokeActionCapability,
   accessibilitySendKeysCapability,
   accessibilityFocusCapability,
+  mouseMoveCapability,
+  mouseClickCapability,
+  mouseScrollCapability,
+  mouseDragCapability,
+  mouseHoverCapability,
+  mouseDownCapability,
+  mouseUpCapability,
+  hotkeyCapability,
+  keyDownCapability,
+  keyUpCapability,
+  keyPressCapability,
 ] as const satisfies readonly CapabilityDefinition[];
 
 export type CapabilityName = (typeof CAPABILITIES)[number]["name"];
