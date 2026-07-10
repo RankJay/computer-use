@@ -5,10 +5,11 @@ use uiautomation::controls::WindowControl;
 use uiautomation::core::{UIAutomation, UIElement, UIMatcherMode};
 use uiautomation::errors::ERR_NOTFOUND;
 use uiautomation::patterns::{
-    UIInvokePattern, UILegacyIAccessiblePattern, UIScrollItemPattern, UITogglePattern,
-    UIValuePattern, UIPatternType,
+    UIExpandCollapsePattern, UIInvokePattern, UILegacyIAccessiblePattern, UIRangeValuePattern,
+    UIScrollItemPattern, UIScrollPattern, UISelectionItemPattern, UITogglePattern, UIValuePattern,
+    UIPatternType,
 };
-use uiautomation::types::{ControlType, Handle, UIProperty};
+use uiautomation::types::{ControlType, Handle, ScrollAmount, UIProperty};
 use windows::Win32::Foundation::HWND;
 use windows::Win32::UI::WindowsAndMessaging::GetWindowThreadProcessId;
 
@@ -17,8 +18,8 @@ use crate::capabilities::path_utils::CommandError;
 use super::budget::{SearchBudget, FIND_MAX_NODES, RESOLVE_MAX_NODES, SNAPSHOT_MAX_NODES};
 use super::state::{make_reference, SnapshotStore, StoredElement};
 use super::types::{
-    ActionResult, FindElementInput, MAX_FIND_CANDIDATES, MAX_WAIT_MS, SnapshotInput, TextResult,
-    WAIT_POLL_MS,
+    ActionResult, FindElementInput, GetValueResult, MAX_FIND_CANDIDATES, MAX_WAIT_MS, SnapshotInput,
+    TextResult, WAIT_POLL_MS,
 };
 
 fn process_id_for_hwnd(hwnd: i64) -> Option<u32> {
@@ -603,6 +604,279 @@ pub fn focus_impl(store: &SnapshotStore, reference: &str) -> Result<ActionResult
         method: "focus".to_string(),
         foregrounded,
     })
+}
+
+pub fn get_value_impl(store: &SnapshotStore, reference: &str) -> Result<GetValueResult, CommandError> {
+    let stored = store.resolve_ref_or_stale(reference)?;
+    let session = UiaSession::new()?;
+    let element = resolve_stored_element(&session, &stored)?;
+
+    if let Ok(pattern) = element.get_pattern::<UIValuePattern>() {
+        if let Ok(value) = pattern.get_value() {
+            if is_useful_value(&value) {
+                return Ok(GetValueResult {
+                    value,
+                    kind: "text".to_string(),
+                    min: None,
+                    max: None,
+                    method: "value_pattern".to_string(),
+                });
+            }
+        }
+    }
+
+    if let Ok(pattern) = element.get_pattern::<UIRangeValuePattern>() {
+        let value = pattern
+            .get_value()
+            .map_err(|error| map_uia_error(error, "get_value_failed"))?;
+        let min = pattern.get_minimum().ok();
+        let max = pattern.get_maximum().ok();
+        return Ok(GetValueResult {
+            value: value.to_string(),
+            kind: "range".to_string(),
+            min,
+            max,
+            method: "range_value".to_string(),
+        });
+    }
+
+    if let Ok(pattern) = element.get_pattern::<UILegacyIAccessiblePattern>() {
+        if let Ok(value) = pattern.get_value() {
+            if is_useful_value(&value) {
+                return Ok(GetValueResult {
+                    value,
+                    kind: "text".to_string(),
+                    min: None,
+                    max: None,
+                    method: "legacy".to_string(),
+                });
+            }
+        }
+    }
+
+    Ok(GetValueResult {
+        value: String::new(),
+        kind: "empty".to_string(),
+        min: None,
+        max: None,
+        method: "empty".to_string(),
+    })
+}
+
+pub fn scroll_element_impl(
+    store: &SnapshotStore,
+    reference: &str,
+    direction: &str,
+    amount: &str,
+) -> Result<ActionResult, CommandError> {
+    let stored = store.resolve_ref_or_stale(reference)?;
+    let session = UiaSession::new()?;
+    let element = resolve_stored_element(&session, &stored)?;
+    let foregrounded = foreground_window(&session, stored.hwnd)?;
+    let (horizontal, vertical) = scroll_amounts(direction, amount)?;
+    let target = find_scrollable_element(&session, &element)?;
+
+    target
+        .get_pattern::<UIScrollPattern>()
+        .map_err(|error| map_uia_error(error, "scroll_unavailable"))?
+        .scroll(horizontal, vertical)
+        .map_err(|error| map_uia_error(error, "scroll_failed"))?;
+
+    Ok(ActionResult {
+        ok: true,
+        method: "scroll".to_string(),
+        foregrounded,
+    })
+}
+
+pub fn right_click_element_impl(
+    store: &SnapshotStore,
+    reference: &str,
+) -> Result<ActionResult, CommandError> {
+    let stored = store.resolve_ref_or_stale(reference)?;
+    let session = UiaSession::new()?;
+    let element = resolve_stored_element(&session, &stored)?;
+    let foregrounded = foreground_window(&session, stored.hwnd)?;
+    prepare_for_click(&element)?;
+    element
+        .right_click()
+        .map_err(|error| map_uia_error(error, "right_click_failed"))?;
+    Ok(ActionResult {
+        ok: true,
+        method: "right_click".to_string(),
+        foregrounded,
+    })
+}
+
+pub fn invoke_action_impl(
+    store: &SnapshotStore,
+    reference: &str,
+    action: &str,
+) -> Result<ActionResult, CommandError> {
+    let stored = store.resolve_ref_or_stale(reference)?;
+    let session = UiaSession::new()?;
+    let element = resolve_stored_element(&session, &stored)?;
+    let foregrounded = foreground_window(&session, stored.hwnd)?;
+    let method = parse_invoke_action(action)?;
+
+    match method {
+        "press" => {
+            let pattern = element.get_pattern::<UIInvokePattern>().map_err(|_| {
+                CommandError::new(
+                    "action_unavailable",
+                    "Invoke pattern is not available on this element",
+                )
+            })?;
+            pattern
+                .invoke()
+                .map_err(|error| map_uia_error(error, "invoke_action_failed"))?;
+        }
+        "toggle" => {
+            let pattern = element.get_pattern::<UITogglePattern>().map_err(|_| {
+                CommandError::new(
+                    "action_unavailable",
+                    "Toggle pattern is not available on this element",
+                )
+            })?;
+            pattern
+                .toggle()
+                .map_err(|error| map_uia_error(error, "invoke_action_failed"))?;
+        }
+        "expand" => {
+            let pattern = element
+                .get_pattern::<UIExpandCollapsePattern>()
+                .map_err(|_| {
+                    CommandError::new(
+                        "action_unavailable",
+                        "ExpandCollapse pattern is not available on this element",
+                    )
+                })?;
+            pattern
+                .expand()
+                .map_err(|error| map_uia_error(error, "invoke_action_failed"))?;
+        }
+        "collapse" => {
+            let pattern = element
+                .get_pattern::<UIExpandCollapsePattern>()
+                .map_err(|_| {
+                    CommandError::new(
+                        "action_unavailable",
+                        "ExpandCollapse pattern is not available on this element",
+                    )
+                })?;
+            pattern
+                .collapse()
+                .map_err(|error| map_uia_error(error, "invoke_action_failed"))?;
+        }
+        "select" => {
+            let pattern = element
+                .get_pattern::<UISelectionItemPattern>()
+                .map_err(|_| {
+                    CommandError::new(
+                        "action_unavailable",
+                        "SelectionItem pattern is not available on this element",
+                    )
+                })?;
+            pattern
+                .select()
+                .map_err(|error| map_uia_error(error, "invoke_action_failed"))?;
+        }
+        _ => {
+            return Err(CommandError::new(
+                "invalid_input",
+                format!("Unknown action: {action}"),
+            ));
+        }
+    }
+
+    Ok(ActionResult {
+        ok: true,
+        method: method.to_string(),
+        foregrounded,
+    })
+}
+
+fn parse_invoke_action(action: &str) -> Result<&'static str, CommandError> {
+    match action {
+        "toggle" => Ok("toggle"),
+        "expand" => Ok("expand"),
+        "collapse" => Ok("collapse"),
+        "press" => Ok("press"),
+        "select" => Ok("select"),
+        _ => Err(CommandError::new(
+            "invalid_input",
+            format!("action must be one of toggle, expand, collapse, press, select; got {action}"),
+        )),
+    }
+}
+
+fn scroll_amounts(
+    direction: &str,
+    amount: &str,
+) -> Result<(ScrollAmount, ScrollAmount), CommandError> {
+    let step = match amount {
+        "large" => "large",
+        "small" | "" => "small",
+        other => {
+            return Err(CommandError::new(
+                "invalid_input",
+                format!("amount must be small or large; got {other}"),
+            ));
+        }
+    };
+
+    let increment = if step == "large" {
+        ScrollAmount::LargeIncrement
+    } else {
+        ScrollAmount::SmallIncrement
+    };
+    let decrement = if step == "large" {
+        ScrollAmount::LargeDecrement
+    } else {
+        ScrollAmount::SmallDecrement
+    };
+
+    match direction {
+        "up" => Ok((ScrollAmount::NoAmount, decrement)),
+        "down" => Ok((ScrollAmount::NoAmount, increment)),
+        "left" => Ok((decrement, ScrollAmount::NoAmount)),
+        "right" => Ok((increment, ScrollAmount::NoAmount)),
+        other => Err(CommandError::new(
+            "invalid_input",
+            format!("direction must be up, down, left, or right; got {other}"),
+        )),
+    }
+}
+
+fn find_scrollable_element(
+    session: &UiaSession,
+    element: &UIElement,
+) -> Result<UIElement, CommandError> {
+    if element.get_pattern::<UIScrollPattern>().is_ok() {
+        return Ok(element.clone());
+    }
+
+    let mut current = element.clone();
+    for _ in 0..8 {
+        let walker = session
+            .automation
+            .get_control_view_walker()
+            .map_err(|error| map_uia_error(error, "scroll_unavailable"))?;
+        match walker.get_parent_build_cache(&current, &session.cache_request) {
+            Ok(parent) => {
+                if parent.get_pattern::<UIScrollPattern>().is_ok() {
+                    return Ok(parent);
+                }
+                current = parent;
+            }
+            Err(_) => break,
+        }
+    }
+
+    Err(CommandError::new(
+        "scroll_unavailable",
+        "No scrollable ancestor found for this element",
+    ))
 }
 
 struct UiaSession {
@@ -1210,5 +1484,30 @@ mod tests {
             "resolve_failed",
             "An event was unable to invoke any of the subscribers"
         )));
+    }
+
+    #[test]
+    fn maps_scroll_amounts() {
+        let (h, v) = scroll_amounts("down", "small").expect("down small");
+        assert_eq!(h, ScrollAmount::NoAmount);
+        assert_eq!(v, ScrollAmount::SmallIncrement);
+
+        let (h, v) = scroll_amounts("up", "large").expect("up large");
+        assert_eq!(h, ScrollAmount::NoAmount);
+        assert_eq!(v, ScrollAmount::LargeDecrement);
+
+        let (h, v) = scroll_amounts("left", "small").expect("left small");
+        assert_eq!(h, ScrollAmount::SmallDecrement);
+        assert_eq!(v, ScrollAmount::NoAmount);
+
+        assert!(scroll_amounts("diagonal", "small").is_err());
+        assert!(scroll_amounts("down", "huge").is_err());
+    }
+
+    #[test]
+    fn parses_invoke_actions() {
+        assert_eq!(parse_invoke_action("press").unwrap(), "press");
+        assert_eq!(parse_invoke_action("toggle").unwrap(), "toggle");
+        assert!(parse_invoke_action("click").is_err());
     }
 }

@@ -9,7 +9,9 @@ mod window;
 
 pub use accessibility::{
     accessibility_click, accessibility_expand_node, accessibility_find_element, accessibility_focus,
-    accessibility_send_keys, accessibility_set_value, accessibility_snapshot, SnapshotStore,
+    accessibility_get_value, accessibility_invoke_action, accessibility_right_click_element,
+    accessibility_scroll_element, accessibility_send_keys, accessibility_set_value,
+    accessibility_snapshot, SnapshotStore,
 };
 pub use clipboard::{
     read_clipboard, read_clipboard_html, read_clipboard_image, write_clipboard,

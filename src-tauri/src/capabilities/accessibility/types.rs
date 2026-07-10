@@ -15,6 +15,18 @@ pub struct ActionResult {
     pub foregrounded: bool,
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GetValueResult {
+    pub value: String,
+    pub kind: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub min: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max: Option<f64>,
+    pub method: String,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct SnapshotInput {
     pub hwnd: i64,

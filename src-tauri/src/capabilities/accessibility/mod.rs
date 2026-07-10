@@ -9,6 +9,8 @@ mod windows_impl;
 
 pub use commands::{
     accessibility_click, accessibility_expand_node, accessibility_find_element, accessibility_focus,
-    accessibility_send_keys, accessibility_set_value, accessibility_snapshot,
+    accessibility_get_value, accessibility_invoke_action, accessibility_right_click_element,
+    accessibility_scroll_element, accessibility_send_keys, accessibility_set_value,
+    accessibility_snapshot,
 };
 pub use state::SnapshotStore;

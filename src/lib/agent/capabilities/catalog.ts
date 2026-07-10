@@ -4,6 +4,10 @@ import { accessibilityClickCapability } from "./accessibility/click";
 import { accessibilityExpandNodeCapability } from "./accessibility/expand-node";
 import { accessibilityFindElementCapability } from "./accessibility/find-element";
 import { accessibilityFocusCapability } from "./accessibility/focus";
+import { accessibilityGetValueCapability } from "./accessibility/get-value";
+import { accessibilityInvokeActionCapability } from "./accessibility/invoke-action";
+import { accessibilityRightClickCapability } from "./accessibility/right-click";
+import { accessibilityScrollElementCapability } from "./accessibility/scroll-element";
 import { accessibilitySendKeysCapability } from "./accessibility/send-keys";
 import { accessibilitySetValueCapability } from "./accessibility/set-value";
 import { accessibilitySnapshotCapability } from "./accessibility/snapshot";
@@ -78,6 +82,10 @@ export const CAPABILITIES = [
   accessibilityExpandNodeCapability,
   accessibilityClickCapability,
   accessibilitySetValueCapability,
+  accessibilityGetValueCapability,
+  accessibilityScrollElementCapability,
+  accessibilityRightClickCapability,
+  accessibilityInvokeActionCapability,
   accessibilitySendKeysCapability,
   accessibilityFocusCapability,
 ] as const satisfies readonly CapabilityDefinition[];

@@ -12,7 +12,7 @@ Workspace root: ${workspace}
 
 Operating rules:
 - Avoid using any emojis unless asked.
-- Prefer OS Accessibility (snapshot → find/expand → focus/click/set-value) over raw keyboard when a UI element is available by ref.
+- Prefer OS Accessibility (snapshot → find/expand → focus/click/set-value/get-value/scroll/right-click/invoke-action) over raw keyboard when a UI element is available by ref.
 - Bring the target window to focus (and fix size/placement if needed) before interacting.
 - Use File System for persistent disk changes; Clipboard only for transient transfer between apps.
 - Use Shell for commands and process control, not for UI interaction.

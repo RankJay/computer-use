@@ -6,7 +6,7 @@ use crate::capabilities::path_utils::CommandError;
 
 use super::state::SnapshotStore;
 use super::types::{
-    ActionResult, TextResult, TIMEOUT_ACTION_MS, TIMEOUT_EXPAND_MS, TIMEOUT_FIND_MS,
+    ActionResult, GetValueResult, TextResult, TIMEOUT_ACTION_MS, TIMEOUT_EXPAND_MS, TIMEOUT_FIND_MS,
 };
 use super::worker::{map_worker_outcome, run_with_timeout, WorkerOutcome};
 
@@ -265,6 +265,119 @@ pub async fn accessibility_focus(
                 windows_impl::focus_impl(&store, &reference_for_work)
             });
             map_worker_outcome(outcome, "focus_timeout", "Accessibility focus timed out")
+        })
+        .await;
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    unsupported_platform()
+}
+
+#[tauri::command]
+pub async fn accessibility_get_value(
+    store: State<'_, SnapshotStore>,
+    reference: String,
+) -> Result<GetValueResult, CommandError> {
+    #[cfg(target_os = "windows")]
+    {
+        let store = store.inner().clone();
+        let reference_for_work = reference.clone();
+        return run_blocking(move || {
+            let outcome = run_with_timeout(Duration::from_millis(TIMEOUT_ACTION_MS), move || {
+                windows_impl::get_value_impl(&store, &reference_for_work)
+            });
+            map_worker_outcome(
+                outcome,
+                "get_value_timeout",
+                "Reading accessibility value timed out",
+            )
+        })
+        .await;
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    unsupported_platform()
+}
+
+#[tauri::command]
+pub async fn accessibility_scroll_element(
+    store: State<'_, SnapshotStore>,
+    reference: String,
+    direction: String,
+    amount: Option<String>,
+) -> Result<ActionResult, CommandError> {
+    #[cfg(target_os = "windows")]
+    {
+        let store = store.inner().clone();
+        let reference_for_work = reference.clone();
+        let amount = amount.unwrap_or_else(|| "small".to_string());
+        return run_blocking(move || {
+            let outcome = run_with_timeout(Duration::from_millis(TIMEOUT_ACTION_MS), move || {
+                windows_impl::scroll_element_impl(
+                    &store,
+                    &reference_for_work,
+                    &direction,
+                    &amount,
+                )
+            });
+            map_worker_outcome(
+                outcome,
+                "scroll_element_timeout",
+                "Accessibility scroll timed out",
+            )
+        })
+        .await;
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    unsupported_platform()
+}
+
+#[tauri::command]
+pub async fn accessibility_right_click_element(
+    store: State<'_, SnapshotStore>,
+    reference: String,
+) -> Result<ActionResult, CommandError> {
+    #[cfg(target_os = "windows")]
+    {
+        let store = store.inner().clone();
+        let reference_for_work = reference.clone();
+        return run_blocking(move || {
+            let outcome = run_with_timeout(Duration::from_millis(TIMEOUT_ACTION_MS), move || {
+                windows_impl::right_click_element_impl(&store, &reference_for_work)
+            });
+            map_worker_outcome(
+                outcome,
+                "right_click_timeout",
+                "Accessibility right-click timed out",
+            )
+        })
+        .await;
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    unsupported_platform()
+}
+
+#[tauri::command]
+pub async fn accessibility_invoke_action(
+    store: State<'_, SnapshotStore>,
+    reference: String,
+    action: String,
+) -> Result<ActionResult, CommandError> {
+    #[cfg(target_os = "windows")]
+    {
+        let store = store.inner().clone();
+        let reference_for_work = reference.clone();
+        return run_blocking(move || {
+            let outcome = run_with_timeout(Duration::from_millis(TIMEOUT_ACTION_MS), move || {
+                windows_impl::invoke_action_impl(&store, &reference_for_work, &action)
+            });
+            map_worker_outcome(
+                outcome,
+                "invoke_action_timeout",
+                "Accessibility invoke_action timed out",
+            )
         })
         .await;
     }

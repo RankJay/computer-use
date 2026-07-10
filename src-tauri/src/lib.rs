@@ -5,12 +5,14 @@ mod commands;
 
 use capabilities::{
     accessibility_click, accessibility_expand_node, accessibility_find_element, accessibility_focus,
-    accessibility_send_keys, accessibility_set_value, accessibility_snapshot, create_directory,
-    delete_path, duplicate_path, get_active_window, get_env, get_system_info, launch, move_path,
-    patch_file, process_info, process_kill, process_list, read_clipboard, read_clipboard_html,
-    read_clipboard_image, read_directory, read_file, run_shell, search_files, set_env, stat_path,
-    wait, window_focus, window_list, window_move, window_resize, window_state, write_clipboard,
-    write_clipboard_html, write_clipboard_image, write_file, SnapshotStore,
+    accessibility_get_value, accessibility_invoke_action, accessibility_right_click_element,
+    accessibility_scroll_element, accessibility_send_keys, accessibility_set_value,
+    accessibility_snapshot, create_directory, delete_path, duplicate_path, get_active_window,
+    get_env, get_system_info, launch, move_path, patch_file, process_info, process_kill,
+    process_list, read_clipboard, read_clipboard_html, read_clipboard_image, read_directory,
+    read_file, run_shell, search_files, set_env, stat_path, wait, window_focus, window_list,
+    window_move, window_resize, window_state, write_clipboard, write_clipboard_html,
+    write_clipboard_image, write_file, SnapshotStore,
 };
 
 #[cfg(desktop)]
@@ -155,6 +157,10 @@ pub fn run() {
             accessibility_set_value,
             accessibility_send_keys,
             accessibility_focus,
+            accessibility_get_value,
+            accessibility_scroll_element,
+            accessibility_right_click_element,
+            accessibility_invoke_action,
         ]);
 
     #[cfg(desktop)]

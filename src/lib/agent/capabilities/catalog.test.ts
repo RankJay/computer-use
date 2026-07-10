@@ -26,13 +26,17 @@ describe("capability catalog", () => {
         "process_list",
         "run_shell",
         "accessibility_snapshot",
+        "accessibility_get_value",
+        "accessibility_scroll_element",
+        "accessibility_right_click_element",
+        "accessibility_invoke_action",
         "read_clipboard_html",
         "write_clipboard_html",
         "read_clipboard_image",
         "write_clipboard_image",
       ]),
     );
-    expect(names).toHaveLength(38);
+    expect(names).toHaveLength(42);
   });
 
   test("groups names by risk", () => {
@@ -50,8 +54,14 @@ describe("capability catalog", () => {
 
     expect(off.high).not.toContain("accessibility_snapshot");
     expect(off.high).not.toContain("accessibility_click");
+    expect(off.high).not.toContain("accessibility_get_value");
+    expect(off.high).not.toContain("accessibility_invoke_action");
     expect(on.high).toContain("accessibility_snapshot");
     expect(on.high).toContain("accessibility_click");
+    expect(on.high).toContain("accessibility_get_value");
+    expect(on.high).toContain("accessibility_scroll_element");
+    expect(on.high).toContain("accessibility_right_click_element");
+    expect(on.high).toContain("accessibility_invoke_action");
   });
 
   test("workspace-root flag is set only on filesystem tools", () => {
