@@ -86,12 +86,12 @@ impl SnapshotStore {
     }
 
     pub fn resolve_ref(&self, reference: &str) -> Option<StoredElement> {
+        let (_index, _generation, hwnd) = parse_reference(reference)?;
         let inner = self.inner.lock().expect("snapshot store poisoned");
-        for state in inner.windows.values() {
-            for generation in state.generations.iter().rev() {
-                if let Some(element) = generation.elements.get(reference) {
-                    return Some(element.clone());
-                }
+        let state = inner.windows.get(&hwnd)?;
+        for generation in state.generations.iter().rev() {
+            if let Some(element) = generation.elements.get(reference) {
+                return Some(element.clone());
             }
         }
         None
@@ -101,7 +101,7 @@ impl SnapshotStore {
         if let Some(element) = self.resolve_ref(reference) {
             return Ok(element);
         }
-        if reference.contains('@') {
+        if parse_reference(reference).is_some() {
             return Err(CommandError::new(
                 "stale_reference",
                 "Reference is stale or unknown; take a new snapshot or find_element call",
@@ -109,7 +109,7 @@ impl SnapshotStore {
         }
         Err(CommandError::new(
             "invalid_reference",
-            "Reference must look like e14@3",
+            "Reference must look like e14@3:123456",
         ))
     }
 
@@ -161,8 +161,19 @@ impl SnapshotStore {
     }
 }
 
-pub fn make_reference(index: u32, generation: u32) -> String {
-    format!("e{index}@{generation}")
+pub fn make_reference(index: u32, generation: u32, hwnd: i64) -> String {
+    format!("e{index}@{generation}:{hwnd}")
+}
+
+/// Parse `e{index}@{generation}:{hwnd}`.
+pub fn parse_reference(reference: &str) -> Option<(u32, u32, i64)> {
+    let rest = reference.strip_prefix('e')?;
+    let (index_str, after_index) = rest.split_once('@')?;
+    let (generation_str, hwnd_str) = after_index.split_once(':')?;
+    let index = index_str.parse().ok()?;
+    let generation = generation_str.parse().ok()?;
+    let hwnd = hwnd_str.parse().ok()?;
+    Some((index, generation, hwnd))
 }
 
 #[cfg(test)]
@@ -178,7 +189,7 @@ mod tests {
         store.store_element(
             hwnd,
             g1,
-            make_reference(1, g1),
+            make_reference(1, g1, hwnd),
             vec![1, 2],
             100,
             "Compose".to_string(),
@@ -188,7 +199,7 @@ mod tests {
         store.store_element(
             hwnd,
             g2,
-            make_reference(1, g2),
+            make_reference(1, g2, hwnd),
             vec![3, 4],
             100,
             "Compose".to_string(),
@@ -198,15 +209,65 @@ mod tests {
         store.store_element(
             hwnd,
             g3,
-            make_reference(1, g3),
+            make_reference(1, g3, hwnd),
             vec![5, 6],
             100,
             "Compose".to_string(),
             Some("Button".to_string()),
         );
 
-        assert!(store.resolve_ref(&make_reference(1, g1)).is_none());
-        assert!(store.resolve_ref(&make_reference(1, g2)).is_some());
-        assert!(store.resolve_ref(&make_reference(1, g3)).is_some());
+        assert!(store.resolve_ref(&make_reference(1, g1, hwnd)).is_none());
+        assert!(store.resolve_ref(&make_reference(1, g2, hwnd)).is_some());
+        assert!(store.resolve_ref(&make_reference(1, g3, hwnd)).is_some());
+    }
+
+    #[test]
+    fn refs_are_hwnd_scoped_and_do_not_collide_across_windows() {
+        let store = SnapshotStore::default();
+        let hwnd_a = 100;
+        let hwnd_b = 200;
+
+        let g_a = store.begin_generation(hwnd_a);
+        let g_b = store.begin_generation(hwnd_b);
+        assert_eq!(g_a, 1);
+        assert_eq!(g_b, 1);
+
+        let ref_a = make_reference(1, g_a, hwnd_a);
+        let ref_b = make_reference(1, g_b, hwnd_b);
+        assert_ne!(ref_a, ref_b);
+
+        store.store_element(
+            hwnd_a,
+            g_a,
+            ref_a.clone(),
+            vec![1],
+            10,
+            "A".to_string(),
+            None,
+        );
+        store.store_element(
+            hwnd_b,
+            g_b,
+            ref_b.clone(),
+            vec![2],
+            20,
+            "B".to_string(),
+            None,
+        );
+
+        let resolved_a = store.resolve_ref(&ref_a).expect("ref_a");
+        let resolved_b = store.resolve_ref(&ref_b).expect("ref_b");
+        assert_eq!(resolved_a.hwnd, hwnd_a);
+        assert_eq!(resolved_b.hwnd, hwnd_b);
+        assert_eq!(resolved_a.name, "A");
+        assert_eq!(resolved_b.name, "B");
+    }
+
+    #[test]
+    fn parse_reference_round_trips() {
+        let reference = make_reference(14, 3, 987654321);
+        assert_eq!(parse_reference(&reference), Some((14, 3, 987654321)));
+        assert!(parse_reference("e14@3").is_none());
+        assert!(parse_reference("not-a-ref").is_none());
     }
 }

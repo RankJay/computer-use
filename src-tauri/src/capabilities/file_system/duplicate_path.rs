@@ -45,10 +45,7 @@ fn copy_directory(source: &Path, destination: &Path) -> Result<(), CommandError>
             copy_directory(&entry_path, &target_path)?;
         } else {
             fs::copy(&entry_path, &target_path).map_err(|error| {
-                CommandError::new(
-                    "duplicate_failed",
-                    format!("Failed to copy file: {error}"),
-                )
+                CommandError::new("duplicate_failed", format!("Failed to copy file: {error}"))
             })?;
         }
     }
@@ -77,7 +74,10 @@ pub fn duplicate_path(
     }
 
     let metadata = fs::metadata(&source).map_err(|error| {
-        CommandError::new("io_error", format!("Failed to read source metadata: {error}"))
+        CommandError::new(
+            "io_error",
+            format!("Failed to read source metadata: {error}"),
+        )
     })?;
 
     let kind = if metadata.is_dir() {
@@ -103,7 +103,11 @@ pub fn duplicate_path(
         })?;
     }
 
-    Ok(DuplicatePathResult { from, to, kind: kind.to_string() })
+    Ok(DuplicatePathResult {
+        from,
+        to,
+        kind: kind.to_string(),
+    })
 }
 
 #[cfg(test)]

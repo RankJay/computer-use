@@ -10,15 +10,12 @@ use std::time::{Duration, Instant};
 
 use windows::core::BOOL;
 use windows::Win32::Foundation::{HWND, LPARAM};
-use windows::Win32::UI::WindowsAndMessaging::{
-    EnumWindows, GetWindowTextW, IsWindowVisible,
-};
+use windows::Win32::UI::WindowsAndMessaging::{EnumWindows, GetWindowTextW, IsWindowVisible};
 
 use super::state::SnapshotStore;
 use super::types::SnapshotInput;
-use super::windows_impl::{
-    resolve_reference_with_stats, snapshot_with_stats, SnapshotStats,
-};
+use super::windows_impl::{resolve_reference_with_stats, snapshot_with_stats, SnapshotStats};
+use super::worker::{run, WorkerOutcome};
 
 const RUNS: usize = 5;
 
@@ -65,6 +62,22 @@ pub fn run_all() -> Vec<BenchSummary> {
     summaries
 }
 
+fn block_on_worker<T, F>(timeout: Duration, work: F) -> WorkerOutcome<T>
+where
+    T: Send + 'static,
+    F: FnOnce(
+            &mut super::worker::WorkerCtx,
+        ) -> Result<T, crate::capabilities::path_utils::CommandError>
+        + Send
+        + 'static,
+{
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_time()
+        .build()
+        .expect("tokio runtime for a11y-bench");
+    runtime.block_on(run(timeout, work))
+}
+
 fn bench_snapshot(fixture: &str, hwnd: i64) -> BenchSummary {
     let store = SnapshotStore::default();
     let mut samples = Vec::with_capacity(RUNS);
@@ -74,11 +87,21 @@ fn bench_snapshot(fixture: &str, hwnd: i64) -> BenchSummary {
             max_depth: 10,
             max_elements: 150,
         };
+        let store_for_worker = store.clone();
         let started = Instant::now();
-        let result = snapshot_with_stats(&store, input);
+        let outcome = block_on_worker(Duration::from_secs(30), move |ctx| {
+            let session = ctx.session()?;
+            snapshot_with_stats(session, &store_for_worker, input, ctx.deadline)
+        });
         let duration_ms = started.elapsed().as_millis() as u64;
-        match result {
-            Ok((_text, SnapshotStats { nodes_visited, emitted })) => {
+        match outcome {
+            WorkerOutcome::Ok((
+                _text,
+                SnapshotStats {
+                    nodes_visited,
+                    emitted,
+                },
+            )) => {
                 samples.push(BenchSample {
                     tool: "snapshot",
                     fixture: fixture.to_string(),
@@ -89,7 +112,7 @@ fn bench_snapshot(fixture: &str, hwnd: i64) -> BenchSummary {
                     error: None,
                 });
             }
-            Err(error) => {
+            WorkerOutcome::Err(error) => {
                 samples.push(BenchSample {
                     tool: "snapshot",
                     fixture: fixture.to_string(),
@@ -98,6 +121,17 @@ fn bench_snapshot(fixture: &str, hwnd: i64) -> BenchSummary {
                     emitted: 0,
                     ok: false,
                     error: Some(format!("{}: {}", error.code, error.message)),
+                });
+            }
+            WorkerOutcome::TimedOut => {
+                samples.push(BenchSample {
+                    tool: "snapshot",
+                    fixture: fixture.to_string(),
+                    duration_ms,
+                    nodes_visited: 0,
+                    emitted: 0,
+                    ok: false,
+                    error: Some("timed out".to_string()),
                 });
             }
         }
@@ -112,7 +146,19 @@ fn bench_resolve(fixture: &str, hwnd: i64) -> BenchSummary {
         max_depth: 10,
         max_elements: 150,
     };
-    let Ok((text, _)) = snapshot_with_stats(&store, input) else {
+    let store_for_snapshot = store.clone();
+    let snapshot_outcome = block_on_worker(Duration::from_secs(30), move |ctx| {
+        let session = ctx.session()?;
+        snapshot_with_stats(session, &store_for_snapshot, input, ctx.deadline)
+    });
+    let Ok((text, _)) = (match snapshot_outcome {
+        WorkerOutcome::Ok(value) => Ok(value),
+        WorkerOutcome::Err(error) => Err(error),
+        WorkerOutcome::TimedOut => Err(crate::capabilities::path_utils::CommandError::new(
+            "snapshot_timeout",
+            "snapshot timed out before resolve",
+        )),
+    }) else {
         return summarize(
             "resolve",
             fixture,
@@ -146,11 +192,16 @@ fn bench_resolve(fixture: &str, hwnd: i64) -> BenchSummary {
 
     let mut samples = Vec::with_capacity(RUNS);
     for _ in 0..RUNS {
+        let store_for_worker = store.clone();
+        let reference_for_worker = reference.clone();
         let started = Instant::now();
-        let result = resolve_reference_with_stats(&store, &reference);
+        let outcome = block_on_worker(Duration::from_secs(10), move |ctx| {
+            let session = ctx.session()?;
+            resolve_reference_with_stats(session, &store_for_worker, &reference_for_worker)
+        });
         let duration_ms = started.elapsed().as_millis() as u64;
-        match result {
-            Ok(stats) => {
+        match outcome {
+            WorkerOutcome::Ok(stats) => {
                 samples.push(BenchSample {
                     tool: "resolve",
                     fixture: fixture.to_string(),
@@ -161,7 +212,7 @@ fn bench_resolve(fixture: &str, hwnd: i64) -> BenchSummary {
                     error: None,
                 });
             }
-            Err(error) => {
+            WorkerOutcome::Err(error) => {
                 samples.push(BenchSample {
                     tool: "resolve",
                     fixture: fixture.to_string(),
@@ -170,6 +221,17 @@ fn bench_resolve(fixture: &str, hwnd: i64) -> BenchSummary {
                     emitted: 0,
                     ok: false,
                     error: Some(format!("{}: {}", error.code, error.message)),
+                });
+            }
+            WorkerOutcome::TimedOut => {
+                samples.push(BenchSample {
+                    tool: "resolve",
+                    fixture: fixture.to_string(),
+                    duration_ms,
+                    nodes_visited: 0,
+                    emitted: 0,
+                    ok: false,
+                    error: Some("timed out".to_string()),
                 });
             }
         }

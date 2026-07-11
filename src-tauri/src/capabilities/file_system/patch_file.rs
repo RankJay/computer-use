@@ -19,10 +19,9 @@ fn map_patch_error(error: PatchError) -> CommandError {
         PatchError::InvalidDiff => {
             CommandError::new("patch_invalid_diff", "Patch is not a valid unified diff")
         }
-        PatchError::MultiFileDiff => CommandError::new(
-            "patch_invalid_diff",
-            "Patch must modify a single file",
-        ),
+        PatchError::MultiFileDiff => {
+            CommandError::new("patch_invalid_diff", "Patch must modify a single file")
+        }
         PatchError::TargetMismatch => CommandError::new(
             "patch_invalid_diff",
             "Patch target does not match the requested path",
@@ -66,7 +65,10 @@ pub fn patch_file(
     }
 
     fs::write(&resolved, patched).map_err(|error| {
-        CommandError::new("write_failed", format!("Failed to write patched file: {error}"))
+        CommandError::new(
+            "write_failed",
+            format!("Failed to write patched file: {error}"),
+        )
     })?;
 
     Ok(PatchFileResult {

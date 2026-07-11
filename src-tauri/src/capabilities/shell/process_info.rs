@@ -35,7 +35,10 @@ fn cpu_percent_from_deltas(cpu_seconds: f64, wall: Duration) -> Option<f64> {
 #[tauri::command]
 pub fn process_info(pid: u32) -> Result<ProcessInfoResult, CommandError> {
     if pid == 0 {
-        return Err(CommandError::new("invalid_pid", "Process id must not be zero"));
+        return Err(CommandError::new(
+            "invalid_pid",
+            "Process id must not be zero",
+        ));
     }
 
     #[cfg(target_os = "windows")]
@@ -64,16 +67,13 @@ pub fn process_info(pid: u32) -> Result<ProcessInfoResult, CommandError> {
 
 #[cfg(target_os = "windows")]
 fn filetime_to_seconds(filetime: windows::Win32::Foundation::FILETIME) -> f64 {
-    let ticks =
-        (u64::from(filetime.dwHighDateTime) << 32) | u64::from(filetime.dwLowDateTime);
+    let ticks = (u64::from(filetime.dwHighDateTime) << 32) | u64::from(filetime.dwLowDateTime);
     // FILETIME is 100-nanosecond intervals
     ticks as f64 / 10_000_000.0
 }
 
 #[cfg(target_os = "windows")]
-fn process_cpu_seconds(
-    process: windows::Win32::Foundation::HANDLE,
-) -> Result<f64, CommandError> {
+fn process_cpu_seconds(process: windows::Win32::Foundation::HANDLE) -> Result<f64, CommandError> {
     use windows::Win32::Foundation::FILETIME;
     use windows::Win32::System::Threading::GetProcessTimes;
 
@@ -109,14 +109,13 @@ fn process_info_windows(pid: u32) -> Result<ProcessInfoResult, CommandError> {
     };
 
     unsafe {
-        let process = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, false, pid).map_err(
-            |error| {
+        let process = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, false, pid)
+            .map_err(|error| {
                 CommandError::new(
                     "process_not_found",
                     format!("Could not open process {pid}: {error}"),
                 )
-            },
-        )?;
+            })?;
 
         let mut buffer = [0u16; 1024];
         let mut size = buffer.len() as u32;
@@ -188,20 +187,26 @@ fn linux_cpu_jiffies(pid: u32) -> Result<u64, CommandError> {
             CommandError::new("process_info_failed", "Unexpected /proc/pid/stat format")
         })?;
     let mut fields = after_comm.split_whitespace();
-    // After ')': state(1) ... utime is field 14 of full stat = index 11 after state? 
+    // After ')': state(1) ... utime is field 14 of full stat = index 11 after state?
     // Full: pid (comm) state ppid ... utime(14) stime(15)
     // After ') ': field[0]=state, [1]=ppid, ... [11]=utime, [12]=stime
     let utime = fields
         .nth(11)
         .and_then(|v| v.parse::<u64>().ok())
         .ok_or_else(|| {
-            CommandError::new("process_info_failed", "Failed to parse utime from /proc/pid/stat")
+            CommandError::new(
+                "process_info_failed",
+                "Failed to parse utime from /proc/pid/stat",
+            )
         })?;
     let stime = fields
         .next()
         .and_then(|v| v.parse::<u64>().ok())
         .ok_or_else(|| {
-            CommandError::new("process_info_failed", "Failed to parse stime from /proc/pid/stat")
+            CommandError::new(
+                "process_info_failed",
+                "Failed to parse stime from /proc/pid/stat",
+            )
         })?;
     Ok(utime.saturating_add(stime))
 }
@@ -320,10 +325,7 @@ fn process_info_macos(pid: u32) -> Result<ProcessInfoResult, CommandError> {
         .args(["-p", &pid.to_string(), "-o", "comm=,rss="])
         .output()
         .map_err(|error| {
-            CommandError::new(
-                "process_info_failed",
-                format!("Failed to run ps: {error}"),
-            )
+            CommandError::new("process_info_failed", format!("Failed to run ps: {error}"))
         })?;
 
     if !output.status.success() {

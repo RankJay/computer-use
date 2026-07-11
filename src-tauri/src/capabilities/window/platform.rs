@@ -42,11 +42,17 @@ mod windows_impl {
 
     pub fn hwnd_from_i64(hwnd: i64) -> Result<HWND, CommandError> {
         if hwnd == 0 {
-            return Err(CommandError::new("invalid_hwnd", "Window handle must not be zero"));
+            return Err(CommandError::new(
+                "invalid_hwnd",
+                "Window handle must not be zero",
+            ));
         }
         let handle = HWND(hwnd as isize as *mut _);
         if !unsafe { IsWindow(Some(handle)).as_bool() } {
-            return Err(CommandError::new("invalid_hwnd", "Window handle is not valid"));
+            return Err(CommandError::new(
+                "invalid_hwnd",
+                "Window handle is not valid",
+            ));
         }
         Ok(handle)
     }
@@ -83,9 +89,7 @@ mod windows_impl {
     }
 
     pub fn list_windows_impl() -> Result<WindowListResult, CommandError> {
-        let mut collector = WindowCollector {
-            lines: Vec::new(),
-        };
+        let mut collector = WindowCollector { lines: Vec::new() };
         unsafe {
             EnumWindows(
                 Some(enum_visible_window),

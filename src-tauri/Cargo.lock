@@ -23,6 +23,7 @@ dependencies = [
  "tauri-plugin-stronghold",
  "tauri-plugin-window-state",
  "time",
+ "tokio",
  "uiautomation",
  "walkdir",
  "windows 0.62.2",

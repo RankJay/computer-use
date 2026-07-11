@@ -13,7 +13,9 @@ pub fn temp_workspace() -> (PathBuf, PathBuf) {
             .unwrap_or(0)
     ));
     let _ = fs::create_dir_all(&cleanup_path);
-    let root = cleanup_path.canonicalize().expect("canonicalize temp workspace");
+    let root = cleanup_path
+        .canonicalize()
+        .expect("canonicalize temp workspace");
     (root, cleanup_path)
 }
 

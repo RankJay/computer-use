@@ -49,7 +49,10 @@ fn list_processes_windows() -> Result<ProcessListResult, CommandError> {
 
     unsafe {
         let snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0).map_err(|error| {
-            CommandError::new("process_enum_failed", format!("Failed to snapshot processes: {error}"))
+            CommandError::new(
+                "process_enum_failed",
+                format!("Failed to snapshot processes: {error}"),
+            )
         })?;
 
         let mut entry = PROCESSENTRY32W {
@@ -133,10 +136,7 @@ fn list_processes_macos() -> Result<ProcessListResult, CommandError> {
         .args(["-ax", "-o", "pid=,comm="])
         .output()
         .map_err(|error| {
-            CommandError::new(
-                "process_enum_failed",
-                format!("Failed to run ps: {error}"),
-            )
+            CommandError::new("process_enum_failed", format!("Failed to run ps: {error}"))
         })?;
 
     if !output.status.success() {

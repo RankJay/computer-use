@@ -1,13 +1,13 @@
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use uiautomation::controls::WindowControl;
-use uiautomation::core::{UIAutomation, UIElement, UIMatcherMode};
+use uiautomation::core::{UIAutomation, UIElement, UIMatcherMode, UITreeWalker};
 use uiautomation::errors::ERR_NOTFOUND;
 use uiautomation::patterns::{
-    UIExpandCollapsePattern, UIInvokePattern, UILegacyIAccessiblePattern, UIRangeValuePattern,
-    UIScrollItemPattern, UIScrollPattern, UISelectionItemPattern, UITogglePattern, UIValuePattern,
-    UIPatternType,
+    UIExpandCollapsePattern, UIInvokePattern, UILegacyIAccessiblePattern, UIPatternType,
+    UIRangeValuePattern, UIScrollItemPattern, UIScrollPattern, UISelectionItemPattern,
+    UITogglePattern, UIValuePattern,
 };
 use uiautomation::types::{ControlType, Handle, ScrollAmount, TreeScope, UIProperty};
 use uiautomation::variants::{Value, Variant};
@@ -19,8 +19,8 @@ use crate::capabilities::path_utils::CommandError;
 use super::budget::{SearchBudget, FIND_MAX_NODES, SNAPSHOT_MAX_NODES};
 use super::state::{make_reference, SnapshotStore, StoredElement};
 use super::types::{
-    ActionResult, FindElementInput, GetValueResult, MAX_FIND_CANDIDATES, MAX_WAIT_MS, SnapshotInput,
-    TextResult, WAIT_POLL_MS,
+    ActionResult, FindElementInput, GetValueResult, SnapshotInput, TextResult, MAX_FIND_CANDIDATES,
+    WAIT_POLL_MS,
 };
 
 fn process_id_for_hwnd(hwnd: i64) -> Option<u32> {
@@ -65,18 +65,21 @@ pub struct SnapshotStats {
 }
 
 pub fn snapshot_impl(
+    session: &UiaSession,
     store: &SnapshotStore,
     input: SnapshotInput,
+    deadline: Instant,
 ) -> Result<TextResult, CommandError> {
-    Ok(snapshot_with_stats(store, input)?.0)
+    Ok(snapshot_with_stats(session, store, input, deadline)?.0)
 }
 
 #[cfg_attr(not(feature = "a11y-bench"), allow(dead_code))]
 pub fn snapshot_with_stats(
+    session: &UiaSession,
     store: &SnapshotStore,
     input: SnapshotInput,
+    deadline: Instant,
 ) -> Result<(TextResult, SnapshotStats), CommandError> {
-    let session = UiaSession::new()?;
     let handle = hwnd_from_i64(input.hwnd)?;
     let root = session
         .automation
@@ -93,23 +96,18 @@ pub fn snapshot_with_stats(
         ));
     }
 
-    let budget_ms = if store.is_first_process_touch(process_id) {
-        super::types::TIMEOUT_SNAPSHOT_FIRST_TOUCH_MS
-    } else {
-        super::types::TIMEOUT_SNAPSHOT_MS
-    };
+    let _ = store.is_first_process_touch(process_id);
 
     let generation = store.begin_generation(input.hwnd);
-    let mut budget = SearchBudget::for_duration(Duration::from_millis(budget_ms), SNAPSHOT_MAX_NODES);
-    let mut builder = OutlineBuilder::new(store, input.hwnd, generation, process_id, input.max_elements);
-    builder.walk(
-        &session,
-        &root,
-        0,
-        input.max_depth,
-        false,
-        &mut budget,
-    )?;
+    let mut budget = SearchBudget::until(deadline, SNAPSHOT_MAX_NODES);
+    let mut builder = OutlineBuilder::new(
+        store,
+        input.hwnd,
+        generation,
+        process_id,
+        input.max_elements,
+    );
+    builder.walk(session, &root, 0, input.max_depth, false, &mut budget)?;
 
     let stats = SnapshotStats {
         nodes_visited: budget.nodes_visited(),
@@ -125,27 +123,25 @@ pub fn snapshot_with_stats(
 }
 
 pub fn find_element_impl(
+    session: &UiaSession,
     store: &SnapshotStore,
     input: FindElementInput,
+    deadline: Instant,
 ) -> Result<TextResult, CommandError> {
-    let wait_ms = input.wait_ms.min(MAX_WAIT_MS);
-    let total_ms = super::types::TIMEOUT_FIND_MS.saturating_add(wait_ms);
-    let deadline = std::time::Instant::now() + Duration::from_millis(total_ms);
-
     loop {
-        let remaining = deadline.saturating_duration_since(std::time::Instant::now());
+        let remaining = deadline.saturating_duration_since(Instant::now());
         if remaining.is_zero() {
             return Ok(empty_find_result(store, input.hwnd));
         }
 
-        match find_element_once(store, &input, deadline) {
+        match find_element_once(session, store, &input, deadline) {
             Ok(result) if !result.text.is_empty() => return Ok(result),
-            Ok(result) if std::time::Instant::now() >= deadline => return Ok(result),
+            Ok(result) if Instant::now() >= deadline => return Ok(result),
             Err(error) if error.code == "target_degraded" => return Err(error),
-            Err(error) if std::time::Instant::now() >= deadline => return Err(error),
-            Ok(_) | Err(_) => thread::sleep(Duration::from_millis(WAIT_POLL_MS.min(
-                remaining.as_millis() as u64,
-            ))),
+            Err(error) if Instant::now() >= deadline => return Err(error),
+            Ok(_) | Err(_) => thread::sleep(Duration::from_millis(
+                WAIT_POLL_MS.min(remaining.as_millis() as u64),
+            )),
         }
     }
 }
@@ -159,11 +155,11 @@ fn empty_find_result(store: &SnapshotStore, hwnd: i64) -> TextResult {
 }
 
 fn find_element_once(
+    session: &UiaSession,
     store: &SnapshotStore,
     input: &FindElementInput,
-    deadline: std::time::Instant,
+    deadline: Instant,
 ) -> Result<TextResult, CommandError> {
-    let session = UiaSession::new()?;
     let handle = hwnd_from_i64(input.hwnd)?;
     let root = session
         .automation
@@ -188,36 +184,21 @@ fn find_element_once(
         ));
     }
 
-    let role_filter = input
-        .role
-        .as_deref()
-        .map(parse_role)
-        .transpose()?;
+    let role_filter = input.role.as_deref().map(parse_role).transpose()?;
 
-    let search_root = find_web_search_root(&session, &root);
-    let mut matches = find_elements_via_matcher(
-        &session,
-        &search_root,
-        name_filter,
-        role_filter,
-        deadline,
-    )?;
+    let search_root = find_web_search_root(session, &root);
+    let mut matches =
+        find_elements_via_matcher(session, &search_root, name_filter, role_filter, deadline)?;
 
     if matches.is_empty() && role_filter.is_some() {
-        matches = find_elements_via_matcher(
-            &session,
-            &search_root,
-            name_filter,
-            None,
-            deadline,
-        )?;
+        matches = find_elements_via_matcher(session, &search_root, name_filter, None, deadline)?;
     }
 
     if matches.is_empty() {
         let name_filter_lower = name_filter.to_lowercase();
         let mut budget = SearchBudget::until(deadline, FIND_MAX_NODES);
         let mut finder = ElementFinder::new(&name_filter_lower, role_filter);
-        finder.search(&session, &search_root, 0, FIND_WALK_MAX_DEPTH, &mut budget)?;
+        finder.search(session, &search_root, 0, FIND_WALK_MAX_DEPTH, &mut budget)?;
         matches = finder.matches;
     }
 
@@ -226,7 +207,7 @@ fn find_element_once(
     let generation = store.begin_generation(input.hwnd);
     let mut lines = Vec::new();
     for (index, element) in matches.into_iter().take(MAX_FIND_CANDIDATES).enumerate() {
-        let reference = make_reference((index + 1) as u32, generation);
+        let reference = make_reference((index + 1) as u32, generation, input.hwnd);
         let runtime_id =
             element_runtime_id(&element).map_err(|error| map_uia_error(error, "find_failed"))?;
         let (name, role) = element_storage_hints(&element);
@@ -318,17 +299,18 @@ fn matcher_error_is_empty(error: &uiautomation::Error) -> bool {
     error.code() == ERR_NOTFOUND
 }
 
-pub fn expand_node_impl(store: &SnapshotStore, reference: &str) -> Result<TextResult, CommandError> {
+pub fn expand_node_impl(
+    session: &UiaSession,
+    store: &SnapshotStore,
+    reference: &str,
+    deadline: Instant,
+) -> Result<TextResult, CommandError> {
     let stored = store.resolve_ref_or_stale(reference)?;
-    let session = UiaSession::new()?;
-    let element = resolve_stored_element(&session, &stored)?;
+    let element = resolve_stored_element(session, &stored)?;
     let generation = store.begin_generation(stored.hwnd);
     let mut builder = OutlineBuilder::new(store, stored.hwnd, generation, stored.process_id, 150);
-    let mut budget = SearchBudget::for_duration(
-        Duration::from_millis(super::types::TIMEOUT_EXPAND_MS),
-        SNAPSHOT_MAX_NODES,
-    );
-    builder.walk(&session, &element, 0, 10, true, &mut budget)?;
+    let mut budget = SearchBudget::until(deadline, SNAPSHOT_MAX_NODES);
+    builder.walk(session, &element, 0, 10, true, &mut budget)?;
 
     Ok(TextResult {
         text: builder.finish(),
@@ -336,17 +318,18 @@ pub fn expand_node_impl(store: &SnapshotStore, reference: &str) -> Result<TextRe
     })
 }
 
-pub fn click_impl(store: &SnapshotStore, reference: &str) -> Result<ActionResult, CommandError> {
+pub fn click_impl(
+    session: &UiaSession,
+    store: &SnapshotStore,
+    reference: &str,
+) -> Result<ActionResult, CommandError> {
     let stored = store.resolve_ref_or_stale(reference)?;
-    let session = UiaSession::new()?;
-    let element = resolve_stored_element(&session, &stored)?;
-    let foregrounded = foreground_window(&session, stored.hwnd)?;
-    let target = resolve_click_target(&session, &element)?;
+    let element = resolve_stored_element(session, &stored)?;
+    let foregrounded = foreground_window(session, stored.hwnd)?;
+    let target = resolve_click_target(session, &element)?;
     prepare_for_click(&target)?;
 
-    let control_type = target
-        .get_control_type()
-        .unwrap_or(ControlType::Custom);
+    let control_type = target.get_control_type().unwrap_or(ControlType::Custom);
 
     if control_type == ControlType::Hyperlink {
         if let Some(result) = try_legacy_action(&target, foregrounded) {
@@ -393,15 +376,17 @@ fn prepare_for_click(element: &UIElement) -> Result<(), CommandError> {
     Ok(())
 }
 
-fn resolve_click_target(session: &UiaSession, element: &UIElement) -> Result<UIElement, CommandError> {
+fn resolve_click_target(
+    session: &UiaSession,
+    element: &UIElement,
+) -> Result<UIElement, CommandError> {
     let mut chain = vec![element.clone()];
     let mut current = element.clone();
     for _ in 0..8 {
-        let walker = session
-            .automation
-            .get_control_view_walker()
-            .map_err(|error| map_uia_error(error, "click_failed"))?;
-        match walker.get_parent_build_cache(&current, &session.cache_request) {
+        match session
+            .control_walker
+            .get_parent_build_cache(&current, &session.cache_request)
+        {
             Ok(parent) => {
                 chain.push(parent.clone());
                 current = parent;
@@ -442,7 +427,10 @@ fn is_preferred_click_target(element: &UIElement) -> bool {
         || element.get_pattern::<UILegacyIAccessiblePattern>().is_ok()
 }
 
-fn try_invoke(element: &UIElement, foregrounded: bool) -> Option<Result<ActionResult, CommandError>> {
+fn try_invoke(
+    element: &UIElement,
+    foregrounded: bool,
+) -> Option<Result<ActionResult, CommandError>> {
     let pattern = element.get_pattern::<UIInvokePattern>().ok()?;
     match pattern.invoke() {
         Ok(()) => Some(Ok(ActionResult {
@@ -455,7 +443,10 @@ fn try_invoke(element: &UIElement, foregrounded: bool) -> Option<Result<ActionRe
     }
 }
 
-fn try_toggle(element: &UIElement, foregrounded: bool) -> Option<Result<ActionResult, CommandError>> {
+fn try_toggle(
+    element: &UIElement,
+    foregrounded: bool,
+) -> Option<Result<ActionResult, CommandError>> {
     let pattern = element.get_pattern::<UITogglePattern>().ok()?;
     match pattern.toggle() {
         Ok(()) => Some(Ok(ActionResult {
@@ -528,14 +519,14 @@ fn find_candidate_priority(element: &UIElement) -> (i32, i32) {
 }
 
 pub fn set_value_impl(
+    session: &UiaSession,
     store: &SnapshotStore,
     reference: &str,
     text: &str,
 ) -> Result<ActionResult, CommandError> {
     let stored = store.resolve_ref_or_stale(reference)?;
-    let session = UiaSession::new()?;
-    let element = resolve_stored_element(&session, &stored)?;
-    let foregrounded = foreground_window(&session, stored.hwnd)?;
+    let element = resolve_stored_element(session, &stored)?;
+    let foregrounded = foreground_window(session, stored.hwnd)?;
 
     if let Ok(pattern) = element.get_pattern::<UIValuePattern>() {
         pattern
@@ -573,6 +564,7 @@ pub fn set_value_impl(
 }
 
 pub fn send_keys_impl(
+    session: &UiaSession,
     store: &SnapshotStore,
     hwnd: i64,
     text: &str,
@@ -582,8 +574,7 @@ pub fn send_keys_impl(
         return Err(CommandError::new("invalid_input", "text must not be empty"));
     }
 
-    let session = UiaSession::new()?;
-    let foregrounded = foreground_window(&session, hwnd)?;
+    let foregrounded = foreground_window(session, hwnd)?;
     let element = if let Some(ref_str) = reference {
         let stored = store.resolve_ref_or_stale(ref_str)?;
         if stored.hwnd != hwnd {
@@ -592,7 +583,7 @@ pub fn send_keys_impl(
                 "reference does not belong to the provided hwnd",
             ));
         }
-        resolve_stored_element(&session, &stored)?
+        resolve_stored_element(session, &stored)?
     } else {
         session
             .automation
@@ -611,11 +602,14 @@ pub fn send_keys_impl(
     })
 }
 
-pub fn focus_impl(store: &SnapshotStore, reference: &str) -> Result<ActionResult, CommandError> {
+pub fn focus_impl(
+    session: &UiaSession,
+    store: &SnapshotStore,
+    reference: &str,
+) -> Result<ActionResult, CommandError> {
     let stored = store.resolve_ref_or_stale(reference)?;
-    let session = UiaSession::new()?;
-    let element = resolve_stored_element(&session, &stored)?;
-    let foregrounded = foreground_window(&session, stored.hwnd)?;
+    let element = resolve_stored_element(session, &stored)?;
+    let foregrounded = foreground_window(session, stored.hwnd)?;
     element
         .set_focus()
         .map_err(|error| map_uia_error(error, "focus_failed"))?;
@@ -626,10 +620,13 @@ pub fn focus_impl(store: &SnapshotStore, reference: &str) -> Result<ActionResult
     })
 }
 
-pub fn get_value_impl(store: &SnapshotStore, reference: &str) -> Result<GetValueResult, CommandError> {
+pub fn get_value_impl(
+    session: &UiaSession,
+    store: &SnapshotStore,
+    reference: &str,
+) -> Result<GetValueResult, CommandError> {
     let stored = store.resolve_ref_or_stale(reference)?;
-    let session = UiaSession::new()?;
-    let element = resolve_stored_element(&session, &stored)?;
+    let element = resolve_stored_element(session, &stored)?;
 
     if let Ok(pattern) = element.get_pattern::<UIValuePattern>() {
         if let Ok(value) = pattern.get_value() {
@@ -684,17 +681,17 @@ pub fn get_value_impl(store: &SnapshotStore, reference: &str) -> Result<GetValue
 }
 
 pub fn scroll_element_impl(
+    session: &UiaSession,
     store: &SnapshotStore,
     reference: &str,
     direction: &str,
     amount: &str,
 ) -> Result<ActionResult, CommandError> {
     let stored = store.resolve_ref_or_stale(reference)?;
-    let session = UiaSession::new()?;
-    let element = resolve_stored_element(&session, &stored)?;
-    let foregrounded = foreground_window(&session, stored.hwnd)?;
+    let element = resolve_stored_element(session, &stored)?;
+    let foregrounded = foreground_window(session, stored.hwnd)?;
     let (horizontal, vertical) = scroll_amounts(direction, amount)?;
-    let target = find_scrollable_element(&session, &element)?;
+    let target = find_scrollable_element(session, &element)?;
 
     target
         .get_pattern::<UIScrollPattern>()
@@ -710,13 +707,13 @@ pub fn scroll_element_impl(
 }
 
 pub fn right_click_element_impl(
+    session: &UiaSession,
     store: &SnapshotStore,
     reference: &str,
 ) -> Result<ActionResult, CommandError> {
     let stored = store.resolve_ref_or_stale(reference)?;
-    let session = UiaSession::new()?;
-    let element = resolve_stored_element(&session, &stored)?;
-    let foregrounded = foreground_window(&session, stored.hwnd)?;
+    let element = resolve_stored_element(session, &stored)?;
+    let foregrounded = foreground_window(session, stored.hwnd)?;
     prepare_for_click(&element)?;
     element
         .right_click()
@@ -729,14 +726,14 @@ pub fn right_click_element_impl(
 }
 
 pub fn invoke_action_impl(
+    session: &UiaSession,
     store: &SnapshotStore,
     reference: &str,
     action: &str,
 ) -> Result<ActionResult, CommandError> {
     let stored = store.resolve_ref_or_stale(reference)?;
-    let session = UiaSession::new()?;
-    let element = resolve_stored_element(&session, &stored)?;
-    let foregrounded = foreground_window(&session, stored.hwnd)?;
+    let element = resolve_stored_element(session, &stored)?;
+    let foregrounded = foreground_window(session, stored.hwnd)?;
     let method = parse_invoke_action(action)?;
 
     match method {
@@ -878,11 +875,10 @@ fn find_scrollable_element(
 
     let mut current = element.clone();
     for _ in 0..8 {
-        let walker = session
-            .automation
-            .get_control_view_walker()
-            .map_err(|error| map_uia_error(error, "scroll_unavailable"))?;
-        match walker.get_parent_build_cache(&current, &session.cache_request) {
+        match session
+            .control_walker
+            .get_parent_build_cache(&current, &session.cache_request)
+        {
             Ok(parent) => {
                 if parent.get_pattern::<UIScrollPattern>().is_ok() {
                     return Ok(parent);
@@ -899,16 +895,17 @@ fn find_scrollable_element(
     ))
 }
 
-struct UiaSession {
-    automation: UIAutomation,
-    cache_request: uiautomation::core::UICacheRequest,
+pub struct UiaSession {
+    pub automation: UIAutomation,
+    pub cache_request: uiautomation::core::UICacheRequest,
+    pub control_walker: UITreeWalker,
 }
 
 impl UiaSession {
-    fn new() -> Result<Self, CommandError> {
-        let automation = UIAutomation::new().map_err(|error| {
-            CommandError::new("uia_init_failed", error.to_string())
-        })?;
+    /// Build the long-lived session on the a11y worker thread after COM is initialized.
+    pub fn init_on_worker_thread() -> Result<Self, CommandError> {
+        let automation = UIAutomation::new_direct()
+            .map_err(|error| CommandError::new("uia_init_failed", error.to_string()))?;
         configure_timeouts(&automation);
 
         let cache_request = automation
@@ -943,9 +940,14 @@ impl UiaSession {
                 .map_err(|error| map_uia_error(error, "uia_init_failed"))?;
         }
 
+        let control_walker = automation
+            .get_control_view_walker()
+            .map_err(|error| map_uia_error(error, "uia_init_failed"))?;
+
         Ok(Self {
             automation,
             cache_request,
+            control_walker,
         })
     }
 }
@@ -1024,7 +1026,7 @@ impl<'a> OutlineBuilder<'a> {
         let collapse = !force_children && should_collapse_control(control_type, depth);
         if is_interactive_or_named(element, control_type)? || collapse {
             self.next_index += 1;
-            let reference = make_reference(self.next_index, self.generation);
+            let reference = make_reference(self.next_index, self.generation, self.hwnd);
             let runtime_id = element_runtime_id(element)
                 .map_err(|error| map_uia_error(error, "snapshot_failed"))?;
             let (name, role) = element_storage_hints(element);
@@ -1037,7 +1039,8 @@ impl<'a> OutlineBuilder<'a> {
                 name,
                 role,
             );
-            self.lines.push(format_element_line(element, depth, &reference)?);
+            self.lines
+                .push(format_element_line(element, depth, &reference)?);
             self.emitted += 1;
         }
 
@@ -1045,10 +1048,7 @@ impl<'a> OutlineBuilder<'a> {
             return Ok(());
         }
 
-        let walker = session
-            .automation
-            .get_control_view_walker()
-            .map_err(|error| map_uia_error(error, "snapshot_failed"))?;
+        let walker = &session.control_walker;
         let mut child = walker
             .get_first_child_build_cache(element, &session.cache_request)
             .ok();
@@ -1112,8 +1112,8 @@ impl<'a> ElementFinder<'a> {
             return Ok(());
         }
 
-        let control_type = element_control_type(element)
-            .map_err(|error| map_uia_error(error, "find_failed"))?;
+        let control_type =
+            element_control_type(element).map_err(|error| map_uia_error(error, "find_failed"))?;
 
         if should_skip_control(control_type) {
             return Ok(());
@@ -1130,10 +1130,7 @@ impl<'a> ElementFinder<'a> {
             return Ok(());
         }
 
-        let walker = session
-            .automation
-            .get_control_view_walker()
-            .map_err(|error| map_uia_error(error, "find_failed"))?;
+        let walker = &session.control_walker;
         let mut child = walker
             .get_first_child_build_cache(element, &session.cache_request)
             .ok();
@@ -1285,12 +1282,12 @@ pub struct ResolveStats {
 /// Resolve a stored reference and return visit stats (for a11y-bench).
 #[cfg_attr(not(feature = "a11y-bench"), allow(dead_code))]
 pub fn resolve_reference_with_stats(
+    session: &UiaSession,
     store: &SnapshotStore,
     reference: &str,
 ) -> Result<ResolveStats, CommandError> {
     let stored = store.resolve_ref_or_stale(reference)?;
-    let session = UiaSession::new()?;
-    Ok(resolve_stored_element_with_stats(&session, &stored)?.1)
+    Ok(resolve_stored_element_with_stats(session, &stored)?.1)
 }
 
 fn resolve_stored_element_with_stats(
@@ -1301,7 +1298,9 @@ fn resolve_stored_element_with_stats(
     for attempt in 0..RESOLVE_RETRY_ATTEMPTS {
         match resolve_stored_element_once(session, stored) {
             Ok(result) => return Ok(result),
-            Err(error) if is_transient_command_error(&error) && attempt + 1 < RESOLVE_RETRY_ATTEMPTS => {
+            Err(error)
+                if is_transient_command_error(&error) && attempt + 1 < RESOLVE_RETRY_ATTEMPTS =>
+            {
                 last_error = Some(error);
                 thread::sleep(Duration::from_millis(
                     TRANSIENT_UIA_RETRY_MS * (attempt as u64 + 1),
@@ -1327,22 +1326,12 @@ fn resolve_stored_element_once(
         .map_err(|error| map_uia_error(error, "resolve_failed"))?;
 
     if let Some(element) = find_by_runtime_id(session, &root, &stored.runtime_id)? {
-        return Ok((
-            element,
-            ResolveStats {
-                nodes_visited: 1,
-            },
-        ));
+        return Ok((element, ResolveStats { nodes_visited: 1 }));
     }
 
     if !stored.name.trim().is_empty() {
         if let Some(element) = resolve_element_by_hints(session, stored, &root) {
-            return Ok((
-                element,
-                ResolveStats {
-                    nodes_visited: 0,
-                },
-            ));
+            return Ok((element, ResolveStats { nodes_visited: 0 }));
         }
     }
 
@@ -1412,16 +1401,14 @@ fn foreground_window(session: &UiaSession, hwnd: i64) -> Result<bool, CommandErr
         .automation
         .element_from_handle(handle)
         .map_err(|error| map_uia_error(error, "focus_denied"))?;
-    let window = WindowControl::try_from(&element)
-        .map_err(|error| map_uia_error(error, "focus_denied"))?;
-    window
-        .set_foregrand()
-        .map_err(|_| {
-            CommandError::new(
-                "focus_denied",
-                "Could not bring target window to foreground",
-            )
-        })
+    let window =
+        WindowControl::try_from(&element).map_err(|error| map_uia_error(error, "focus_denied"))?;
+    window.set_foregrand().map_err(|_| {
+        CommandError::new(
+            "focus_denied",
+            "Could not bring target window to foreground",
+        )
+    })
 }
 
 fn parse_role(role: &str) -> Result<ControlType, CommandError> {
@@ -1448,7 +1435,10 @@ fn parse_role(role: &str) -> Result<ControlType, CommandError> {
     }
 }
 
-fn is_interactive_or_named(element: &UIElement, control_type: ControlType) -> Result<bool, CommandError> {
+fn is_interactive_or_named(
+    element: &UIElement,
+    control_type: ControlType,
+) -> Result<bool, CommandError> {
     if is_interactive_control(control_type) {
         return Ok(true);
     }
@@ -1500,7 +1490,10 @@ fn should_skip_control(control_type: ControlType) -> bool {
 
 fn hwnd_from_i64(hwnd: i64) -> Result<Handle, CommandError> {
     if hwnd == 0 {
-        return Err(CommandError::new("invalid_hwnd", "Window handle must not be zero"));
+        return Err(CommandError::new(
+            "invalid_hwnd",
+            "Window handle must not be zero",
+        ));
     }
     Ok(Handle::from(HWND(hwnd as isize as *mut _)))
 }

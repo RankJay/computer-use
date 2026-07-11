@@ -14,6 +14,7 @@ pub struct SearchBudget {
 }
 
 impl SearchBudget {
+    #[allow(dead_code)]
     pub fn for_duration(duration: Duration, max_nodes: u32) -> Self {
         Self {
             deadline: Instant::now() + duration,

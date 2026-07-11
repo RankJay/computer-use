@@ -23,7 +23,10 @@ pub fn launch(
 ) -> Result<LaunchResult, CommandError> {
     let exe = exe.trim().to_string();
     if exe.is_empty() {
-        return Err(CommandError::new("invalid_exe", "Executable must not be empty"));
+        return Err(CommandError::new(
+            "invalid_exe",
+            "Executable must not be empty",
+        ));
     }
 
     let working_dir = resolve_cwd(cwd.as_deref())?;
@@ -46,10 +49,7 @@ pub fn launch(
     }
 
     let child = command.spawn().map_err(|error| {
-        CommandError::new(
-            "spawn_failed",
-            format!("Failed to launch process: {error}"),
-        )
+        CommandError::new("spawn_failed", format!("Failed to launch process: {error}"))
     })?;
 
     Ok(LaunchResult {

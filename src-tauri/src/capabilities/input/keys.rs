@@ -4,30 +4,33 @@ use crate::capabilities::path_utils::CommandError;
 pub fn parse_key(name: &str) -> Result<u16, CommandError> {
     let key = name.trim().to_ascii_lowercase();
     if key.is_empty() {
-        return Err(CommandError::new("invalid_key", "Key name must not be empty"));
+        return Err(CommandError::new(
+            "invalid_key",
+            "Key name must not be empty",
+        ));
     }
 
     let vk = match key.as_str() {
-        "ctrl" | "control" => 0x11, // VK_CONTROL
-        "shift" => 0x10,            // VK_SHIFT
-        "alt" => 0x12,              // VK_MENU
+        "ctrl" | "control" => 0x11,       // VK_CONTROL
+        "shift" => 0x10,                  // VK_SHIFT
+        "alt" => 0x12,                    // VK_MENU
         "win" | "meta" | "super" => 0x5B, // VK_LWIN
-        "enter" | "return" => 0x0D, // VK_RETURN
-        "tab" => 0x09,              // VK_TAB
-        "escape" | "esc" => 0x1B,   // VK_ESCAPE
-        "space" => 0x20,            // VK_SPACE
-        "backspace" => 0x08,        // VK_BACK
-        "delete" | "del" => 0x2E,   // VK_DELETE
-        "up" => 0x26,               // VK_UP
-        "down" => 0x28,             // VK_DOWN
-        "left" => 0x25,             // VK_LEFT
-        "right" => 0x27,            // VK_RIGHT
-        "home" => 0x24,             // VK_HOME
-        "end" => 0x23,              // VK_END
-        "pageup" | "pgup" => 0x21,  // VK_PRIOR
-        "pagedown" | "pgdn" => 0x22, // VK_NEXT
-        "insert" | "ins" => 0x2D,   // VK_INSERT
-        "capslock" => 0x14,         // VK_CAPITAL
+        "enter" | "return" => 0x0D,       // VK_RETURN
+        "tab" => 0x09,                    // VK_TAB
+        "escape" | "esc" => 0x1B,         // VK_ESCAPE
+        "space" => 0x20,                  // VK_SPACE
+        "backspace" => 0x08,              // VK_BACK
+        "delete" | "del" => 0x2E,         // VK_DELETE
+        "up" => 0x26,                     // VK_UP
+        "down" => 0x28,                   // VK_DOWN
+        "left" => 0x25,                   // VK_LEFT
+        "right" => 0x27,                  // VK_RIGHT
+        "home" => 0x24,                   // VK_HOME
+        "end" => 0x23,                    // VK_END
+        "pageup" | "pgup" => 0x21,        // VK_PRIOR
+        "pagedown" | "pgdn" => 0x22,      // VK_NEXT
+        "insert" | "ins" => 0x2D,         // VK_INSERT
+        "capslock" => 0x14,               // VK_CAPITAL
         "f1" => 0x70,
         "f2" => 0x71,
         "f3" => 0x72,

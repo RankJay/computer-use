@@ -1,5 +1,5 @@
-use std::fs;
 use crate::capabilities::path_utils::{self, CommandError};
+use std::fs;
 
 #[tauri::command]
 pub fn delete_path(path: String, workspace_root: String) -> Result<(), CommandError> {
@@ -15,7 +15,10 @@ pub fn delete_path(path: String, workspace_root: String) -> Result<(), CommandEr
 
     if metadata.is_dir() {
         fs::remove_dir_all(&resolved).map_err(|error| {
-            CommandError::new("delete_failed", format!("Failed to delete directory: {error}"))
+            CommandError::new(
+                "delete_failed",
+                format!("Failed to delete directory: {error}"),
+            )
         })?;
     } else {
         fs::remove_file(&resolved).map_err(|error| {
@@ -61,8 +64,11 @@ mod tests {
     #[test]
     fn rejects_missing_path() {
         let (root, cleanup) = temp_workspace();
-        let error = delete_path("missing.txt".to_string(), root.to_string_lossy().to_string())
-            .expect_err("missing path");
+        let error = delete_path(
+            "missing.txt".to_string(),
+            root.to_string_lossy().to_string(),
+        )
+        .expect_err("missing path");
 
         assert_eq!(error.code, "not_found");
         cleanup_workspace(&cleanup);
@@ -71,9 +77,11 @@ mod tests {
     #[test]
     fn rejects_path_traversal() {
         let (root, cleanup) = temp_workspace();
-        let error =
-            delete_path("../outside.txt".to_string(), root.to_string_lossy().to_string())
-                .expect_err("traversal");
+        let error = delete_path(
+            "../outside.txt".to_string(),
+            root.to_string_lossy().to_string(),
+        )
+        .expect_err("traversal");
 
         assert_eq!(error.code, "path_traversal");
         cleanup_workspace(&cleanup);

@@ -9,7 +9,11 @@ use super::platform::resize_window_impl;
 use super::platform::unsupported_platform;
 
 #[tauri::command]
-pub fn window_resize(hwnd: i64, width: i32, height: i32) -> Result<WindowResizeResult, CommandError> {
+pub fn window_resize(
+    hwnd: i64,
+    width: i32,
+    height: i32,
+) -> Result<WindowResizeResult, CommandError> {
     #[cfg(target_os = "windows")]
     {
         return resize_window_impl(hwnd, width, height);

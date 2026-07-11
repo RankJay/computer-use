@@ -42,6 +42,7 @@ pub struct FindElementInput {
     pub name_contains: String,
     pub role: Option<String>,
     #[serde(default)]
+    #[allow(dead_code)] // encoded into the worker job deadline by commands
     pub wait_ms: u64,
 }
 

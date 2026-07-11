@@ -85,10 +85,13 @@ fn empty_image_result() -> ReadClipboardImageResult {
     }
 }
 
-fn rgba_to_png_base64(width: usize, height: usize, bytes: &[u8]) -> Result<(u32, u32, String), CommandError> {
-    let width_u32 = u32::try_from(width).map_err(|_| {
-        CommandError::new("clipboard_image_invalid", "Image width is out of range")
-    })?;
+fn rgba_to_png_base64(
+    width: usize,
+    height: usize,
+    bytes: &[u8],
+) -> Result<(u32, u32, String), CommandError> {
+    let width_u32 = u32::try_from(width)
+        .map_err(|_| CommandError::new("clipboard_image_invalid", "Image width is out of range"))?;
     let height_u32 = u32::try_from(height).map_err(|_| {
         CommandError::new("clipboard_image_invalid", "Image height is out of range")
     })?;
@@ -96,9 +99,7 @@ fn rgba_to_png_base64(width: usize, height: usize, bytes: &[u8]) -> Result<(u32,
     let expected = width
         .checked_mul(height)
         .and_then(|pixels| pixels.checked_mul(4))
-        .ok_or_else(|| {
-            CommandError::new("clipboard_image_invalid", "Image dimensions overflow")
-        })?;
+        .ok_or_else(|| CommandError::new("clipboard_image_invalid", "Image dimensions overflow"))?;
     if bytes.len() != expected {
         return Err(CommandError::new(
             "clipboard_image_invalid",
@@ -117,9 +118,13 @@ fn rgba_to_png_base64(width: usize, height: usize, bytes: &[u8]) -> Result<(u32,
         ));
     }
 
-    let image: RgbaImage = ImageBuffer::from_raw(width_u32, height_u32, bytes.to_vec()).ok_or_else(
-        || CommandError::new("clipboard_image_invalid", "Failed to build RGBA image buffer"),
-    )?;
+    let image: RgbaImage = ImageBuffer::from_raw(width_u32, height_u32, bytes.to_vec())
+        .ok_or_else(|| {
+            CommandError::new(
+                "clipboard_image_invalid",
+                "Failed to build RGBA image buffer",
+            )
+        })?;
 
     let mut png_bytes = Vec::new();
     image
@@ -305,9 +310,8 @@ pub fn write_clipboard_image(
     }
 
     let image = png_base64_to_image_data(&base64)?;
-    let width = u32::try_from(image.width).map_err(|_| {
-        CommandError::new("clipboard_image_invalid", "Image width is out of range")
-    })?;
+    let width = u32::try_from(image.width)
+        .map_err(|_| CommandError::new("clipboard_image_invalid", "Image width is out of range"))?;
     let height = u32::try_from(image.height).map_err(|_| {
         CommandError::new("clipboard_image_invalid", "Image height is out of range")
     })?;

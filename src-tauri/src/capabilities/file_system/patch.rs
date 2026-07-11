@@ -10,7 +10,11 @@ pub enum PatchError {
     ApplyFailed,
 }
 
-pub fn apply_unified_diff(base: &str, diff: &str, expected_path: &str) -> Result<(String, usize), PatchError> {
+pub fn apply_unified_diff(
+    base: &str,
+    diff: &str,
+    expected_path: &str,
+) -> Result<(String, usize), PatchError> {
     validate_single_file_target(diff, expected_path)?;
 
     let patch = Patch::from_str(diff).map_err(|_| PatchError::InvalidDiff)?;

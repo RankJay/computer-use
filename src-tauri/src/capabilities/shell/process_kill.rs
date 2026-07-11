@@ -12,11 +12,12 @@ pub struct ProcessKillResult {
 }
 
 #[tauri::command]
-pub fn process_kill(pid: Option<u32>, name: Option<String>) -> Result<ProcessKillResult, CommandError> {
+pub fn process_kill(
+    pid: Option<u32>,
+    name: Option<String>,
+) -> Result<ProcessKillResult, CommandError> {
     let has_pid = pid.is_some();
-    let has_name = name
-        .as_ref()
-        .is_some_and(|value| !value.trim().is_empty());
+    let has_name = name.as_ref().is_some_and(|value| !value.trim().is_empty());
 
     if has_pid == has_name {
         return Err(CommandError::new(
@@ -27,7 +28,10 @@ pub fn process_kill(pid: Option<u32>, name: Option<String>) -> Result<ProcessKil
 
     let target_pid = if let Some(pid) = pid {
         if pid == 0 {
-            return Err(CommandError::new("invalid_pid", "Process id must not be zero"));
+            return Err(CommandError::new(
+                "invalid_pid",
+                "Process id must not be zero",
+            ));
         }
         pid
     } else {
@@ -56,7 +60,10 @@ pub fn process_kill(pid: Option<u32>, name: Option<String>) -> Result<ProcessKil
 fn resolve_pid_by_name(name: &str) -> Result<u32, CommandError> {
     let needle = name.trim().to_ascii_lowercase();
     if needle.is_empty() {
-        return Err(CommandError::new("invalid_name", "Process name must not be empty"));
+        return Err(CommandError::new(
+            "invalid_name",
+            "Process name must not be empty",
+        ));
     }
 
     let listed = process_list()?;
@@ -68,7 +75,9 @@ fn resolve_pid_by_name(name: &str) -> Result<u32, CommandError> {
             let pid = parts.next()?.parse::<u32>().ok()?;
             let process_name = parts.next()?.to_string();
             if process_name.to_ascii_lowercase() == needle
-                || process_name.to_ascii_lowercase().ends_with(&format!(".{needle}"))
+                || process_name
+                    .to_ascii_lowercase()
+                    .ends_with(&format!(".{needle}"))
             {
                 Some((pid, process_name))
             } else {
@@ -100,9 +109,7 @@ fn resolve_pid_by_name(name: &str) -> Result<u32, CommandError> {
 #[cfg(target_os = "windows")]
 fn kill_process_windows(pid: u32) -> Result<ProcessKillResult, CommandError> {
     use windows::Win32::Foundation::CloseHandle;
-    use windows::Win32::System::Threading::{
-        OpenProcess, TerminateProcess, PROCESS_TERMINATE,
-    };
+    use windows::Win32::System::Threading::{OpenProcess, TerminateProcess, PROCESS_TERMINATE};
 
     unsafe {
         let process = OpenProcess(PROCESS_TERMINATE, false, pid).map_err(|error| {

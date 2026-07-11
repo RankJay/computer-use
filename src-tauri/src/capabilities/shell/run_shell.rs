@@ -102,10 +102,7 @@ pub fn run_shell(
 
     let started = Instant::now();
     let mut child = command.spawn().map_err(|error| {
-        CommandError::new(
-            "spawn_failed",
-            format!("Failed to start process: {error}"),
-        )
+        CommandError::new("spawn_failed", format!("Failed to start process: {error}"))
     })?;
 
     let stdout_handle = read_stream(child.stdout.take());
@@ -118,12 +115,12 @@ pub fn run_shell(
             .map_err(|error| CommandError::new("wait_failed", format!("Failed to wait: {error}")))?
         {
             Some(status) => {
-                let stdout = stdout_handle
-                    .join()
-                    .map_err(|_| CommandError::new("read_output_failed", "stdout reader panicked"))??;
-                let stderr = stderr_handle
-                    .join()
-                    .map_err(|_| CommandError::new("read_output_failed", "stderr reader panicked"))??;
+                let stdout = stdout_handle.join().map_err(|_| {
+                    CommandError::new("read_output_failed", "stdout reader panicked")
+                })??;
+                let stderr = stderr_handle.join().map_err(|_| {
+                    CommandError::new("read_output_failed", "stderr reader panicked")
+                })??;
 
                 return Ok(RunShellResult {
                     exit_code: status.code().unwrap_or(-1),

@@ -164,7 +164,8 @@ mod tests {
         let (root, cleanup) = temp_workspace();
         fs::create_dir(root.join("dir")).expect("create dir");
 
-        let result = stat_path("dir".to_string(), root.to_string_lossy().to_string()).expect("stat");
+        let result =
+            stat_path("dir".to_string(), root.to_string_lossy().to_string()).expect("stat");
 
         assert_eq!(result.kind, "directory");
         assert_eq!(result.size_bytes, 0);
@@ -179,8 +180,8 @@ mod tests {
         #[cfg(windows)]
         {
             fs::write(root.join("tool.exe"), "mz").expect("write exe");
-            let result =
-                stat_path("tool.exe".to_string(), root.to_string_lossy().to_string()).expect("stat");
+            let result = stat_path("tool.exe".to_string(), root.to_string_lossy().to_string())
+                .expect("stat");
             assert!(result.executable);
         }
 

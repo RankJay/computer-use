@@ -1,5 +1,5 @@
-use std::fs;
 use serde::Serialize;
+use std::fs;
 
 use crate::capabilities::path_utils::{self, CommandError};
 
@@ -32,7 +32,10 @@ fn entry_kind(metadata: &fs::Metadata) -> &'static str {
 }
 
 #[tauri::command]
-pub fn read_directory(path: String, workspace_root: String) -> Result<ReadDirectoryResult, CommandError> {
+pub fn read_directory(
+    path: String,
+    workspace_root: String,
+) -> Result<ReadDirectoryResult, CommandError> {
     let resolved = path_utils::resolve_workspace_path(&workspace_root, &path)?;
 
     if !resolved.exists() {
@@ -48,16 +51,16 @@ pub fn read_directory(path: String, workspace_root: String) -> Result<ReadDirect
 
     let mut entries = Vec::new();
     for entry in fs::read_dir(&resolved).map_err(|error| {
-        CommandError::new(
-            "read_failed",
-            format!("Failed to read directory: {error}"),
-        )
+        CommandError::new("read_failed", format!("Failed to read directory: {error}"))
     })? {
         let entry = entry.map_err(|error| {
             CommandError::new("read_failed", format!("Failed to read entry: {error}"))
         })?;
         let metadata = entry.metadata().map_err(|error| {
-            CommandError::new("read_failed", format!("Failed to read entry metadata: {error}"))
+            CommandError::new(
+                "read_failed",
+                format!("Failed to read entry metadata: {error}"),
+            )
         })?;
 
         entries.push(DirectoryEntry {
@@ -101,7 +104,11 @@ mod tests {
             read_directory(".".to_string(), root.to_string_lossy().to_string()).expect("read dir");
 
         assert_eq!(
-            result.entries.iter().map(|entry| entry.name.as_str()).collect::<Vec<_>>(),
+            result
+                .entries
+                .iter()
+                .map(|entry| entry.name.as_str())
+                .collect::<Vec<_>>(),
             vec!["a.txt", "b.txt", "dir"]
         );
         cleanup_workspace(&cleanup);

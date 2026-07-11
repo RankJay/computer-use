@@ -38,10 +38,10 @@ mod windows_impl {
     use std::time::Duration;
 
     use windows::Win32::UI::Input::KeyboardAndMouse::{
-        SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, INPUT_MOUSE, KEYBD_EVENT_FLAGS, KEYBDINPUT,
-        KEYEVENTF_KEYUP, MOUSE_EVENT_FLAGS, MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP,
+        SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, INPUT_MOUSE, KEYBDINPUT, KEYBD_EVENT_FLAGS,
+        KEYEVENTF_KEYUP, MOUSEEVENTF_HWHEEL, MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP,
         MOUSEEVENTF_MIDDLEDOWN, MOUSEEVENTF_MIDDLEUP, MOUSEEVENTF_RIGHTDOWN, MOUSEEVENTF_RIGHTUP,
-        MOUSEEVENTF_HWHEEL, MOUSEEVENTF_WHEEL, MOUSEINPUT, VIRTUAL_KEY,
+        MOUSEEVENTF_WHEEL, MOUSEINPUT, MOUSE_EVENT_FLAGS, VIRTUAL_KEY,
     };
     use windows::Win32::UI::WindowsAndMessaging::{
         GetSystemMetrics, SetCursorPos, SM_CXSCREEN, SM_CYSCREEN, WHEEL_DELTA,
@@ -56,18 +56,13 @@ mod windows_impl {
         let sent = unsafe {
             SendInput(
                 inputs,
-                size_of::<INPUT>()
-                    .try_into()
-                    .expect("INPUT size fits i32"),
+                size_of::<INPUT>().try_into().expect("INPUT size fits i32"),
             )
         };
         if sent as usize != inputs.len() {
             return Err(CommandError::new(
                 "send_input_failed",
-                format!(
-                    "SendInput accepted {sent} of {} events",
-                    inputs.len()
-                ),
+                format!("SendInput accepted {sent} of {} events", inputs.len()),
             ));
         }
         Ok(())
@@ -409,7 +404,10 @@ mod tests {
         assert_eq!(MouseButton::parse("left").unwrap(), MouseButton::Left);
         assert_eq!(MouseButton::parse("RIGHT").unwrap(), MouseButton::Right);
         assert_eq!(MouseButton::parse("middle").unwrap(), MouseButton::Middle);
-        assert_eq!(MouseButton::parse("other").unwrap_err().code, "invalid_button");
+        assert_eq!(
+            MouseButton::parse("other").unwrap_err().code,
+            "invalid_button"
+        );
     }
 
     #[test]

@@ -22,9 +22,7 @@ fn read_hostname() -> Option<String> {
 }
 
 fn read_username() -> Option<String> {
-    env::var("USERNAME")
-        .ok()
-        .or_else(|| env::var("USER").ok())
+    env::var("USERNAME").ok().or_else(|| env::var("USER").ok())
 }
 
 fn run_command_detail(program: &str, args: &[&str]) -> Option<String> {
@@ -44,14 +42,12 @@ fn run_command_detail(program: &str, args: &[&str]) -> Option<String> {
 fn platform_detail() -> String {
     #[cfg(target_os = "windows")]
     {
-        return run_command_detail("cmd", &["/C", "ver"])
-            .unwrap_or_else(|| "Windows".to_string());
+        return run_command_detail("cmd", &["/C", "ver"]).unwrap_or_else(|| "Windows".to_string());
     }
 
     #[cfg(target_os = "macos")]
     {
-        return run_command_detail("sw_vers", &[])
-            .unwrap_or_else(|| "macOS".to_string());
+        return run_command_detail("sw_vers", &[]).unwrap_or_else(|| "macOS".to_string());
     }
 
     #[cfg(target_os = "linux")]
