@@ -1,16 +1,22 @@
 import type { AppSettings } from "@/lib/settings/types";
 
 import { accessibilityClickCapability } from "./accessibility/click";
-import { accessibilityExpandNodeCapability } from "./accessibility/expand-node";
+import { accessibilityElementAtPointCapability } from "./accessibility/element-at-point";
 import { accessibilityFindElementCapability } from "./accessibility/find-element";
 import { accessibilityFocusCapability } from "./accessibility/focus";
+import { accessibilityGetFocusedCapability } from "./accessibility/get-focused";
+import { accessibilityGetSelectionCapability } from "./accessibility/get-selection";
+import { accessibilityGetTextCapability } from "./accessibility/get-text";
 import { accessibilityGetValueCapability } from "./accessibility/get-value";
+import { accessibilityInspectCapability } from "./accessibility/inspect";
 import { accessibilityInvokeActionCapability } from "./accessibility/invoke-action";
+import { accessibilityQueryCapability } from "./accessibility/query";
 import { accessibilityRightClickCapability } from "./accessibility/right-click";
 import { accessibilityScrollElementCapability } from "./accessibility/scroll-element";
 import { accessibilitySendKeysCapability } from "./accessibility/send-keys";
 import { accessibilitySetValueCapability } from "./accessibility/set-value";
 import { accessibilitySnapshotCapability } from "./accessibility/snapshot";
+import { accessibilityWaitCapability } from "./accessibility/wait";
 import { readClipboardCapability } from "./clipboard/read-clipboard";
 import { readClipboardHtmlCapability } from "./clipboard/read-clipboard-html";
 import { readClipboardImageCapability } from "./clipboard/read-clipboard-image";
@@ -89,8 +95,14 @@ export const CAPABILITIES = [
   windowResizeCapability,
   getActiveWindowCapability,
   accessibilitySnapshotCapability,
+  accessibilityQueryCapability,
   accessibilityFindElementCapability,
-  accessibilityExpandNodeCapability,
+  accessibilityWaitCapability,
+  accessibilityGetTextCapability,
+  accessibilityGetFocusedCapability,
+  accessibilityElementAtPointCapability,
+  accessibilityInspectCapability,
+  accessibilityGetSelectionCapability,
   accessibilityClickCapability,
   accessibilitySetValueCapability,
   accessibilityGetValueCapability,

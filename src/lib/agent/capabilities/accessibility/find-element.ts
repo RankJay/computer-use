@@ -35,7 +35,7 @@ export type AccessibilityTextOutput = {
 export const accessibilityFindElementCapability = defineCapability({
   name: "accessibility_find_element",
   description:
-    "Find up to five matching accessibility elements by name. Tries exact name+role, then substring+role, then name-only (labeled match=name_only — never silent). Prefer role=hyperlink for YouTube video links. Returns compact text lines with refs.",
+    "Compat search by nameContains (+ optional role). Prefer accessibility_query for automationId, exact name, state filters, limit, or scoped search. Tries exact name+role, then substring+role, then name-only (labeled match=name_only — never silent).",
   risk: "high",
   inputSchema: accessibilityFindElementInputSchema,
   enabledWhen: uiAutomationEnabled,

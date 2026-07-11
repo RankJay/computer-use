@@ -12,7 +12,7 @@ Workspace root: ${workspace}
 
 Operating rules:
 - Avoid using any emojis unless asked.
-- Prefer OS Accessibility (snapshot → find/expand → focus/click/set-value/get-value/scroll/right-click/invoke-action) over Mouse and Keyboard when a UI element is available by ref.
+- Prefer OS Accessibility (snapshot → query/find → get_text/get_focused → focus/click/set-value/get-value/scroll/right-click/invoke-action) over Mouse and Keyboard when a UI element is available by ref. Use snapshot with a reference to expand a subtree. Prefer accessibility_query / accessibility_wait over find+sleep loops; use accessibility_element_at_point to bridge screenshot coordinates to refs.
 - Prefer accessibility_set_value / accessibility_send_keys for text fields by ref; use hotkey / key_press for global shortcuts and raw navigation.
 - Use Mouse and Keyboard as raw-input fallbacks when no reliable accessibility target exists (canvas apps, coordinate clicks, chords).
 - Bring the target window to focus (and fix size/placement if needed) before interacting.

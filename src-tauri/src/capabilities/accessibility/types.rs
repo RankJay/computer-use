@@ -48,9 +48,17 @@ pub struct GetValueResult {
     pub method: String,
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GetTextResult {
+    pub text: String,
+    pub method: String,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct SnapshotInput {
-    pub hwnd: i64,
+    pub hwnd: Option<i64>,
+    pub reference: Option<String>,
     #[serde(default = "default_max_depth")]
     pub max_depth: u32,
     #[serde(default = "default_max_elements")]
@@ -65,6 +73,11 @@ impl SnapshotInput {
     }
 }
 
+/// Soft cap on outline text size (chars). Hard caps remain max_elements / max_depth.
+pub const MAX_OUTLINE_CHARS: usize = 12_000;
+/// Emit this many consecutive identical siblings before compressing the rest.
+pub const SIBLING_FINGERPRINT_EMIT: u32 = 3;
+
 #[derive(Debug, Deserialize)]
 pub struct FindElementInput {
     pub hwnd: i64,
@@ -73,6 +86,63 @@ pub struct FindElementInput {
     #[serde(default)]
     #[allow(dead_code)] // encoded into the worker job deadline by commands
     pub wait_ms: u64,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct QueryInput {
+    pub hwnd: i64,
+    pub name: Option<String>,
+    pub name_contains: Option<String>,
+    pub automation_id: Option<String>,
+    pub role: Option<String>,
+    pub enabled: Option<bool>,
+    pub visible: Option<bool>,
+    pub limit: Option<u32>,
+    #[serde(default)]
+    pub wait_ms: u64,
+    pub scope_reference: Option<String>,
+}
+
+impl QueryInput {
+    pub fn clamped(mut self) -> Self {
+        if let Some(limit) = self.limit {
+            self.limit = Some(limit.clamp(1, 20));
+        }
+        self.wait_ms = self.wait_ms.min(MAX_WAIT_MS);
+        self
+    }
+
+    pub fn from_find(input: FindElementInput) -> Self {
+        Self {
+            hwnd: input.hwnd,
+            name: None,
+            name_contains: Some(input.name_contains),
+            automation_id: None,
+            role: input.role,
+            enabled: None,
+            visible: None,
+            limit: Some(MAX_FIND_CANDIDATES as u32),
+            wait_ms: input.wait_ms,
+            scope_reference: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InspectResult {
+    pub text: String,
+    pub name: String,
+    pub role: Option<String>,
+    pub automation_id: String,
+    pub runtime_id: Vec<i32>,
+    pub enabled: bool,
+    pub offscreen: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub value: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rect: Option<(i32, i32, i32, i32)>,
+    pub patterns: Vec<String>,
 }
 
 fn default_max_depth() -> u32 {

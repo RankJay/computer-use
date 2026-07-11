@@ -8,9 +8,11 @@ use uiautomation::errors::ERR_NOTFOUND;
 use uiautomation::patterns::{
     UIExpandCollapsePattern, UIInvokePattern, UILegacyIAccessiblePattern, UIPatternType,
     UIRangeValuePattern, UIScrollItemPattern, UIScrollPattern, UISelectionItemPattern,
-    UITogglePattern, UIValuePattern,
+    UISelectionPattern, UITextPattern, UITogglePattern, UIValuePattern,
 };
-use uiautomation::types::{ControlType, ElementMode, Handle, ScrollAmount, TreeScope, UIProperty};
+use uiautomation::types::{
+    ControlType, ElementMode, Handle, Point, ScrollAmount, TreeScope, UIProperty,
+};
 use uiautomation::variants::{Value, Variant};
 use windows::Win32::Foundation::HWND;
 use windows::Win32::UI::WindowsAndMessaging::GetWindowThreadProcessId;
@@ -21,7 +23,8 @@ use super::arena::{HwndArena, NodeRecord};
 use super::budget::{SearchBudget, FIND_MAX_NODES, SNAPSHOT_MAX_NODES};
 use super::state::{make_reference, parse_reference, SnapshotStore, StoredElement};
 use super::types::{
-    ActionResult, FindElementInput, GetValueResult, SnapshotInput, TextResult, MAX_FIND_CANDIDATES,
+    ActionResult, FindElementInput, GetTextResult, GetValueResult, InspectResult, QueryInput,
+    SnapshotInput, TextResult, MAX_FIND_CANDIDATES, MAX_OUTLINE_CHARS, SIBLING_FINGERPRINT_EMIT,
     WAIT_POLL_MS,
 };
 
@@ -53,7 +56,6 @@ pub fn process_id_for_hwnd_command(hwnd: i64) -> Option<u32> {
 
 const CONNECTION_TIMEOUT_MS: u32 = 500;
 const TRANSACTION_TIMEOUT_MS: u32 = 1_500;
-const MAX_SIBLING_REPEAT: u32 = 3;
 const RESOLVE_RETRY_ATTEMPTS: u32 = 3;
 const TRANSIENT_UIA_RETRY_MS: u64 = 120;
 
@@ -82,7 +84,47 @@ pub fn snapshot_with_stats(
     deadline: Instant,
 ) -> Result<(TextResult, SnapshotStats), CommandError> {
     let input = input.clamped();
-    let process_id = process_id_for_hwnd(input.hwnd).ok_or_else(|| {
+    match input.reference.as_deref() {
+        Some(reference) => snapshot_from_reference(
+            session,
+            arenas,
+            store,
+            reference,
+            input.hwnd,
+            input.max_depth,
+            input.max_elements,
+            deadline,
+        ),
+        None => {
+            let hwnd = input.hwnd.ok_or_else(|| {
+                CommandError::new(
+                    "invalid_input",
+                    "accessibility_snapshot requires hwnd or reference",
+                )
+            })?;
+            snapshot_from_hwnd(
+                session,
+                arenas,
+                store,
+                hwnd,
+                input.max_depth,
+                input.max_elements,
+                deadline,
+            )
+        }
+    }
+}
+
+fn snapshot_from_hwnd(
+    session: &UiaSession,
+    arenas: &mut HashMap<i64, HwndArena>,
+    store: &SnapshotStore,
+    hwnd: i64,
+    max_depth: u32,
+    max_elements: u32,
+    deadline: Instant,
+) -> Result<(TextResult, SnapshotStats), CommandError> {
+    let process_id = process_id_for_hwnd(hwnd).ok_or_else(|| {
         CommandError::new("snapshot_failed", "Could not resolve process id for hwnd")
     })?;
 
@@ -95,22 +137,22 @@ pub fn snapshot_with_stats(
 
     let _ = store.is_first_process_touch(process_id);
 
-    let extracted = fetch_tree(session, input.hwnd, input.max_depth, deadline)?;
-    let generation = store.begin_generation(input.hwnd);
+    let extracted = fetch_tree(session, hwnd, max_depth, deadline)?;
+    let generation = store.begin_generation(hwnd);
     let outline = emit_outline_from_arena(
         store,
-        input.hwnd,
+        hwnd,
         generation,
         process_id,
         &extracted.nodes,
         0,
-        input.max_depth,
-        input.max_elements,
+        max_depth,
+        max_elements,
         false,
     );
 
     arenas.insert(
-        input.hwnd,
+        hwnd,
         HwndArena {
             generation,
             process_id,
@@ -118,6 +160,93 @@ pub fn snapshot_with_stats(
         },
     );
 
+    Ok(finalize_outline(outline, generation, extracted.used_bfs))
+}
+
+fn snapshot_from_reference(
+    session: &UiaSession,
+    arenas: &mut HashMap<i64, HwndArena>,
+    store: &SnapshotStore,
+    reference: &str,
+    hwnd_arg: Option<i64>,
+    max_depth: u32,
+    max_elements: u32,
+    deadline: Instant,
+) -> Result<(TextResult, SnapshotStats), CommandError> {
+    let stored = store.resolve_ref_or_stale(reference)?;
+    let (_index, ref_generation, ref_hwnd) = parse_reference(reference).ok_or_else(|| {
+        CommandError::new("invalid_reference", "Reference must look like e14@3:123456")
+    })?;
+    if let Some(hwnd) = hwnd_arg {
+        if hwnd != stored.hwnd || hwnd != ref_hwnd {
+            return Err(CommandError::new(
+                "invalid_input",
+                "hwnd does not match reference window",
+            ));
+        }
+    }
+
+    if store.is_process_degraded(stored.process_id) {
+        return Err(CommandError::new(
+            "target_degraded",
+            "Target process is temporarily marked degraded after repeated timeouts",
+        ));
+    }
+
+    if let Some(arena) = arenas.get(&stored.hwnd) {
+        if arena.generation == ref_generation {
+            if let Some(root_idx) = arena.find_by_runtime_id(&stored.runtime_id) {
+                let generation = store.begin_generation(stored.hwnd);
+                let outline = emit_outline_from_arena(
+                    store,
+                    stored.hwnd,
+                    generation,
+                    stored.process_id,
+                    &arena.nodes,
+                    root_idx,
+                    max_depth,
+                    max_elements,
+                    true,
+                );
+                if let Some(arena_mut) = arenas.get_mut(&stored.hwnd) {
+                    arena_mut.generation = generation;
+                }
+                return Ok(finalize_outline(outline, generation, false));
+            }
+        }
+    }
+
+    let element = resolve_stored_element(session, &stored)?;
+    let extracted = fetch_tree_from_element(session, &element, max_depth, deadline)?;
+    let generation = store.begin_generation(stored.hwnd);
+    let outline = emit_outline_from_arena(
+        store,
+        stored.hwnd,
+        generation,
+        stored.process_id,
+        &extracted.nodes,
+        0,
+        max_depth,
+        max_elements,
+        true,
+    );
+    arenas.insert(
+        stored.hwnd,
+        HwndArena {
+            generation,
+            process_id: stored.process_id,
+            nodes: extracted.nodes,
+        },
+    );
+
+    Ok(finalize_outline(outline, generation, extracted.used_bfs))
+}
+
+fn finalize_outline(
+    outline: OutlineEmit,
+    generation: u32,
+    used_bfs: bool,
+) -> (TextResult, SnapshotStats) {
     let mut text = outline.text;
     if outline.truncated {
         if let Some(reason) = &outline.truncation_reason {
@@ -127,7 +256,7 @@ pub fn snapshot_with_stats(
             text.push_str(&format!("[truncated:{reason}]"));
         }
     }
-    if extracted.used_bfs {
+    if used_bfs {
         if !text.is_empty() {
             text.push('\n');
         }
@@ -138,7 +267,7 @@ pub fn snapshot_with_stats(
         nodes_visited: outline.visited,
         emitted: outline.emitted,
     };
-    Ok((
+    (
         TextResult {
             text,
             generation: Some(generation),
@@ -148,7 +277,7 @@ pub fn snapshot_with_stats(
             truncation_reason: outline.truncation_reason,
         },
         stats,
-    ))
+    )
 }
 
 pub fn find_element_impl(
@@ -157,22 +286,50 @@ pub fn find_element_impl(
     input: FindElementInput,
     deadline: Instant,
 ) -> Result<TextResult, CommandError> {
+    query_impl(session, store, QueryInput::from_find(input), deadline)
+}
+
+pub fn query_impl(
+    session: &UiaSession,
+    store: &SnapshotStore,
+    input: QueryInput,
+    deadline: Instant,
+) -> Result<TextResult, CommandError> {
+    let input = input.clamped();
     loop {
         let remaining = deadline.saturating_duration_since(Instant::now());
         if remaining.is_zero() {
             return Ok(empty_find_result(store, input.hwnd));
         }
 
-        match find_element_once(session, store, &input, deadline) {
+        match query_once(session, store, &input, deadline) {
             Ok(result) if !result.text.is_empty() => return Ok(result),
             Ok(result) if Instant::now() >= deadline => return Ok(result),
-            Err(error) if error.code == "target_degraded" => return Err(error),
+            Err(error) if error.code == "target_degraded" || error.code == "invalid_input" => {
+                return Err(error);
+            }
             Err(error) if Instant::now() >= deadline => return Err(error),
             Ok(_) | Err(_) => thread::sleep(Duration::from_millis(
                 WAIT_POLL_MS.min(remaining.as_millis() as u64),
             )),
         }
     }
+}
+
+pub fn wait_impl(
+    session: &UiaSession,
+    store: &SnapshotStore,
+    input: QueryInput,
+    deadline: Instant,
+) -> Result<TextResult, CommandError> {
+    let result = query_impl(session, store, input, deadline)?;
+    if result.text.is_empty() {
+        return Err(CommandError::new(
+            "wait_timeout",
+            "Timed out waiting for accessibility query match",
+        ));
+    }
+    Ok(result)
 }
 
 fn empty_find_result(store: &SnapshotStore, hwnd: i64) -> TextResult {
@@ -182,15 +339,16 @@ fn empty_find_result(store: &SnapshotStore, hwnd: i64) -> TextResult {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum MatchTier {
+    AutomationId,
     ExactNameRole,
     SubstringRole,
     NameOnly,
 }
 
-fn find_element_once(
+fn query_once(
     session: &UiaSession,
     store: &SnapshotStore,
-    input: &FindElementInput,
+    input: &QueryInput,
     deadline: Instant,
 ) -> Result<TextResult, CommandError> {
     let handle = hwnd_from_i64(input.hwnd)?;
@@ -204,26 +362,63 @@ fn find_element_once(
         ));
     }
 
-    let name_filter = input.name_contains.trim();
-    if name_filter.is_empty() {
+    let name_exact = input
+        .name
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_ascii_lowercase());
+    let name_contains = input
+        .name_contains
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_ascii_lowercase());
+    let automation_id = input
+        .automation_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty());
+    let role_filter = input.role.as_deref().map(parse_role).transpose()?;
+    let limit = input.limit.unwrap_or(MAX_FIND_CANDIDATES as u32) as usize;
+
+    if name_exact.is_none()
+        && name_contains.is_none()
+        && automation_id.is_none()
+        && role_filter.is_none()
+    {
         return Err(CommandError::new(
             "invalid_input",
-            "nameContains must not be empty",
+            "query requires at least one of name, nameContains, automationId, or role",
         ));
     }
-    let name_lower = name_filter.to_ascii_lowercase();
-    let role_filter = input.role.as_deref().map(parse_role).transpose()?;
 
     if Instant::now() >= deadline {
         return Ok(empty_find_result(store, input.hwnd));
     }
 
-    let root = session
-        .automation
-        .element_from_handle_build_cache(handle, &session.subtree_cache)
-        .map_err(|error| map_uia_error(error, "find_failed"))?;
+    let root = if let Some(scope_ref) = input.scope_reference.as_deref() {
+        let stored = store.resolve_ref_or_stale(scope_ref)?;
+        if stored.hwnd != input.hwnd {
+            return Err(CommandError::new(
+                "invalid_input",
+                "scopeReference does not belong to the provided hwnd",
+            ));
+        }
+        resolve_stored_element(session, &stored)?
+    } else {
+        session
+            .automation
+            .element_from_handle_build_cache(handle, &session.subtree_cache)
+            .map_err(|error| map_uia_error(error, "find_failed"))?
+    };
 
-    let condition = if let Some(role) = role_filter {
+    let condition = if let Some(auto_id) = automation_id {
+        session
+            .automation
+            .create_property_condition(UIProperty::AutomationId, Variant::from(auto_id), None)
+            .map_err(|error| map_uia_error(error, "find_failed"))?
+    } else if let Some(role) = role_filter {
         session
             .automation
             .create_property_condition(UIProperty::ControlType, Variant::from(role as i32), None)
@@ -253,10 +448,31 @@ fn find_element_once(
         }
     }
 
-    // Prefer Document subtree when present (web content).
     let search_records = prefer_document_scope(&records);
+    let filtered: Vec<_> = search_records
+        .into_iter()
+        .filter(|(_, record)| {
+            if let Some(enabled) = input.enabled {
+                if record.enabled != enabled {
+                    return false;
+                }
+            }
+            if let Some(visible) = input.visible {
+                if record.offscreen == visible {
+                    return false;
+                }
+            }
+            true
+        })
+        .collect();
 
-    let (tier, mut matches) = select_find_matches(&search_records, &name_lower, role_filter);
+    let (tier, mut matches) = select_query_matches(
+        &filtered,
+        name_exact.as_deref(),
+        name_contains.as_deref(),
+        automation_id,
+        role_filter,
+    );
     matches.sort_by_key(|(order, record)| (find_record_priority(record), *order));
 
     let generation = store.begin_generation(input.hwnd);
@@ -264,7 +480,7 @@ fn find_element_once(
     let mut seen_runtime = HashSet::new();
     let mut emitted = 0usize;
     for (_order, record) in matches {
-        if emitted >= MAX_FIND_CANDIDATES {
+        if emitted >= limit {
             break;
         }
         if !record.runtime_id.is_empty() && !seen_runtime.insert(record.runtime_id.clone()) {
@@ -279,6 +495,7 @@ fn find_element_once(
             stored_from_record(input.hwnd, process_id, &record),
         );
         let tier_label = match tier {
+            MatchTier::AutomationId => "automation_id",
             MatchTier::ExactNameRole => "exact",
             MatchTier::SubstringRole => "substring",
             MatchTier::NameOnly => "name_only",
@@ -289,7 +506,7 @@ fn find_element_once(
     Ok(TextResult {
         text: lines.join("\n"),
         generation: Some(generation),
-        visited: Some(search_records.len() as u32),
+        visited: Some(filtered.len() as u32),
         emitted: Some(emitted as u32),
         truncated: None,
         truncation_reason: None,
@@ -307,7 +524,6 @@ fn prefer_document_scope(records: &[(usize, NodeRecord)]) -> Vec<(usize, NodeRec
     if doc_runtime.is_empty() {
         return records.to_vec();
     }
-    // Keep document and nodes that list it in ancestor chain, or all if we can't tell.
     let filtered: Vec<_> = records
         .iter()
         .filter(|(_, r)| {
@@ -323,24 +539,54 @@ fn prefer_document_scope(records: &[(usize, NodeRecord)]) -> Vec<(usize, NodeRec
     }
 }
 
-fn select_find_matches(
+fn select_query_matches(
     records: &[(usize, NodeRecord)],
-    name_lower: &str,
+    name_exact: Option<&str>,
+    name_contains: Option<&str>,
+    automation_id: Option<&str>,
     role_filter: Option<ControlType>,
 ) -> (MatchTier, Vec<(usize, NodeRecord)>) {
-    let exact_role: Vec<_> = records
-        .iter()
-        .filter(|(_, r)| role_matches(r, role_filter) && r.name.to_ascii_lowercase() == name_lower)
-        .cloned()
-        .collect();
-    if !exact_role.is_empty() {
-        return (MatchTier::ExactNameRole, exact_role);
+    if let Some(auto_id) = automation_id {
+        let matches: Vec<_> = records
+            .iter()
+            .filter(|(_, r)| r.automation_id == auto_id)
+            .filter(|(_, r)| role_matches(r, role_filter))
+            .cloned()
+            .collect();
+        if !matches.is_empty() {
+            return (MatchTier::AutomationId, matches);
+        }
+        if name_exact.is_none() && name_contains.is_none() {
+            return (MatchTier::AutomationId, Vec::new());
+        }
     }
 
+    let name_lower = name_exact.or(name_contains).unwrap_or("");
+    if name_lower.is_empty() {
+        let role_only: Vec<_> = records
+            .iter()
+            .filter(|(_, r)| role_matches(r, role_filter))
+            .cloned()
+            .collect();
+        return (MatchTier::SubstringRole, role_only);
+    }
+
+    if let Some(exact) = name_exact {
+        let exact_role: Vec<_> = records
+            .iter()
+            .filter(|(_, r)| role_matches(r, role_filter) && r.name.to_ascii_lowercase() == exact)
+            .cloned()
+            .collect();
+        if !exact_role.is_empty() {
+            return (MatchTier::ExactNameRole, exact_role);
+        }
+    }
+
+    let needle = name_contains.or(name_exact).unwrap_or(name_lower);
     let substring_role: Vec<_> = records
         .iter()
         .filter(|(_, r)| {
-            role_matches(r, role_filter) && r.name.to_ascii_lowercase().contains(name_lower)
+            role_matches(r, role_filter) && r.name.to_ascii_lowercase().contains(needle)
         })
         .cloned()
         .collect();
@@ -348,10 +594,9 @@ fn select_find_matches(
         return (MatchTier::SubstringRole, substring_role);
     }
 
-    // Explicit no-role fallback — never silent.
     let name_only: Vec<_> = records
         .iter()
-        .filter(|(_, r)| r.name.to_ascii_lowercase().contains(name_lower))
+        .filter(|(_, r)| r.name.to_ascii_lowercase().contains(needle))
         .cloned()
         .collect();
     (MatchTier::NameOnly, name_only)
@@ -384,6 +629,7 @@ fn find_record_priority(record: &NodeRecord) -> (i32, i32, i32) {
     (role, offscreen, disabled)
 }
 
+/// Thin compat wrapper: scoped snapshot from a reference root.
 pub fn expand_node_impl(
     session: &UiaSession,
     arenas: &mut HashMap<i64, HwndArena>,
@@ -391,92 +637,388 @@ pub fn expand_node_impl(
     reference: &str,
     deadline: Instant,
 ) -> Result<TextResult, CommandError> {
-    let stored = store.resolve_ref_or_stale(reference)?;
-    let (_index, ref_generation, _hwnd) = parse_reference(reference).ok_or_else(|| {
-        CommandError::new("invalid_reference", "Reference must look like e14@3:123456")
-    })?;
+    snapshot_impl(
+        session,
+        arenas,
+        store,
+        SnapshotInput {
+            hwnd: None,
+            reference: Some(reference.to_string()),
+            max_depth: 10,
+            max_elements: 150,
+        },
+        deadline,
+    )
+}
 
-    if let Some(arena) = arenas.get(&stored.hwnd) {
-        if arena.generation == ref_generation {
-            if let Some(root_idx) = arena.find_by_runtime_id(&stored.runtime_id) {
-                let generation = store.begin_generation(stored.hwnd);
-                let outline = emit_outline_from_arena(
-                    store,
-                    stored.hwnd,
-                    generation,
-                    stored.process_id,
-                    &arena.nodes,
-                    root_idx,
-                    10,
-                    150,
-                    true,
-                );
-                // Refresh arena generation tag to newest for this hwnd.
-                if let Some(arena_mut) = arenas.get_mut(&stored.hwnd) {
-                    arena_mut.generation = generation;
+pub fn get_text_impl(
+    session: &UiaSession,
+    store: &SnapshotStore,
+    reference: &str,
+) -> Result<GetTextResult, CommandError> {
+    let stored = store.resolve_ref_or_stale(reference)?;
+    let element = resolve_stored_element(session, &stored)?;
+
+    if let Ok(pattern) = element.get_pattern::<UITextPattern>() {
+        if let Ok(range) = pattern.get_document_range() {
+            if let Ok(text) = range.get_text(-1) {
+                let trimmed = text.trim();
+                if !trimmed.is_empty() {
+                    return Ok(GetTextResult {
+                        text: text,
+                        method: "text_pattern".to_string(),
+                    });
                 }
-                let mut text = outline.text;
-                if outline.truncated {
-                    if let Some(reason) = &outline.truncation_reason {
-                        if !text.is_empty() {
-                            text.push('\n');
-                        }
-                        text.push_str(&format!("[truncated:{reason}]"));
-                    }
-                }
-                return Ok(TextResult {
-                    text,
-                    generation: Some(generation),
-                    visited: Some(outline.visited),
-                    emitted: Some(outline.emitted),
-                    truncated: Some(outline.truncated),
-                    truncation_reason: outline.truncation_reason,
-                });
             }
         }
     }
 
-    // Live resolve + subtree fetch from the element.
-    let element = resolve_stored_element(session, &stored)?;
-    let extracted = fetch_tree_from_element(session, &element, 10, deadline)?;
-    let generation = store.begin_generation(stored.hwnd);
-    let outline = emit_outline_from_arena(
-        store,
-        stored.hwnd,
-        generation,
-        stored.process_id,
-        &extracted.nodes,
-        0,
-        10,
-        150,
-        true,
-    );
-    arenas.insert(
-        stored.hwnd,
-        HwndArena {
-            generation,
-            process_id: stored.process_id,
-            nodes: extracted.nodes,
-        },
-    );
-
-    let mut text = outline.text;
-    if outline.truncated {
-        if let Some(reason) = &outline.truncation_reason {
-            if !text.is_empty() {
-                text.push('\n');
-            }
-            text.push_str(&format!("[truncated:{reason}]"));
+    let names = collect_text_descendant_names(session, &element)?;
+    if names.is_empty() {
+        let own = element_name(&element);
+        if !own.trim().is_empty()
+            && element_control_type(&element)
+                .ok()
+                .is_some_and(|ct| ct == ControlType::Text)
+        {
+            return Ok(GetTextResult {
+                text: own,
+                method: "text_descendants".to_string(),
+            });
         }
+        return Ok(GetTextResult {
+            text: String::new(),
+            method: "empty".to_string(),
+        });
+    }
+
+    Ok(GetTextResult {
+        text: names.join("\n"),
+        method: "text_descendants".to_string(),
+    })
+}
+
+pub fn inspect_impl(
+    session: &UiaSession,
+    store: &SnapshotStore,
+    reference: &str,
+) -> Result<InspectResult, CommandError> {
+    let stored = store.resolve_ref_or_stale(reference)?;
+    let element = resolve_stored_element(session, &stored)?;
+    let record = project_element_allow_text(&element, None, 0, &[]).ok_or_else(|| {
+        CommandError::new("inspect_failed", "Could not project accessibility element")
+    })?;
+
+    let mut patterns = Vec::new();
+    if element.get_pattern::<UIInvokePattern>().is_ok() {
+        patterns.push("Invoke".to_string());
+    }
+    if element.get_pattern::<UIValuePattern>().is_ok() {
+        patterns.push("Value".to_string());
+    }
+    if element.get_pattern::<UITogglePattern>().is_ok() {
+        patterns.push("Toggle".to_string());
+    }
+    if element.get_pattern::<UITextPattern>().is_ok() {
+        patterns.push("Text".to_string());
+    }
+    if element.get_pattern::<UISelectionPattern>().is_ok() {
+        patterns.push("Selection".to_string());
+    }
+    if element.get_pattern::<UISelectionItemPattern>().is_ok() {
+        patterns.push("SelectionItem".to_string());
+    }
+    if element.get_pattern::<UIExpandCollapsePattern>().is_ok() {
+        patterns.push("ExpandCollapse".to_string());
+    }
+    if element.get_pattern::<UILegacyIAccessiblePattern>().is_ok() {
+        patterns.push("LegacyIAccessible".to_string());
+    }
+    if element.get_pattern::<UIScrollPattern>().is_ok() {
+        patterns.push("Scroll".to_string());
+    }
+    if element.get_pattern::<UIRangeValuePattern>().is_ok() {
+        patterns.push("RangeValue".to_string());
+    }
+
+    let role = record.role.clone().unwrap_or_else(|| "unknown".to_string());
+    let rect_text = match record.rect {
+        Some((l, t, r, b)) => format!("rect=({l},{t},{r},{b})"),
+        None => "rect=none".to_string(),
+    };
+    let mut lines = vec![
+        format!("ref={reference}"),
+        format!("name=\"{}\"", record.name.replace('"', "'")),
+        format!("role={role}"),
+        format!(
+            "automationId=\"{}\"",
+            record.automation_id.replace('"', "'")
+        ),
+        format!("runtimeId={:?}", record.runtime_id),
+        format!("enabled={}", record.enabled),
+        format!("offscreen={}", record.offscreen),
+        rect_text,
+        format!("patterns={}", patterns.join(",")),
+    ];
+    if let Some(value) = &record.value {
+        lines.push(format!("value=\"{}\"", value.replace('"', "'")));
+    }
+
+    Ok(InspectResult {
+        text: lines.join("\n"),
+        name: record.name,
+        role: record.role,
+        automation_id: record.automation_id,
+        runtime_id: record.runtime_id,
+        enabled: record.enabled,
+        offscreen: record.offscreen,
+        value: record.value,
+        rect: record.rect,
+        patterns,
+    })
+}
+
+pub fn get_selection_impl(
+    session: &UiaSession,
+    store: &SnapshotStore,
+    reference: &str,
+) -> Result<TextResult, CommandError> {
+    let stored = store.resolve_ref_or_stale(reference)?;
+    let element = resolve_stored_element(session, &stored)?;
+    let pattern = element.get_pattern::<UISelectionPattern>().map_err(|_| {
+        CommandError::new(
+            "selection_unavailable",
+            "Selection pattern is not available on this element",
+        )
+    })?;
+    let selected = pattern
+        .get_selection()
+        .map_err(|error| map_uia_error(error, "get_selection_failed"))?;
+
+    let generation = store.begin_generation(stored.hwnd);
+    let mut lines = Vec::new();
+    let mut emitted = 0u32;
+    for selected_element in selected {
+        let Some(record) = project_element_allow_text(&selected_element, None, 0, &[]) else {
+            continue;
+        };
+        emitted = emitted.saturating_add(1);
+        let item_ref = make_reference(emitted, generation, stored.hwnd);
+        store.store_element(
+            stored.hwnd,
+            generation,
+            item_ref.clone(),
+            stored_from_record(stored.hwnd, stored.process_id, &record),
+        );
+        lines.push(format_record_line(&record, 0, &item_ref, Some("selected")));
     }
 
     Ok(TextResult {
-        text,
+        text: lines.join("\n"),
         generation: Some(generation),
-        visited: Some(outline.visited),
-        emitted: Some(outline.emitted),
-        truncated: Some(outline.truncated),
-        truncation_reason: outline.truncation_reason,
+        visited: Some(emitted),
+        emitted: Some(emitted),
+        truncated: None,
+        truncation_reason: None,
+    })
+}
+
+pub fn get_focused_impl(
+    session: &UiaSession,
+    store: &SnapshotStore,
+    hwnd: Option<i64>,
+) -> Result<TextResult, CommandError> {
+    let element = session
+        .automation
+        .get_focused_element_build_cache(&session.live_cache)
+        .map_err(|error| map_uia_error(error, "get_focused_failed"))?;
+
+    if let Some(filter) = hwnd {
+        let filter_pid = process_id_for_hwnd(filter);
+        let elem_pid = element.get_process_id().ok();
+        if filter_pid.is_none() || filter_pid != elem_pid {
+            return Err(CommandError::new(
+                "focus_mismatch",
+                "Focused element is not in the requested window",
+            ));
+        }
+        return mint_projected_element(store, filter, &element);
+    }
+
+    let resolved_hwnd = resolve_element_hwnd(session, &element, None)?;
+    mint_projected_element(store, resolved_hwnd, &element)
+}
+
+pub fn element_at_point_impl(
+    session: &UiaSession,
+    store: &SnapshotStore,
+    x: i32,
+    y: i32,
+    hwnd: Option<i64>,
+) -> Result<TextResult, CommandError> {
+    let element = session
+        .automation
+        .element_from_point_build_cache(Point::new(x, y), &session.live_cache)
+        .map_err(|error| map_uia_error(error, "element_at_point_failed"))?;
+
+    if let Some(filter) = hwnd {
+        let filter_pid = process_id_for_hwnd(filter);
+        let elem_pid = element.get_process_id().ok();
+        if filter_pid.is_none() || filter_pid != elem_pid {
+            return Err(CommandError::new(
+                "point_mismatch",
+                "Element at point is not in the requested window",
+            ));
+        }
+        return mint_projected_element(store, filter, &element);
+    }
+
+    let resolved_hwnd = resolve_element_hwnd(session, &element, None)?;
+    mint_projected_element(store, resolved_hwnd, &element)
+}
+
+fn collect_text_descendant_names(
+    session: &UiaSession,
+    root: &UIElement,
+) -> Result<Vec<String>, CommandError> {
+    let condition = session
+        .automation
+        .create_property_condition(
+            UIProperty::ControlType,
+            Variant::from(ControlType::Text as i32),
+            None,
+        )
+        .map_err(|error| map_uia_error(error, "get_text_failed"))?;
+
+    let elements =
+        match root.find_all_build_cache(TreeScope::Descendants, &condition, &session.subtree_cache)
+        {
+            Ok(elements) => elements,
+            Err(error) if error.code() == ERR_NOTFOUND => Vec::new(),
+            Err(error) => return Err(map_uia_error(error, "get_text_failed")),
+        };
+
+    let mut names = Vec::new();
+    for element in elements {
+        let name = element_name(&element);
+        if !name.trim().is_empty() {
+            names.push(name);
+        }
+    }
+    Ok(names)
+}
+
+fn resolve_element_hwnd(
+    session: &UiaSession,
+    element: &UIElement,
+    preferred: Option<i64>,
+) -> Result<i64, CommandError> {
+    if let Some(hwnd) = preferred {
+        hwnd_from_i64(hwnd)?;
+        return Ok(hwnd);
+    }
+
+    if let Ok(handle) = element.get_native_window_handle() {
+        let raw: isize = handle.into();
+        if raw != 0 {
+            return Ok(raw as i64);
+        }
+    }
+
+    let mut current = element.clone();
+    for _ in 0..16 {
+        match session
+            .control_walker
+            .get_parent_build_cache(&current, &session.live_cache)
+        {
+            Ok(parent) => {
+                if let Ok(handle) = parent.get_native_window_handle() {
+                    let raw: isize = handle.into();
+                    if raw != 0 {
+                        return Ok(raw as i64);
+                    }
+                }
+                current = parent;
+            }
+            Err(_) => break,
+        }
+    }
+
+    Err(CommandError::new(
+        "resolve_failed",
+        "Could not resolve window handle for element",
+    ))
+}
+
+fn mint_projected_element(
+    store: &SnapshotStore,
+    hwnd: i64,
+    element: &UIElement,
+) -> Result<TextResult, CommandError> {
+    let process_id = process_id_for_hwnd(hwnd)
+        .or_else(|| element.get_process_id().ok())
+        .ok_or_else(|| {
+            CommandError::new("resolve_failed", "Could not resolve process id for element")
+        })?;
+
+    let record = project_element_allow_text(element, None, 0, &[]).ok_or_else(|| {
+        CommandError::new("resolve_failed", "Could not project accessibility element")
+    })?;
+
+    let generation = store.begin_generation(hwnd);
+    let reference = make_reference(1, generation, hwnd);
+    store.store_element(
+        hwnd,
+        generation,
+        reference.clone(),
+        stored_from_record(hwnd, process_id, &record),
+    );
+
+    Ok(TextResult {
+        text: format_record_line(&record, 0, &reference, None),
+        generation: Some(generation),
+        visited: Some(1),
+        emitted: Some(1),
+        truncated: None,
+        truncation_reason: None,
+    })
+}
+
+/// Like `project_element` but keeps Text nodes (needed for focused/hit-test targets).
+fn project_element_allow_text(
+    element: &UIElement,
+    parent: Option<u32>,
+    depth: u32,
+    ancestors: &[String],
+) -> Option<NodeRecord> {
+    let control_type = element_control_type(element).ok()?;
+    if matches!(
+        control_type,
+        ControlType::Image | ControlType::Separator | ControlType::ToolTip
+    ) {
+        return None;
+    }
+    let name = element_name(element);
+    let automation_id = element_automation_id(element);
+    let runtime_id = element_runtime_id(element).unwrap_or_default();
+    let enabled = element_is_enabled(element).unwrap_or(true);
+    let offscreen = element_is_offscreen(element).unwrap_or(false);
+    let rect = element_rect(element);
+    let value = element_value_text(element).filter(|v| is_useful_value(v));
+    Some(NodeRecord {
+        parent,
+        children: Vec::new(),
+        runtime_id,
+        automation_id,
+        name,
+        role: Some(control_type.to_string()),
+        control_type_raw: control_type as i32,
+        enabled,
+        offscreen,
+        rect,
+        value,
+        ancestor_chain: ancestors.to_vec(),
+        depth,
     })
 }
 
@@ -756,6 +1298,7 @@ fn emit_outline_from_arena(
     force_children: bool,
 ) -> OutlineEmit {
     let mut lines = Vec::new();
+    let mut char_count = 0usize;
     let mut next_index = 0u32;
     let mut emitted = 0u32;
     let mut visited = 0u32;
@@ -772,6 +1315,37 @@ fn emit_outline_from_arena(
         };
     }
 
+    fn push_line(
+        lines: &mut Vec<String>,
+        char_count: &mut usize,
+        truncated: &mut bool,
+        truncation_reason: &mut Option<String>,
+        line: String,
+    ) -> bool {
+        let extra = if lines.is_empty() {
+            line.len()
+        } else {
+            line.len() + 1
+        };
+        if *char_count + extra > MAX_OUTLINE_CHARS {
+            *truncated = true;
+            *truncation_reason = Some("token_cap".to_string());
+            return false;
+        }
+        *char_count += extra;
+        lines.push(line);
+        true
+    }
+
+    fn sibling_fingerprint(node: &NodeRecord) -> (i32, &str, bool, bool) {
+        (
+            node.control_type_raw,
+            node.name.as_str(),
+            node.enabled,
+            node.offscreen,
+        )
+    }
+
     fn walk(
         store: &SnapshotStore,
         hwnd: i64,
@@ -784,12 +1358,19 @@ fn emit_outline_from_arena(
         max_elements: u32,
         force_children: bool,
         lines: &mut Vec<String>,
+        char_count: &mut usize,
         next_index: &mut u32,
         emitted: &mut u32,
         visited: &mut u32,
         truncated: &mut bool,
         truncation_reason: &mut Option<String>,
     ) {
+        if matches!(
+            truncation_reason.as_deref(),
+            Some("token_cap" | "max_elements")
+        ) {
+            return;
+        }
         if *emitted >= max_elements {
             *truncated = true;
             *truncation_reason = Some("max_elements".to_string());
@@ -810,7 +1391,10 @@ fn emit_outline_from_arena(
                 reference.clone(),
                 stored_from_record(hwnd, process_id, node),
             );
-            lines.push(format_record_line(node, depth, &reference, None));
+            let line = format_record_line(node, depth, &reference, None);
+            if !push_line(lines, char_count, truncated, truncation_reason, line) {
+                return;
+            }
             *emitted = emitted.saturating_add(1);
         }
 
@@ -830,47 +1414,89 @@ fn emit_outline_from_arena(
             return;
         }
 
-        let mut sibling_count = 0u32;
-        for &child in &node.children {
+        let children = &node.children;
+        let mut i = 0usize;
+        while i < children.len() {
+            if matches!(
+                truncation_reason.as_deref(),
+                Some("token_cap" | "max_elements")
+            ) {
+                break;
+            }
             if *emitted >= max_elements {
-                lines.push(format!(
+                let omit = format!(
                     "{:indent$}+more elements omitted",
                     "",
                     indent = (depth as usize + 1) * 2
-                ));
+                );
+                let _ = push_line(lines, char_count, truncated, truncation_reason, omit);
                 *truncated = true;
                 *truncation_reason = Some("max_elements".to_string());
                 break;
             }
-            walk(
-                store,
-                hwnd,
-                generation,
-                process_id,
-                nodes,
-                child as usize,
-                depth + 1,
-                max_depth,
-                max_elements,
-                false,
-                lines,
-                next_index,
-                emitted,
-                visited,
-                truncated,
-                truncation_reason,
-            );
-            sibling_count += 1;
-            if sibling_count >= MAX_SIBLING_REPEAT {
-                lines.push(format!(
-                    "{:indent$}+more siblings like this",
+
+            let fp = sibling_fingerprint(&nodes[children[i] as usize]);
+            let mut run_end = i + 1;
+            while run_end < children.len()
+                && sibling_fingerprint(&nodes[children[run_end] as usize]) == fp
+            {
+                run_end += 1;
+            }
+            let run_len = run_end - i;
+            let emit_count = run_len.min(SIBLING_FINGERPRINT_EMIT as usize);
+
+            for j in 0..emit_count {
+                if matches!(
+                    truncation_reason.as_deref(),
+                    Some("token_cap" | "max_elements")
+                ) || *emitted >= max_elements
+                {
+                    break;
+                }
+                walk(
+                    store,
+                    hwnd,
+                    generation,
+                    process_id,
+                    nodes,
+                    children[i + j] as usize,
+                    depth + 1,
+                    max_depth,
+                    max_elements,
+                    false,
+                    lines,
+                    char_count,
+                    next_index,
+                    emitted,
+                    visited,
+                    truncated,
+                    truncation_reason,
+                );
+            }
+
+            if run_len > emit_count
+                && !matches!(
+                    truncation_reason.as_deref(),
+                    Some("token_cap" | "max_elements")
+                )
+            {
+                let n = run_len - emit_count;
+                let compress = format!(
+                    "{:indent$}+{n} more like this",
                     "",
                     indent = (depth as usize + 1) * 2
-                ));
-                *truncated = true;
-                *truncation_reason = Some("sibling_cap".to_string());
-                break;
+                );
+                if push_line(lines, char_count, truncated, truncation_reason, compress) {
+                    *truncated = true;
+                    if truncation_reason.is_none()
+                        || truncation_reason.as_deref() == Some("sibling_compress")
+                    {
+                        *truncation_reason = Some("sibling_compress".to_string());
+                    }
+                }
             }
+
+            i = run_end;
         }
     }
 
@@ -886,6 +1512,7 @@ fn emit_outline_from_arena(
         max_elements,
         force_children,
         &mut lines,
+        &mut char_count,
         &mut next_index,
         &mut emitted,
         &mut visited,
@@ -2157,15 +2784,23 @@ mod tests {
                 },
             ),
         ];
-        let (tier, matches) = select_find_matches(&records, "sav", Some(ControlType::Button));
+        let (tier, matches) =
+            select_query_matches(&records, None, Some("sav"), None, Some(ControlType::Button));
         assert_eq!(tier, MatchTier::SubstringRole);
         assert_eq!(matches.len(), 2);
 
-        let (tier, matches) = select_find_matches(&records, "save", Some(ControlType::Edit));
+        let (tier, matches) =
+            select_query_matches(&records, None, Some("save"), None, Some(ControlType::Edit));
         assert_eq!(tier, MatchTier::NameOnly);
         assert_eq!(matches.len(), 2);
 
-        let (tier, matches) = select_find_matches(&records, "save", Some(ControlType::Button));
+        let (tier, matches) = select_query_matches(
+            &records,
+            Some("save"),
+            None,
+            None,
+            Some(ControlType::Button),
+        );
         assert_eq!(tier, MatchTier::ExactNameRole);
         assert_eq!(matches.len(), 1);
         assert_eq!(matches[0].1.name, "Save");
@@ -2174,7 +2809,8 @@ mod tests {
     #[test]
     fn snapshot_input_clamps_bounds() {
         let input = SnapshotInput {
-            hwnd: 1,
+            hwnd: Some(1),
+            reference: None,
             max_depth: 100,
             max_elements: 999,
         }

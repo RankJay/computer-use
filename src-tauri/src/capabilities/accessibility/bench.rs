@@ -83,7 +83,8 @@ fn bench_snapshot(fixture: &str, hwnd: i64) -> BenchSummary {
     let mut samples = Vec::with_capacity(RUNS);
     for _ in 0..RUNS {
         let input = SnapshotInput {
-            hwnd,
+            hwnd: Some(hwnd),
+            reference: None,
             max_depth: 10,
             max_elements: 150,
         };
@@ -142,7 +143,8 @@ fn bench_snapshot(fixture: &str, hwnd: i64) -> BenchSummary {
 fn bench_resolve(fixture: &str, hwnd: i64) -> BenchSummary {
     let store = SnapshotStore::default();
     let input = SnapshotInput {
-        hwnd,
+        hwnd: Some(hwnd),
+        reference: None,
         max_depth: 10,
         max_elements: 150,
     };
