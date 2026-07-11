@@ -1721,29 +1721,33 @@ pub fn click_impl(
 
     let control_type = target.get_control_type().unwrap_or(ControlType::Custom);
 
-    if control_type == ControlType::Hyperlink {
-        if let Some(result) = try_legacy_action(&target, foregrounded) {
-            return result;
-        }
-        if let Some(result) = try_invoke(&target, foregrounded) {
-            return result;
-        }
-        if let Some(result) = try_keyboard_enter(&target, foregrounded) {
-            return result;
-        }
-    } else {
-        if let Some(result) = try_invoke(&target, foregrounded) {
-            return result;
-        }
-        if let Some(result) = try_toggle(&target, foregrounded) {
-            return result;
-        }
-        if let Some(result) = try_legacy_action(&target, foregrounded) {
-            return result;
-        }
-        if control_type == ControlType::ListItem {
+    // Edit/Document: patterns often advertise Invoke but fail ("Pattern not found").
+    // Focus was already applied in prepare_for_click; synthetic click places the caret.
+    if !matches!(control_type, ControlType::Edit | ControlType::Document) {
+        if control_type == ControlType::Hyperlink {
+            if let Some(result) = try_legacy_action(&target, foregrounded) {
+                return result;
+            }
+            if let Some(result) = try_invoke(&target, foregrounded) {
+                return result;
+            }
             if let Some(result) = try_keyboard_enter(&target, foregrounded) {
                 return result;
+            }
+        } else {
+            if let Some(result) = try_invoke(&target, foregrounded) {
+                return result;
+            }
+            if let Some(result) = try_toggle(&target, foregrounded) {
+                return result;
+            }
+            if let Some(result) = try_legacy_action(&target, foregrounded) {
+                return result;
+            }
+            if control_type == ControlType::ListItem {
+                if let Some(result) = try_keyboard_enter(&target, foregrounded) {
+                    return result;
+                }
             }
         }
     }
@@ -1828,7 +1832,7 @@ fn try_invoke(
             method: "invoke".to_string(),
             foregrounded,
         })),
-        Err(error) if is_transient_subscriber_error(&error) => None,
+        Err(error) if is_recoverable_click_pattern_error(&error) => None,
         Err(error) => Some(Err(map_uia_error(error, "click_failed"))),
     }
 }
@@ -1844,7 +1848,7 @@ fn try_toggle(
             method: "toggle".to_string(),
             foregrounded,
         })),
-        Err(error) if is_transient_subscriber_error(&error) => None,
+        Err(error) if is_recoverable_click_pattern_error(&error) => None,
         Err(error) => Some(Err(map_uia_error(error, "click_failed"))),
     }
 }
@@ -1860,7 +1864,7 @@ fn try_legacy_action(
             method: "legacy".to_string(),
             foregrounded,
         })),
-        Err(error) if is_transient_subscriber_error(&error) => None,
+        Err(error) if is_recoverable_click_pattern_error(&error) => None,
         Err(error) => Some(Err(map_uia_error(error, "click_failed"))),
     }
 }
@@ -2716,14 +2720,15 @@ fn foreground_window(session: &UiaSession, hwnd: i64) -> Result<bool, CommandErr
 fn parse_role(role: &str) -> Result<ControlType, CommandError> {
     match role.trim().to_ascii_lowercase().as_str() {
         "button" => Ok(ControlType::Button),
-        "edit" => Ok(ControlType::Edit),
-        "combobox" => Ok(ControlType::ComboBox),
+        "edit" | "textbox" | "textfield" => Ok(ControlType::Edit),
+        "combobox" | "select" => Ok(ControlType::ComboBox),
         "checkbox" => Ok(ControlType::CheckBox),
-        "radiobutton" => Ok(ControlType::RadioButton),
+        "radiobutton" | "radio" => Ok(ControlType::RadioButton),
         "menuitem" => Ok(ControlType::MenuItem),
-        "hyperlink" => Ok(ControlType::Hyperlink),
-        "tabitem" => Ok(ControlType::TabItem),
-        "listitem" => Ok(ControlType::ListItem),
+        // Agents often say "link"; UIA control type is Hyperlink.
+        "hyperlink" | "link" | "a" => Ok(ControlType::Hyperlink),
+        "tabitem" | "tab" => Ok(ControlType::TabItem),
+        "listitem" | "option" => Ok(ControlType::ListItem),
         "treeitem" => Ok(ControlType::TreeItem),
         "slider" => Ok(ControlType::Slider),
         "spinner" => Ok(ControlType::Spinner),
@@ -2814,6 +2819,17 @@ fn is_transient_subscriber_error(error: &uiautomation::Error) -> bool {
             .contains("unable to invoke any of the subscribers")
 }
 
+/// Pattern advertised but unusable (common on Chromium Edit/omnibox) — fall through to next click strategy.
+fn is_recoverable_click_pattern_error(error: &uiautomation::Error) -> bool {
+    if is_transient_subscriber_error(error) {
+        return true;
+    }
+    let message = error.message().to_ascii_lowercase();
+    message.contains("pattern not found")
+        || message.contains("pattern is not supported")
+        || message.contains("does not support the")
+}
+
 fn is_transient_command_error(error: &CommandError) -> bool {
     error
         .message
@@ -2856,6 +2872,23 @@ mod tests {
             "resolve_failed",
             "An event was unable to invoke any of the subscribers"
         )));
+    }
+
+    #[test]
+    fn recovers_from_pattern_not_found_on_click() {
+        let error = uiautomation::Error::new(0, "Pattern not found");
+        assert!(is_recoverable_click_pattern_error(&error));
+        let other = uiautomation::Error::new(0, "Access is denied");
+        assert!(!is_recoverable_click_pattern_error(&other));
+    }
+
+    #[test]
+    fn parse_role_accepts_common_aliases() {
+        assert_eq!(parse_role("link").unwrap(), ControlType::Hyperlink);
+        assert_eq!(parse_role("Hyperlink").unwrap(), ControlType::Hyperlink);
+        assert_eq!(parse_role("textbox").unwrap(), ControlType::Edit);
+        assert_eq!(parse_role("tab").unwrap(), ControlType::TabItem);
+        assert!(parse_role("banana").is_err());
     }
 
     #[test]

@@ -43,6 +43,18 @@ pub fn parse_key(name: &str) -> Result<u16, CommandError> {
         "f10" => 0x79,
         "f11" => 0x7A,
         "f12" => 0x7B,
+        // US-layout OEM punctuation (names + single-char forms)
+        "slash" | "/" => 0xBF,                     // VK_OEM_2
+        "backslash" | "\\" => 0xDC,                // VK_OEM_5
+        "period" | "dot" | "." => 0xBE,            // VK_OEM_PERIOD
+        "comma" | "," => 0xBC,                     // VK_OEM_COMMA
+        "minus" | "dash" | "hyphen" | "-" => 0xBD, // VK_OEM_MINUS
+        "equals" | "equal" | "=" => 0xBB,          // VK_OEM_PLUS
+        "semicolon" | ";" => 0xBA,                 // VK_OEM_1
+        "quote" | "apostrophe" | "'" => 0xDE,      // VK_OEM_7
+        "backtick" | "`" => 0xC0,                  // VK_OEM_3
+        "lbracket" | "[" => 0xDB,                  // VK_OEM_4
+        "rbracket" | "]" => 0xDD,                  // VK_OEM_6
         other if other.len() == 1 => {
             let ch = other.chars().next().expect("len checked");
             match ch {
@@ -91,11 +103,15 @@ mod tests {
         assert_eq!(parse_key("f4").unwrap(), 0x73);
         assert_eq!(parse_key("escape").unwrap(), 0x1B);
         assert_eq!(parse_key("esc").unwrap(), 0x1B);
+        assert_eq!(parse_key("slash").unwrap(), 0xBF);
+        assert_eq!(parse_key("/").unwrap(), 0xBF);
+        assert_eq!(parse_key("comma").unwrap(), 0xBC);
+        assert_eq!(parse_key(".").unwrap(), 0xBE);
     }
 
     #[test]
     fn rejects_unknown_keys() {
-        let error = parse_key("comma").expect_err("unknown");
+        let error = parse_key("semicolonish").expect_err("unknown");
         assert_eq!(error.code, "invalid_key");
         let empty = parse_key("  ").expect_err("empty");
         assert_eq!(empty.code, "invalid_key");

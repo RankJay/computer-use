@@ -56,4 +56,5 @@ pub struct ActiveWindowResult {
     pub process_name: Option<String>,
 }
 
-pub const TIMEOUT_LIST_WINDOWS_MS: u64 = 1_500;
+/// Outer recv timeout for window listing. Kept above the in-list name-resolve budget.
+pub const TIMEOUT_LIST_WINDOWS_MS: u64 = 5_000;

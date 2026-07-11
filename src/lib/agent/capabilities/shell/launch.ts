@@ -3,7 +3,7 @@ import { z } from "zod";
 import { defineCapability } from "../types";
 
 export const launchInputSchema = z.object({
-  exe: z.string().min(1).describe("Executable path or command to launch"),
+  exe: z.string().min(1).describe("Executable path or short name (e.g. chrome, notepad, msedge)"),
   args: z.array(z.string()).optional().describe("Arguments passed to the executable"),
   cwd: z.string().optional().describe("Absolute working directory; defaults to the process cwd"),
   env: z
@@ -22,7 +22,7 @@ export type LaunchOutput = {
 export const launchCapability = defineCapability({
   name: "launch",
   description:
-    "Launch an executable without capturing stdout/stderr. Returns the spawned process id.",
+    "Launch an executable without capturing stdout/stderr. Accepts absolute paths or short names (chrome, notepad) resolved via Windows App Paths / well-known install locations. Returns the spawned process id.",
   risk: "high",
   inputSchema: launchInputSchema,
 });

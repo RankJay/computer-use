@@ -9,7 +9,7 @@ export const accessibilityQueryInputSchema = z
     name: z.string().min(1).optional().describe("Exact name match (case-insensitive)"),
     nameContains: z.string().min(1).optional().describe("Substring name match"),
     automationId: z.string().min(1).optional().describe("Exact AutomationId"),
-    role: z.string().optional().describe("Control role, e.g. button, edit, menuitem"),
+    role: z.string().optional().describe("Control role, e.g. button, edit, link, menuitem"),
     enabled: z.boolean().optional().describe("Filter by enabled state"),
     visible: z.boolean().optional().describe("Filter by on-screen (not offscreen)"),
     limit: z.number().int().min(1).max(20).optional().describe("Max candidates (default 5)"),

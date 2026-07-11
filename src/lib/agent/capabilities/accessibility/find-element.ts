@@ -9,7 +9,7 @@ export const accessibilityFindElementInputSchema = z.object({
   role: z
     .string()
     .optional()
-    .describe("Optional control role filter such as button, edit, or menuitem"),
+    .describe("Optional control role filter such as button, edit, link/hyperlink, or menuitem"),
   waitMs: z
     .number()
     .int()

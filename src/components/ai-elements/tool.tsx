@@ -125,17 +125,74 @@ export type ToolOutputProps = ComponentProps<"div"> & {
   errorText: ToolPart["errorText"];
 };
 
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isDisplayPrimitive(value: unknown): boolean {
+  return (
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean" ||
+    value === null
+  );
+}
+
+/** Key/value lines without JSON string escaping (keeps `\` and real newlines readable). */
+function formatPlainFields(record: Record<string, unknown>): string | null {
+  const entries = Object.entries(record).filter(([, value]) => value !== undefined);
+  if (entries.length === 0) {
+    return null;
+  }
+  if (!entries.every(([, value]) => isDisplayPrimitive(value))) {
+    return null;
+  }
+  return entries
+    .map(([key, value]) => (value === null ? `${key}: null` : `${key}: ${String(value)}`))
+    .join("\n");
+}
+
+function PreText({ children }: { children: string }) {
+  return <pre className="m-0 whitespace-pre-wrap break-words p-2 font-mono">{children}</pre>;
+}
+
+/** Prefer readable text over JSON-escaped `\n` / `\\` / `\"`. */
+function renderToolOutput(output: ToolPart["output"]): ReactNode {
+  if (output == null) {
+    return null;
+  }
+  if (typeof output === "string") {
+    return <PreText>{output}</PreText>;
+  }
+  if (isValidElement(output)) {
+    return output;
+  }
+  if (isPlainRecord(output)) {
+    if (typeof output.text === "string") {
+      const { text, ...rest } = output;
+      const meta = formatPlainFields(rest);
+      return (
+        <div className="space-y-2">
+          {meta ? <PreText>{meta}</PreText> : null}
+          <PreText>{text}</PreText>
+        </div>
+      );
+    }
+    const plain = formatPlainFields(output);
+    if (plain) {
+      return <PreText>{plain}</PreText>;
+    }
+    return <CodeBlock code={JSON.stringify(output, null, 2)} language="json" />;
+  }
+  if (Array.isArray(output)) {
+    return <CodeBlock code={JSON.stringify(output, null, 2)} language="json" />;
+  }
+  return <div>{String(output)}</div>;
+}
+
 export const ToolOutput = ({ className, output, errorText, ...props }: ToolOutputProps) => {
   if (!(output || errorText)) {
     return null;
-  }
-
-  let Output = <div>{output as ReactNode}</div>;
-
-  if (typeof output === "object" && !isValidElement(output)) {
-    Output = <CodeBlock code={JSON.stringify(output, null, 2)} language="json" />;
-  } else if (typeof output === "string") {
-    Output = <CodeBlock code={output} language="json" />;
   }
 
   return (
@@ -150,7 +207,7 @@ export const ToolOutput = ({ className, output, errorText, ...props }: ToolOutpu
         )}
       >
         {errorText && <div>{errorText}</div>}
-        {Output}
+        {renderToolOutput(output)}
       </div>
     </div>
   );

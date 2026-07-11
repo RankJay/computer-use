@@ -11,7 +11,7 @@ export type WindowListOutput = {
 export const windowListCapability = defineCapability({
   name: "window_list",
   description:
-    "List visible top-level windows with handle, process name, and title for window management.",
+    "List visible top-level windows with handle, process name, and title for window management. Prefer this before launching an app that may already be open.",
   risk: "low",
   inputSchema: windowListInputSchema,
 });

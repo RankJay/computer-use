@@ -2,7 +2,7 @@ use crate::capabilities::path_utils::CommandError;
 
 use super::types::{
     ActiveWindowResult, WindowActionResult, WindowListResult, WindowMoveResult, WindowResizeResult,
-    WindowStateOp, WindowStateResult,
+    WindowStateOp, WindowStateResult, TIMEOUT_LIST_WINDOWS_MS,
 };
 
 #[cfg(not(target_os = "windows"))]
@@ -25,9 +25,9 @@ mod windows_impl {
         PROCESS_QUERY_LIMITED_INFORMATION,
     };
     use windows::Win32::UI::WindowsAndMessaging::{
-        EnumWindows, GetForegroundWindow, GetWindowTextW, GetWindowThreadProcessId, IsWindow,
-        IsWindowVisible, PostMessageW, SetForegroundWindow, SetWindowPos, ShowWindow, HWND_TOP,
-        SW_MAXIMIZE, SW_MINIMIZE, SW_RESTORE, WM_CLOSE,
+        EnumWindows, GetForegroundWindow, GetWindowThreadProcessId, IsWindow, IsWindowVisible,
+        PostMessageW, SendMessageTimeoutW, SetForegroundWindow, SetWindowPos, ShowWindow, HWND_TOP,
+        SMTO_ABORTIFHUNG, SW_MAXIMIZE, SW_MINIMIZE, SW_RESTORE, WM_CLOSE, WM_GETTEXT,
     };
 
     use super::*;
@@ -77,19 +77,43 @@ mod windows_impl {
         }
     }
 
+    /// Per-window title read budget. GetWindowTextW can block forever on a hung UI thread;
+    /// SendMessageTimeout + ABORTIFHUNG keeps EnumWindows moving.
+    const TITLE_TIMEOUT_MS: u32 = 50;
+
     fn window_title(hwnd: HWND) -> Option<String> {
         let mut title_buffer = [0u16; 512];
-        let title_len = unsafe { GetWindowTextW(hwnd, &mut title_buffer) };
-        if title_len == 0 {
+        let mut result = 0usize;
+        let sent = unsafe {
+            SendMessageTimeoutW(
+                hwnd,
+                WM_GETTEXT,
+                WPARAM(title_buffer.len()),
+                LPARAM(title_buffer.as_mut_ptr() as isize),
+                SMTO_ABORTIFHUNG,
+                TITLE_TIMEOUT_MS,
+                Some(&mut result),
+            )
+        };
+        if sent.0 == 0 || result == 0 {
             return None;
         }
-        Some(String::from_utf16_lossy(
-            &title_buffer[..title_len as usize],
-        ))
+        let title_len = result.min(title_buffer.len().saturating_sub(1));
+        let title = String::from_utf16_lossy(&title_buffer[..title_len]);
+        if title.is_empty() {
+            None
+        } else {
+            Some(title)
+        }
     }
 
     pub fn list_windows_impl() -> Result<WindowListResult, CommandError> {
-        let mut collector = WindowCollector { lines: Vec::new() };
+        // Phase 1: EnumWindows only collects hwnd/title/pid (fast). Process-image
+        // queries can stall on elevated/hung processes — do those after, with a budget,
+        // so we still return a list instead of timing out the whole command.
+        let mut collector = WindowCollector {
+            entries: Vec::new(),
+        };
         unsafe {
             EnumWindows(
                 Some(enum_visible_window),
@@ -98,13 +122,36 @@ mod windows_impl {
             .map_err(|error| CommandError::new("window_enum_failed", error.to_string()))?;
         }
 
+        // Leave headroom under TIMEOUT_LIST_WINDOWS_MS for channel/send overhead.
+        let name_deadline = std::time::Instant::now()
+            + Duration::from_millis(TIMEOUT_LIST_WINDOWS_MS.saturating_sub(500));
+        let mut lines = Vec::with_capacity(collector.entries.len());
+        for entry in collector.entries {
+            let process_name = if std::time::Instant::now() < name_deadline {
+                process_name_from_pid(entry.process_id)
+                    .unwrap_or_else(|| format!("pid:{}", entry.process_id))
+            } else {
+                format!("pid:{}", entry.process_id)
+            };
+            lines.push(format!(
+                "{}  {}  \"{}\"",
+                entry.hwnd, process_name, entry.title
+            ));
+        }
+
         Ok(WindowListResult {
-            text: collector.lines.join("\n"),
+            text: lines.join("\n"),
         })
     }
 
+    struct WindowEntry {
+        hwnd: i64,
+        title: String,
+        process_id: u32,
+    }
+
     struct WindowCollector {
-        lines: Vec<String>,
+        entries: Vec<WindowEntry>,
     }
 
     unsafe extern "system" fn enum_visible_window(hwnd: HWND, lparam: LPARAM) -> BOOL {
@@ -119,13 +166,11 @@ mod windows_impl {
 
         let mut process_id = 0u32;
         GetWindowThreadProcessId(hwnd, Some(&mut process_id));
-        let process_name =
-            process_name_from_pid(process_id).unwrap_or_else(|| format!("pid:{process_id}"));
-
-        collector.lines.push(format!(
-            "{}  {}  \"{}\"",
-            hwnd.0 as i64, process_name, title
-        ));
+        collector.entries.push(WindowEntry {
+            hwnd: hwnd.0 as i64,
+            title,
+            process_id,
+        });
         ENUM_CONTINUE
     }
 
@@ -282,6 +327,8 @@ mod windows_impl {
     #[cfg(test)]
     mod tests {
         use super::*;
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        use std::time::Instant;
 
         #[test]
         fn rejects_zero_hwnd() {
@@ -293,6 +340,68 @@ mod windows_impl {
         fn rejects_non_positive_resize() {
             let error = resize_window_impl(1, 0, 100).expect_err("invalid width");
             assert_eq!(error.code, "invalid_size");
+        }
+
+        /// Live diagnostic: `cargo test -p actuate --lib diagnose_window_list_latency -- --ignored --nocapture`
+        #[test]
+        #[ignore = "live desktop probe; run manually when window_list misbehaves"]
+        fn diagnose_window_list_latency() {
+            static VISIBLE_ONLY: AtomicUsize = AtomicUsize::new(0);
+            unsafe extern "system" fn count_visible(hwnd: HWND, _: LPARAM) -> BOOL {
+                if IsWindowVisible(hwnd).as_bool() {
+                    VISIBLE_ONLY.fetch_add(1, Ordering::Relaxed);
+                }
+                ENUM_CONTINUE
+            }
+
+            let t0 = Instant::now();
+            unsafe {
+                let _ = EnumWindows(Some(count_visible), LPARAM(0));
+            }
+            let visible_ms = t0.elapsed().as_millis();
+            let visible_count = VISIBLE_ONLY.load(Ordering::Relaxed);
+
+            let t1 = Instant::now();
+            let listed = list_windows_impl();
+            let list_ms = t1.elapsed().as_millis();
+
+            let t2 = Instant::now();
+            let wrapped = run_with_list_timeout(TIMEOUT_LIST_WINDOWS_MS, list_windows_impl);
+            let wrap_ms = t2.elapsed().as_millis();
+
+            let line_count = listed
+                .as_ref()
+                .ok()
+                .map(|r| r.text.lines().count())
+                .unwrap_or(0);
+
+            let report = format!(
+                "window_list diagnose: visible_only={visible_count} in {visible_ms}ms; \
+                 list_windows_impl lines={line_count} in {list_ms}ms ok={}; \
+                 wrapped in {wrap_ms}ms ok={}\n",
+                listed.is_ok(),
+                wrapped.is_ok()
+            );
+            let mut full = report.clone();
+            if let Err(error) = &wrapped {
+                full.push_str(&format!(
+                    "wrapped error: {} — {}\n",
+                    error.code, error.message
+                ));
+            }
+            if let Ok(result) = &listed {
+                let preview: Vec<_> = result.text.lines().take(8).collect();
+                full.push_str(&format!("preview:\n{}\n", preview.join("\n")));
+            }
+            let out = std::env::temp_dir().join("actuate_window_list_diagnose.txt");
+            std::fs::write(&out, &full).expect("write diagnose");
+            eprintln!("{full}");
+            println!("wrote diagnose to {}", out.display());
+
+            assert!(
+                list_ms < 10_000,
+                "list_windows_impl took {list_ms}ms — likely hung GetWindowTextW in EnumWindows"
+            );
         }
     }
 }

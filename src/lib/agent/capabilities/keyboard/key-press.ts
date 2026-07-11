@@ -4,7 +4,7 @@ import { uiAutomationEnabled } from "../shared/ui-automation";
 import { defineCapability } from "../types";
 
 export const keyPressInputSchema = z.object({
-  key: z.string().min(1).describe("Key to press (e.g. enter, tab, up, down, a, f5)"),
+  key: z.string().min(1).describe("Key to press (e.g. enter, tab, slash, /, up, down, a, f5)"),
   count: z.number().int().min(1).optional().describe("Number of press+release cycles (default 1)"),
 });
 
