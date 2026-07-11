@@ -74,6 +74,28 @@ fn show_main_window(app: &AppHandle) {
     let _ = window.set_focus();
 }
 
+/// Show, focus, or hide the main window.
+/// Hidden → show+focus. Visible but unfocused → focus. Focused → hide.
+#[cfg(desktop)]
+pub fn toggle_main_window(app: &AppHandle) {
+    let Some(window) = app.get_webview_window("main") else {
+        return;
+    };
+    if !window.is_visible().unwrap_or(false) {
+        let _ = window.show();
+        set_taskbar_visible(&window, true);
+        let _ = window.set_focus();
+        return;
+    }
+    if window.is_focused().unwrap_or(false) {
+        let _ = window.hide();
+        set_taskbar_visible(&window, false);
+        return;
+    }
+    let _ = window.unminimize();
+    let _ = window.set_focus();
+}
+
 /// Show the main window once the frontend has painted its first ready frame.
 pub fn reveal_main_window_once(app: &AppHandle) {
     #[cfg(desktop)]

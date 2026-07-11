@@ -153,7 +153,7 @@ function formatPlainFields(record: Record<string, unknown>): string | null {
 }
 
 function PreText({ children }: { children: string }) {
-  return <pre className="m-0 whitespace-pre-wrap break-words p-2 font-mono">{children}</pre>;
+  return <pre className="m-0 whitespace-pre-wrap wrap-break-word p-2 font-mono">{children}</pre>;
 }
 
 /** Prefer readable text over JSON-escaped `\n` / `\\` / `\"`. */

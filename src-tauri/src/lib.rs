@@ -35,7 +35,10 @@ fn setup_desktop(app: &mut tauri::App) -> tauri::Result<()> {
         tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     };
 
-    use commands::window::{reveal_main_window_once, set_taskbar_visible};
+    use commands::window::{reveal_main_window_once, set_taskbar_visible, toggle_main_window};
+    use tauri_plugin_global_shortcut::{
+        Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState,
+    };
 
     let show = MenuItem::with_id(app, "show", "Show", true, None::<&str>)?;
     let hide = MenuItem::with_id(app, "hide", "Hide", true, None::<&str>)?;
@@ -72,21 +75,24 @@ fn setup_desktop(app: &mut tauri::App) -> tauri::Result<()> {
                 ..
             } = event
             {
-                let app = tray.app_handle();
-                let Some(window) = app.get_webview_window("main") else {
-                    return;
-                };
-                if window.is_visible().unwrap_or(false) {
-                    let _ = window.hide();
-                    set_taskbar_visible(&window, false);
-                } else {
-                    let _ = window.show();
-                    set_taskbar_visible(&window, true);
-                    let _ = window.set_focus();
-                }
+                toggle_main_window(tray.app_handle());
             }
         })
         .build(app)?;
+
+    let toggle_shortcut = Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::KeyA);
+    app.handle().plugin(
+        tauri_plugin_global_shortcut::Builder::new()
+            .with_handler(|app, _shortcut, event| {
+                if event.state() == ShortcutState::Pressed {
+                    toggle_main_window(app);
+                }
+            })
+            .build(),
+    )?;
+    app.global_shortcut()
+        .register(toggle_shortcut)
+        .map_err(|e| tauri::Error::Io(std::io::Error::other(e.to_string())))?;
 
     let window = app
         .get_webview_window("main")
