@@ -16,6 +16,9 @@ use capabilities::{
     write_clipboard_image, write_file, SnapshotStore,
 };
 
+#[cfg(all(windows, feature = "a11y-bench"))]
+pub use capabilities::bench as a11y_bench;
+
 #[cfg(desktop)]
 fn apply_frameless_window(window: &tauri::WebviewWindow) {
     let _ = window.set_decorations(false);

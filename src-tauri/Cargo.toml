@@ -42,5 +42,9 @@ tauri-plugin-window-state = "2"
 uiautomation = "0.25.0"
 windows = { version = "0.62.2", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_HiDpi", "Win32_System_Threading", "Win32_System_ProcessStatus", "Win32_System_Diagnostics_ToolHelp"] }
 
+[features]
+default = []
+a11y-bench = []
+
 [profile.dev.package.scrypt]
 opt-level = 3

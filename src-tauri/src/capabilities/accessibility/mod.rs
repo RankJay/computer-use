@@ -7,6 +7,9 @@ mod worker;
 #[cfg(target_os = "windows")]
 mod windows_impl;
 
+#[cfg(all(windows, feature = "a11y-bench"))]
+pub mod bench;
+
 pub use commands::{
     accessibility_click, accessibility_expand_node, accessibility_find_element, accessibility_focus,
     accessibility_get_value, accessibility_invoke_action, accessibility_right_click_element,

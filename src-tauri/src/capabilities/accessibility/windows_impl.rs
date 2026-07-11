@@ -9,13 +9,14 @@ use uiautomation::patterns::{
     UIScrollItemPattern, UIScrollPattern, UISelectionItemPattern, UITogglePattern, UIValuePattern,
     UIPatternType,
 };
-use uiautomation::types::{ControlType, Handle, ScrollAmount, UIProperty};
+use uiautomation::types::{ControlType, Handle, ScrollAmount, TreeScope, UIProperty};
+use uiautomation::variants::{Value, Variant};
 use windows::Win32::Foundation::HWND;
 use windows::Win32::UI::WindowsAndMessaging::GetWindowThreadProcessId;
 
 use crate::capabilities::path_utils::CommandError;
 
-use super::budget::{SearchBudget, FIND_MAX_NODES, RESOLVE_MAX_NODES, SNAPSHOT_MAX_NODES};
+use super::budget::{SearchBudget, FIND_MAX_NODES, SNAPSHOT_MAX_NODES};
 use super::state::{make_reference, SnapshotStore, StoredElement};
 use super::types::{
     ActionResult, FindElementInput, GetValueResult, MAX_FIND_CANDIDATES, MAX_WAIT_MS, SnapshotInput,
@@ -54,19 +55,32 @@ const FIND_WALK_MAX_DEPTH: u32 = 24;
 const FIND_MATCHER_MAX_DEPTH: u32 = 32;
 const MAX_SIBLING_REPEAT: u32 = 3;
 const FIND_MAX_SIBLING_REPEAT: u32 = 64;
-const RESOLVE_MAX_DEPTH: u32 = 48;
 const RESOLVE_RETRY_ATTEMPTS: u32 = 3;
 const TRANSIENT_UIA_RETRY_MS: u64 = 120;
+
+#[cfg_attr(not(feature = "a11y-bench"), allow(dead_code))]
+pub struct SnapshotStats {
+    pub nodes_visited: u32,
+    pub emitted: u32,
+}
 
 pub fn snapshot_impl(
     store: &SnapshotStore,
     input: SnapshotInput,
 ) -> Result<TextResult, CommandError> {
+    Ok(snapshot_with_stats(store, input)?.0)
+}
+
+#[cfg_attr(not(feature = "a11y-bench"), allow(dead_code))]
+pub fn snapshot_with_stats(
+    store: &SnapshotStore,
+    input: SnapshotInput,
+) -> Result<(TextResult, SnapshotStats), CommandError> {
     let session = UiaSession::new()?;
     let handle = hwnd_from_i64(input.hwnd)?;
     let root = session
         .automation
-        .element_from_handle(handle)
+        .element_from_handle_build_cache(handle, &session.cache_request)
         .map_err(|error| map_uia_error(error, "snapshot_failed"))?;
     let process_id = root
         .get_process_id()
@@ -97,10 +111,17 @@ pub fn snapshot_impl(
         &mut budget,
     )?;
 
-    Ok(TextResult {
-        text: builder.finish(),
-        generation: Some(generation),
-    })
+    let stats = SnapshotStats {
+        nodes_visited: budget.nodes_visited(),
+        emitted: builder.emitted,
+    };
+    Ok((
+        TextResult {
+            text: builder.finish(),
+            generation: Some(generation),
+        },
+        stats,
+    ))
 }
 
 pub fn find_element_impl(
@@ -146,7 +167,7 @@ fn find_element_once(
     let handle = hwnd_from_i64(input.hwnd)?;
     let root = session
         .automation
-        .element_from_handle(handle)
+        .element_from_handle_build_cache(handle, &session.cache_request)
         .map_err(|error| map_uia_error(error, "find_failed"))?;
     let process_id = root
         .get_process_id()
@@ -206,9 +227,8 @@ fn find_element_once(
     let mut lines = Vec::new();
     for (index, element) in matches.into_iter().take(MAX_FIND_CANDIDATES).enumerate() {
         let reference = make_reference((index + 1) as u32, generation);
-        let runtime_id = element
-            .get_runtime_id()
-            .map_err(|error| map_uia_error(error, "find_failed"))?;
+        let runtime_id =
+            element_runtime_id(&element).map_err(|error| map_uia_error(error, "find_failed"))?;
         let (name, role) = element_storage_hints(&element);
         store.store_element(
             input.hwnd,
@@ -902,6 +922,7 @@ impl UiaSession {
             UIProperty::IsOffscreen,
             UIProperty::BoundingRectangle,
             UIProperty::ValueValue,
+            UIProperty::RuntimeId,
             UIProperty::IsInvokePatternAvailable,
             UIProperty::IsValuePatternAvailable,
             UIProperty::IsTogglePatternAvailable,
@@ -993,8 +1014,7 @@ impl<'a> OutlineBuilder<'a> {
             return Ok(());
         }
 
-        let control_type = element
-            .get_control_type()
+        let control_type = element_control_type(element)
             .map_err(|error| map_uia_error(error, "snapshot_failed"))?;
 
         if should_skip_control(control_type) {
@@ -1005,8 +1025,7 @@ impl<'a> OutlineBuilder<'a> {
         if is_interactive_or_named(element, control_type)? || collapse {
             self.next_index += 1;
             let reference = make_reference(self.next_index, self.generation);
-            let runtime_id = element
-                .get_runtime_id()
+            let runtime_id = element_runtime_id(element)
                 .map_err(|error| map_uia_error(error, "snapshot_failed"))?;
             let (name, role) = element_storage_hints(element);
             self.store.store_element(
@@ -1093,8 +1112,7 @@ impl<'a> ElementFinder<'a> {
             return Ok(());
         }
 
-        let control_type = element
-            .get_control_type()
+        let control_type = element_control_type(element)
             .map_err(|error| map_uia_error(error, "find_failed"))?;
 
         if should_skip_control(control_type) {
@@ -1150,10 +1168,7 @@ fn element_matches(
         }
     }
 
-    let name = element
-        .get_name()
-        .unwrap_or_default()
-        .to_ascii_lowercase();
+    let name = element_name(element).to_ascii_lowercase();
     Ok(name.contains(name_filter))
 }
 
@@ -1162,23 +1177,18 @@ fn format_element_line(
     depth: u32,
     reference: &str,
 ) -> Result<String, CommandError> {
-    let role = element
-        .get_control_type()
+    let role = element_control_type(element)
         .map(|control_type| control_type.to_string())
         .unwrap_or_else(|_| "unknown".to_string());
-    let name = element
-        .get_name()
-        .unwrap_or_default()
-        .replace('"', "'");
+    let name = element_name(element).replace('"', "'");
     let mut state: Vec<String> = Vec::new();
-    if element.is_enabled().ok() == Some(false) {
+    if element_is_enabled(element) == Some(false) {
         state.push("disabled".to_string());
     }
-    if element.is_offscreen().ok() == Some(true) {
+    if element_is_offscreen(element) == Some(true) {
         state.push("offscreen".to_string());
     }
-    if let Ok(value) = element.get_property_value(UIProperty::ValueValue) {
-        let value_text = value.to_string();
+    if let Some(value_text) = element_value_text(element) {
         if is_useful_value(&value_text) {
             state.push(format!("value=\"{}\"", value_text.replace('"', "'")));
         }
@@ -1198,22 +1208,99 @@ fn format_element_line(
 }
 
 fn element_storage_hints(element: &UIElement) -> (String, Option<String>) {
-    let name = element.get_name().unwrap_or_default();
-    let role = element
-        .get_control_type()
+    let name = element_name(element);
+    let role = element_control_type(element)
         .ok()
         .map(|control_type| control_type.to_string());
     (name, role)
+}
+
+fn element_name(element: &UIElement) -> String {
+    element
+        .get_cached_name()
+        .or_else(|_| element.get_name())
+        .unwrap_or_default()
+}
+
+fn element_control_type(element: &UIElement) -> Result<ControlType, uiautomation::Error> {
+    element
+        .get_cached_control_type()
+        .or_else(|_| element.get_control_type())
+}
+
+fn element_is_enabled(element: &UIElement) -> Option<bool> {
+    element
+        .is_cached_enabled()
+        .or_else(|_| element.is_enabled())
+        .ok()
+}
+
+fn element_is_offscreen(element: &UIElement) -> Option<bool> {
+    element
+        .is_cached_offscreen()
+        .or_else(|_| element.is_offscreen())
+        .ok()
+}
+
+fn element_value_text(element: &UIElement) -> Option<String> {
+    element
+        .get_cached_property_value(UIProperty::ValueValue)
+        .or_else(|_| element.get_property_value(UIProperty::ValueValue))
+        .ok()
+        .map(|value| value.to_string())
+}
+
+fn element_runtime_id(element: &UIElement) -> Result<Vec<i32>, uiautomation::Error> {
+    if let Ok(variant) = element.get_cached_property_value(UIProperty::RuntimeId) {
+        if let Ok(ids) = runtime_id_from_variant(&variant) {
+            return Ok(ids);
+        }
+    }
+    element.get_runtime_id()
+}
+
+fn runtime_id_from_variant(variant: &Variant) -> Result<Vec<i32>, uiautomation::Error> {
+    match TryInto::<Value>::try_into(variant)? {
+        Value::ArrayI4(ids) => Ok(ids),
+        Value::SAFEARRAY(arr) => arr.try_into(),
+        _ => {
+            let arr = variant.get_array()?;
+            arr.try_into()
+        }
+    }
 }
 
 fn resolve_stored_element(
     session: &UiaSession,
     stored: &StoredElement,
 ) -> Result<UIElement, CommandError> {
+    Ok(resolve_stored_element_with_stats(session, stored)?.0)
+}
+
+#[cfg_attr(not(feature = "a11y-bench"), allow(dead_code))]
+pub struct ResolveStats {
+    pub nodes_visited: u32,
+}
+
+/// Resolve a stored reference and return visit stats (for a11y-bench).
+#[cfg_attr(not(feature = "a11y-bench"), allow(dead_code))]
+pub fn resolve_reference_with_stats(
+    store: &SnapshotStore,
+    reference: &str,
+) -> Result<ResolveStats, CommandError> {
+    let stored = store.resolve_ref_or_stale(reference)?;
+    let session = UiaSession::new()?;
+    Ok(resolve_stored_element_with_stats(&session, &stored)?.1)
+}
+
+fn resolve_stored_element_with_stats(
+    session: &UiaSession,
+    stored: &StoredElement,
+) -> Result<(UIElement, ResolveStats), CommandError> {
     let mut last_error: Option<CommandError> = None;
     for attempt in 0..RESOLVE_RETRY_ATTEMPTS {
         match resolve_stored_element_once(session, stored) {
-            Ok(element) => return Ok(element),
+            Ok(result) => return Ok(result),
             Err(error) if is_transient_command_error(&error) && attempt + 1 < RESOLVE_RETRY_ATTEMPTS => {
                 last_error = Some(error);
                 thread::sleep(Duration::from_millis(
@@ -1232,27 +1319,30 @@ fn resolve_stored_element(
 fn resolve_stored_element_once(
     session: &UiaSession,
     stored: &StoredElement,
-) -> Result<UIElement, CommandError> {
+) -> Result<(UIElement, ResolveStats), CommandError> {
     let handle = hwnd_from_i64(stored.hwnd)?;
     let root = session
         .automation
         .element_from_handle_build_cache(handle, &session.cache_request)
         .map_err(|error| map_uia_error(error, "resolve_failed"))?;
 
-    if let Some(element) = find_by_runtime_id(
-        &session.automation,
-        &root,
-        &stored.runtime_id,
-        0,
-        RESOLVE_MAX_DEPTH,
-        &mut SearchBudget::for_duration(Duration::from_millis(4_000), RESOLVE_MAX_NODES),
-    ) {
-        return Ok(element);
+    if let Some(element) = find_by_runtime_id(session, &root, &stored.runtime_id)? {
+        return Ok((
+            element,
+            ResolveStats {
+                nodes_visited: 1,
+            },
+        ));
     }
 
     if !stored.name.trim().is_empty() {
         if let Some(element) = resolve_element_by_hints(session, stored, &root) {
-            return Ok(element);
+            return Ok((
+                element,
+                ResolveStats {
+                    nodes_visited: 0,
+                },
+            ));
         }
     }
 
@@ -1295,31 +1385,25 @@ fn parse_role_label(role: &str) -> Option<ControlType> {
 }
 
 fn find_by_runtime_id(
-    automation: &UIAutomation,
-    current: &UIElement,
+    session: &UiaSession,
+    root: &UIElement,
     target: &[i32],
-    depth: u32,
-    max_depth: u32,
-    budget: &mut SearchBudget,
-) -> Option<UIElement> {
-    if current.get_runtime_id().ok().as_deref() == Some(target) {
-        return Some(current.clone());
-    }
-    if depth >= max_depth || !budget.visit_soft() {
-        return None;
+) -> Result<Option<UIElement>, CommandError> {
+    if target.is_empty() {
+        return Ok(None);
     }
 
-    let walker = automation.get_control_view_walker().ok()?;
-    let mut child = walker.get_first_child(current).ok();
-    while let Some(current_child) = child {
-        if let Some(found) =
-            find_by_runtime_id(automation, &current_child, target, depth + 1, max_depth, budget)
-        {
-            return Some(found);
-        }
-        child = walker.get_next_sibling(&current_child).ok();
+    let variant = Variant::from(Value::ArrayI4(target.to_vec()));
+    let condition = session
+        .automation
+        .create_property_condition(UIProperty::RuntimeId, variant, None)
+        .map_err(|error| map_uia_error(error, "resolve_failed"))?;
+
+    match root.find_first_build_cache(TreeScope::Subtree, &condition, &session.cache_request) {
+        Ok(element) => Ok(Some(element)),
+        Err(error) if error.code() == ERR_NOTFOUND => Ok(None),
+        Err(error) => Err(map_uia_error(error, "resolve_failed")),
     }
-    None
 }
 
 fn foreground_window(session: &UiaSession, hwnd: i64) -> Result<bool, CommandError> {
@@ -1368,7 +1452,7 @@ fn is_interactive_or_named(element: &UIElement, control_type: ControlType) -> Re
     if is_interactive_control(control_type) {
         return Ok(true);
     }
-    let name = element.get_name().unwrap_or_default();
+    let name = element_name(element);
     Ok(!name.trim().is_empty())
 }
 

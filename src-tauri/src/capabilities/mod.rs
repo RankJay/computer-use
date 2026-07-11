@@ -16,6 +16,9 @@ pub use accessibility::{
     accessibility_scroll_element, accessibility_send_keys, accessibility_set_value,
     accessibility_snapshot, SnapshotStore,
 };
+
+#[cfg(all(windows, feature = "a11y-bench"))]
+pub use accessibility::bench;
 pub use clipboard::{
     read_clipboard, read_clipboard_html, read_clipboard_image, write_clipboard,
     write_clipboard_html, write_clipboard_image,

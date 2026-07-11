@@ -2,6 +2,8 @@ use std::time::{Duration, Instant};
 
 pub const FIND_MAX_NODES: u32 = 2_500;
 pub const SNAPSHOT_MAX_NODES: u32 = 600;
+/// Retained for resolve budgets if a DFS fallback is reintroduced.
+#[allow(dead_code)]
 pub const RESOLVE_MAX_NODES: u32 = 2_500;
 
 #[derive(Debug, Clone, Copy)]
@@ -35,5 +37,9 @@ impl SearchBudget {
     pub fn visit_soft(&mut self) -> bool {
         self.nodes_visited = self.nodes_visited.saturating_add(1);
         !self.exhausted()
+    }
+
+    pub fn nodes_visited(&self) -> u32 {
+        self.nodes_visited
     }
 }
