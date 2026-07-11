@@ -13,6 +13,7 @@ use windows::Win32::Foundation::{HWND, LPARAM};
 use windows::Win32::UI::WindowsAndMessaging::{EnumWindows, GetWindowTextW, IsWindowVisible};
 
 use crate::capabilities::error::{CommandError, ErrorCode};
+use crate::capabilities::window::WindowId;
 
 use super::state::SnapshotStore;
 use super::types::SnapshotInput;
@@ -85,7 +86,7 @@ where
     runtime.block_on(run(timeout, work))
 }
 
-fn bench_snapshot(fixture: &str, hwnd: i64) -> BenchSummary {
+fn bench_snapshot(fixture: &str, hwnd: WindowId) -> BenchSummary {
     let store = SnapshotStore::default();
     let mut samples = Vec::with_capacity(RUNS);
     for _ in 0..RUNS {
@@ -147,7 +148,7 @@ fn bench_snapshot(fixture: &str, hwnd: i64) -> BenchSummary {
     summarize("snapshot", fixture, samples)
 }
 
-fn bench_resolve(fixture: &str, hwnd: i64) -> BenchSummary {
+fn bench_resolve(fixture: &str, hwnd: WindowId) -> BenchSummary {
     let store = SnapshotStore::default();
     let input = SnapshotInput {
         hwnd: Some(hwnd),
@@ -304,7 +305,7 @@ fn first_reference(outline: &str) -> Option<String> {
     None
 }
 
-fn ensure_notepad_hwnd() -> Option<i64> {
+fn ensure_notepad_hwnd() -> Option<WindowId> {
     if let Some(hwnd) = find_window_title_contains(&["Notepad", "Untitled - Notepad"]) {
         return Some(hwnd);
     }
@@ -318,7 +319,7 @@ fn ensure_notepad_hwnd() -> Option<i64> {
     None
 }
 
-fn ensure_explorer_hwnd() -> Option<i64> {
+fn ensure_explorer_hwnd() -> Option<WindowId> {
     if let Some(hwnd) =
         find_window_title_contains(&["File Explorer", "Exploring", "This PC", "Quick access"])
     {
@@ -390,7 +391,7 @@ fn bench_timeout_recovery() -> BenchSummary {
     summarize("timeout_recovery", "induced_slow", samples)
 }
 
-fn find_window_title_contains(needles: &[&str]) -> Option<i64> {
+fn find_window_title_contains(needles: &[&str]) -> Option<WindowId> {
     let mut state = EnumState {
         needles: needles.iter().map(|s| (*s).to_string()).collect(),
         found: None,
@@ -406,7 +407,7 @@ fn find_window_title_contains(needles: &[&str]) -> Option<i64> {
 
 struct EnumState {
     needles: Vec<String>,
-    found: Option<i64>,
+    found: Option<WindowId>,
 }
 
 unsafe extern "system" fn enum_windows_callback(hwnd: HWND, lparam: LPARAM) -> BOOL {
@@ -424,7 +425,7 @@ unsafe extern "system" fn enum_windows_callback(hwnd: HWND, lparam: LPARAM) -> B
     }
     let title = String::from_utf16_lossy(&buf[..len as usize]);
     if state.needles.iter().any(|needle| title.contains(needle)) {
-        state.found = Some(hwnd.0 as isize as i64);
+        state.found = Some(WindowId(hwnd.0 as isize as i64));
         return BOOL(0);
     }
     BOOL(1)

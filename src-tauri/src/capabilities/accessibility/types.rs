@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+use crate::capabilities::window::WindowId;
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TextResult {
@@ -57,7 +59,7 @@ pub struct GetTextResult {
 
 #[derive(Debug, Deserialize)]
 pub struct SnapshotInput {
-    pub hwnd: Option<i64>,
+    pub hwnd: Option<WindowId>,
     pub reference: Option<String>,
     #[serde(default = "default_max_depth")]
     pub max_depth: u32,
@@ -80,7 +82,7 @@ pub const SIBLING_FINGERPRINT_EMIT: u32 = 3;
 
 #[derive(Debug, Deserialize)]
 pub struct FindElementInput {
-    pub hwnd: i64,
+    pub hwnd: WindowId,
     pub name_contains: String,
     pub role: Option<String>,
     #[serde(default)]
@@ -90,7 +92,7 @@ pub struct FindElementInput {
 
 #[derive(Debug, Deserialize)]
 pub struct QueryInput {
-    pub hwnd: i64,
+    pub hwnd: WindowId,
     pub name: Option<String>,
     pub name_contains: Option<String>,
     pub automation_id: Option<String>,

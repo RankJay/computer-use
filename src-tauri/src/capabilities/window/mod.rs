@@ -1,20 +1,31 @@
-mod active;
-mod focus;
-mod geometry;
-mod list;
-mod resize;
-mod state;
+mod commands;
+mod manager;
 mod types;
 
-#[cfg(target_os = "windows")]
-mod platform;
+#[cfg(windows)]
+mod win32;
 
-#[cfg(not(target_os = "windows"))]
-mod platform;
+#[cfg(not(windows))]
+mod unsupported;
 
-pub use active::get_active_window;
-pub use focus::window_focus;
-pub use geometry::window_move;
-pub use list::window_list;
-pub use resize::window_resize;
-pub use state::window_state;
+pub use commands::{
+    get_active_window, window_focus, window_list, window_move, window_resize, window_state,
+};
+pub use types::WindowId;
+
+use manager::WindowManager;
+
+/// Process-wide window manager. Single `#[cfg]` switch for the adapter.
+pub fn manager() -> &'static dyn WindowManager {
+    #[cfg(windows)]
+    {
+        static MANAGER: win32::Win32WindowManager = win32::Win32WindowManager;
+        &MANAGER
+    }
+    #[cfg(not(windows))]
+    {
+        static MANAGER: unsupported::UnsupportedWindowManager =
+            unsupported::UnsupportedWindowManager;
+        &MANAGER
+    }
+}

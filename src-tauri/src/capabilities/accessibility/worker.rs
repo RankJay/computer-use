@@ -15,6 +15,7 @@ use std::time::{Duration, Instant};
 #[cfg(not(target_os = "windows"))]
 use crate::capabilities::error::unsupported_platform;
 use crate::capabilities::error::{CommandError, ErrorCode};
+use crate::capabilities::window::WindowId;
 
 use super::arena::HwndArena;
 
@@ -30,8 +31,8 @@ pub struct WorkerCtx {
     pub deadline: Instant,
     #[cfg(windows)]
     session: Result<super::windows_impl::UiaSession, CommandError>,
-    /// Last extracted tree per HWND (worker-thread-local).
-    pub arenas: HashMap<i64, HwndArena>,
+    /// Last extracted tree per window (worker-thread-local).
+    pub arenas: HashMap<WindowId, HwndArena>,
 }
 
 impl WorkerCtx {
@@ -41,7 +42,7 @@ impl WorkerCtx {
     ) -> Result<
         (
             &super::windows_impl::UiaSession,
-            &mut HashMap<i64, HwndArena>,
+            &mut HashMap<WindowId, HwndArena>,
             Instant,
         ),
         CommandError,

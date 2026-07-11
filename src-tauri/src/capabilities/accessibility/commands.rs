@@ -5,6 +5,7 @@ use tauri::State;
 #[cfg(not(target_os = "windows"))]
 use crate::capabilities::error::unsupported_platform;
 use crate::capabilities::error::{CommandError, ErrorCode};
+use crate::capabilities::window::WindowId;
 
 use super::state::SnapshotStore;
 use super::types::{
@@ -19,7 +20,7 @@ use super::windows_impl;
 #[tauri::command]
 pub async fn accessibility_snapshot(
     store: State<'_, SnapshotStore>,
-    hwnd: Option<i64>,
+    hwnd: Option<WindowId>,
     reference: Option<String>,
     max_depth: Option<u32>,
     max_elements: Option<u32>,
@@ -90,7 +91,7 @@ pub async fn accessibility_snapshot(
 #[tauri::command]
 pub async fn accessibility_find_element(
     store: State<'_, SnapshotStore>,
-    hwnd: i64,
+    hwnd: WindowId,
     name_contains: String,
     role: Option<String>,
     wait_ms: Option<u64>,
@@ -149,7 +150,7 @@ pub async fn accessibility_find_element(
 #[tauri::command]
 pub async fn accessibility_query(
     store: State<'_, SnapshotStore>,
-    hwnd: i64,
+    hwnd: WindowId,
     name: Option<String>,
     name_contains: Option<String>,
     automation_id: Option<String>,
@@ -230,7 +231,7 @@ pub async fn accessibility_query(
 #[tauri::command]
 pub async fn accessibility_wait(
     store: State<'_, SnapshotStore>,
-    hwnd: i64,
+    hwnd: WindowId,
     name: Option<String>,
     name_contains: Option<String>,
     automation_id: Option<String>,
@@ -334,7 +335,7 @@ pub async fn accessibility_get_text(
 #[tauri::command]
 pub async fn accessibility_get_focused(
     store: State<'_, SnapshotStore>,
-    hwnd: Option<i64>,
+    hwnd: Option<WindowId>,
 ) -> Result<TextResult, CommandError> {
     #[cfg(target_os = "windows")]
     {
@@ -363,7 +364,7 @@ pub async fn accessibility_element_at_point(
     store: State<'_, SnapshotStore>,
     x: i32,
     y: i32,
-    hwnd: Option<i64>,
+    hwnd: Option<WindowId>,
 ) -> Result<TextResult, CommandError> {
     #[cfg(target_os = "windows")]
     {
@@ -487,7 +488,7 @@ pub async fn accessibility_set_value(
 #[tauri::command]
 pub async fn accessibility_send_keys(
     store: State<'_, SnapshotStore>,
-    hwnd: i64,
+    hwnd: WindowId,
     text: String,
     reference: Option<String>,
 ) -> Result<ActionResult, CommandError> {

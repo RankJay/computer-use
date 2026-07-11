@@ -3,12 +3,13 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use crate::capabilities::error::{CommandError, ErrorCode};
+use crate::capabilities::window::WindowId;
 
 use super::types::MAX_GENERATIONS_PER_HWND;
 
 #[derive(Debug, Clone)]
 pub struct StoredElement {
-    pub hwnd: i64,
+    pub hwnd: WindowId,
     pub runtime_id: Vec<i32>,
     pub process_id: u32,
     pub name: String,
@@ -25,7 +26,7 @@ struct GenerationEntry {
 }
 
 #[derive(Debug, Default)]
-struct HwndState {
+struct WindowStoreState {
     next_generation: u32,
     generations: VecDeque<GenerationEntry>,
 }
@@ -37,14 +38,14 @@ pub struct SnapshotStore {
 
 #[derive(Debug, Default)]
 struct StoreInner {
-    windows: HashMap<i64, HwndState>,
+    windows: HashMap<WindowId, WindowStoreState>,
     touched_processes: HashMap<u32, bool>,
     degraded_processes: HashMap<u32, Instant>,
     timeout_counts: HashMap<u32, u32>,
 }
 
 impl SnapshotStore {
-    pub fn begin_generation(&self, hwnd: i64) -> u32 {
+    pub fn begin_generation(&self, hwnd: WindowId) -> u32 {
         let mut inner = self.inner.lock().expect("snapshot store poisoned");
         let state = inner.windows.entry(hwnd).or_default();
         state.next_generation = state.next_generation.saturating_add(1);
@@ -61,7 +62,7 @@ impl SnapshotStore {
 
     pub fn store_element(
         &self,
-        hwnd: i64,
+        hwnd: WindowId,
         generation: u32,
         reference: String,
         element: StoredElement,
@@ -152,18 +153,18 @@ impl SnapshotStore {
     }
 }
 
-pub fn make_reference(index: u32, generation: u32, hwnd: i64) -> String {
+pub fn make_reference(index: u32, generation: u32, hwnd: WindowId) -> String {
     format!("e{index}@{generation}:{hwnd}")
 }
 
-/// Parse `e{index}@{generation}:{hwnd}`.
-pub fn parse_reference(reference: &str) -> Option<(u32, u32, i64)> {
+/// Parse `e{index}@{generation}:{id}` (wire digits unchanged).
+pub fn parse_reference(reference: &str) -> Option<(u32, u32, WindowId)> {
     let rest = reference.strip_prefix('e')?;
     let (index_str, after_index) = rest.split_once('@')?;
-    let (generation_str, hwnd_str) = after_index.split_once(':')?;
+    let (generation_str, id_str) = after_index.split_once(':')?;
     let index = index_str.parse().ok()?;
     let generation = generation_str.parse().ok()?;
-    let hwnd = hwnd_str.parse().ok()?;
+    let hwnd = WindowId(id_str.parse().ok()?);
     Some((index, generation, hwnd))
 }
 
@@ -171,7 +172,7 @@ pub fn parse_reference(reference: &str) -> Option<(u32, u32, i64)> {
 mod tests {
     use super::*;
 
-    fn sample_element(hwnd: i64, name: &str) -> StoredElement {
+    fn sample_element(hwnd: WindowId, name: &str) -> StoredElement {
         StoredElement {
             hwnd,
             runtime_id: vec![1, 2],
@@ -187,7 +188,7 @@ mod tests {
     #[test]
     fn keeps_only_last_two_generations() {
         let store = SnapshotStore::default();
-        let hwnd = 12345;
+        let hwnd = WindowId(12345);
 
         let g1 = store.begin_generation(hwnd);
         store.store_element(
@@ -219,8 +220,8 @@ mod tests {
     #[test]
     fn refs_are_hwnd_scoped_and_do_not_collide_across_windows() {
         let store = SnapshotStore::default();
-        let hwnd_a = 100;
-        let hwnd_b = 200;
+        let hwnd_a = WindowId(100);
+        let hwnd_b = WindowId(200);
 
         let g_a = store.begin_generation(hwnd_a);
         let g_b = store.begin_generation(hwnd_b);
@@ -244,8 +245,11 @@ mod tests {
 
     #[test]
     fn parse_reference_round_trips() {
-        let reference = make_reference(14, 3, 987654321);
-        assert_eq!(parse_reference(&reference), Some((14, 3, 987654321)));
+        let reference = make_reference(14, 3, WindowId(987654321));
+        assert_eq!(
+            parse_reference(&reference),
+            Some((14, 3, WindowId(987654321)))
+        );
         assert!(parse_reference("e14@3").is_none());
         assert!(parse_reference("not-a-ref").is_none());
     }

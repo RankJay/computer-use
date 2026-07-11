@@ -18,6 +18,7 @@ use windows::Win32::Foundation::HWND;
 use windows::Win32::UI::WindowsAndMessaging::GetWindowThreadProcessId;
 
 use crate::capabilities::error::{CommandError, ErrorCode};
+use crate::capabilities::window::WindowId;
 
 use super::arena::{HwndArena, NodeRecord};
 use super::budget::{SearchBudget, FIND_MAX_NODES, SNAPSHOT_MAX_NODES};
@@ -28,8 +29,8 @@ use super::types::{
     WAIT_POLL_MS,
 };
 
-fn process_id_for_hwnd(hwnd: i64) -> Option<u32> {
-    let handle = hwnd_from_i64(hwnd).ok()?;
+fn process_id_for_hwnd(hwnd: WindowId) -> Option<u32> {
+    let handle = hwnd_from_id(hwnd).ok()?;
     let mut process_id = 0u32;
     unsafe {
         GetWindowThreadProcessId(handle.into(), Some(&mut process_id));
@@ -41,7 +42,7 @@ fn process_id_for_hwnd(hwnd: i64) -> Option<u32> {
     }
 }
 
-pub fn snapshot_timeout_ms(store: &SnapshotStore, hwnd: i64) -> u64 {
+pub fn snapshot_timeout_ms(store: &SnapshotStore, hwnd: WindowId) -> u64 {
     if let Some(process_id) = process_id_for_hwnd(hwnd) {
         if !store.was_process_touched(process_id) {
             return super::types::TIMEOUT_SNAPSHOT_FIRST_TOUCH_MS;
@@ -50,7 +51,7 @@ pub fn snapshot_timeout_ms(store: &SnapshotStore, hwnd: i64) -> u64 {
     super::types::TIMEOUT_SNAPSHOT_MS
 }
 
-pub fn process_id_for_hwnd_command(hwnd: i64) -> Option<u32> {
+pub fn process_id_for_hwnd_command(hwnd: WindowId) -> Option<u32> {
     process_id_for_hwnd(hwnd)
 }
 
@@ -67,7 +68,7 @@ pub struct SnapshotStats {
 
 pub fn snapshot_impl(
     session: &UiaSession,
-    arenas: &mut HashMap<i64, HwndArena>,
+    arenas: &mut HashMap<WindowId, HwndArena>,
     store: &SnapshotStore,
     input: SnapshotInput,
     deadline: Instant,
@@ -78,7 +79,7 @@ pub fn snapshot_impl(
 #[cfg_attr(not(feature = "a11y-bench"), allow(dead_code))]
 pub fn snapshot_with_stats(
     session: &UiaSession,
-    arenas: &mut HashMap<i64, HwndArena>,
+    arenas: &mut HashMap<WindowId, HwndArena>,
     store: &SnapshotStore,
     input: SnapshotInput,
     deadline: Instant,
@@ -117,9 +118,9 @@ pub fn snapshot_with_stats(
 
 fn snapshot_from_hwnd(
     session: &UiaSession,
-    arenas: &mut HashMap<i64, HwndArena>,
+    arenas: &mut HashMap<WindowId, HwndArena>,
     store: &SnapshotStore,
-    hwnd: i64,
+    hwnd: WindowId,
     max_depth: u32,
     max_elements: u32,
     deadline: Instant,
@@ -168,10 +169,10 @@ fn snapshot_from_hwnd(
 
 fn snapshot_from_reference(
     session: &UiaSession,
-    arenas: &mut HashMap<i64, HwndArena>,
+    arenas: &mut HashMap<WindowId, HwndArena>,
     store: &SnapshotStore,
     reference: &str,
-    hwnd_arg: Option<i64>,
+    hwnd_arg: Option<WindowId>,
     max_depth: u32,
     max_elements: u32,
     deadline: Instant,
@@ -288,7 +289,7 @@ fn finalize_outline(
 
 pub fn find_element_impl(
     session: &UiaSession,
-    arenas: &HashMap<i64, HwndArena>,
+    arenas: &HashMap<WindowId, HwndArena>,
     store: &SnapshotStore,
     input: FindElementInput,
     deadline: Instant,
@@ -304,7 +305,7 @@ pub fn find_element_impl(
 
 pub fn query_impl(
     session: &UiaSession,
-    arenas: &HashMap<i64, HwndArena>,
+    arenas: &HashMap<WindowId, HwndArena>,
     store: &SnapshotStore,
     input: QueryInput,
     deadline: Instant,
@@ -332,7 +333,7 @@ pub fn query_impl(
 
 pub fn wait_impl(
     session: &UiaSession,
-    arenas: &HashMap<i64, HwndArena>,
+    arenas: &HashMap<WindowId, HwndArena>,
     store: &SnapshotStore,
     input: QueryInput,
     deadline: Instant,
@@ -347,7 +348,7 @@ pub fn wait_impl(
     Ok(result)
 }
 
-fn empty_find_result(store: &SnapshotStore, hwnd: i64) -> TextResult {
+fn empty_find_result(store: &SnapshotStore, hwnd: WindowId) -> TextResult {
     let generation = store.begin_generation(hwnd);
     TextResult::plain(String::new(), Some(generation))
 }
@@ -362,12 +363,12 @@ enum MatchTier {
 
 fn query_once(
     session: &UiaSession,
-    arenas: &HashMap<i64, HwndArena>,
+    arenas: &HashMap<WindowId, HwndArena>,
     store: &SnapshotStore,
     input: &QueryInput,
     deadline: Instant,
 ) -> Result<TextResult, CommandError> {
-    let handle = hwnd_from_i64(input.hwnd)?;
+    let handle = hwnd_from_id(input.hwnd)?;
     let process_id = process_id_for_hwnd(input.hwnd).ok_or_else(|| {
         CommandError::new(
             ErrorCode::FindFailed,
@@ -689,7 +690,7 @@ fn scope_depth_from_arena(
 
 pub fn get_text_impl(
     session: &UiaSession,
-    arenas: &HashMap<i64, HwndArena>,
+    arenas: &HashMap<WindowId, HwndArena>,
     store: &SnapshotStore,
     reference: &str,
 ) -> Result<GetTextResult, CommandError> {
@@ -886,7 +887,7 @@ pub fn get_selection_impl(
 pub fn get_focused_impl(
     session: &UiaSession,
     store: &SnapshotStore,
-    hwnd: Option<i64>,
+    hwnd: Option<WindowId>,
 ) -> Result<TextResult, CommandError> {
     let element = session
         .automation
@@ -914,7 +915,7 @@ pub fn element_at_point_impl(
     store: &SnapshotStore,
     x: i32,
     y: i32,
-    hwnd: Option<i64>,
+    hwnd: Option<WindowId>,
 ) -> Result<TextResult, CommandError> {
     let element = session
         .automation
@@ -993,17 +994,17 @@ fn collect_text_names_from_arena(nodes: &[NodeRecord], root_idx: usize) -> Vec<S
 fn resolve_element_hwnd(
     session: &UiaSession,
     element: &UIElement,
-    preferred: Option<i64>,
-) -> Result<i64, CommandError> {
+    preferred: Option<WindowId>,
+) -> Result<WindowId, CommandError> {
     if let Some(hwnd) = preferred {
-        hwnd_from_i64(hwnd)?;
+        hwnd_from_id(hwnd)?;
         return Ok(hwnd);
     }
 
     if let Ok(handle) = element.get_native_window_handle() {
         let raw: isize = handle.into();
         if raw != 0 {
-            return Ok(raw as i64);
+            return Ok(WindowId(raw as i64));
         }
     }
 
@@ -1017,7 +1018,7 @@ fn resolve_element_hwnd(
                 if let Ok(handle) = parent.get_native_window_handle() {
                     let raw: isize = handle.into();
                     if raw != 0 {
-                        return Ok(raw as i64);
+                        return Ok(WindowId(raw as i64));
                     }
                 }
                 current = parent;
@@ -1034,7 +1035,7 @@ fn resolve_element_hwnd(
 
 fn mint_projected_element(
     store: &SnapshotStore,
-    hwnd: i64,
+    hwnd: WindowId,
     element: &UIElement,
 ) -> Result<TextResult, CommandError> {
     let process_id = process_id_for_hwnd(hwnd)
@@ -1117,11 +1118,11 @@ struct ExtractedTree {
 
 fn fetch_tree(
     session: &UiaSession,
-    hwnd: i64,
+    hwnd: WindowId,
     max_depth: u32,
     deadline: Instant,
 ) -> Result<ExtractedTree, CommandError> {
-    let handle = hwnd_from_i64(hwnd)?;
+    let handle = hwnd_from_id(hwnd)?;
     match session
         .automation
         .element_from_handle_build_cache(handle, &session.subtree_cache)
@@ -1171,7 +1172,7 @@ fn fetch_tree_from_element(
         if raw == 0 {
             None
         } else {
-            Some(raw as i64)
+            Some(WindowId(raw as i64))
         }
     });
 
@@ -1191,11 +1192,11 @@ fn fetch_tree_from_element(
 
 fn fetch_tree_bfs(
     session: &UiaSession,
-    hwnd: i64,
+    hwnd: WindowId,
     max_depth: u32,
     deadline: Instant,
 ) -> Result<ExtractedTree, CommandError> {
-    let handle = hwnd_from_i64(hwnd)?;
+    let handle = hwnd_from_id(hwnd)?;
     let root = session
         .automation
         .element_from_handle_build_cache(handle, &session.children_cache)
@@ -1378,7 +1379,7 @@ struct OutlineEmit {
 
 fn emit_outline_from_arena(
     store: &SnapshotStore,
-    hwnd: i64,
+    hwnd: WindowId,
     generation: u32,
     process_id: u32,
     nodes: &[NodeRecord],
@@ -1438,7 +1439,7 @@ fn emit_outline_from_arena(
 
     fn walk(
         store: &SnapshotStore,
-        hwnd: i64,
+        hwnd: WindowId,
         generation: u32,
         process_id: u32,
         nodes: &[NodeRecord],
@@ -1653,7 +1654,7 @@ fn emit_outline_from_arena(
     }
 }
 
-fn stored_from_record(hwnd: i64, process_id: u32, node: &NodeRecord) -> StoredElement {
+fn stored_from_record(hwnd: WindowId, process_id: u32, node: &NodeRecord) -> StoredElement {
     StoredElement {
         hwnd,
         runtime_id: node.runtime_id.clone(),
@@ -1953,7 +1954,7 @@ pub fn set_value_impl(
 pub fn send_keys_impl(
     session: &UiaSession,
     store: &SnapshotStore,
-    hwnd: i64,
+    hwnd: WindowId,
     text: &str,
     reference: Option<&str>,
 ) -> Result<ActionResult, CommandError> {
@@ -1977,7 +1978,7 @@ pub fn send_keys_impl(
     } else {
         session
             .automation
-            .element_from_handle(hwnd_from_i64(hwnd)?)
+            .element_from_handle(hwnd_from_id(hwnd)?)
             .map_err(|error| map_uia_error(error, ErrorCode::SendKeysFailed))?
     };
 
@@ -2514,7 +2515,7 @@ fn resolve_stored_element_once(
     session: &UiaSession,
     stored: &StoredElement,
 ) -> Result<(UIElement, ResolveStats), CommandError> {
-    let handle = hwnd_from_i64(stored.hwnd)?;
+    let handle = hwnd_from_id(stored.hwnd)?;
     let root = session
         .automation
         .element_from_handle_build_cache(handle, &session.live_cache)
@@ -2723,8 +2724,8 @@ fn find_by_runtime_id(
     }
 }
 
-fn foreground_window(session: &UiaSession, hwnd: i64) -> Result<bool, CommandError> {
-    let handle = hwnd_from_i64(hwnd)?;
+fn foreground_window(session: &UiaSession, hwnd: WindowId) -> Result<bool, CommandError> {
+    let handle = hwnd_from_id(hwnd)?;
     let element = session
         .automation
         .element_from_handle(handle)
@@ -2805,14 +2806,14 @@ fn should_skip_control(control_type: ControlType) -> bool {
     )
 }
 
-fn hwnd_from_i64(hwnd: i64) -> Result<Handle, CommandError> {
-    if hwnd == 0 {
+fn hwnd_from_id(id: WindowId) -> Result<Handle, CommandError> {
+    if id.0 == 0 {
         return Err(CommandError::new(
             ErrorCode::InvalidHwnd,
             "Window handle must not be zero",
         ));
     }
-    Ok(Handle::from(HWND(hwnd as isize as *mut _)))
+    Ok(Handle::from(HWND(id.0 as isize as *mut _)))
 }
 
 fn map_uia_error(error: uiautomation::Error, code: ErrorCode) -> CommandError {
@@ -3003,7 +3004,7 @@ mod tests {
     #[test]
     fn snapshot_input_clamps_bounds() {
         let input = SnapshotInput {
-            hwnd: Some(1),
+            hwnd: Some(WindowId(1)),
             reference: None,
             max_depth: 100,
             max_elements: 999,
