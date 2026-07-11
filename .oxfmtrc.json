@@ -1,7 +1,6 @@
 {
   "$schema": "./node_modules/oxfmt/configuration_schema.json",
 
-  // Project defaults: keep close to Oxfmt defaults, but make every choice visible.
   "printWidth": 100,
   "tabWidth": 2,
   "useTabs": false,

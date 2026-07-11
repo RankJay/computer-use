@@ -1,4 +1,5 @@
 use tauri::{AppHandle, Manager};
+use tauri_plugin_notification::NotificationExt;
 
 #[cfg(desktop)]
 use std::sync::Once;
@@ -108,4 +109,38 @@ pub fn reveal_main_window_once(app: &AppHandle) {
 #[tauri::command]
 pub fn app_ready(app: AppHandle) {
     reveal_main_window_once(&app);
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NotifyResult {
+    pub notified: bool,
+}
+
+/// Send an OS notification via the notification plugin.
+/// When `only_if_unfocused` is true, skips if the main window currently has focus.
+#[tauri::command]
+pub fn notify(
+    app: AppHandle,
+    title: String,
+    body: String,
+    only_if_unfocused: bool,
+) -> Result<NotifyResult, String> {
+    if only_if_unfocused {
+        let Some(window) = app.get_webview_window("main") else {
+            return Ok(NotifyResult { notified: false });
+        };
+        if window.is_focused().unwrap_or(false) {
+            return Ok(NotifyResult { notified: false });
+        }
+    }
+
+    app.notification()
+        .builder()
+        .title(title)
+        .body(body)
+        .show()
+        .map_err(|e| e.to_string())?;
+
+    Ok(NotifyResult { notified: true })
 }

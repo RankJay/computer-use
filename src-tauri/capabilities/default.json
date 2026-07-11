@@ -11,6 +11,7 @@
     "store:default",
     "stronghold:default",
     "dialog:default",
+    "notification:default",
     {
       "identifier": "http:default",
       "allow": [

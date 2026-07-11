@@ -21,6 +21,7 @@ import {
   syncAssistantMessage,
   type MessageSyncState,
 } from "@/lib/agent/ui-stream-sync";
+import { notifyIfUnfocused } from "@/lib/native/notification";
 import { createBudgetGuard, createBudgetTracker } from "@/lib/session/control/budget";
 import type { PermissionWaiter } from "@/lib/session/control/run-controller";
 import type { RuntimeEventPayload } from "@/lib/session/events";
@@ -123,6 +124,14 @@ export async function runStreamCoordinator(
         finishAssistantMessage(emit, messageSync);
         messageSync = null;
         budgetGuard.checkAndStop();
+      },
+      onEnd: ({ finishReason }) => {
+        if (finishReason === "stop") {
+          notifyIfUnfocused({
+            title: "Quietly done",
+            body: "Your reply is ready. Click to hop back in.",
+          });
+        }
       },
     });
 

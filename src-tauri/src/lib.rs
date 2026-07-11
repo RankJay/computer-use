@@ -130,11 +130,13 @@ pub fn run() {
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_notification::init())
         .invoke_handler(tauri::generate_handler![
             commands::maintenance::open_logs_folder,
             commands::maintenance::clear_logs,
             commands::maintenance::reset_session,
             commands::window::app_ready,
+            commands::window::notify,
             read_file,
             read_directory,
             search_files,

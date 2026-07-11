@@ -1,7 +1,6 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
 
-  // Keep this list explicit: setting plugins replaces Oxlint's default plugin set.
   "plugins": [
     "eslint",
     "typescript",
