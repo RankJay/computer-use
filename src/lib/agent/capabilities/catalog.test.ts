@@ -26,10 +26,22 @@ describe("capability catalog", () => {
         "process_list",
         "run_shell",
         "accessibility_snapshot",
+        "accessibility_query",
+        "accessibility_find_element",
+        "accessibility_wait",
+        "accessibility_get_text",
+        "accessibility_get_focused",
+        "accessibility_element_at_point",
+        "accessibility_inspect",
+        "accessibility_get_selection",
+        "accessibility_click",
+        "accessibility_set_value",
         "accessibility_get_value",
         "accessibility_scroll_element",
         "accessibility_right_click_element",
         "accessibility_invoke_action",
+        "accessibility_send_keys",
+        "accessibility_focus",
         "read_clipboard_html",
         "write_clipboard_html",
         "read_clipboard_image",
@@ -47,7 +59,8 @@ describe("capability catalog", () => {
         "key_press",
       ]),
     );
-    expect(names).toHaveLength(53);
+    expect(names).not.toContain("accessibility_expand_node");
+    expect(names).toHaveLength(59);
   });
 
   test("groups names by risk", () => {
@@ -73,6 +86,13 @@ describe("capability catalog", () => {
     expect(off.high).not.toContain("hotkey");
     expect(off.high).not.toContain("key_press");
     expect(on.high).toContain("accessibility_snapshot");
+    expect(on.high).toContain("accessibility_query");
+    expect(on.high).toContain("accessibility_wait");
+    expect(on.high).toContain("accessibility_get_text");
+    expect(on.high).toContain("accessibility_get_focused");
+    expect(on.high).toContain("accessibility_element_at_point");
+    expect(on.high).toContain("accessibility_inspect");
+    expect(on.high).toContain("accessibility_get_selection");
     expect(on.high).toContain("accessibility_click");
     expect(on.high).toContain("accessibility_get_value");
     expect(on.high).toContain("accessibility_scroll_element");

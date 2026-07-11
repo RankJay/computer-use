@@ -7,7 +7,7 @@ use crate::capabilities::path_utils::CommandError;
 use super::state::SnapshotStore;
 use super::types::{
     ActionResult, GetTextResult, GetValueResult, InspectResult, TextResult, MAX_WAIT_MS,
-    TIMEOUT_ACTION_MS, TIMEOUT_EXPAND_MS, TIMEOUT_FIND_MS,
+    TIMEOUT_ACTION_MS, TIMEOUT_FIND_MS,
 };
 use super::worker::{map_worker_outcome, run, WorkerOutcome};
 
@@ -113,9 +113,10 @@ pub async fn accessibility_find_element(
         let store_for_worker = store.clone();
 
         let outcome = run(Duration::from_millis(timeout_budget), move |ctx| {
-            let (session, _arenas, deadline) = ctx.resources()?;
+            let (session, arenas, deadline) = ctx.resources()?;
             windows_impl::find_element_impl(
                 session,
+                arenas,
                 &store_for_worker,
                 FindElementInput {
                     hwnd,
@@ -190,8 +191,8 @@ pub async fn accessibility_query(
         let store_for_worker = store.clone();
 
         let outcome = run(Duration::from_millis(timeout_budget), move |ctx| {
-            let (session, _arenas, deadline) = ctx.resources()?;
-            windows_impl::query_impl(session, &store_for_worker, input, deadline)
+            let (session, arenas, deadline) = ctx.resources()?;
+            windows_impl::query_impl(session, arenas, &store_for_worker, input, deadline)
         })
         .await;
 
@@ -270,8 +271,8 @@ pub async fn accessibility_wait(
         let store_for_worker = store.clone();
 
         let outcome = run(Duration::from_millis(timeout_ms), move |ctx| {
-            let (session, _arenas, deadline) = ctx.resources()?;
-            windows_impl::wait_impl(session, &store_for_worker, input, deadline)
+            let (session, arenas, deadline) = ctx.resources()?;
+            windows_impl::wait_impl(session, arenas, &store_for_worker, input, deadline)
         })
         .await;
 
@@ -314,30 +315,6 @@ pub async fn accessibility_wait(
 }
 
 #[tauri::command]
-pub async fn accessibility_expand_node(
-    store: State<'_, SnapshotStore>,
-    reference: String,
-) -> Result<TextResult, CommandError> {
-    #[cfg(target_os = "windows")]
-    {
-        let store = store.inner().clone();
-        let outcome = run(Duration::from_millis(TIMEOUT_EXPAND_MS), move |ctx| {
-            let (session, arenas, deadline) = ctx.resources()?;
-            windows_impl::expand_node_impl(session, arenas, &store, &reference, deadline)
-        })
-        .await;
-        return map_worker_outcome(
-            outcome,
-            "expand_node_timeout",
-            "Expanding accessibility node timed out",
-        );
-    }
-
-    #[cfg(not(target_os = "windows"))]
-    unsupported_platform()
-}
-
-#[tauri::command]
 pub async fn accessibility_get_text(
     store: State<'_, SnapshotStore>,
     reference: String,
@@ -346,8 +323,8 @@ pub async fn accessibility_get_text(
     {
         let store = store.inner().clone();
         let outcome = run(Duration::from_millis(TIMEOUT_ACTION_MS), move |ctx| {
-            let session = ctx.session()?;
-            windows_impl::get_text_impl(session, &store, &reference)
+            let (session, arenas, _deadline) = ctx.resources()?;
+            windows_impl::get_text_impl(session, arenas, &store, &reference)
         })
         .await;
         return map_worker_outcome(

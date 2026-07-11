@@ -4,19 +4,18 @@ mod capabilities;
 mod commands;
 
 use capabilities::{
-    accessibility_click, accessibility_element_at_point, accessibility_expand_node,
-    accessibility_find_element, accessibility_focus, accessibility_get_focused,
-    accessibility_get_selection, accessibility_get_text, accessibility_get_value,
-    accessibility_inspect, accessibility_invoke_action, accessibility_query,
-    accessibility_right_click_element, accessibility_scroll_element, accessibility_send_keys,
-    accessibility_set_value, accessibility_snapshot, accessibility_wait, create_directory,
-    delete_path, duplicate_path, get_active_window, get_env, get_system_info, hotkey, key_down,
-    key_press, key_up, launch, mouse_click, mouse_down, mouse_drag, mouse_hover, mouse_move,
-    mouse_scroll, mouse_up, move_path, patch_file, process_info, process_kill, process_list,
-    read_clipboard, read_clipboard_html, read_clipboard_image, read_directory, read_file,
-    run_shell, search_files, set_env, stat_path, wait, window_focus, window_list, window_move,
-    window_resize, window_state, write_clipboard, write_clipboard_html, write_clipboard_image,
-    write_file, SnapshotStore,
+    accessibility_click, accessibility_element_at_point, accessibility_find_element,
+    accessibility_focus, accessibility_get_focused, accessibility_get_selection,
+    accessibility_get_text, accessibility_get_value, accessibility_inspect,
+    accessibility_invoke_action, accessibility_query, accessibility_right_click_element,
+    accessibility_scroll_element, accessibility_send_keys, accessibility_set_value,
+    accessibility_snapshot, accessibility_wait, create_directory, delete_path, duplicate_path,
+    get_active_window, get_env, get_system_info, hotkey, key_down, key_press, key_up, launch,
+    mouse_click, mouse_down, mouse_drag, mouse_hover, mouse_move, mouse_scroll, mouse_up,
+    move_path, patch_file, process_info, process_kill, process_list, read_clipboard,
+    read_clipboard_html, read_clipboard_image, read_directory, read_file, run_shell, search_files,
+    set_env, stat_path, wait, window_focus, window_list, window_move, window_resize, window_state,
+    write_clipboard, write_clipboard_html, write_clipboard_image, write_file, SnapshotStore,
 };
 
 #[cfg(all(windows, feature = "a11y-bench"))]
@@ -161,7 +160,6 @@ pub fn run() {
             accessibility_find_element,
             accessibility_query,
             accessibility_wait,
-            accessibility_expand_node,
             accessibility_get_text,
             accessibility_get_focused,
             accessibility_element_at_point,

@@ -49,12 +49,21 @@ pub fn run_all() -> Vec<BenchSummary> {
         eprintln!("a11y-bench: could not open Notepad; skipping required fixture");
     }
 
+    if let Some(hwnd) = ensure_explorer_hwnd() {
+        summaries.push(bench_snapshot("explorer", hwnd));
+        summaries.push(bench_resolve("explorer", hwnd));
+    } else {
+        eprintln!("a11y-bench: could not open Explorer; skipping optional fixture");
+    }
+
     if let Some(hwnd) = find_window_title_contains(&["Chrome", "Edge", "Firefox", "Brave"]) {
         summaries.push(bench_snapshot("browser", hwnd));
         summaries.push(bench_resolve("browser", hwnd));
     } else {
         eprintln!("a11y-bench: no browser window found; skipping optional fixture");
     }
+
+    summaries.push(bench_timeout_recovery());
 
     for summary in &summaries {
         print_summary(summary);
@@ -309,6 +318,78 @@ fn ensure_notepad_hwnd() -> Option<i64> {
         }
     }
     None
+}
+
+fn ensure_explorer_hwnd() -> Option<i64> {
+    if let Some(hwnd) =
+        find_window_title_contains(&["File Explorer", "Exploring", "This PC", "Quick access"])
+    {
+        return Some(hwnd);
+    }
+    let _ = Command::new("explorer.exe").spawn().ok()?;
+    for _ in 0..30 {
+        thread::sleep(Duration::from_millis(150));
+        if let Some(hwnd) =
+            find_window_title_contains(&["File Explorer", "Exploring", "This PC", "Quick access"])
+        {
+            return Some(hwnd);
+        }
+    }
+    None
+}
+
+/// Induced slow job must not poison the next call (no a11y_busy cascade).
+fn bench_timeout_recovery() -> BenchSummary {
+    let started = Instant::now();
+    let slow = block_on_worker(Duration::from_millis(80), |_| {
+        thread::sleep(Duration::from_millis(500));
+        Ok(())
+    });
+    let slow_ms = started.elapsed().as_millis() as u64;
+    let slow_ok = matches!(slow, WorkerOutcome::TimedOut);
+
+    let started_next = Instant::now();
+    let next = block_on_worker(Duration::from_secs(2), |_| Ok(()));
+    let next_ms = started_next.elapsed().as_millis() as u64;
+    let next_ok = matches!(next, WorkerOutcome::Ok(()));
+    // Give the slow job time to finish so later benches are not queued behind it.
+    thread::sleep(Duration::from_millis(600));
+
+    let samples = vec![
+        BenchSample {
+            tool: "timeout_recovery",
+            fixture: "induced_slow".to_string(),
+            duration_ms: slow_ms,
+            nodes_visited: 0,
+            emitted: 0,
+            ok: slow_ok,
+            error: if slow_ok {
+                None
+            } else {
+                Some("expected TimedOut for slow job".to_string())
+            },
+        },
+        BenchSample {
+            tool: "timeout_recovery",
+            fixture: "induced_slow".to_string(),
+            duration_ms: next_ms,
+            nodes_visited: 0,
+            emitted: 0,
+            ok: next_ok,
+            error: if next_ok {
+                None
+            } else {
+                Some(match next {
+                    WorkerOutcome::Ok(()) => unreachable!(),
+                    WorkerOutcome::TimedOut => "next job timed out".to_string(),
+                    WorkerOutcome::Err(error) => {
+                        format!("next job error: {}: {}", error.code, error.message)
+                    }
+                })
+            },
+        },
+    ];
+    summarize("timeout_recovery", "induced_slow", samples)
 }
 
 fn find_window_title_contains(needles: &[&str]) -> Option<i64> {

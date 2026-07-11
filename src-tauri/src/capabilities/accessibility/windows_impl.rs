@@ -282,15 +282,23 @@ fn finalize_outline(
 
 pub fn find_element_impl(
     session: &UiaSession,
+    arenas: &HashMap<i64, HwndArena>,
     store: &SnapshotStore,
     input: FindElementInput,
     deadline: Instant,
 ) -> Result<TextResult, CommandError> {
-    query_impl(session, store, QueryInput::from_find(input), deadline)
+    query_impl(
+        session,
+        arenas,
+        store,
+        QueryInput::from_find(input),
+        deadline,
+    )
 }
 
 pub fn query_impl(
     session: &UiaSession,
+    arenas: &HashMap<i64, HwndArena>,
     store: &SnapshotStore,
     input: QueryInput,
     deadline: Instant,
@@ -302,7 +310,7 @@ pub fn query_impl(
             return Ok(empty_find_result(store, input.hwnd));
         }
 
-        match query_once(session, store, &input, deadline) {
+        match query_once(session, arenas, store, &input, deadline) {
             Ok(result) if !result.text.is_empty() => return Ok(result),
             Ok(result) if Instant::now() >= deadline => return Ok(result),
             Err(error) if error.code == "target_degraded" || error.code == "invalid_input" => {
@@ -318,11 +326,12 @@ pub fn query_impl(
 
 pub fn wait_impl(
     session: &UiaSession,
+    arenas: &HashMap<i64, HwndArena>,
     store: &SnapshotStore,
     input: QueryInput,
     deadline: Instant,
 ) -> Result<TextResult, CommandError> {
-    let result = query_impl(session, store, input, deadline)?;
+    let result = query_impl(session, arenas, store, input, deadline)?;
     if result.text.is_empty() {
         return Err(CommandError::new(
             "wait_timeout",
@@ -347,6 +356,7 @@ enum MatchTier {
 
 fn query_once(
     session: &UiaSession,
+    arenas: &HashMap<i64, HwndArena>,
     store: &SnapshotStore,
     input: &QueryInput,
     deadline: Instant,
@@ -443,10 +453,17 @@ fn query_once(
         if Instant::now() >= deadline || records.len() as u32 >= FIND_MAX_NODES {
             break;
         }
-        if let Some(record) = project_element(&element, None, 0, &[]) {
+        if let Some(mut record) = project_element(&element, None, 0, &[]) {
+            enrich_record_from_arena(arenas.get(&input.hwnd), &mut record);
             records.push((order, record));
         }
     }
+
+    let scope_depth = scope_depth_from_arena(
+        arenas.get(&input.hwnd),
+        store,
+        input.scope_reference.as_deref(),
+    );
 
     let search_records = prefer_document_scope(&records);
     let filtered: Vec<_> = search_records
@@ -473,7 +490,7 @@ fn query_once(
         automation_id,
         role_filter,
     );
-    matches.sort_by_key(|(order, record)| (find_record_priority(record), *order));
+    matches.sort_by_key(|(order, record)| (find_record_priority(record, scope_depth), *order));
 
     let generation = store.begin_generation(input.hwnd);
     let mut lines = Vec::new();
@@ -609,7 +626,7 @@ fn role_matches(record: &NodeRecord, role_filter: Option<ControlType>) -> bool {
     }
 }
 
-fn find_record_priority(record: &NodeRecord) -> (i32, i32, i32) {
+fn find_record_priority(record: &NodeRecord, scope_depth: Option<u32>) -> (i32, i32, i32, i32) {
     let offscreen = if record.offscreen { 1 } else { 0 };
     let disabled = if record.enabled { 0 } else { 1 };
     let role = match record.control_type_raw {
@@ -626,37 +643,67 @@ fn find_record_priority(record: &NodeRecord) -> (i32, i32, i32) {
         x if x == ControlType::Image as i32 => 55,
         _ => 20,
     };
-    (role, offscreen, disabled)
+    let distance = match scope_depth {
+        Some(scope) => (record.depth as i32 - scope as i32).abs(),
+        None => record.depth as i32,
+    };
+    (role, offscreen, disabled, distance)
 }
 
-/// Thin compat wrapper: scoped snapshot from a reference root.
-pub fn expand_node_impl(
-    session: &UiaSession,
-    arenas: &mut HashMap<i64, HwndArena>,
+fn enrich_record_from_arena(arena: Option<&HwndArena>, record: &mut NodeRecord) {
+    let Some(arena) = arena else {
+        return;
+    };
+    let Some(idx) = arena.find_by_runtime_id(&record.runtime_id) else {
+        return;
+    };
+    let node = &arena.nodes[idx];
+    record.parent = node.parent;
+    record.depth = node.depth;
+    if record.ancestor_chain.is_empty() {
+        record.ancestor_chain = node.ancestor_chain.clone();
+    }
+}
+
+fn scope_depth_from_arena(
+    arena: Option<&HwndArena>,
     store: &SnapshotStore,
-    reference: &str,
-    deadline: Instant,
-) -> Result<TextResult, CommandError> {
-    snapshot_impl(
-        session,
-        arenas,
-        store,
-        SnapshotInput {
-            hwnd: None,
-            reference: Some(reference.to_string()),
-            max_depth: 10,
-            max_elements: 150,
-        },
-        deadline,
-    )
+    scope_reference: Option<&str>,
+) -> Option<u32> {
+    let scope_reference = scope_reference?;
+    let arena = arena?;
+    let stored = store.resolve_ref(scope_reference)?;
+    let idx = arena.find_by_runtime_id(&stored.runtime_id)?;
+    Some(arena.nodes[idx].depth)
 }
 
 pub fn get_text_impl(
     session: &UiaSession,
+    arenas: &HashMap<i64, HwndArena>,
     store: &SnapshotStore,
     reference: &str,
 ) -> Result<GetTextResult, CommandError> {
     let stored = store.resolve_ref_or_stale(reference)?;
+
+    if let Some(arena) = arenas.get(&stored.hwnd) {
+        if let Some(root_idx) = arena.find_by_runtime_id(&stored.runtime_id) {
+            let names = collect_text_names_from_arena(&arena.nodes, root_idx);
+            if !names.is_empty() {
+                return Ok(GetTextResult {
+                    text: names.join("\n"),
+                    method: "arena_text".to_string(),
+                });
+            }
+            let node = &arena.nodes[root_idx];
+            if node.control_type_raw == ControlType::Text as i32 && !node.name.trim().is_empty() {
+                return Ok(GetTextResult {
+                    text: node.name.clone(),
+                    method: "arena_text".to_string(),
+                });
+            }
+        }
+    }
+
     let element = resolve_stored_element(session, &stored)?;
 
     if let Ok(pattern) = element.get_pattern::<UITextPattern>() {
@@ -665,7 +712,7 @@ pub fn get_text_impl(
                 let trimmed = text.trim();
                 if !trimmed.is_empty() {
                     return Ok(GetTextResult {
-                        text: text,
+                        text,
                         method: "text_pattern".to_string(),
                     });
                 }
@@ -908,6 +955,28 @@ fn collect_text_descendant_names(
     Ok(names)
 }
 
+fn collect_text_names_from_arena(nodes: &[NodeRecord], root_idx: usize) -> Vec<String> {
+    let mut names = Vec::new();
+    let mut stack = vec![root_idx];
+    while let Some(idx) = stack.pop() {
+        let Some(node) = nodes.get(idx) else {
+            continue;
+        };
+        if node.control_type_raw == ControlType::Text as i32 && !node.name.trim().is_empty() {
+            // Skip the root itself when collecting descendants; caller handles own Text.
+            if idx != root_idx {
+                names.push(node.name.clone());
+            }
+        }
+        for &child in node.children.iter().rev() {
+            stack.push(child as usize);
+        }
+    }
+    // If root is a container, also include Text names found above.
+    // If root itself is Text with a name and no descendants, caller uses own-name path.
+    names
+}
+
 fn resolve_element_hwnd(
     session: &UiaSession,
     element: &UIElement,
@@ -1137,7 +1206,7 @@ fn extract_cached_subtree(
         return Ok(());
     }
 
-    let Some(record) = project_element(element, parent, depth, ancestors) else {
+    let Some(record) = project_element_allow_text(element, parent, depth, ancestors) else {
         return Ok(());
     };
     let idx = nodes.len() as u32;
@@ -1182,7 +1251,7 @@ fn extract_via_bfs_from(
         .create_true_condition()
         .map_err(|error| map_uia_error(error, "snapshot_failed"))?;
 
-    let Some(root_record) = project_element(root, None, 0, &[]) else {
+    let Some(root_record) = project_element_allow_text(root, None, 0, &[]) else {
         return Ok(());
     };
     if !budget.visit_soft() {
@@ -1225,7 +1294,9 @@ fn extract_via_bfs_from(
                 break;
             }
             let depth = parent_depth + 1;
-            let Some(record) = project_element(&child, Some(parent_idx), depth, &ancestors) else {
+            let Some(record) =
+                project_element_allow_text(&child, Some(parent_idx), depth, &ancestors)
+            else {
                 continue;
             };
             let idx = nodes.len() as u32;
@@ -1379,6 +1450,40 @@ fn emit_outline_from_arena(
         *visited = visited.saturating_add(1);
         let node = &nodes[idx];
         let control_type = control_type_from_raw(node.control_type_raw);
+
+        // Text stays in the arena for get_text, but is omitted from outline emission
+        // (transparent: children keep the Text node's depth).
+        if matches!(control_type, ControlType::Text) {
+            for &child in &node.children {
+                if matches!(
+                    truncation_reason.as_deref(),
+                    Some("token_cap" | "max_elements")
+                ) {
+                    break;
+                }
+                walk(
+                    store,
+                    hwnd,
+                    generation,
+                    process_id,
+                    nodes,
+                    child as usize,
+                    depth,
+                    max_depth,
+                    max_elements,
+                    force_children,
+                    lines,
+                    char_count,
+                    next_index,
+                    emitted,
+                    visited,
+                    truncated,
+                    truncation_reason,
+                );
+            }
+            return;
+        }
+
         let collapse = !force_children && should_collapse_control(control_type, depth);
         let interactive = is_interactive_control(control_type) || !node.name.trim().is_empty();
 
@@ -2438,7 +2543,7 @@ fn resolve_element_by_fingerprint(
 
     let mut scored: Vec<(i32, UIElement)> = Vec::new();
     for element in candidates {
-        let score = fingerprint_score(stored, &element);
+        let score = fingerprint_score(session, stored, &element);
         if score > 0 {
             scored.push((score, element));
         }
@@ -2469,7 +2574,7 @@ fn resolve_element_by_fingerprint(
     }
 }
 
-fn fingerprint_score(stored: &StoredElement, element: &UIElement) -> i32 {
+fn fingerprint_score(session: &UiaSession, stored: &StoredElement, element: &UIElement) -> i32 {
     let mut score = 0i32;
     let name = element_name(element);
     let automation_id = element_automation_id(element);
@@ -2496,16 +2601,50 @@ fn fingerprint_score(stored: &StoredElement, element: &UIElement) -> i32 {
         score += overlap;
     }
     if !stored.ancestor_chain.is_empty() {
-        // Weak signal: reward if any ancestor label appears in the name path — limited without tree.
-        if stored
+        let live_chain = collect_ancestor_labels(session, element, stored.ancestor_chain.len());
+        let common = stored
             .ancestor_chain
             .iter()
-            .any(|a| a.contains(&name) && !name.is_empty())
-        {
-            score += 5;
-        }
+            .rev()
+            .zip(live_chain.iter().rev())
+            .take_while(|(a, b)| a == b)
+            .count();
+        score += (common as i32) * 12;
     }
     score
+}
+
+fn collect_ancestor_labels(
+    session: &UiaSession,
+    element: &UIElement,
+    max_len: usize,
+) -> Vec<String> {
+    let mut chain = Vec::new();
+    let mut current = element.clone();
+    for _ in 0..max_len.saturating_add(2).min(24) {
+        match session
+            .control_walker
+            .get_parent_build_cache(&current, &session.live_cache)
+        {
+            Ok(parent) => {
+                let label = format!(
+                    "{}:{}",
+                    element_control_type(&parent)
+                        .map(|c| c.to_string())
+                        .unwrap_or_else(|_| "Unknown".to_string()),
+                    element_name(&parent)
+                );
+                chain.push(label);
+                current = parent;
+            }
+            Err(_) => break,
+        }
+    }
+    chain.reverse();
+    if chain.len() > max_len {
+        chain = chain[chain.len() - max_len..].to_vec();
+    }
+    chain
 }
 
 fn rect_overlap_score(a: (i32, i32, i32, i32), b: (i32, i32, i32, i32)) -> i32 {
@@ -2817,5 +2956,84 @@ mod tests {
         .clamped();
         assert_eq!(input.max_depth, 20);
         assert_eq!(input.max_elements, 300);
+    }
+
+    #[test]
+    fn find_priority_prefers_closer_to_scope() {
+        let near = NodeRecord {
+            parent: Some(0),
+            children: vec![],
+            runtime_id: vec![1],
+            automation_id: String::new(),
+            name: "Ok".to_string(),
+            role: Some("Button".to_string()),
+            control_type_raw: ControlType::Button as i32,
+            enabled: true,
+            offscreen: false,
+            rect: None,
+            value: None,
+            ancestor_chain: vec![],
+            depth: 2,
+        };
+        let far = NodeRecord {
+            depth: 8,
+            ..near.clone()
+        };
+        let near_p = find_record_priority(&near, Some(2));
+        let far_p = find_record_priority(&far, Some(2));
+        assert!(near_p < far_p);
+    }
+
+    #[test]
+    fn arena_collects_text_descendant_names() {
+        let nodes = vec![
+            NodeRecord {
+                parent: None,
+                children: vec![1, 2],
+                runtime_id: vec![1],
+                automation_id: String::new(),
+                name: "Dialog".to_string(),
+                role: Some("Pane".to_string()),
+                control_type_raw: ControlType::Pane as i32,
+                enabled: true,
+                offscreen: false,
+                rect: None,
+                value: None,
+                ancestor_chain: vec![],
+                depth: 0,
+            },
+            NodeRecord {
+                parent: Some(0),
+                children: vec![],
+                runtime_id: vec![2],
+                automation_id: String::new(),
+                name: "Are you sure?".to_string(),
+                role: Some("Text".to_string()),
+                control_type_raw: ControlType::Text as i32,
+                enabled: true,
+                offscreen: false,
+                rect: None,
+                value: None,
+                ancestor_chain: vec!["Pane:Dialog".to_string()],
+                depth: 1,
+            },
+            NodeRecord {
+                parent: Some(0),
+                children: vec![],
+                runtime_id: vec![3],
+                automation_id: String::new(),
+                name: "OK".to_string(),
+                role: Some("Button".to_string()),
+                control_type_raw: ControlType::Button as i32,
+                enabled: true,
+                offscreen: false,
+                rect: None,
+                value: None,
+                ancestor_chain: vec!["Pane:Dialog".to_string()],
+                depth: 1,
+            },
+        ];
+        let names = collect_text_names_from_arena(&nodes, 0);
+        assert_eq!(names, vec!["Are you sure?".to_string()]);
     }
 }

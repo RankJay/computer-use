@@ -10,4 +10,10 @@ fn a11y_bench_fixtures() {
             .any(|s| s.fixture == "notepad" && s.samples.iter().any(|x| x.ok)),
         "expected at least one successful Notepad sample"
     );
+    assert!(
+        summaries
+            .iter()
+            .any(|s| s.tool == "timeout_recovery" && s.samples.iter().all(|x| x.ok)),
+        "expected timeout recovery samples to succeed (no queue poison)"
+    );
 }

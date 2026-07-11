@@ -160,7 +160,6 @@ pub const MAX_FIND_CANDIDATES: usize = 5;
 pub const TIMEOUT_SNAPSHOT_MS: u64 = 4_000;
 pub const TIMEOUT_SNAPSHOT_FIRST_TOUCH_MS: u64 = 8_000;
 pub const TIMEOUT_FIND_MS: u64 = 30_000;
-pub const TIMEOUT_EXPAND_MS: u64 = 2_500;
 pub const TIMEOUT_ACTION_MS: u64 = 2_000;
 
 pub const DEGRADED_COOLDOWN_MS: u64 = 30_000;
