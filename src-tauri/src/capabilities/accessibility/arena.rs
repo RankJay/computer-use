@@ -1,5 +1,5 @@
-//! Worker-thread-local flat tree from the last snapshot per HWND.
-//! COM cache results are extracted into these records, then dropped.
+//! Worker-thread-local flat tree from the last snapshot per window.
+//! COM/AX cache results are extracted into these records, then dropped.
 
 #[derive(Debug, Clone)]
 pub struct NodeRecord {
@@ -21,14 +21,14 @@ pub struct NodeRecord {
 }
 
 #[derive(Debug, Clone, Default)]
-pub struct HwndArena {
+pub struct ElementArena {
     pub generation: u32,
     #[allow(dead_code)]
     pub process_id: u32,
     pub nodes: Vec<NodeRecord>,
 }
 
-impl HwndArena {
+impl ElementArena {
     pub fn find_by_runtime_id(&self, runtime_id: &[i32]) -> Option<usize> {
         if runtime_id.is_empty() {
             return None;

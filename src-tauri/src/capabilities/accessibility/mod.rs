@@ -1,12 +1,20 @@
 mod arena;
 mod budget;
 mod commands;
+mod outline;
+mod provider;
 mod state;
 mod types;
 mod worker;
 
-#[cfg(target_os = "windows")]
-mod windows_impl;
+#[cfg(windows)]
+mod uia;
+
+#[cfg(not(windows))]
+mod unsupported;
+
+#[cfg(test)]
+mod fake;
 
 #[cfg(all(windows, feature = "a11y-bench"))]
 pub mod bench;
@@ -20,3 +28,20 @@ pub use commands::{
     accessibility_snapshot, accessibility_wait,
 };
 pub use state::SnapshotStore;
+
+use provider::AccessibilityProvider;
+
+/// Process-wide accessibility provider. Single `#[cfg]` switch for the adapter.
+pub fn provider() -> &'static dyn AccessibilityProvider {
+    #[cfg(windows)]
+    {
+        static PROVIDER: uia::UiaProvider = uia::UiaProvider;
+        &PROVIDER
+    }
+    #[cfg(not(windows))]
+    {
+        static PROVIDER: unsupported::UnsupportedAccessibilityProvider =
+            unsupported::UnsupportedAccessibilityProvider;
+        &PROVIDER
+    }
+}

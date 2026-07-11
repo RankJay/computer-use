@@ -17,7 +17,9 @@ use crate::capabilities::window::WindowId;
 
 use super::state::SnapshotStore;
 use super::types::SnapshotInput;
-use super::windows_impl::{resolve_reference_with_stats, snapshot_with_stats, SnapshotStats};
+use super::uia::{
+    resolve_reference_with_stats, snapshot_with_stats, SnapshotStats, UiaAccessibilitySession,
+};
 use super::worker::{run, WorkerOutcome};
 
 const RUNS: usize = 5;
@@ -99,8 +101,21 @@ fn bench_snapshot(fixture: &str, hwnd: WindowId) -> BenchSummary {
         let store_for_worker = store.clone();
         let started = Instant::now();
         let outcome = block_on_worker(Duration::from_secs(30), move |ctx| {
-            let (session, arenas, deadline) = ctx.resources()?;
-            snapshot_with_stats(session, arenas, &store_for_worker, input, deadline)
+            let deadline = ctx.deadline;
+            let session = ctx.session_mut()?;
+            let uia = session
+                .as_any_mut()
+                .downcast_mut::<UiaAccessibilitySession>()
+                .ok_or_else(|| {
+                    CommandError::new(ErrorCode::WorkerFailed, "expected UiaAccessibilitySession")
+                })?;
+            snapshot_with_stats(
+                &uia.inner,
+                &mut uia.arenas,
+                &store_for_worker,
+                input,
+                deadline,
+            )
         });
         let duration_ms = started.elapsed().as_millis() as u64;
         match outcome {
@@ -158,8 +173,21 @@ fn bench_resolve(fixture: &str, hwnd: WindowId) -> BenchSummary {
     };
     let store_for_snapshot = store.clone();
     let snapshot_outcome = block_on_worker(Duration::from_secs(30), move |ctx| {
-        let (session, arenas, deadline) = ctx.resources()?;
-        snapshot_with_stats(session, arenas, &store_for_snapshot, input, deadline)
+        let deadline = ctx.deadline;
+        let session = ctx.session_mut()?;
+        let uia = session
+            .as_any_mut()
+            .downcast_mut::<UiaAccessibilitySession>()
+            .ok_or_else(|| {
+                CommandError::new(ErrorCode::WorkerFailed, "expected UiaAccessibilitySession")
+            })?;
+        snapshot_with_stats(
+            &uia.inner,
+            &mut uia.arenas,
+            &store_for_snapshot,
+            input,
+            deadline,
+        )
     });
     let Ok((text, _)) = (match snapshot_outcome {
         WorkerOutcome::Ok(value) => Ok(value),
@@ -206,8 +234,14 @@ fn bench_resolve(fixture: &str, hwnd: WindowId) -> BenchSummary {
         let reference_for_worker = reference.clone();
         let started = Instant::now();
         let outcome = block_on_worker(Duration::from_secs(10), move |ctx| {
-            let session = ctx.session()?;
-            resolve_reference_with_stats(session, &store_for_worker, &reference_for_worker)
+            let session = ctx.session_mut()?;
+            let uia = session
+                .as_any_mut()
+                .downcast_mut::<UiaAccessibilitySession>()
+                .ok_or_else(|| {
+                    CommandError::new(ErrorCode::WorkerFailed, "expected UiaAccessibilitySession")
+                })?;
+            resolve_reference_with_stats(&uia.inner, &store_for_worker, &reference_for_worker)
         });
         let duration_ms = started.elapsed().as_millis() as u64;
         match outcome {

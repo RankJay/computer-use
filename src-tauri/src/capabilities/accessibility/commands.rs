@@ -2,20 +2,32 @@ use std::time::Duration;
 
 use tauri::State;
 
-#[cfg(not(target_os = "windows"))]
-use crate::capabilities::error::unsupported_platform;
 use crate::capabilities::error::{CommandError, ErrorCode};
 use crate::capabilities::window::WindowId;
 
 use super::state::SnapshotStore;
 use super::types::{
-    ActionResult, GetTextResult, GetValueResult, InspectResult, TextResult, MAX_WAIT_MS,
-    TIMEOUT_ACTION_MS, TIMEOUT_FIND_MS,
+    ActionResult, FindElementInput, GetTextResult, GetValueResult, InspectResult, QueryInput,
+    SnapshotInput, TextResult, MAX_WAIT_MS, TIMEOUT_ACTION_MS, TIMEOUT_FIND_MS,
 };
 use super::worker::{map_worker_outcome, run, WorkerOutcome};
 
-#[cfg(target_os = "windows")]
-use super::windows_impl;
+async fn run_action<T, F>(
+    timeout_ms: u64,
+    timeout_code: ErrorCode,
+    timeout_msg: &str,
+    work: F,
+) -> Result<T, CommandError>
+where
+    T: Send + 'static,
+    F: FnOnce(&mut super::worker::WorkerCtx) -> Result<T, CommandError> + Send + 'static,
+{
+    map_worker_outcome(
+        run(Duration::from_millis(timeout_ms), work).await,
+        timeout_code,
+        timeout_msg,
+    )
+}
 
 #[tauri::command]
 pub async fn accessibility_snapshot(
@@ -25,66 +37,56 @@ pub async fn accessibility_snapshot(
     max_depth: Option<u32>,
     max_elements: Option<u32>,
 ) -> Result<TextResult, CommandError> {
-    #[cfg(target_os = "windows")]
-    {
-        use super::types::SnapshotInput;
-
-        if hwnd.is_none() && reference.is_none() {
-            return Err(CommandError::new(
-                ErrorCode::InvalidInput,
-                "accessibility_snapshot requires hwnd or reference",
-            ));
-        }
-
-        let input = SnapshotInput {
-            hwnd,
-            reference,
-            max_depth: max_depth.unwrap_or(10),
-            max_elements: max_elements.unwrap_or(150),
-        };
-        let store = store.inner().clone();
-        let timeout_hwnd = hwnd.or_else(|| {
-            input
-                .reference
-                .as_deref()
-                .and_then(|r| store.resolve_ref(r).map(|e| e.hwnd))
-        });
-        let timeout_ms = timeout_hwnd
-            .map(|h| windows_impl::snapshot_timeout_ms(&store, h))
-            .unwrap_or(super::types::TIMEOUT_SNAPSHOT_MS);
-        let process_id = timeout_hwnd.and_then(windows_impl::process_id_for_hwnd_command);
-        let store_for_worker = store.clone();
-
-        let outcome = run(Duration::from_millis(timeout_ms), move |ctx| {
-            let (session, arenas, deadline) = ctx.resources()?;
-            windows_impl::snapshot_impl(session, arenas, &store_for_worker, input, deadline)
-        })
-        .await;
-
-        return match outcome {
-            WorkerOutcome::Ok(value) => {
-                if let Some(process_id) = process_id {
-                    store.clear_process_timeout(process_id);
-                }
-                Ok(value)
-            }
-            WorkerOutcome::Err(error) => Err(error),
-            WorkerOutcome::TimedOut => {
-                if let Some(process_id) = process_id {
-                    store.mark_process_timeout(process_id);
-                }
-                Err(CommandError::new(
-                    ErrorCode::SnapshotTimeout,
-                    "Accessibility snapshot timed out",
-                ))
-            }
-        };
+    if hwnd.is_none() && reference.is_none() {
+        return Err(CommandError::new(
+            ErrorCode::InvalidInput,
+            "accessibility_snapshot requires hwnd or reference",
+        ));
     }
 
-    #[cfg(not(target_os = "windows"))]
-    {
-        let _ = (hwnd, reference, max_depth, max_elements);
-        Err(unsupported_platform("Accessibility automation"))
+    let input = SnapshotInput {
+        hwnd,
+        reference,
+        max_depth: max_depth.unwrap_or(10),
+        max_elements: max_elements.unwrap_or(150),
+    };
+    let store = store.inner().clone();
+    let timeout_hwnd = hwnd.or_else(|| {
+        input
+            .reference
+            .as_deref()
+            .and_then(|r| store.resolve_ref(r).map(|e| e.hwnd))
+    });
+    let timeout_ms = timeout_hwnd
+        .map(|h| super::provider().snapshot_timeout_ms(&store, h))
+        .unwrap_or(super::types::TIMEOUT_SNAPSHOT_MS);
+    let process_id = timeout_hwnd.and_then(|h| super::provider().process_id_for_window(h));
+    let store_for_worker = store.clone();
+
+    let outcome = run(Duration::from_millis(timeout_ms), move |ctx| {
+        let deadline = ctx.deadline;
+        let session = ctx.session_mut()?;
+        session.snapshot(&store_for_worker, input, deadline)
+    })
+    .await;
+
+    match outcome {
+        WorkerOutcome::Ok(value) => {
+            if let Some(process_id) = process_id {
+                store.clear_process_timeout(process_id);
+            }
+            Ok(value)
+        }
+        WorkerOutcome::Err(error) => Err(error),
+        WorkerOutcome::TimedOut => {
+            if let Some(process_id) = process_id {
+                store.mark_process_timeout(process_id);
+            }
+            Err(CommandError::new(
+                ErrorCode::SnapshotTimeout,
+                "Accessibility snapshot timed out",
+            ))
+        }
     }
 }
 
@@ -96,58 +98,50 @@ pub async fn accessibility_find_element(
     role: Option<String>,
     wait_ms: Option<u64>,
 ) -> Result<TextResult, CommandError> {
-    #[cfg(target_os = "windows")]
-    {
-        use super::types::FindElementInput;
+    let wait_ms = wait_ms.unwrap_or(0).min(MAX_WAIT_MS);
+    let store = store.inner().clone();
+    let process_id = super::provider().process_id_for_window(hwnd);
+    let timeout_budget = TIMEOUT_FIND_MS.saturating_add(wait_ms);
+    let store_for_worker = store.clone();
 
-        let wait_ms = wait_ms.unwrap_or(0).min(MAX_WAIT_MS);
-        let store = store.inner().clone();
-        let process_id = windows_impl::process_id_for_hwnd_command(hwnd);
-        let timeout_budget = TIMEOUT_FIND_MS.saturating_add(wait_ms);
-        let store_for_worker = store.clone();
+    let outcome = run(Duration::from_millis(timeout_budget), move |ctx| {
+        let deadline = ctx.deadline;
+        let session = ctx.session_mut()?;
+        session.find_element(
+            &store_for_worker,
+            FindElementInput {
+                hwnd,
+                name_contains,
+                role,
+                wait_ms,
+            },
+            deadline,
+        )
+    })
+    .await;
 
-        let outcome = run(Duration::from_millis(timeout_budget), move |ctx| {
-            let (session, arenas, deadline) = ctx.resources()?;
-            windows_impl::find_element_impl(
-                session,
-                arenas,
-                &store_for_worker,
-                FindElementInput {
-                    hwnd,
-                    name_contains,
-                    role,
-                    wait_ms,
-                },
-                deadline,
-            )
-        })
-        .await;
-
-        return match outcome {
-            WorkerOutcome::Ok(value) => {
-                if let Some(process_id) = process_id {
-                    store.clear_process_timeout(process_id);
-                }
-                Ok(value)
+    match outcome {
+        WorkerOutcome::Ok(value) => {
+            if let Some(process_id) = process_id {
+                store.clear_process_timeout(process_id);
             }
-            WorkerOutcome::Err(error) => Err(error),
-            WorkerOutcome::TimedOut => {
-                if let Some(process_id) = process_id {
-                    store.mark_process_find_timeout(process_id);
-                }
-                Err(CommandError::new(
-                    ErrorCode::FindElementTimeout,
-                    "Finding accessibility element timed out",
-                ))
+            Ok(value)
+        }
+        WorkerOutcome::Err(error) => Err(error),
+        WorkerOutcome::TimedOut => {
+            if let Some(process_id) = process_id {
+                store.mark_process_find_timeout(process_id);
             }
-        };
+            Err(CommandError::new(
+                ErrorCode::FindElementTimeout,
+                "Finding accessibility element timed out",
+            ))
+        }
     }
-
-    #[cfg(not(target_os = "windows"))]
-    Err(unsupported_platform("Accessibility automation"))
 }
 
 #[tauri::command]
+#[allow(clippy::too_many_arguments)] // wire-stable Tauri command arity
 pub async fn accessibility_query(
     store: State<'_, SnapshotStore>,
     hwnd: WindowId,
@@ -161,74 +155,54 @@ pub async fn accessibility_query(
     wait_ms: Option<u64>,
     scope_reference: Option<String>,
 ) -> Result<TextResult, CommandError> {
-    #[cfg(target_os = "windows")]
-    {
-        use super::types::QueryInput;
-
-        let wait_ms = wait_ms.unwrap_or(0).min(MAX_WAIT_MS);
-        let input = QueryInput {
-            hwnd,
-            name,
-            name_contains,
-            automation_id,
-            role,
-            enabled,
-            visible,
-            limit,
-            wait_ms,
-            scope_reference,
-        }
-        .clamped();
-        let store = store.inner().clone();
-        let process_id = windows_impl::process_id_for_hwnd_command(hwnd);
-        let timeout_budget = TIMEOUT_FIND_MS.saturating_add(wait_ms);
-        let store_for_worker = store.clone();
-
-        let outcome = run(Duration::from_millis(timeout_budget), move |ctx| {
-            let (session, arenas, deadline) = ctx.resources()?;
-            windows_impl::query_impl(session, arenas, &store_for_worker, input, deadline)
-        })
-        .await;
-
-        return match outcome {
-            WorkerOutcome::Ok(value) => {
-                if let Some(process_id) = process_id {
-                    store.clear_process_timeout(process_id);
-                }
-                Ok(value)
-            }
-            WorkerOutcome::Err(error) => Err(error),
-            WorkerOutcome::TimedOut => {
-                if let Some(process_id) = process_id {
-                    store.mark_process_find_timeout(process_id);
-                }
-                Err(CommandError::new(
-                    ErrorCode::QueryTimeout,
-                    "Accessibility query timed out",
-                ))
-            }
-        };
+    let wait_ms = wait_ms.unwrap_or(0).min(MAX_WAIT_MS);
+    let input = QueryInput {
+        hwnd,
+        name,
+        name_contains,
+        automation_id,
+        role,
+        enabled,
+        visible,
+        limit,
+        wait_ms,
+        scope_reference,
     }
+    .clamped();
+    let store = store.inner().clone();
+    let process_id = super::provider().process_id_for_window(hwnd);
+    let timeout_budget = TIMEOUT_FIND_MS.saturating_add(wait_ms);
+    let store_for_worker = store.clone();
 
-    #[cfg(not(target_os = "windows"))]
-    {
-        let _ = (
-            hwnd,
-            name,
-            name_contains,
-            automation_id,
-            role,
-            enabled,
-            visible,
-            limit,
-            wait_ms,
-            scope_reference,
-        );
-        Err(unsupported_platform("Accessibility automation"))
+    let outcome = run(Duration::from_millis(timeout_budget), move |ctx| {
+        let deadline = ctx.deadline;
+        let session = ctx.session_mut()?;
+        session.query(&store_for_worker, input, deadline)
+    })
+    .await;
+
+    match outcome {
+        WorkerOutcome::Ok(value) => {
+            if let Some(process_id) = process_id {
+                store.clear_process_timeout(process_id);
+            }
+            Ok(value)
+        }
+        WorkerOutcome::Err(error) => Err(error),
+        WorkerOutcome::TimedOut => {
+            if let Some(process_id) = process_id {
+                store.mark_process_find_timeout(process_id);
+            }
+            Err(CommandError::new(
+                ErrorCode::QueryTimeout,
+                "Accessibility query timed out",
+            ))
+        }
     }
 }
 
 #[tauri::command]
+#[allow(clippy::too_many_arguments)] // wire-stable Tauri command arity
 pub async fn accessibility_wait(
     store: State<'_, SnapshotStore>,
     hwnd: WindowId,
@@ -242,69 +216,48 @@ pub async fn accessibility_wait(
     timeout_ms: Option<u64>,
     scope_reference: Option<String>,
 ) -> Result<TextResult, CommandError> {
-    #[cfg(target_os = "windows")]
-    {
-        use super::types::QueryInput;
-
-        let timeout_ms = timeout_ms.unwrap_or(5_000).min(MAX_WAIT_MS).max(1);
-        let input = QueryInput {
-            hwnd,
-            name,
-            name_contains,
-            automation_id,
-            role,
-            enabled,
-            visible,
-            limit,
-            wait_ms: timeout_ms,
-            scope_reference,
-        }
-        .clamped();
-        let store = store.inner().clone();
-        let process_id = windows_impl::process_id_for_hwnd_command(hwnd);
-        let store_for_worker = store.clone();
-
-        let outcome = run(Duration::from_millis(timeout_ms), move |ctx| {
-            let (session, arenas, deadline) = ctx.resources()?;
-            windows_impl::wait_impl(session, arenas, &store_for_worker, input, deadline)
-        })
-        .await;
-
-        return match outcome {
-            WorkerOutcome::Ok(value) => {
-                if let Some(process_id) = process_id {
-                    store.clear_process_timeout(process_id);
-                }
-                Ok(value)
-            }
-            WorkerOutcome::Err(error) => Err(error),
-            WorkerOutcome::TimedOut => {
-                if let Some(process_id) = process_id {
-                    store.mark_process_find_timeout(process_id);
-                }
-                Err(CommandError::new(
-                    ErrorCode::WaitTimeout,
-                    "Timed out waiting for accessibility query match",
-                ))
-            }
-        };
+    let timeout_ms = timeout_ms.unwrap_or(5_000).clamp(1, MAX_WAIT_MS);
+    let input = QueryInput {
+        hwnd,
+        name,
+        name_contains,
+        automation_id,
+        role,
+        enabled,
+        visible,
+        limit,
+        wait_ms: timeout_ms,
+        scope_reference,
     }
+    .clamped();
+    let store = store.inner().clone();
+    let process_id = super::provider().process_id_for_window(hwnd);
+    let store_for_worker = store.clone();
 
-    #[cfg(not(target_os = "windows"))]
-    {
-        let _ = (
-            hwnd,
-            name,
-            name_contains,
-            automation_id,
-            role,
-            enabled,
-            visible,
-            limit,
-            timeout_ms,
-            scope_reference,
-        );
-        Err(unsupported_platform("Accessibility automation"))
+    let outcome = run(Duration::from_millis(timeout_ms), move |ctx| {
+        let deadline = ctx.deadline;
+        let session = ctx.session_mut()?;
+        session.wait(&store_for_worker, input, deadline)
+    })
+    .await;
+
+    match outcome {
+        WorkerOutcome::Ok(value) => {
+            if let Some(process_id) = process_id {
+                store.clear_process_timeout(process_id);
+            }
+            Ok(value)
+        }
+        WorkerOutcome::Err(error) => Err(error),
+        WorkerOutcome::TimedOut => {
+            if let Some(process_id) = process_id {
+                store.mark_process_find_timeout(process_id);
+            }
+            Err(CommandError::new(
+                ErrorCode::WaitTimeout,
+                "Timed out waiting for accessibility query match",
+            ))
+        }
     }
 }
 
@@ -313,23 +266,17 @@ pub async fn accessibility_get_text(
     store: State<'_, SnapshotStore>,
     reference: String,
 ) -> Result<GetTextResult, CommandError> {
-    #[cfg(target_os = "windows")]
-    {
-        let store = store.inner().clone();
-        let outcome = run(Duration::from_millis(TIMEOUT_ACTION_MS), move |ctx| {
-            let (session, arenas, _deadline) = ctx.resources()?;
-            windows_impl::get_text_impl(session, arenas, &store, &reference)
-        })
-        .await;
-        return map_worker_outcome(
-            outcome,
-            ErrorCode::GetTextTimeout,
-            "Reading accessibility text timed out",
-        );
-    }
-
-    #[cfg(not(target_os = "windows"))]
-    Err(unsupported_platform("Accessibility automation"))
+    let store = store.inner().clone();
+    run_action(
+        TIMEOUT_ACTION_MS,
+        ErrorCode::GetTextTimeout,
+        "Reading accessibility text timed out",
+        move |ctx| {
+            let session = ctx.session_mut()?;
+            session.get_text(&store, &reference)
+        },
+    )
+    .await
 }
 
 #[tauri::command]
@@ -337,26 +284,17 @@ pub async fn accessibility_get_focused(
     store: State<'_, SnapshotStore>,
     hwnd: Option<WindowId>,
 ) -> Result<TextResult, CommandError> {
-    #[cfg(target_os = "windows")]
-    {
-        let store = store.inner().clone();
-        let outcome = run(Duration::from_millis(TIMEOUT_ACTION_MS), move |ctx| {
-            let session = ctx.session()?;
-            windows_impl::get_focused_impl(session, &store, hwnd)
-        })
-        .await;
-        return map_worker_outcome(
-            outcome,
-            ErrorCode::GetFocusedTimeout,
-            "Getting focused accessibility element timed out",
-        );
-    }
-
-    #[cfg(not(target_os = "windows"))]
-    {
-        let _ = hwnd;
-        Err(unsupported_platform("Accessibility automation"))
-    }
+    let store = store.inner().clone();
+    run_action(
+        TIMEOUT_ACTION_MS,
+        ErrorCode::GetFocusedTimeout,
+        "Getting focused accessibility element timed out",
+        move |ctx| {
+            let session = ctx.session_mut()?;
+            session.get_focused(&store, hwnd)
+        },
+    )
+    .await
 }
 
 #[tauri::command]
@@ -366,26 +304,17 @@ pub async fn accessibility_element_at_point(
     y: i32,
     hwnd: Option<WindowId>,
 ) -> Result<TextResult, CommandError> {
-    #[cfg(target_os = "windows")]
-    {
-        let store = store.inner().clone();
-        let outcome = run(Duration::from_millis(TIMEOUT_ACTION_MS), move |ctx| {
-            let session = ctx.session()?;
-            windows_impl::element_at_point_impl(session, &store, x, y, hwnd)
-        })
-        .await;
-        return map_worker_outcome(
-            outcome,
-            ErrorCode::ElementAtPointTimeout,
-            "Element-at-point lookup timed out",
-        );
-    }
-
-    #[cfg(not(target_os = "windows"))]
-    {
-        let _ = (x, y, hwnd);
-        Err(unsupported_platform("Accessibility automation"))
-    }
+    let store = store.inner().clone();
+    run_action(
+        TIMEOUT_ACTION_MS,
+        ErrorCode::ElementAtPointTimeout,
+        "Element-at-point lookup timed out",
+        move |ctx| {
+            let session = ctx.session_mut()?;
+            session.element_at_point(&store, x, y, hwnd)
+        },
+    )
+    .await
 }
 
 #[tauri::command]
@@ -393,23 +322,17 @@ pub async fn accessibility_inspect(
     store: State<'_, SnapshotStore>,
     reference: String,
 ) -> Result<InspectResult, CommandError> {
-    #[cfg(target_os = "windows")]
-    {
-        let store = store.inner().clone();
-        let outcome = run(Duration::from_millis(TIMEOUT_ACTION_MS), move |ctx| {
-            let session = ctx.session()?;
-            windows_impl::inspect_impl(session, &store, &reference)
-        })
-        .await;
-        return map_worker_outcome(
-            outcome,
-            ErrorCode::InspectTimeout,
-            "Accessibility inspect timed out",
-        );
-    }
-
-    #[cfg(not(target_os = "windows"))]
-    Err(unsupported_platform("Accessibility automation"))
+    let store = store.inner().clone();
+    run_action(
+        TIMEOUT_ACTION_MS,
+        ErrorCode::InspectTimeout,
+        "Accessibility inspect timed out",
+        move |ctx| {
+            let session = ctx.session_mut()?;
+            session.inspect(&store, &reference)
+        },
+    )
+    .await
 }
 
 #[tauri::command]
@@ -417,23 +340,17 @@ pub async fn accessibility_get_selection(
     store: State<'_, SnapshotStore>,
     reference: String,
 ) -> Result<TextResult, CommandError> {
-    #[cfg(target_os = "windows")]
-    {
-        let store = store.inner().clone();
-        let outcome = run(Duration::from_millis(TIMEOUT_ACTION_MS), move |ctx| {
-            let session = ctx.session()?;
-            windows_impl::get_selection_impl(session, &store, &reference)
-        })
-        .await;
-        return map_worker_outcome(
-            outcome,
-            ErrorCode::GetSelectionTimeout,
-            "Reading accessibility selection timed out",
-        );
-    }
-
-    #[cfg(not(target_os = "windows"))]
-    Err(unsupported_platform("Accessibility automation"))
+    let store = store.inner().clone();
+    run_action(
+        TIMEOUT_ACTION_MS,
+        ErrorCode::GetSelectionTimeout,
+        "Reading accessibility selection timed out",
+        move |ctx| {
+            let session = ctx.session_mut()?;
+            session.get_selection(&store, &reference)
+        },
+    )
+    .await
 }
 
 #[tauri::command]
@@ -441,23 +358,17 @@ pub async fn accessibility_click(
     store: State<'_, SnapshotStore>,
     reference: String,
 ) -> Result<ActionResult, CommandError> {
-    #[cfg(target_os = "windows")]
-    {
-        let store = store.inner().clone();
-        let outcome = run(Duration::from_millis(TIMEOUT_ACTION_MS), move |ctx| {
-            let session = ctx.session()?;
-            windows_impl::click_impl(session, &store, &reference)
-        })
-        .await;
-        return map_worker_outcome(
-            outcome,
-            ErrorCode::ClickTimeout,
-            "Accessibility click timed out",
-        );
-    }
-
-    #[cfg(not(target_os = "windows"))]
-    Err(unsupported_platform("Accessibility automation"))
+    let store = store.inner().clone();
+    run_action(
+        TIMEOUT_ACTION_MS,
+        ErrorCode::ClickTimeout,
+        "Accessibility click timed out",
+        move |ctx| {
+            let session = ctx.session_mut()?;
+            session.click(&store, &reference)
+        },
+    )
+    .await
 }
 
 #[tauri::command]
@@ -466,23 +377,17 @@ pub async fn accessibility_set_value(
     reference: String,
     text: String,
 ) -> Result<ActionResult, CommandError> {
-    #[cfg(target_os = "windows")]
-    {
-        let store = store.inner().clone();
-        let outcome = run(Duration::from_millis(TIMEOUT_ACTION_MS), move |ctx| {
-            let session = ctx.session()?;
-            windows_impl::set_value_impl(session, &store, &reference, &text)
-        })
-        .await;
-        return map_worker_outcome(
-            outcome,
-            ErrorCode::SetValueTimeout,
-            "Setting accessibility value timed out",
-        );
-    }
-
-    #[cfg(not(target_os = "windows"))]
-    Err(unsupported_platform("Accessibility automation"))
+    let store = store.inner().clone();
+    run_action(
+        TIMEOUT_ACTION_MS,
+        ErrorCode::SetValueTimeout,
+        "Setting accessibility value timed out",
+        move |ctx| {
+            let session = ctx.session_mut()?;
+            session.set_value(&store, &reference, &text)
+        },
+    )
+    .await
 }
 
 #[tauri::command]
@@ -492,23 +397,17 @@ pub async fn accessibility_send_keys(
     text: String,
     reference: Option<String>,
 ) -> Result<ActionResult, CommandError> {
-    #[cfg(target_os = "windows")]
-    {
-        let store = store.inner().clone();
-        let outcome = run(Duration::from_millis(TIMEOUT_ACTION_MS), move |ctx| {
-            let session = ctx.session()?;
-            windows_impl::send_keys_impl(session, &store, hwnd, &text, reference.as_deref())
-        })
-        .await;
-        return map_worker_outcome(
-            outcome,
-            ErrorCode::SendKeysTimeout,
-            "Accessibility send_keys timed out",
-        );
-    }
-
-    #[cfg(not(target_os = "windows"))]
-    Err(unsupported_platform("Accessibility automation"))
+    let store = store.inner().clone();
+    run_action(
+        TIMEOUT_ACTION_MS,
+        ErrorCode::SendKeysTimeout,
+        "Accessibility send_keys timed out",
+        move |ctx| {
+            let session = ctx.session_mut()?;
+            session.send_keys(&store, hwnd, &text, reference.as_deref())
+        },
+    )
+    .await
 }
 
 #[tauri::command]
@@ -516,23 +415,17 @@ pub async fn accessibility_focus(
     store: State<'_, SnapshotStore>,
     reference: String,
 ) -> Result<ActionResult, CommandError> {
-    #[cfg(target_os = "windows")]
-    {
-        let store = store.inner().clone();
-        let outcome = run(Duration::from_millis(TIMEOUT_ACTION_MS), move |ctx| {
-            let session = ctx.session()?;
-            windows_impl::focus_impl(session, &store, &reference)
-        })
-        .await;
-        return map_worker_outcome(
-            outcome,
-            ErrorCode::FocusTimeout,
-            "Accessibility focus timed out",
-        );
-    }
-
-    #[cfg(not(target_os = "windows"))]
-    Err(unsupported_platform("Accessibility automation"))
+    let store = store.inner().clone();
+    run_action(
+        TIMEOUT_ACTION_MS,
+        ErrorCode::FocusTimeout,
+        "Accessibility focus timed out",
+        move |ctx| {
+            let session = ctx.session_mut()?;
+            session.focus(&store, &reference)
+        },
+    )
+    .await
 }
 
 #[tauri::command]
@@ -540,23 +433,17 @@ pub async fn accessibility_get_value(
     store: State<'_, SnapshotStore>,
     reference: String,
 ) -> Result<GetValueResult, CommandError> {
-    #[cfg(target_os = "windows")]
-    {
-        let store = store.inner().clone();
-        let outcome = run(Duration::from_millis(TIMEOUT_ACTION_MS), move |ctx| {
-            let session = ctx.session()?;
-            windows_impl::get_value_impl(session, &store, &reference)
-        })
-        .await;
-        return map_worker_outcome(
-            outcome,
-            ErrorCode::GetValueTimeout,
-            "Reading accessibility value timed out",
-        );
-    }
-
-    #[cfg(not(target_os = "windows"))]
-    Err(unsupported_platform("Accessibility automation"))
+    let store = store.inner().clone();
+    run_action(
+        TIMEOUT_ACTION_MS,
+        ErrorCode::GetValueTimeout,
+        "Reading accessibility value timed out",
+        move |ctx| {
+            let session = ctx.session_mut()?;
+            session.get_value(&store, &reference)
+        },
+    )
+    .await
 }
 
 #[tauri::command]
@@ -566,24 +453,18 @@ pub async fn accessibility_scroll_element(
     direction: String,
     amount: Option<String>,
 ) -> Result<ActionResult, CommandError> {
-    #[cfg(target_os = "windows")]
-    {
-        let store = store.inner().clone();
-        let amount = amount.unwrap_or_else(|| "small".to_string());
-        let outcome = run(Duration::from_millis(TIMEOUT_ACTION_MS), move |ctx| {
-            let session = ctx.session()?;
-            windows_impl::scroll_element_impl(session, &store, &reference, &direction, &amount)
-        })
-        .await;
-        return map_worker_outcome(
-            outcome,
-            ErrorCode::ScrollElementTimeout,
-            "Accessibility scroll timed out",
-        );
-    }
-
-    #[cfg(not(target_os = "windows"))]
-    Err(unsupported_platform("Accessibility automation"))
+    let store = store.inner().clone();
+    let amount = amount.unwrap_or_else(|| "small".to_string());
+    run_action(
+        TIMEOUT_ACTION_MS,
+        ErrorCode::ScrollElementTimeout,
+        "Accessibility scroll timed out",
+        move |ctx| {
+            let session = ctx.session_mut()?;
+            session.scroll_element(&store, &reference, &direction, &amount)
+        },
+    )
+    .await
 }
 
 #[tauri::command]
@@ -591,23 +472,17 @@ pub async fn accessibility_right_click_element(
     store: State<'_, SnapshotStore>,
     reference: String,
 ) -> Result<ActionResult, CommandError> {
-    #[cfg(target_os = "windows")]
-    {
-        let store = store.inner().clone();
-        let outcome = run(Duration::from_millis(TIMEOUT_ACTION_MS), move |ctx| {
-            let session = ctx.session()?;
-            windows_impl::right_click_element_impl(session, &store, &reference)
-        })
-        .await;
-        return map_worker_outcome(
-            outcome,
-            ErrorCode::RightClickTimeout,
-            "Accessibility right-click timed out",
-        );
-    }
-
-    #[cfg(not(target_os = "windows"))]
-    Err(unsupported_platform("Accessibility automation"))
+    let store = store.inner().clone();
+    run_action(
+        TIMEOUT_ACTION_MS,
+        ErrorCode::RightClickTimeout,
+        "Accessibility right-click timed out",
+        move |ctx| {
+            let session = ctx.session_mut()?;
+            session.right_click_element(&store, &reference)
+        },
+    )
+    .await
 }
 
 #[tauri::command]
@@ -616,21 +491,15 @@ pub async fn accessibility_invoke_action(
     reference: String,
     action: String,
 ) -> Result<ActionResult, CommandError> {
-    #[cfg(target_os = "windows")]
-    {
-        let store = store.inner().clone();
-        let outcome = run(Duration::from_millis(TIMEOUT_ACTION_MS), move |ctx| {
-            let session = ctx.session()?;
-            windows_impl::invoke_action_impl(session, &store, &reference, &action)
-        })
-        .await;
-        return map_worker_outcome(
-            outcome,
-            ErrorCode::InvokeActionTimeout,
-            "Accessibility invoke_action timed out",
-        );
-    }
-
-    #[cfg(not(target_os = "windows"))]
-    Err(unsupported_platform("Accessibility automation"))
+    let store = store.inner().clone();
+    run_action(
+        TIMEOUT_ACTION_MS,
+        ErrorCode::InvokeActionTimeout,
+        "Accessibility invoke_action timed out",
+        move |ctx| {
+            let session = ctx.session_mut()?;
+            session.invoke_action(&store, &reference, &action)
+        },
+    )
+    .await
 }
