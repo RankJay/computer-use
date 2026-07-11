@@ -3,7 +3,7 @@ use tauri::Manager;
 mod capabilities;
 mod commands;
 
-use capabilities::{
+pub use capabilities::{
     accessibility_click, accessibility_element_at_point, accessibility_find_element,
     accessibility_focus, accessibility_get_focused, accessibility_get_selection,
     accessibility_get_text, accessibility_get_value, accessibility_inspect,
@@ -16,7 +16,11 @@ use capabilities::{
     read_clipboard_html, read_clipboard_image, read_directory, read_file, run_shell, search_files,
     set_env, stat_path, wait, window_focus, window_list, window_move, window_resize, window_state,
     write_clipboard, write_clipboard_html, write_clipboard_image, write_file, SnapshotStore,
+    WindowId,
 };
+
+#[cfg(windows)]
+pub use capabilities::a11y_live_smoke;
 
 #[cfg(all(windows, feature = "a11y-bench"))]
 pub use capabilities::bench as a11y_bench;

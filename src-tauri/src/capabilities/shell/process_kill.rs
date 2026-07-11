@@ -40,12 +40,12 @@ pub fn process_kill(
 
     #[cfg(target_os = "windows")]
     {
-        return kill_process_windows(target_pid);
+        kill_process_windows(target_pid)
     }
 
     #[cfg(any(target_os = "linux", target_os = "macos"))]
     {
-        return kill_process_unix(target_pid);
+        kill_process_unix(target_pid)
     }
 
     #[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]

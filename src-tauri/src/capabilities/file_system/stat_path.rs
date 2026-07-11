@@ -27,7 +27,7 @@ pub struct StatPathResult {
 }
 
 fn format_timestamp(time: SystemTime) -> Option<String> {
-    let datetime: OffsetDateTime = time.try_into().ok()?;
+    let datetime: OffsetDateTime = time.into();
     datetime.format(&Rfc3339).ok()
 }
 

@@ -3,7 +3,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use uiautomation::errors::ERR_NOTFOUND;
-use uiautomation::types::{ControlType, TreeScope, UIProperty};
+use uiautomation::types::{TreeScope, UIProperty};
 use uiautomation::variants::Variant;
 
 use crate::capabilities::error::{CommandError, ErrorCode};
@@ -11,7 +11,8 @@ use crate::capabilities::window::WindowId;
 
 use super::super::arena::{ElementArena, NodeRecord};
 use super::super::budget::FIND_MAX_NODES;
-use super::super::outline::{format_record_line, stored_from_record};
+use super::super::outline::{format_record_line, stored_from_record, CT_DOCUMENT};
+use super::super::query_match::{find_record_priority, select_query_matches};
 use super::super::state::{make_reference, SnapshotStore};
 use super::super::types::{
     FindElementInput, QueryInput, TextResult, MAX_FIND_CANDIDATES, WAIT_POLL_MS,
@@ -86,14 +87,6 @@ fn empty_find_result(store: &SnapshotStore, hwnd: WindowId) -> TextResult {
     TextResult::plain(String::new(), Some(generation))
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum MatchTier {
-    AutomationId,
-    ExactNameRole,
-    SubstringRole,
-    NameOnly,
-}
-
 fn query_once(
     session: &UiaSession,
     arenas: &HashMap<WindowId, ElementArena>,
@@ -134,6 +127,7 @@ fn query_once(
         .map(str::trim)
         .filter(|s| !s.is_empty());
     let role_filter = input.role.as_deref().map(parse_role).transpose()?;
+    let role_filter_raw = role_filter.map(|r| r as i32);
     let limit = input.limit.unwrap_or(MAX_FIND_CANDIDATES as u32) as usize;
 
     if name_exact.is_none()
@@ -232,7 +226,7 @@ fn query_once(
         name_exact.as_deref(),
         name_contains.as_deref(),
         automation_id,
-        role_filter,
+        role_filter_raw,
     );
     matches.sort_by_key(|(order, record)| (find_record_priority(record, scope_depth), *order));
 
@@ -255,13 +249,12 @@ fn query_once(
             reference.clone(),
             stored_from_record(input.hwnd, process_id, &record),
         );
-        let tier_label = match tier {
-            MatchTier::AutomationId => "automation_id",
-            MatchTier::ExactNameRole => "exact",
-            MatchTier::SubstringRole => "substring",
-            MatchTier::NameOnly => "name_only",
-        };
-        lines.push(format_record_line(&record, 0, &reference, Some(tier_label)));
+        lines.push(format_record_line(
+            &record,
+            0,
+            &reference,
+            Some(tier.label()),
+        ));
     }
 
     Ok(TextResult {
@@ -277,7 +270,7 @@ fn query_once(
 fn prefer_document_scope(records: &[(usize, NodeRecord)]) -> Vec<(usize, NodeRecord)> {
     let Some((_, doc)) = records
         .iter()
-        .find(|(_, r)| r.control_type_raw == ControlType::Document as i32)
+        .find(|(_, r)| r.control_type_raw == CT_DOCUMENT)
     else {
         return records.to_vec();
     };
@@ -298,100 +291,6 @@ fn prefer_document_scope(records: &[(usize, NodeRecord)]) -> Vec<(usize, NodeRec
     } else {
         records.to_vec()
     }
-}
-
-fn select_query_matches(
-    records: &[(usize, NodeRecord)],
-    name_exact: Option<&str>,
-    name_contains: Option<&str>,
-    automation_id: Option<&str>,
-    role_filter: Option<ControlType>,
-) -> (MatchTier, Vec<(usize, NodeRecord)>) {
-    if let Some(auto_id) = automation_id {
-        let matches: Vec<_> = records
-            .iter()
-            .filter(|(_, r)| r.automation_id == auto_id)
-            .filter(|(_, r)| role_matches(r, role_filter))
-            .cloned()
-            .collect();
-        if !matches.is_empty() {
-            return (MatchTier::AutomationId, matches);
-        }
-        if name_exact.is_none() && name_contains.is_none() {
-            return (MatchTier::AutomationId, Vec::new());
-        }
-    }
-
-    let name_lower = name_exact.or(name_contains).unwrap_or("");
-    if name_lower.is_empty() {
-        let role_only: Vec<_> = records
-            .iter()
-            .filter(|(_, r)| role_matches(r, role_filter))
-            .cloned()
-            .collect();
-        return (MatchTier::SubstringRole, role_only);
-    }
-
-    if let Some(exact) = name_exact {
-        let exact_role: Vec<_> = records
-            .iter()
-            .filter(|(_, r)| role_matches(r, role_filter) && r.name.to_ascii_lowercase() == exact)
-            .cloned()
-            .collect();
-        if !exact_role.is_empty() {
-            return (MatchTier::ExactNameRole, exact_role);
-        }
-    }
-
-    let needle = name_contains.or(name_exact).unwrap_or(name_lower);
-    let substring_role: Vec<_> = records
-        .iter()
-        .filter(|(_, r)| {
-            role_matches(r, role_filter) && r.name.to_ascii_lowercase().contains(needle)
-        })
-        .cloned()
-        .collect();
-    if !substring_role.is_empty() {
-        return (MatchTier::SubstringRole, substring_role);
-    }
-
-    let name_only: Vec<_> = records
-        .iter()
-        .filter(|(_, r)| r.name.to_ascii_lowercase().contains(needle))
-        .cloned()
-        .collect();
-    (MatchTier::NameOnly, name_only)
-}
-
-fn role_matches(record: &NodeRecord, role_filter: Option<ControlType>) -> bool {
-    match role_filter {
-        Some(role) => record.control_type_raw == role as i32,
-        None => true,
-    }
-}
-
-fn find_record_priority(record: &NodeRecord, scope_depth: Option<u32>) -> (i32, i32, i32, i32) {
-    let offscreen = if record.offscreen { 1 } else { 0 };
-    let disabled = if record.enabled { 0 } else { 1 };
-    let role = match record.control_type_raw {
-        x if x == ControlType::Hyperlink as i32 => 0,
-        x if x == ControlType::Button as i32 => 1,
-        x if x == ControlType::ListItem as i32 => 2,
-        x if x == ControlType::MenuItem as i32 => 3,
-        x if x == ControlType::TabItem as i32 => 4,
-        x if x == ControlType::TreeItem as i32 => 5,
-        x if x == ControlType::Edit as i32 => 6,
-        x if x == ControlType::ComboBox as i32 => 7,
-        x if x == ControlType::Group as i32 => 40,
-        x if x == ControlType::Text as i32 => 50,
-        x if x == ControlType::Image as i32 => 55,
-        _ => 20,
-    };
-    let distance = match scope_depth {
-        Some(scope) => (record.depth as i32 - scope as i32).abs(),
-        None => record.depth as i32,
-    };
-    (role, offscreen, disabled, distance)
 }
 
 fn enrich_record_from_arena(arena: Option<&ElementArena>, record: &mut NodeRecord) {
@@ -419,98 +318,4 @@ fn scope_depth_from_arena(
     let stored = store.resolve_ref(scope_reference)?;
     let idx = arena.find_by_runtime_id(&stored.runtime_id)?;
     Some(arena.nodes[idx].depth)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use uiautomation::types::ControlType;
-
-    #[test]
-    fn find_match_tiers_are_deterministic() {
-        let records = vec![
-            (
-                0,
-                NodeRecord {
-                    parent: None,
-                    children: vec![],
-                    runtime_id: vec![1],
-                    automation_id: String::new(),
-                    name: "Save As".to_string(),
-                    role: Some("Button".to_string()),
-                    control_type_raw: ControlType::Button as i32,
-                    enabled: true,
-                    offscreen: false,
-                    rect: None,
-                    value: None,
-                    ancestor_chain: vec![],
-                    depth: 1,
-                },
-            ),
-            (
-                1,
-                NodeRecord {
-                    parent: None,
-                    children: vec![],
-                    runtime_id: vec![2],
-                    automation_id: String::new(),
-                    name: "Save".to_string(),
-                    role: Some("Button".to_string()),
-                    control_type_raw: ControlType::Button as i32,
-                    enabled: true,
-                    offscreen: false,
-                    rect: None,
-                    value: None,
-                    ancestor_chain: vec![],
-                    depth: 1,
-                },
-            ),
-        ];
-        let (tier, matches) =
-            select_query_matches(&records, None, Some("sav"), None, Some(ControlType::Button));
-        assert_eq!(tier, MatchTier::SubstringRole);
-        assert_eq!(matches.len(), 2);
-
-        let (tier, matches) =
-            select_query_matches(&records, None, Some("save"), None, Some(ControlType::Edit));
-        assert_eq!(tier, MatchTier::NameOnly);
-        assert_eq!(matches.len(), 2);
-
-        let (tier, matches) = select_query_matches(
-            &records,
-            Some("save"),
-            None,
-            None,
-            Some(ControlType::Button),
-        );
-        assert_eq!(tier, MatchTier::ExactNameRole);
-        assert_eq!(matches.len(), 1);
-        assert_eq!(matches[0].1.name, "Save");
-    }
-
-    #[test]
-    fn find_priority_prefers_closer_to_scope() {
-        let near = NodeRecord {
-            parent: Some(0),
-            children: vec![],
-            runtime_id: vec![1],
-            automation_id: String::new(),
-            name: "Ok".to_string(),
-            role: Some("Button".to_string()),
-            control_type_raw: ControlType::Button as i32,
-            enabled: true,
-            offscreen: false,
-            rect: None,
-            value: None,
-            ancestor_chain: vec![],
-            depth: 2,
-        };
-        let far = NodeRecord {
-            depth: 8,
-            ..near.clone()
-        };
-        let near_p = find_record_priority(&near, Some(2));
-        let far_p = find_record_priority(&far, Some(2));
-        assert!(near_p < far_p);
-    }
 }

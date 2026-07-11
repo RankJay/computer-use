@@ -14,6 +14,7 @@ pub(crate) const CT_CHECK_BOX: i32 = 50002;
 pub(crate) const CT_COMBO_BOX: i32 = 50003;
 pub(crate) const CT_EDIT: i32 = 50004;
 pub(crate) const CT_HYPERLINK: i32 = 50005;
+pub(crate) const CT_IMAGE: i32 = 50006;
 pub(crate) const CT_LIST_ITEM: i32 = 50007;
 pub(crate) const CT_MENU_ITEM: i32 = 50011;
 pub(crate) const CT_RADIO_BUTTON: i32 = 50013;
@@ -22,11 +23,11 @@ pub(crate) const CT_SPINNER: i32 = 50016;
 pub(crate) const CT_TAB_ITEM: i32 = 50019;
 pub(crate) const CT_TEXT: i32 = 50020;
 pub(crate) const CT_TREE_ITEM: i32 = 50024;
-pub(crate) const CT_SPLIT_BUTTON: i32 = 50031;
-pub(crate) const CT_PANE: i32 = 50033;
-
-#[cfg(test)]
+pub(crate) const CT_GROUP: i32 = 50026;
 pub(crate) const CT_DOCUMENT: i32 = 50030;
+pub(crate) const CT_SPLIT_BUTTON: i32 = 50031;
+pub(crate) const CT_WINDOW: i32 = 50032;
+pub(crate) const CT_PANE: i32 = 50033;
 
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(not(feature = "a11y-bench"), allow(dead_code))]
@@ -491,12 +492,13 @@ mod tests {
         let generation = store.begin_generation(hwnd);
         let outline =
             emit_outline_from_arena(&store, hwnd, generation, 7, &nodes, 0, 10, 150, false);
-        let lines: Vec<&str> = outline.text.lines().collect();
-        assert_eq!(lines.len(), 3);
-        assert!(lines[0].contains("Pane \"Dialog\""));
-        assert!(lines[1].contains("Button \"OK\""));
-        assert!(lines[2].contains("Button \"Cancel\""));
+        const GOLDEN: &str = "\
+e1@1:42 Pane \"Dialog\"
+  e2@1:42 Button \"OK\"
+  e3@1:42 Button \"Cancel\"";
+        assert_eq!(outline.text, GOLDEN);
         assert_eq!(outline.emitted, 3);
+        assert_eq!(generation, 1);
     }
 
     #[test]

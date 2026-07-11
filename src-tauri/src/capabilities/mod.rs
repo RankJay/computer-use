@@ -18,6 +18,8 @@ pub use accessibility::{
     accessibility_snapshot, accessibility_wait, SnapshotStore,
 };
 
+#[cfg(windows)]
+pub use accessibility::a11y_live_smoke;
 #[cfg(all(windows, feature = "a11y-bench"))]
 pub use accessibility::bench;
 pub use clipboard::{
@@ -36,6 +38,7 @@ pub use shared::wait;
 pub use shell::{
     get_env, get_system_info, launch, process_info, process_kill, process_list, run_shell, set_env,
 };
+pub use window::WindowId;
 pub use window::{
     get_active_window, window_focus, window_list, window_move, window_resize, window_state,
 };

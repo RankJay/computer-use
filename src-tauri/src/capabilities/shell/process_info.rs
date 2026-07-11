@@ -43,17 +43,17 @@ pub fn process_info(pid: u32) -> Result<ProcessInfoResult, CommandError> {
 
     #[cfg(target_os = "windows")]
     {
-        return process_info_windows(pid);
+        process_info_windows(pid)
     }
 
     #[cfg(target_os = "linux")]
     {
-        return process_info_linux(pid);
+        process_info_linux(pid)
     }
 
     #[cfg(target_os = "macos")]
     {
-        return process_info_macos(pid);
+        process_info_macos(pid)
     }
 
     #[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]

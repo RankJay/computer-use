@@ -3,6 +3,7 @@ mod budget;
 mod commands;
 mod outline;
 mod provider;
+mod query_match;
 mod state;
 mod types;
 mod worker;
@@ -19,6 +20,9 @@ mod fake;
 #[cfg(all(windows, feature = "a11y-bench"))]
 pub mod bench;
 
+#[cfg(windows)]
+pub mod live_smoke;
+
 pub use commands::{
     accessibility_click, accessibility_element_at_point, accessibility_find_element,
     accessibility_focus, accessibility_get_focused, accessibility_get_selection,
@@ -28,6 +32,9 @@ pub use commands::{
     accessibility_snapshot, accessibility_wait,
 };
 pub use state::SnapshotStore;
+
+#[cfg(windows)]
+pub use live_smoke as a11y_live_smoke;
 
 use provider::AccessibilityProvider;
 

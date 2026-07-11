@@ -304,26 +304,32 @@ pub(super) fn foreground_window(
 }
 
 pub(super) fn parse_role(role: &str) -> Result<ControlType, CommandError> {
-    match role.trim().to_ascii_lowercase().as_str() {
-        "button" => Ok(ControlType::Button),
-        "edit" | "textbox" | "textfield" => Ok(ControlType::Edit),
-        "combobox" | "select" => Ok(ControlType::ComboBox),
-        "checkbox" => Ok(ControlType::CheckBox),
-        "radiobutton" | "radio" => Ok(ControlType::RadioButton),
-        "menuitem" => Ok(ControlType::MenuItem),
-        // Agents often say "link"; UIA control type is Hyperlink.
-        "hyperlink" | "link" | "a" => Ok(ControlType::Hyperlink),
-        "tabitem" | "tab" => Ok(ControlType::TabItem),
-        "listitem" | "option" => Ok(ControlType::ListItem),
-        "treeitem" => Ok(ControlType::TreeItem),
-        "slider" => Ok(ControlType::Slider),
-        "spinner" => Ok(ControlType::Spinner),
-        "document" => Ok(ControlType::Document),
-        "pane" => Ok(ControlType::Pane),
-        "window" => Ok(ControlType::Window),
-        other => Err(CommandError::new(
+    use super::super::outline::{
+        CT_BUTTON, CT_CHECK_BOX, CT_COMBO_BOX, CT_DOCUMENT, CT_EDIT, CT_HYPERLINK, CT_LIST_ITEM,
+        CT_MENU_ITEM, CT_PANE, CT_RADIO_BUTTON, CT_SLIDER, CT_SPINNER, CT_TAB_ITEM, CT_TREE_ITEM,
+        CT_WINDOW,
+    };
+    use super::super::query_match::parse_role_raw;
+
+    match parse_role_raw(role)? {
+        CT_BUTTON => Ok(ControlType::Button),
+        CT_EDIT => Ok(ControlType::Edit),
+        CT_COMBO_BOX => Ok(ControlType::ComboBox),
+        CT_CHECK_BOX => Ok(ControlType::CheckBox),
+        CT_RADIO_BUTTON => Ok(ControlType::RadioButton),
+        CT_MENU_ITEM => Ok(ControlType::MenuItem),
+        CT_HYPERLINK => Ok(ControlType::Hyperlink),
+        CT_TAB_ITEM => Ok(ControlType::TabItem),
+        CT_LIST_ITEM => Ok(ControlType::ListItem),
+        CT_TREE_ITEM => Ok(ControlType::TreeItem),
+        CT_SLIDER => Ok(ControlType::Slider),
+        CT_SPINNER => Ok(ControlType::Spinner),
+        CT_DOCUMENT => Ok(ControlType::Document),
+        CT_PANE => Ok(ControlType::Pane),
+        CT_WINDOW => Ok(ControlType::Window),
+        raw => Err(CommandError::new(
             ErrorCode::InvalidInput,
-            format!("Unsupported role filter: {other}"),
+            format!("Unsupported role filter raw: {raw}"),
         )),
     }
 }

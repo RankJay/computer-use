@@ -42,12 +42,12 @@ fn run_command_detail(program: &str, args: &[&str]) -> Option<String> {
 fn platform_detail() -> String {
     #[cfg(target_os = "windows")]
     {
-        return run_command_detail("cmd", &["/C", "ver"]).unwrap_or_else(|| "Windows".to_string());
+        run_command_detail("cmd", &["/C", "ver"]).unwrap_or_else(|| "Windows".to_string())
     }
 
     #[cfg(target_os = "macos")]
     {
-        return run_command_detail("sw_vers", &[]).unwrap_or_else(|| "macOS".to_string());
+        run_command_detail("sw_vers", &[]).unwrap_or_else(|| "macOS".to_string())
     }
 
     #[cfg(target_os = "linux")]
@@ -60,7 +60,7 @@ fn platform_detail() -> String {
             }
         }
 
-        return run_command_detail("uname", &["-sr"]).unwrap_or_else(|| "Linux".to_string());
+        run_command_detail("uname", &["-sr"]).unwrap_or_else(|| "Linux".to_string())
     }
 
     #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]

@@ -15,17 +15,17 @@ pub struct ProcessListResult {
 pub fn process_list() -> Result<ProcessListResult, CommandError> {
     #[cfg(target_os = "windows")]
     {
-        return list_processes_windows();
+        list_processes_windows()
     }
 
     #[cfg(target_os = "linux")]
     {
-        return list_processes_linux();
+        list_processes_linux()
     }
 
     #[cfg(target_os = "macos")]
     {
-        return list_processes_macos();
+        list_processes_macos()
     }
 
     #[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
