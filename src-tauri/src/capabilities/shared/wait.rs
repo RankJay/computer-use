@@ -2,7 +2,7 @@ use std::time::{Duration, Instant};
 
 use serde::Serialize;
 
-use crate::capabilities::path_utils::CommandError;
+use crate::capabilities::error::{CommandError, ErrorCode};
 
 const MIN_MS: u64 = 1;
 const MAX_MS: u64 = 60_000;
@@ -18,7 +18,7 @@ pub struct WaitResult {
 pub fn wait(ms: u64) -> Result<WaitResult, CommandError> {
     if !(MIN_MS..=MAX_MS).contains(&ms) {
         return Err(CommandError::new(
-            "invalid_duration",
+            ErrorCode::InvalidDuration,
             format!("Duration must be between {MIN_MS} and {MAX_MS} milliseconds"),
         ));
     }

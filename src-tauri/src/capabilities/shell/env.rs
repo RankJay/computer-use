@@ -2,7 +2,7 @@ use std::env;
 
 use serde::Serialize;
 
-use crate::capabilities::path_utils::CommandError;
+use crate::capabilities::error::{CommandError, ErrorCode};
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -24,7 +24,7 @@ pub fn get_env(name: String) -> Result<GetEnvResult, CommandError> {
     let name = name.trim().to_string();
     if name.is_empty() {
         return Err(CommandError::new(
-            "invalid_name",
+            ErrorCode::InvalidName,
             "Environment variable name must not be empty",
         ));
     }
@@ -41,7 +41,7 @@ pub fn get_env(name: String) -> Result<GetEnvResult, CommandError> {
             set: false,
         }),
         Err(error) => Err(CommandError::new(
-            "get_env_failed",
+            ErrorCode::GetEnvFailed,
             format!("Failed to read environment variable: {error}"),
         )),
     }
@@ -52,7 +52,7 @@ pub fn set_env(name: String, value: String) -> Result<SetEnvResult, CommandError
     let name = name.trim().to_string();
     if name.is_empty() {
         return Err(CommandError::new(
-            "invalid_name",
+            ErrorCode::InvalidName,
             "Environment variable name must not be empty",
         ));
     }

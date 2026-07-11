@@ -1,17 +1,9 @@
-use crate::capabilities::path_utils::CommandError;
+use crate::capabilities::error::{CommandError, ErrorCode};
 
 use super::types::{
     ActiveWindowResult, WindowActionResult, WindowListResult, WindowMoveResult, WindowResizeResult,
     WindowStateOp, WindowStateResult, TIMEOUT_LIST_WINDOWS_MS,
 };
-
-#[cfg(not(target_os = "windows"))]
-pub fn unsupported_platform<T>() -> Result<T, CommandError> {
-    Err(CommandError::new(
-        "unsupported_platform",
-        "Window management is only supported on Windows",
-    ))
-}
 
 #[cfg(target_os = "windows")]
 mod windows_impl {
@@ -43,14 +35,14 @@ mod windows_impl {
     pub fn hwnd_from_i64(hwnd: i64) -> Result<HWND, CommandError> {
         if hwnd == 0 {
             return Err(CommandError::new(
-                "invalid_hwnd",
+                ErrorCode::InvalidHwnd,
                 "Window handle must not be zero",
             ));
         }
         let handle = HWND(hwnd as isize as *mut _);
         if !unsafe { IsWindow(Some(handle)).as_bool() } {
             return Err(CommandError::new(
-                "invalid_hwnd",
+                ErrorCode::InvalidHwnd,
                 "Window handle is not valid",
             ));
         }
@@ -119,7 +111,7 @@ mod windows_impl {
                 Some(enum_visible_window),
                 LPARAM(&mut collector as *mut WindowCollector as isize),
             )
-            .map_err(|error| CommandError::new("window_enum_failed", error.to_string()))?;
+            .map_err(|error| CommandError::new(ErrorCode::WindowEnumFailed, error.to_string()))?;
         }
 
         // Leave headroom under TIMEOUT_LIST_WINDOWS_MS for channel/send overhead.
@@ -179,7 +171,7 @@ mod windows_impl {
         let focused = unsafe { SetForegroundWindow(handle) };
         if !focused.as_bool() {
             return Err(CommandError::new(
-                "focus_failed",
+                ErrorCode::FocusFailed,
                 "Could not bring window to foreground",
             ));
         }
@@ -212,8 +204,9 @@ mod windows_impl {
             }
             WindowStateOp::Close => {
                 unsafe {
-                    PostMessageW(Some(handle), WM_CLOSE, WPARAM(0), LPARAM(0))
-                        .map_err(|error| CommandError::new("close_failed", error.to_string()))?;
+                    PostMessageW(Some(handle), WM_CLOSE, WPARAM(0), LPARAM(0)).map_err(
+                        |error| CommandError::new(ErrorCode::CloseFailed, error.to_string()),
+                    )?;
                 }
                 "close"
             }
@@ -238,7 +231,7 @@ mod windows_impl {
                 0,
                 SWP_NOZORDER | SWP_NOSIZE,
             )
-            .map_err(|error| CommandError::new("move_failed", error.to_string()))?;
+            .map_err(|error| CommandError::new(ErrorCode::MoveFailed, error.to_string()))?;
         }
         Ok(WindowMoveResult {
             ok: true,
@@ -255,7 +248,7 @@ mod windows_impl {
     ) -> Result<WindowResizeResult, CommandError> {
         if width <= 0 || height <= 0 {
             return Err(CommandError::new(
-                "invalid_size",
+                ErrorCode::InvalidSize,
                 "Width and height must be positive",
             ));
         }
@@ -271,7 +264,7 @@ mod windows_impl {
                 height,
                 SWP_NOZORDER | SWP_NOMOVE,
             )
-            .map_err(|error| CommandError::new("resize_failed", error.to_string()))?;
+            .map_err(|error| CommandError::new(ErrorCode::ResizeFailed, error.to_string()))?;
         }
         Ok(WindowResizeResult {
             ok: true,
@@ -285,7 +278,7 @@ mod windows_impl {
         let hwnd = unsafe { GetForegroundWindow() };
         if hwnd.0.is_null() {
             return Err(CommandError::new(
-                "no_active_window",
+                ErrorCode::NoActiveWindow,
                 "No foreground window is available",
             ));
         }
@@ -314,11 +307,11 @@ mod windows_impl {
         match receiver.recv_timeout(Duration::from_millis(timeout_ms)) {
             Ok(result) => result,
             Err(std::sync::mpsc::RecvTimeoutError::Timeout) => Err(CommandError::new(
-                "list_windows_timeout",
+                ErrorCode::ListWindowsTimeout,
                 "Listing windows timed out",
             )),
             Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => Err(CommandError::new(
-                "worker_failed",
+                ErrorCode::WorkerFailed,
                 "Window worker task failed",
             )),
         }

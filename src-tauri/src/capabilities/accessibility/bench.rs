@@ -12,6 +12,8 @@ use windows::core::BOOL;
 use windows::Win32::Foundation::{HWND, LPARAM};
 use windows::Win32::UI::WindowsAndMessaging::{EnumWindows, GetWindowTextW, IsWindowVisible};
 
+use crate::capabilities::error::{CommandError, ErrorCode};
+
 use super::state::SnapshotStore;
 use super::types::SnapshotInput;
 use super::windows_impl::{resolve_reference_with_stats, snapshot_with_stats, SnapshotStats};
@@ -74,11 +76,7 @@ pub fn run_all() -> Vec<BenchSummary> {
 fn block_on_worker<T, F>(timeout: Duration, work: F) -> WorkerOutcome<T>
 where
     T: Send + 'static,
-    F: FnOnce(
-            &mut super::worker::WorkerCtx,
-        ) -> Result<T, crate::capabilities::path_utils::CommandError>
-        + Send
-        + 'static,
+    F: FnOnce(&mut super::worker::WorkerCtx) -> Result<T, CommandError> + Send + 'static,
 {
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_time()
@@ -165,8 +163,8 @@ fn bench_resolve(fixture: &str, hwnd: i64) -> BenchSummary {
     let Ok((text, _)) = (match snapshot_outcome {
         WorkerOutcome::Ok(value) => Ok(value),
         WorkerOutcome::Err(error) => Err(error),
-        WorkerOutcome::TimedOut => Err(crate::capabilities::path_utils::CommandError::new(
-            "snapshot_timeout",
+        WorkerOutcome::TimedOut => Err(CommandError::new(
+            ErrorCode::SnapshotTimeout,
             "snapshot timed out before resolve",
         )),
     }) else {

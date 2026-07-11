@@ -12,7 +12,9 @@ use std::sync::OnceLock;
 use std::thread;
 use std::time::{Duration, Instant};
 
-use crate::capabilities::path_utils::CommandError;
+#[cfg(not(target_os = "windows"))]
+use crate::capabilities::error::unsupported_platform;
+use crate::capabilities::error::{CommandError, ErrorCode};
 
 use super::arena::HwndArena;
 
@@ -62,10 +64,7 @@ impl WorkerCtx {
 
     #[cfg(not(windows))]
     pub fn session(&self) -> Result<(), CommandError> {
-        Err(CommandError::new(
-            "unsupported_platform",
-            "Accessibility automation is only supported on Windows",
-        ))
+        Err(unsupported_platform("Accessibility automation"))
     }
 }
 
@@ -99,7 +98,7 @@ fn worker_loop(rx: Receiver<Job>) {
         };
         if hr.is_err() {
             Err(CommandError::new(
-                "uia_init_failed",
+                ErrorCode::UiaInitFailed,
                 format!("CoInitializeEx failed: {hr:?}"),
             ))
         } else {
@@ -138,7 +137,7 @@ where
         work: Box::new(move |ctx| {
             let result = if Instant::now() >= deadline {
                 Err(CommandError::new(
-                    "deadline_exceeded",
+                    ErrorCode::DeadlineExceeded,
                     "Accessibility job expired while queued",
                 ))
             } else {
@@ -152,13 +151,13 @@ where
         Ok(()) => {}
         Err(TrySendError::Full(_)) => {
             return WorkerOutcome::Err(CommandError::new(
-                "a11y_busy",
+                ErrorCode::A11yBusy,
                 "Accessibility worker queue is full",
             ));
         }
         Err(TrySendError::Disconnected(_)) => {
             return WorkerOutcome::Err(CommandError::new(
-                "worker_failed",
+                ErrorCode::WorkerFailed,
                 "Accessibility worker disconnected before accepting a job",
             ));
         }
@@ -168,7 +167,7 @@ where
         Ok(Ok(Ok(value))) => WorkerOutcome::Ok(value),
         Ok(Ok(Err(error))) => WorkerOutcome::Err(error),
         Ok(Err(_)) => WorkerOutcome::Err(CommandError::new(
-            "worker_failed",
+            ErrorCode::WorkerFailed,
             "Accessibility worker disconnected before returning a result",
         )),
         Err(_) => WorkerOutcome::TimedOut,
@@ -177,7 +176,7 @@ where
 
 pub fn map_worker_outcome<T>(
     outcome: WorkerOutcome<T>,
-    timeout_code: &str,
+    timeout_code: ErrorCode,
     timeout_message: &str,
 ) -> Result<T, CommandError> {
     match outcome {

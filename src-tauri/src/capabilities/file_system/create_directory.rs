@@ -2,7 +2,8 @@ use std::fs;
 
 use serde::Serialize;
 
-use crate::capabilities::path_utils::{self, CommandError};
+use crate::capabilities::error::{CommandError, ErrorCode};
+use crate::capabilities::path_utils;
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -21,7 +22,7 @@ pub fn create_directory(
 
     if resolved.exists() {
         return Err(CommandError::new(
-            "already_exists",
+            ErrorCode::AlreadyExists,
             "Directory already exists",
         ));
     }
@@ -29,14 +30,14 @@ pub fn create_directory(
     if recursive.unwrap_or(false) {
         fs::create_dir_all(&resolved).map_err(|error| {
             CommandError::new(
-                "create_failed",
+                ErrorCode::CreateFailed,
                 format!("Failed to create directories: {error}"),
             )
         })?;
     } else {
         fs::create_dir(&resolved).map_err(|error| {
             CommandError::new(
-                "create_failed",
+                ErrorCode::CreateFailed,
                 format!("Failed to create directory: {error}"),
             )
         })?;

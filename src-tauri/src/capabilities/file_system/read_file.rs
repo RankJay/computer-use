@@ -2,7 +2,8 @@ use std::fs;
 
 use serde::Serialize;
 
-use crate::capabilities::path_utils::{self, CommandError, MAX_READ_BYTES};
+use crate::capabilities::error::{CommandError, ErrorCode};
+use crate::capabilities::path_utils::{self, MAX_READ_BYTES};
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -16,22 +17,26 @@ pub struct ReadFileResult {
 pub fn read_file(path: String, workspace_root: String) -> Result<ReadFileResult, CommandError> {
     let resolved = path_utils::resolve_workspace_path(&workspace_root, &path)?;
 
-    let metadata = fs::metadata(&resolved)
-        .map_err(|error| CommandError::new("not_found", format!("File not found: {error}")))?;
+    let metadata = fs::metadata(&resolved).map_err(|error| {
+        CommandError::new(ErrorCode::NotFound, format!("File not found: {error}"))
+    })?;
 
     if !metadata.is_file() {
-        return Err(CommandError::new("not_a_file", "Path is not a file"));
+        return Err(CommandError::new(ErrorCode::NotAFile, "Path is not a file"));
     }
 
     if metadata.len() > MAX_READ_BYTES {
         return Err(CommandError::new(
-            "file_too_large",
+            ErrorCode::FileTooLarge,
             format!("File exceeds {MAX_READ_BYTES} byte read limit"),
         ));
     }
 
     let content = fs::read_to_string(&resolved).map_err(|error| {
-        CommandError::new("read_failed", format!("Failed to read file: {error}"))
+        CommandError::new(
+            ErrorCode::ReadFailed,
+            format!("Failed to read file: {error}"),
+        )
     })?;
 
     Ok(ReadFileResult {

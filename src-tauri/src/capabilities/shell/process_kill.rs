@@ -1,6 +1,6 @@
 use serde::Serialize;
 
-use crate::capabilities::path_utils::CommandError;
+use crate::capabilities::error::{CommandError, ErrorCode};
 
 use super::process_list::process_list;
 
@@ -21,7 +21,7 @@ pub fn process_kill(
 
     if has_pid == has_name {
         return Err(CommandError::new(
-            "invalid_input",
+            ErrorCode::InvalidInput,
             "Provide exactly one of pid or name",
         ));
     }
@@ -29,7 +29,7 @@ pub fn process_kill(
     let target_pid = if let Some(pid) = pid {
         if pid == 0 {
             return Err(CommandError::new(
-                "invalid_pid",
+                ErrorCode::InvalidPid,
                 "Process id must not be zero",
             ));
         }
@@ -51,7 +51,7 @@ pub fn process_kill(
     #[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
     {
         Err(CommandError::new(
-            "unsupported_platform",
+            ErrorCode::UnsupportedPlatform,
             "Process termination is not supported on this platform",
         ))
     }
@@ -61,7 +61,7 @@ fn resolve_pid_by_name(name: &str) -> Result<u32, CommandError> {
     let needle = name.trim().to_ascii_lowercase();
     if needle.is_empty() {
         return Err(CommandError::new(
-            "invalid_name",
+            ErrorCode::InvalidName,
             "Process name must not be empty",
         ));
     }
@@ -88,12 +88,12 @@ fn resolve_pid_by_name(name: &str) -> Result<u32, CommandError> {
 
     match matches.len() {
         0 => Err(CommandError::new(
-            "process_not_found",
+            ErrorCode::ProcessNotFound,
             format!("No running process matched name '{name}'"),
         )),
         1 => Ok(matches[0].0),
         _ => Err(CommandError::new(
-            "ambiguous_process_name",
+            ErrorCode::AmbiguousProcessName,
             format!("Multiple processes matched name '{name}'"),
         )
         .with_details(
@@ -114,13 +114,13 @@ fn kill_process_windows(pid: u32) -> Result<ProcessKillResult, CommandError> {
     unsafe {
         let process = OpenProcess(PROCESS_TERMINATE, false, pid).map_err(|error| {
             CommandError::new(
-                "process_not_found",
+                ErrorCode::ProcessNotFound,
                 format!("Could not open process {pid}: {error}"),
             )
         })?;
         TerminateProcess(process, 1).map_err(|error| {
             CommandError::new(
-                "kill_failed",
+                ErrorCode::KillFailed,
                 format!("Failed to terminate process {pid}: {error}"),
             )
         })?;
@@ -138,12 +138,15 @@ fn kill_process_unix(pid: u32) -> Result<ProcessKillResult, CommandError> {
         .arg(pid.to_string())
         .status()
         .map_err(|error| {
-            CommandError::new("kill_failed", format!("Failed to run kill: {error}"))
+            CommandError::new(
+                ErrorCode::KillFailed,
+                format!("Failed to run kill: {error}"),
+            )
         })?;
 
     if !status.success() {
         return Err(CommandError::new(
-            "kill_failed",
+            ErrorCode::KillFailed,
             format!("kill command failed for pid {pid}"),
         ));
     }

@@ -2,7 +2,8 @@ use glob::Pattern;
 use serde::Serialize;
 use walkdir::WalkDir;
 
-use crate::capabilities::path_utils::{self, CommandError};
+use crate::capabilities::error::{CommandError, ErrorCode};
+use crate::capabilities::path_utils;
 
 const MAX_MATCHES: usize = 100;
 
@@ -20,7 +21,10 @@ pub fn search_files(
 ) -> Result<SearchFilesResult, CommandError> {
     let root = path_utils::resolve_root(&workspace_root)?;
     let pattern = Pattern::new(&glob).map_err(|error| {
-        CommandError::new("invalid_glob", format!("Invalid glob pattern: {error}"))
+        CommandError::new(
+            ErrorCode::InvalidGlob,
+            format!("Invalid glob pattern: {error}"),
+        )
     })?;
 
     let query = query.trim().to_lowercase();

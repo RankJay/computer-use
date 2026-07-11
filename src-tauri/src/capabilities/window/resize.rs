@@ -1,12 +1,11 @@
-use crate::capabilities::path_utils::CommandError;
+#[cfg(not(target_os = "windows"))]
+use crate::capabilities::error::unsupported_platform;
+use crate::capabilities::error::CommandError;
 
 use super::types::WindowResizeResult;
 
 #[cfg(target_os = "windows")]
 use super::platform::resize_window_impl;
-
-#[cfg(not(target_os = "windows"))]
-use super::platform::unsupported_platform;
 
 #[tauri::command]
 pub fn window_resize(
@@ -20,5 +19,5 @@ pub fn window_resize(
     }
 
     #[cfg(not(target_os = "windows"))]
-    unsupported_platform()
+    Err(unsupported_platform("Window management"))
 }

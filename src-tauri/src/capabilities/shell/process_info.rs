@@ -3,7 +3,7 @@ use std::time::{Duration, Instant};
 
 use serde::Serialize;
 
-use crate::capabilities::path_utils::CommandError;
+use crate::capabilities::error::{CommandError, ErrorCode};
 
 const CPU_SAMPLE_INTERVAL: Duration = Duration::from_millis(150);
 
@@ -36,7 +36,7 @@ fn cpu_percent_from_deltas(cpu_seconds: f64, wall: Duration) -> Option<f64> {
 pub fn process_info(pid: u32) -> Result<ProcessInfoResult, CommandError> {
     if pid == 0 {
         return Err(CommandError::new(
-            "invalid_pid",
+            ErrorCode::InvalidPid,
             "Process id must not be zero",
         ));
     }
@@ -59,7 +59,7 @@ pub fn process_info(pid: u32) -> Result<ProcessInfoResult, CommandError> {
     #[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
     {
         Err(CommandError::new(
-            "unsupported_platform",
+            ErrorCode::UnsupportedPlatform,
             "Process info is not supported on this platform",
         ))
     }
@@ -86,7 +86,7 @@ fn process_cpu_seconds(process: windows::Win32::Foundation::HANDLE) -> Result<f6
         GetProcessTimes(process, &mut creation, &mut exit, &mut kernel, &mut user).map_err(
             |error| {
                 CommandError::new(
-                    "process_info_failed",
+                    ErrorCode::ProcessInfoFailed,
                     format!("Failed to read process CPU times: {error}"),
                 )
             },
@@ -112,7 +112,7 @@ fn process_info_windows(pid: u32) -> Result<ProcessInfoResult, CommandError> {
         let process = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, false, pid)
             .map_err(|error| {
                 CommandError::new(
-                    "process_not_found",
+                    ErrorCode::ProcessNotFound,
                     format!("Could not open process {pid}: {error}"),
                 )
             })?;
@@ -127,7 +127,7 @@ fn process_info_windows(pid: u32) -> Result<ProcessInfoResult, CommandError> {
         )
         .map_err(|error| {
             CommandError::new(
-                "process_info_failed",
+                ErrorCode::ProcessInfoFailed,
                 format!("Failed to read process name: {error}"),
             )
         })?;
@@ -145,7 +145,7 @@ fn process_info_windows(pid: u32) -> Result<ProcessInfoResult, CommandError> {
         )
         .map_err(|error| {
             CommandError::new(
-                "process_info_failed",
+                ErrorCode::ProcessInfoFailed,
                 format!("Failed to read process memory: {error}"),
             )
         })?;
@@ -177,14 +177,20 @@ fn linux_cpu_jiffies(pid: u32) -> Result<u64, CommandError> {
     use std::fs;
 
     let stat = fs::read_to_string(format!("/proc/{pid}/stat")).map_err(|_| {
-        CommandError::new("process_not_found", format!("Process {pid} was not found"))
+        CommandError::new(
+            ErrorCode::ProcessNotFound,
+            format!("Process {pid} was not found"),
+        )
     })?;
     // comm may contain spaces/parens; fields after the last ')' are numbered from 1 as utime=14
     let after_comm = stat
         .rsplit_once(')')
         .map(|(_, rest)| rest.trim_start())
         .ok_or_else(|| {
-            CommandError::new("process_info_failed", "Unexpected /proc/pid/stat format")
+            CommandError::new(
+                ErrorCode::ProcessInfoFailed,
+                "Unexpected /proc/pid/stat format",
+            )
         })?;
     let mut fields = after_comm.split_whitespace();
     // After ')': state(1) ... utime is field 14 of full stat = index 11 after state?
@@ -195,7 +201,7 @@ fn linux_cpu_jiffies(pid: u32) -> Result<u64, CommandError> {
         .and_then(|v| v.parse::<u64>().ok())
         .ok_or_else(|| {
             CommandError::new(
-                "process_info_failed",
+                ErrorCode::ProcessInfoFailed,
                 "Failed to parse utime from /proc/pid/stat",
             )
         })?;
@@ -204,7 +210,7 @@ fn linux_cpu_jiffies(pid: u32) -> Result<u64, CommandError> {
         .and_then(|v| v.parse::<u64>().ok())
         .ok_or_else(|| {
             CommandError::new(
-                "process_info_failed",
+                ErrorCode::ProcessInfoFailed,
                 "Failed to parse stime from /proc/pid/stat",
             )
         })?;
@@ -216,10 +222,16 @@ fn process_info_linux(pid: u32) -> Result<ProcessInfoResult, CommandError> {
     use std::fs;
 
     let comm = fs::read_to_string(format!("/proc/{pid}/comm")).map_err(|_| {
-        CommandError::new("process_not_found", format!("Process {pid} was not found"))
+        CommandError::new(
+            ErrorCode::ProcessNotFound,
+            format!("Process {pid} was not found"),
+        )
     })?;
     let statm = fs::read_to_string(format!("/proc/{pid}/statm")).map_err(|_| {
-        CommandError::new("process_not_found", format!("Process {pid} was not found"))
+        CommandError::new(
+            ErrorCode::ProcessNotFound,
+            format!("Process {pid} was not found"),
+        )
     })?;
     let pages = statm
         .split_whitespace()
@@ -302,7 +314,7 @@ fn macos_cpu_seconds(pid: u32) -> Result<f64, CommandError> {
     };
     if written <= 0 {
         return Err(CommandError::new(
-            "process_not_found",
+            ErrorCode::ProcessNotFound,
             format!("Process {pid} was not found"),
         ));
     }
@@ -325,12 +337,15 @@ fn process_info_macos(pid: u32) -> Result<ProcessInfoResult, CommandError> {
         .args(["-p", &pid.to_string(), "-o", "comm=,rss="])
         .output()
         .map_err(|error| {
-            CommandError::new("process_info_failed", format!("Failed to run ps: {error}"))
+            CommandError::new(
+                ErrorCode::ProcessInfoFailed,
+                format!("Failed to run ps: {error}"),
+            )
         })?;
 
     if !output.status.success() {
         return Err(CommandError::new(
-            "process_not_found",
+            ErrorCode::ProcessNotFound,
             format!("Process {pid} was not found"),
         ));
     }
@@ -339,7 +354,7 @@ fn process_info_macos(pid: u32) -> Result<ProcessInfoResult, CommandError> {
     let mut parts = line.split_whitespace();
     let name = parts
         .next()
-        .ok_or_else(|| CommandError::new("process_info_failed", "Unexpected ps output"))?
+        .ok_or_else(|| CommandError::new(ErrorCode::ProcessInfoFailed, "Unexpected ps output"))?
         .to_string();
     let rss_kb = parts
         .next()

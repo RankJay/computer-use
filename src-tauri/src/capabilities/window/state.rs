@@ -1,12 +1,11 @@
-use crate::capabilities::path_utils::CommandError;
+#[cfg(not(target_os = "windows"))]
+use crate::capabilities::error::unsupported_platform;
+use crate::capabilities::error::CommandError;
 
 use super::types::{WindowStateOp, WindowStateResult};
 
 #[cfg(target_os = "windows")]
 use super::platform::window_state_impl;
-
-#[cfg(not(target_os = "windows"))]
-use super::platform::unsupported_platform;
 
 #[tauri::command]
 pub fn window_state(hwnd: i64, op: WindowStateOp) -> Result<WindowStateResult, CommandError> {
@@ -16,5 +15,5 @@ pub fn window_state(hwnd: i64, op: WindowStateOp) -> Result<WindowStateResult, C
     }
 
     #[cfg(not(target_os = "windows"))]
-    unsupported_platform()
+    Err(unsupported_platform("Window management"))
 }

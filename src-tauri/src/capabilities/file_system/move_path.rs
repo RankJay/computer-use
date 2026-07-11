@@ -2,7 +2,8 @@ use std::fs;
 
 use serde::Serialize;
 
-use crate::capabilities::path_utils::{self, CommandError};
+use crate::capabilities::error::{CommandError, ErrorCode};
+use crate::capabilities::path_utils;
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -21,12 +22,15 @@ pub fn move_path(
     let destination = path_utils::resolve_workspace_path(&workspace_root, &to)?;
 
     if !source.exists() {
-        return Err(CommandError::new("not_found", "Source path does not exist"));
+        return Err(CommandError::new(
+            ErrorCode::NotFound,
+            "Source path does not exist",
+        ));
     }
 
     if destination.exists() {
         return Err(CommandError::new(
-            "dest_exists",
+            ErrorCode::DestExists,
             "Destination path already exists",
         ));
     }
@@ -34,14 +38,17 @@ pub fn move_path(
     if let Some(parent) = destination.parent() {
         if !parent.exists() {
             return Err(CommandError::new(
-                "parent_missing",
+                ErrorCode::ParentMissing,
                 "Destination parent directory does not exist",
             ));
         }
     }
 
     fs::rename(&source, &destination).map_err(|error| {
-        CommandError::new("move_failed", format!("Failed to move path: {error}"))
+        CommandError::new(
+            ErrorCode::MoveFailed,
+            format!("Failed to move path: {error}"),
+        )
     })?;
 
     Ok(MovePathResult { from, to })

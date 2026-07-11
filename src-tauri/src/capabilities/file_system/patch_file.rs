@@ -2,7 +2,8 @@ use std::fs;
 
 use serde::Serialize;
 
-use crate::capabilities::path_utils::{self, CommandError, MAX_READ_BYTES};
+use crate::capabilities::error::{CommandError, ErrorCode};
+use crate::capabilities::path_utils::{self, MAX_READ_BYTES};
 
 use super::patch::{apply_unified_diff, PatchError};
 
@@ -16,18 +17,20 @@ pub struct PatchFileResult {
 
 fn map_patch_error(error: PatchError) -> CommandError {
     match error {
-        PatchError::InvalidDiff => {
-            CommandError::new("patch_invalid_diff", "Patch is not a valid unified diff")
-        }
-        PatchError::MultiFileDiff => {
-            CommandError::new("patch_invalid_diff", "Patch must modify a single file")
-        }
+        PatchError::InvalidDiff => CommandError::new(
+            ErrorCode::PatchInvalidDiff,
+            "Patch is not a valid unified diff",
+        ),
+        PatchError::MultiFileDiff => CommandError::new(
+            ErrorCode::PatchInvalidDiff,
+            "Patch must modify a single file",
+        ),
         PatchError::TargetMismatch => CommandError::new(
-            "patch_invalid_diff",
+            ErrorCode::PatchInvalidDiff,
             "Patch target does not match the requested path",
         ),
         PatchError::ApplyFailed => CommandError::new(
-            "patch_apply_failed",
+            ErrorCode::PatchApplyFailed,
             "Failed to apply patch to file contents",
         ),
     }
@@ -42,15 +45,21 @@ pub fn patch_file(
     let resolved = path_utils::resolve_workspace_path(&workspace_root, &path)?;
 
     if !resolved.exists() {
-        return Err(CommandError::new("not_found", "File does not exist"));
+        return Err(CommandError::new(
+            ErrorCode::NotFound,
+            "File does not exist",
+        ));
     }
 
     if !resolved.is_file() {
-        return Err(CommandError::new("not_a_file", "Path is not a file"));
+        return Err(CommandError::new(ErrorCode::NotAFile, "Path is not a file"));
     }
 
     let original = fs::read_to_string(&resolved).map_err(|error| {
-        CommandError::new("read_failed", format!("Failed to read file: {error}"))
+        CommandError::new(
+            ErrorCode::ReadFailed,
+            format!("Failed to read file: {error}"),
+        )
     })?;
 
     let (patched, hunks_applied) =
@@ -59,14 +68,14 @@ pub fn patch_file(
     let bytes_written = patched.len() as u64;
     if bytes_written > MAX_READ_BYTES {
         return Err(CommandError::new(
-            "file_too_large",
+            ErrorCode::FileTooLarge,
             format!("Patched file exceeds {MAX_READ_BYTES} byte limit"),
         ));
     }
 
     fs::write(&resolved, patched).map_err(|error| {
         CommandError::new(
-            "write_failed",
+            ErrorCode::WriteFailed,
             format!("Failed to write patched file: {error}"),
         )
     })?;

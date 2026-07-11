@@ -1,11 +1,11 @@
-use crate::capabilities::path_utils::CommandError;
+use crate::capabilities::error::{CommandError, ErrorCode};
 
 /// Resolve a key name to a Windows virtual-key code.
 pub fn parse_key(name: &str) -> Result<u16, CommandError> {
     let key = name.trim().to_ascii_lowercase();
     if key.is_empty() {
         return Err(CommandError::new(
-            "invalid_key",
+            ErrorCode::InvalidKey,
             "Key name must not be empty",
         ));
     }
@@ -62,7 +62,7 @@ pub fn parse_key(name: &str) -> Result<u16, CommandError> {
                 '0'..='9' => (ch as u8) as u16,               // VK_0..VK_9
                 _ => {
                     return Err(CommandError::new(
-                        "invalid_key",
+                        ErrorCode::InvalidKey,
                         format!("Unsupported key: {name}"),
                     ));
                 }
@@ -70,7 +70,7 @@ pub fn parse_key(name: &str) -> Result<u16, CommandError> {
         }
         _ => {
             return Err(CommandError::new(
-                "invalid_key",
+                ErrorCode::InvalidKey,
                 format!("Unsupported key: {name}"),
             ));
         }
@@ -83,7 +83,7 @@ pub fn parse_key(name: &str) -> Result<u16, CommandError> {
 pub fn parse_keys(names: &[String]) -> Result<Vec<u16>, CommandError> {
     if names.is_empty() {
         return Err(CommandError::new(
-            "invalid_keys",
+            ErrorCode::InvalidKeys,
             "At least one key is required",
         ));
     }

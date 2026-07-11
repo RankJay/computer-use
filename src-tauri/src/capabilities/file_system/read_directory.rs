@@ -1,7 +1,8 @@
 use serde::Serialize;
 use std::fs;
 
-use crate::capabilities::path_utils::{self, CommandError};
+use crate::capabilities::error::{CommandError, ErrorCode};
+use crate::capabilities::path_utils;
 
 const MAX_DIRECTORY_ENTRIES: usize = 500;
 
@@ -39,26 +40,35 @@ pub fn read_directory(
     let resolved = path_utils::resolve_workspace_path(&workspace_root, &path)?;
 
     if !resolved.exists() {
-        return Err(CommandError::new("not_found", "Directory does not exist"));
+        return Err(CommandError::new(
+            ErrorCode::NotFound,
+            "Directory does not exist",
+        ));
     }
 
     if !resolved.is_dir() {
         return Err(CommandError::new(
-            "not_a_directory",
+            ErrorCode::NotADirectory,
             "Path is not a directory",
         ));
     }
 
     let mut entries = Vec::new();
     for entry in fs::read_dir(&resolved).map_err(|error| {
-        CommandError::new("read_failed", format!("Failed to read directory: {error}"))
+        CommandError::new(
+            ErrorCode::ReadFailed,
+            format!("Failed to read directory: {error}"),
+        )
     })? {
         let entry = entry.map_err(|error| {
-            CommandError::new("read_failed", format!("Failed to read entry: {error}"))
+            CommandError::new(
+                ErrorCode::ReadFailed,
+                format!("Failed to read entry: {error}"),
+            )
         })?;
         let metadata = entry.metadata().map_err(|error| {
             CommandError::new(
-                "read_failed",
+                ErrorCode::ReadFailed,
                 format!("Failed to read entry metadata: {error}"),
             )
         })?;
@@ -75,7 +85,7 @@ pub fn read_directory(
 
         if entries.len() > MAX_DIRECTORY_ENTRIES {
             return Err(CommandError::new(
-                "too_many_entries",
+                ErrorCode::TooManyEntries,
                 format!("Directory exceeds {MAX_DIRECTORY_ENTRIES} entry limit"),
             ));
         }

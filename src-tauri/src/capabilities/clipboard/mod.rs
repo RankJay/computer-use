@@ -6,7 +6,7 @@ use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
 use image::{ImageBuffer, ImageFormat, RgbaImage};
 use serde::Serialize;
 
-use crate::capabilities::path_utils::CommandError;
+use crate::capabilities::error::{CommandError, ErrorCode};
 
 const MAX_CLIPBOARD_BYTES: usize = 512_000;
 const MAX_IMAGE_DECODED_BYTES: usize = 10 * 1024 * 1024;
@@ -58,7 +58,7 @@ pub struct WriteClipboardImageResult {
 fn open_clipboard() -> Result<Clipboard, CommandError> {
     Clipboard::new().map_err(|error| {
         CommandError::new(
-            "clipboard_unavailable",
+            ErrorCode::ClipboardUnavailable,
             format!("Could not access clipboard: {error}"),
         )
     })
@@ -90,19 +90,31 @@ fn rgba_to_png_base64(
     height: usize,
     bytes: &[u8],
 ) -> Result<(u32, u32, String), CommandError> {
-    let width_u32 = u32::try_from(width)
-        .map_err(|_| CommandError::new("clipboard_image_invalid", "Image width is out of range"))?;
+    let width_u32 = u32::try_from(width).map_err(|_| {
+        CommandError::new(
+            ErrorCode::ClipboardImageInvalid,
+            "Image width is out of range",
+        )
+    })?;
     let height_u32 = u32::try_from(height).map_err(|_| {
-        CommandError::new("clipboard_image_invalid", "Image height is out of range")
+        CommandError::new(
+            ErrorCode::ClipboardImageInvalid,
+            "Image height is out of range",
+        )
     })?;
 
     let expected = width
         .checked_mul(height)
         .and_then(|pixels| pixels.checked_mul(4))
-        .ok_or_else(|| CommandError::new("clipboard_image_invalid", "Image dimensions overflow"))?;
+        .ok_or_else(|| {
+            CommandError::new(
+                ErrorCode::ClipboardImageInvalid,
+                "Image dimensions overflow",
+            )
+        })?;
     if bytes.len() != expected {
         return Err(CommandError::new(
-            "clipboard_image_invalid",
+            ErrorCode::ClipboardImageInvalid,
             format!(
                 "Image byte length {} does not match {}x{} RGBA",
                 bytes.len(),
@@ -113,7 +125,7 @@ fn rgba_to_png_base64(
     }
     if bytes.len() > MAX_IMAGE_DECODED_BYTES {
         return Err(CommandError::new(
-            "clipboard_image_too_large",
+            ErrorCode::ClipboardImageTooLarge,
             format!("Image exceeds {MAX_IMAGE_DECODED_BYTES} decoded bytes"),
         ));
     }
@@ -121,7 +133,7 @@ fn rgba_to_png_base64(
     let image: RgbaImage = ImageBuffer::from_raw(width_u32, height_u32, bytes.to_vec())
         .ok_or_else(|| {
             CommandError::new(
-                "clipboard_image_invalid",
+                ErrorCode::ClipboardImageInvalid,
                 "Failed to build RGBA image buffer",
             )
         })?;
@@ -131,7 +143,7 @@ fn rgba_to_png_base64(
         .write_to(&mut Cursor::new(&mut png_bytes), ImageFormat::Png)
         .map_err(|error| {
             CommandError::new(
-                "clipboard_image_encode_failed",
+                ErrorCode::ClipboardImageEncodeFailed,
                 format!("Failed to encode PNG: {error}"),
             )
         })?;
@@ -142,21 +154,21 @@ fn rgba_to_png_base64(
 fn png_base64_to_image_data(base64: &str) -> Result<ImageData<'static>, CommandError> {
     let png_bytes = BASE64.decode(base64.trim()).map_err(|error| {
         CommandError::new(
-            "clipboard_image_invalid",
+            ErrorCode::ClipboardImageInvalid,
             format!("Invalid base64 image payload: {error}"),
         )
     })?;
 
     if png_bytes.len() > MAX_IMAGE_DECODED_BYTES {
         return Err(CommandError::new(
-            "clipboard_image_too_large",
+            ErrorCode::ClipboardImageTooLarge,
             format!("Image exceeds {MAX_IMAGE_DECODED_BYTES} bytes"),
         ));
     }
 
     let dyn_image = image::load_from_memory(&png_bytes).map_err(|error| {
         CommandError::new(
-            "clipboard_image_invalid",
+            ErrorCode::ClipboardImageInvalid,
             format!("Failed to decode PNG: {error}"),
         )
     })?;
@@ -167,7 +179,7 @@ fn png_base64_to_image_data(base64: &str) -> Result<ImageData<'static>, CommandE
 
     if bytes.len() > MAX_IMAGE_DECODED_BYTES {
         return Err(CommandError::new(
-            "clipboard_image_too_large",
+            ErrorCode::ClipboardImageTooLarge,
             format!("Decoded image exceeds {MAX_IMAGE_DECODED_BYTES} bytes"),
         ));
     }
@@ -202,7 +214,7 @@ pub fn read_clipboard() -> Result<ReadClipboardResult, CommandError> {
             empty: true,
         }),
         Err(error) => Err(CommandError::new(
-            "clipboard_read_failed",
+            ErrorCode::ClipboardReadFailed,
             format!("Failed to read clipboard: {error}"),
         )),
     }
@@ -215,7 +227,7 @@ pub fn write_clipboard(text: String) -> Result<WriteClipboardResult, CommandErro
     let bytes = text.len();
     clipboard.set_text(text).map_err(|error| {
         CommandError::new(
-            "clipboard_write_failed",
+            ErrorCode::ClipboardWriteFailed,
             format!("Failed to write clipboard: {error}"),
         )
     })?;
@@ -246,7 +258,7 @@ pub fn read_clipboard_html() -> Result<ReadClipboardHtmlResult, CommandError> {
             empty: true,
         }),
         Err(error) => Err(CommandError::new(
-            "clipboard_read_failed",
+            ErrorCode::ClipboardReadFailed,
             format!("Failed to read HTML from clipboard: {error}"),
         )),
     }
@@ -260,7 +272,7 @@ pub fn write_clipboard_html(html: String) -> Result<WriteClipboardHtmlResult, Co
         .set_html(html.clone(), Some(html))
         .map_err(|error| {
             CommandError::new(
-                "clipboard_write_failed",
+                ErrorCode::ClipboardWriteFailed,
                 format!("Failed to write HTML to clipboard: {error}"),
             )
         })?;
@@ -289,7 +301,7 @@ pub fn read_clipboard_image() -> Result<ReadClipboardImageResult, CommandError> 
         }
         Err(arboard::Error::ContentNotAvailable) => Ok(empty_image_result()),
         Err(error) => Err(CommandError::new(
-            "clipboard_read_failed",
+            ErrorCode::ClipboardReadFailed,
             format!("Failed to read image from clipboard: {error}"),
         )),
     }
@@ -303,24 +315,31 @@ pub fn write_clipboard_image(
     if let Some(mime) = mime_type.as_deref() {
         if mime != "image/png" {
             return Err(CommandError::new(
-                "clipboard_image_invalid",
+                ErrorCode::ClipboardImageInvalid,
                 format!("Unsupported mime type '{mime}'; only image/png is supported"),
             ));
         }
     }
 
     let image = png_base64_to_image_data(&base64)?;
-    let width = u32::try_from(image.width)
-        .map_err(|_| CommandError::new("clipboard_image_invalid", "Image width is out of range"))?;
+    let width = u32::try_from(image.width).map_err(|_| {
+        CommandError::new(
+            ErrorCode::ClipboardImageInvalid,
+            "Image width is out of range",
+        )
+    })?;
     let height = u32::try_from(image.height).map_err(|_| {
-        CommandError::new("clipboard_image_invalid", "Image height is out of range")
+        CommandError::new(
+            ErrorCode::ClipboardImageInvalid,
+            "Image height is out of range",
+        )
     })?;
     let bytes = image.bytes.len();
 
     let mut clipboard = open_clipboard()?;
     clipboard.set_image(image).map_err(|error| {
         CommandError::new(
-            "clipboard_write_failed",
+            ErrorCode::ClipboardWriteFailed,
             format!("Failed to write image to clipboard: {error}"),
         )
     })?;

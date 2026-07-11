@@ -1,6 +1,6 @@
 use serde::Serialize;
 
-use crate::capabilities::path_utils::CommandError;
+use crate::capabilities::error::{CommandError, ErrorCode};
 
 const MAX_PROCESSES: usize = 200;
 
@@ -31,7 +31,7 @@ pub fn process_list() -> Result<ProcessListResult, CommandError> {
     #[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
     {
         Err(CommandError::new(
-            "unsupported_platform",
+            ErrorCode::UnsupportedPlatform,
             "Process listing is not supported on this platform",
         ))
     }
@@ -50,7 +50,7 @@ fn list_processes_windows() -> Result<ProcessListResult, CommandError> {
     unsafe {
         let snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0).map_err(|error| {
             CommandError::new(
-                "process_enum_failed",
+                ErrorCode::ProcessEnumFailed,
                 format!("Failed to snapshot processes: {error}"),
             )
         })?;
@@ -98,7 +98,7 @@ fn list_processes_linux() -> Result<ProcessListResult, CommandError> {
     let mut entries: Vec<(u32, String)> = fs::read_dir("/proc")
         .map_err(|error| {
             CommandError::new(
-                "process_enum_failed",
+                ErrorCode::ProcessEnumFailed,
                 format!("Failed to read /proc: {error}"),
             )
         })?
@@ -136,12 +136,15 @@ fn list_processes_macos() -> Result<ProcessListResult, CommandError> {
         .args(["-ax", "-o", "pid=,comm="])
         .output()
         .map_err(|error| {
-            CommandError::new("process_enum_failed", format!("Failed to run ps: {error}"))
+            CommandError::new(
+                ErrorCode::ProcessEnumFailed,
+                format!("Failed to run ps: {error}"),
+            )
         })?;
 
     if !output.status.success() {
         return Err(CommandError::new(
-            "process_enum_failed",
+            ErrorCode::ProcessEnumFailed,
             "ps command failed",
         ));
     }

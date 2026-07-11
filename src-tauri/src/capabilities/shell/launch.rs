@@ -4,7 +4,7 @@ use std::process::Stdio;
 
 use serde::Serialize;
 
-use crate::capabilities::path_utils::CommandError;
+use crate::capabilities::error::{CommandError, ErrorCode};
 
 use super::common::resolve_cwd;
 
@@ -25,7 +25,7 @@ pub fn launch(
     let exe = exe.trim().to_string();
     if exe.is_empty() {
         return Err(CommandError::new(
-            "invalid_exe",
+            ErrorCode::InvalidExe,
             "Executable must not be empty",
         ));
     }
@@ -51,7 +51,10 @@ pub fn launch(
     }
 
     let child = command.spawn().map_err(|error| {
-        CommandError::new("spawn_failed", format!("Failed to launch process: {error}"))
+        CommandError::new(
+            ErrorCode::SpawnFailed,
+            format!("Failed to launch process: {error}"),
+        )
     })?;
 
     Ok(LaunchResult {

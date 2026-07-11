@@ -2,7 +2,7 @@ use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use crate::capabilities::path_utils::CommandError;
+use crate::capabilities::error::{CommandError, ErrorCode};
 
 use super::types::MAX_GENERATIONS_PER_HWND;
 
@@ -94,12 +94,12 @@ impl SnapshotStore {
         }
         if parse_reference(reference).is_some() {
             return Err(CommandError::new(
-                "stale_reference",
+                ErrorCode::StaleReference,
                 "Reference is stale or unknown; take a new snapshot or find_element call",
             ));
         }
         Err(CommandError::new(
-            "invalid_reference",
+            ErrorCode::InvalidReference,
             "Reference must look like e14@3:123456",
         ))
     }

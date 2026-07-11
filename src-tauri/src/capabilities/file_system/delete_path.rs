@@ -1,4 +1,5 @@
-use crate::capabilities::path_utils::{self, CommandError};
+use crate::capabilities::error::{CommandError, ErrorCode};
+use crate::capabilities::path_utils;
 use std::fs;
 
 #[tauri::command]
@@ -6,23 +7,32 @@ pub fn delete_path(path: String, workspace_root: String) -> Result<(), CommandEr
     let resolved = path_utils::resolve_workspace_path(&workspace_root, &path)?;
 
     if !resolved.exists() {
-        return Err(CommandError::new("not_found", "Path does not exist"));
+        return Err(CommandError::new(
+            ErrorCode::NotFound,
+            "Path does not exist",
+        ));
     }
 
     let metadata = fs::symlink_metadata(&resolved).map_err(|error| {
-        CommandError::new("io_error", format!("Failed to read path metadata: {error}"))
+        CommandError::new(
+            ErrorCode::IoError,
+            format!("Failed to read path metadata: {error}"),
+        )
     })?;
 
     if metadata.is_dir() {
         fs::remove_dir_all(&resolved).map_err(|error| {
             CommandError::new(
-                "delete_failed",
+                ErrorCode::DeleteFailed,
                 format!("Failed to delete directory: {error}"),
             )
         })?;
     } else {
         fs::remove_file(&resolved).map_err(|error| {
-            CommandError::new("delete_failed", format!("Failed to delete file: {error}"))
+            CommandError::new(
+                ErrorCode::DeleteFailed,
+                format!("Failed to delete file: {error}"),
+            )
         })?;
     }
 

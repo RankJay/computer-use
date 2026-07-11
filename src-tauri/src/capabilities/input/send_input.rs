@@ -1,6 +1,6 @@
-use serde::Serialize;
-
-use crate::capabilities::path_utils::CommandError;
+#[cfg(not(target_os = "windows"))]
+use crate::capabilities::error::unsupported_platform;
+use crate::capabilities::error::{CommandError, ErrorCode, OkResult};
 
 use super::keys::{parse_key, parse_keys};
 
@@ -18,17 +18,11 @@ impl MouseButton {
             "right" => Ok(Self::Right),
             "middle" => Ok(Self::Middle),
             other => Err(CommandError::new(
-                "invalid_button",
+                ErrorCode::InvalidButton,
                 format!("Unsupported mouse button: {other}"),
             )),
         }
     }
-}
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct OkResult {
-    pub ok: bool,
 }
 
 #[cfg(target_os = "windows")]
@@ -61,7 +55,7 @@ mod windows_impl {
         };
         if sent as usize != inputs.len() {
             return Err(CommandError::new(
-                "send_input_failed",
+                ErrorCode::SendInputFailed,
                 format!("SendInput accepted {sent} of {} events", inputs.len()),
             ));
         }
@@ -117,21 +111,21 @@ mod windows_impl {
         let height = unsafe { GetSystemMetrics(SM_CYSCREEN) };
         if width <= 0 || height <= 0 {
             return Err(CommandError::new(
-                "cursor_move_failed",
+                ErrorCode::CursorMoveFailed,
                 "Could not read screen metrics",
             ));
         }
         // Allow a small margin for multi-monitor virtual desktop edges.
         if x < -width * 2 || y < -height * 2 || x > width * 3 || y > height * 3 {
             return Err(CommandError::new(
-                "invalid_coordinates",
+                ErrorCode::InvalidCoordinates,
                 format!("Coordinates ({x}, {y}) are outside a reasonable screen range"),
             ));
         }
         unsafe {
             SetCursorPos(x, y).map_err(|error| {
                 CommandError::new(
-                    "cursor_move_failed",
+                    ErrorCode::CursorMoveFailed,
                     format!("SetCursorPos failed: {error}"),
                 )
             })?;
@@ -144,7 +138,7 @@ mod windows_impl {
             (Some(x), Some(y)) => set_cursor_pos(x, y),
             (None, None) => Ok(()),
             _ => Err(CommandError::new(
-                "invalid_coordinates",
+                ErrorCode::InvalidCoordinates,
                 "Provide both x and y, or neither",
             )),
         }
@@ -185,7 +179,7 @@ mod windows_impl {
     ) -> Result<OkResult, CommandError> {
         if count == 0 {
             return Err(CommandError::new(
-                "invalid_count",
+                ErrorCode::InvalidCount,
                 "Click count must be at least 1",
             ));
         }
@@ -208,7 +202,7 @@ mod windows_impl {
     ) -> Result<OkResult, CommandError> {
         if dx == 0 && dy == 0 {
             return Err(CommandError::new(
-                "invalid_scroll",
+                ErrorCode::InvalidScroll,
                 "At least one of dx or dy must be non-zero",
             ));
         }
@@ -274,7 +268,7 @@ mod windows_impl {
     pub fn key_press(key: &str, count: u32) -> Result<OkResult, CommandError> {
         if count == 0 {
             return Err(CommandError::new(
-                "invalid_count",
+                ErrorCode::InvalidCount,
                 "Key press count must be at least 1",
             ));
         }
@@ -313,10 +307,7 @@ mod stubs {
     use super::*;
 
     fn unsupported<T>() -> Result<T, CommandError> {
-        Err(CommandError::new(
-            "unsupported_platform",
-            "Mouse and keyboard input is only supported on Windows",
-        ))
+        Err(unsupported_platform("Mouse and keyboard input"))
     }
 
     pub fn mouse_move(_x: i32, _y: i32) -> Result<OkResult, CommandError> {

@@ -3,7 +3,8 @@ use std::path::Path;
 
 use serde::Serialize;
 
-use crate::capabilities::path_utils::{self, CommandError};
+use crate::capabilities::error::{CommandError, ErrorCode};
+use crate::capabilities::path_utils;
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -16,19 +17,22 @@ pub struct DuplicatePathResult {
 fn copy_directory(source: &Path, destination: &Path) -> Result<(), CommandError> {
     fs::create_dir_all(destination).map_err(|error| {
         CommandError::new(
-            "duplicate_failed",
+            ErrorCode::DuplicateFailed,
             format!("Failed to create destination directory: {error}"),
         )
     })?;
 
     for entry in fs::read_dir(source).map_err(|error| {
         CommandError::new(
-            "duplicate_failed",
+            ErrorCode::DuplicateFailed,
             format!("Failed to read source directory: {error}"),
         )
     })? {
         let entry = entry.map_err(|error| {
-            CommandError::new("duplicate_failed", format!("Failed to read entry: {error}"))
+            CommandError::new(
+                ErrorCode::DuplicateFailed,
+                format!("Failed to read entry: {error}"),
+            )
         })?;
         let entry_path = entry.path();
         let file_name = entry.file_name();
@@ -36,7 +40,7 @@ fn copy_directory(source: &Path, destination: &Path) -> Result<(), CommandError>
 
         let metadata = entry.metadata().map_err(|error| {
             CommandError::new(
-                "duplicate_failed",
+                ErrorCode::DuplicateFailed,
                 format!("Failed to read entry metadata: {error}"),
             )
         })?;
@@ -45,7 +49,10 @@ fn copy_directory(source: &Path, destination: &Path) -> Result<(), CommandError>
             copy_directory(&entry_path, &target_path)?;
         } else {
             fs::copy(&entry_path, &target_path).map_err(|error| {
-                CommandError::new("duplicate_failed", format!("Failed to copy file: {error}"))
+                CommandError::new(
+                    ErrorCode::DuplicateFailed,
+                    format!("Failed to copy file: {error}"),
+                )
             })?;
         }
     }
@@ -63,19 +70,22 @@ pub fn duplicate_path(
     let destination = path_utils::resolve_workspace_path(&workspace_root, &to)?;
 
     if !source.exists() {
-        return Err(CommandError::new("not_found", "Source path does not exist"));
+        return Err(CommandError::new(
+            ErrorCode::NotFound,
+            "Source path does not exist",
+        ));
     }
 
     if destination.exists() {
         return Err(CommandError::new(
-            "dest_exists",
+            ErrorCode::DestExists,
             "Destination path already exists",
         ));
     }
 
     let metadata = fs::metadata(&source).map_err(|error| {
         CommandError::new(
-            "io_error",
+            ErrorCode::IoError,
             format!("Failed to read source metadata: {error}"),
         )
     })?;
@@ -92,14 +102,17 @@ pub fn duplicate_path(
         if let Some(parent) = destination.parent() {
             if !parent.exists() {
                 return Err(CommandError::new(
-                    "parent_missing",
+                    ErrorCode::ParentMissing,
                     "Destination parent directory does not exist",
                 ));
             }
         }
 
         fs::copy(&source, &destination).map_err(|error| {
-            CommandError::new("duplicate_failed", format!("Failed to copy file: {error}"))
+            CommandError::new(
+                ErrorCode::DuplicateFailed,
+                format!("Failed to copy file: {error}"),
+            )
         })?;
     }
 

@@ -6,7 +6,7 @@ use std::time::{Duration, Instant};
 
 use serde::Serialize;
 
-use crate::capabilities::path_utils::CommandError;
+use crate::capabilities::error::{CommandError, ErrorCode};
 
 use super::common::resolve_cwd;
 
@@ -45,7 +45,7 @@ fn read_stream(
         let mut buffer = String::new();
         reader
             .read_to_string(&mut buffer)
-            .map_err(|error| CommandError::new("read_output_failed", format!("{error}")))?;
+            .map_err(|error| CommandError::new(ErrorCode::ReadOutputFailed, format!("{error}")))?;
         Ok(buffer)
     })
 }
@@ -61,7 +61,7 @@ fn read_stderr_stream(
         let mut buffer = String::new();
         reader
             .read_to_string(&mut buffer)
-            .map_err(|error| CommandError::new("read_output_failed", format!("{error}")))?;
+            .map_err(|error| CommandError::new(ErrorCode::ReadOutputFailed, format!("{error}")))?;
         Ok(buffer)
     })
 }
@@ -76,7 +76,7 @@ pub fn run_shell(
     let program = program.trim();
     if program.is_empty() {
         return Err(CommandError::new(
-            "invalid_program",
+            ErrorCode::InvalidProgram,
             "Program must not be empty",
         ));
     }
@@ -102,7 +102,10 @@ pub fn run_shell(
 
     let started = Instant::now();
     let mut child = command.spawn().map_err(|error| {
-        CommandError::new("spawn_failed", format!("Failed to start process: {error}"))
+        CommandError::new(
+            ErrorCode::SpawnFailed,
+            format!("Failed to start process: {error}"),
+        )
     })?;
 
     let stdout_handle = read_stream(child.stdout.take());
@@ -110,16 +113,15 @@ pub fn run_shell(
 
     let timed_out;
     loop {
-        match child
-            .try_wait()
-            .map_err(|error| CommandError::new("wait_failed", format!("Failed to wait: {error}")))?
-        {
+        match child.try_wait().map_err(|error| {
+            CommandError::new(ErrorCode::WaitFailed, format!("Failed to wait: {error}"))
+        })? {
             Some(status) => {
                 let stdout = stdout_handle.join().map_err(|_| {
-                    CommandError::new("read_output_failed", "stdout reader panicked")
+                    CommandError::new(ErrorCode::ReadOutputFailed, "stdout reader panicked")
                 })??;
                 let stderr = stderr_handle.join().map_err(|_| {
-                    CommandError::new("read_output_failed", "stderr reader panicked")
+                    CommandError::new(ErrorCode::ReadOutputFailed, "stderr reader panicked")
                 })??;
 
                 return Ok(RunShellResult {
@@ -142,11 +144,11 @@ pub fn run_shell(
 
     let stdout = stdout_handle
         .join()
-        .map_err(|_| CommandError::new("read_output_failed", "stdout reader panicked"))?
+        .map_err(|_| CommandError::new(ErrorCode::ReadOutputFailed, "stdout reader panicked"))?
         .unwrap_or_default();
     let stderr = stderr_handle
         .join()
-        .map_err(|_| CommandError::new("read_output_failed", "stderr reader panicked"))?
+        .map_err(|_| CommandError::new(ErrorCode::ReadOutputFailed, "stderr reader panicked"))?
         .unwrap_or_default();
 
     Ok(RunShellResult {

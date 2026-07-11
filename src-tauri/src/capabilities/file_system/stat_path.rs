@@ -7,7 +7,8 @@ use serde::Serialize;
 use time::format_description::well_known::Rfc3339;
 use time::OffsetDateTime;
 
-use crate::capabilities::path_utils::{self, CommandError};
+use crate::capabilities::error::{CommandError, ErrorCode};
+use crate::capabilities::path_utils;
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -89,9 +90,12 @@ pub fn stat_path(path: String, workspace_root: String) -> Result<StatPathResult,
 
     let metadata = fs::symlink_metadata(&resolved).map_err(|error| {
         if error.kind() == ErrorKind::NotFound {
-            CommandError::new("not_found", "Path does not exist")
+            CommandError::new(ErrorCode::NotFound, "Path does not exist")
         } else {
-            CommandError::new("io_error", format!("Failed to read path metadata: {error}"))
+            CommandError::new(
+                ErrorCode::IoError,
+                format!("Failed to read path metadata: {error}"),
+            )
         }
     })?;
 
@@ -101,7 +105,7 @@ pub fn stat_path(path: String, workspace_root: String) -> Result<StatPathResult,
             fs::read_link(&resolved)
                 .map_err(|error| {
                     CommandError::new(
-                        "io_error",
+                        ErrorCode::IoError,
                         format!("Failed to read symlink target: {error}"),
                     )
                 })?
@@ -113,9 +117,12 @@ pub fn stat_path(path: String, workspace_root: String) -> Result<StatPathResult,
     };
 
     let modified_at = format_timestamp(metadata.modified().map_err(|error| {
-        CommandError::new("io_error", format!("Failed to read modified time: {error}"))
+        CommandError::new(
+            ErrorCode::IoError,
+            format!("Failed to read modified time: {error}"),
+        )
     })?)
-    .ok_or_else(|| CommandError::new("io_error", "Failed to format modified timestamp"))?;
+    .ok_or_else(|| CommandError::new(ErrorCode::IoError, "Failed to format modified timestamp"))?;
 
     let created_at = metadata.created().ok().and_then(format_timestamp);
 

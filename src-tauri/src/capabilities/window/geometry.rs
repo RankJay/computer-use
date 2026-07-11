@@ -1,12 +1,11 @@
-use crate::capabilities::path_utils::CommandError;
+#[cfg(not(target_os = "windows"))]
+use crate::capabilities::error::unsupported_platform;
+use crate::capabilities::error::CommandError;
 
 use super::types::WindowMoveResult;
 
 #[cfg(target_os = "windows")]
 use super::platform::move_window_impl;
-
-#[cfg(not(target_os = "windows"))]
-use super::platform::unsupported_platform;
 
 #[tauri::command]
 pub fn window_move(hwnd: i64, x: i32, y: i32) -> Result<WindowMoveResult, CommandError> {
@@ -16,5 +15,5 @@ pub fn window_move(hwnd: i64, x: i32, y: i32) -> Result<WindowMoveResult, Comman
     }
 
     #[cfg(not(target_os = "windows"))]
-    unsupported_platform()
+    Err(unsupported_platform("Window management"))
 }

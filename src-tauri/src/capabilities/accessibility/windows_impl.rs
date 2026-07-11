@@ -17,7 +17,7 @@ use uiautomation::variants::{Value, Variant};
 use windows::Win32::Foundation::HWND;
 use windows::Win32::UI::WindowsAndMessaging::GetWindowThreadProcessId;
 
-use crate::capabilities::path_utils::CommandError;
+use crate::capabilities::error::{CommandError, ErrorCode};
 
 use super::arena::{HwndArena, NodeRecord};
 use super::budget::{SearchBudget, FIND_MAX_NODES, SNAPSHOT_MAX_NODES};
@@ -98,7 +98,7 @@ pub fn snapshot_with_stats(
         None => {
             let hwnd = input.hwnd.ok_or_else(|| {
                 CommandError::new(
-                    "invalid_input",
+                    ErrorCode::InvalidInput,
                     "accessibility_snapshot requires hwnd or reference",
                 )
             })?;
@@ -125,12 +125,15 @@ fn snapshot_from_hwnd(
     deadline: Instant,
 ) -> Result<(TextResult, SnapshotStats), CommandError> {
     let process_id = process_id_for_hwnd(hwnd).ok_or_else(|| {
-        CommandError::new("snapshot_failed", "Could not resolve process id for hwnd")
+        CommandError::new(
+            ErrorCode::SnapshotFailed,
+            "Could not resolve process id for hwnd",
+        )
     })?;
 
     if store.is_process_degraded(process_id) {
         return Err(CommandError::new(
-            "target_degraded",
+            ErrorCode::TargetDegraded,
             "Target process is temporarily marked degraded after repeated timeouts",
         ));
     }
@@ -175,12 +178,15 @@ fn snapshot_from_reference(
 ) -> Result<(TextResult, SnapshotStats), CommandError> {
     let stored = store.resolve_ref_or_stale(reference)?;
     let (_index, ref_generation, ref_hwnd) = parse_reference(reference).ok_or_else(|| {
-        CommandError::new("invalid_reference", "Reference must look like e14@3:123456")
+        CommandError::new(
+            ErrorCode::InvalidReference,
+            "Reference must look like e14@3:123456",
+        )
     })?;
     if let Some(hwnd) = hwnd_arg {
         if hwnd != stored.hwnd || hwnd != ref_hwnd {
             return Err(CommandError::new(
-                "invalid_input",
+                ErrorCode::InvalidInput,
                 "hwnd does not match reference window",
             ));
         }
@@ -188,7 +194,7 @@ fn snapshot_from_reference(
 
     if store.is_process_degraded(stored.process_id) {
         return Err(CommandError::new(
-            "target_degraded",
+            ErrorCode::TargetDegraded,
             "Target process is temporarily marked degraded after repeated timeouts",
         ));
     }
@@ -334,7 +340,7 @@ pub fn wait_impl(
     let result = query_impl(session, arenas, store, input, deadline)?;
     if result.text.is_empty() {
         return Err(CommandError::new(
-            "wait_timeout",
+            ErrorCode::WaitTimeout,
             "Timed out waiting for accessibility query match",
         ));
     }
@@ -362,12 +368,16 @@ fn query_once(
     deadline: Instant,
 ) -> Result<TextResult, CommandError> {
     let handle = hwnd_from_i64(input.hwnd)?;
-    let process_id = process_id_for_hwnd(input.hwnd)
-        .ok_or_else(|| CommandError::new("find_failed", "Could not resolve process id for hwnd"))?;
+    let process_id = process_id_for_hwnd(input.hwnd).ok_or_else(|| {
+        CommandError::new(
+            ErrorCode::FindFailed,
+            "Could not resolve process id for hwnd",
+        )
+    })?;
 
     if store.is_process_degraded(process_id) {
         return Err(CommandError::new(
-            "target_degraded",
+            ErrorCode::TargetDegraded,
             "Target process is temporarily marked degraded after repeated snapshot timeouts",
         ));
     }
@@ -398,7 +408,7 @@ fn query_once(
         && role_filter.is_none()
     {
         return Err(CommandError::new(
-            "invalid_input",
+            ErrorCode::InvalidInput,
             "query requires at least one of name, nameContains, automationId, or role",
         ));
     }
@@ -411,7 +421,7 @@ fn query_once(
         let stored = store.resolve_ref_or_stale(scope_ref)?;
         if stored.hwnd != input.hwnd {
             return Err(CommandError::new(
-                "invalid_input",
+                ErrorCode::InvalidInput,
                 "scopeReference does not belong to the provided hwnd",
             ));
         }
@@ -420,24 +430,24 @@ fn query_once(
         session
             .automation
             .element_from_handle_build_cache(handle, &session.subtree_cache)
-            .map_err(|error| map_uia_error(error, "find_failed"))?
+            .map_err(|error| map_uia_error(error, ErrorCode::FindFailed))?
     };
 
     let condition = if let Some(auto_id) = automation_id {
         session
             .automation
             .create_property_condition(UIProperty::AutomationId, Variant::from(auto_id), None)
-            .map_err(|error| map_uia_error(error, "find_failed"))?
+            .map_err(|error| map_uia_error(error, ErrorCode::FindFailed))?
     } else if let Some(role) = role_filter {
         session
             .automation
             .create_property_condition(UIProperty::ControlType, Variant::from(role as i32), None)
-            .map_err(|error| map_uia_error(error, "find_failed"))?
+            .map_err(|error| map_uia_error(error, ErrorCode::FindFailed))?
     } else {
         session
             .automation
             .create_true_condition()
-            .map_err(|error| map_uia_error(error, "find_failed"))?
+            .map_err(|error| map_uia_error(error, ErrorCode::FindFailed))?
     };
 
     let candidates =
@@ -445,7 +455,7 @@ fn query_once(
         {
             Ok(elements) => elements,
             Err(error) if error.code() == ERR_NOTFOUND => Vec::new(),
-            Err(error) => return Err(map_uia_error(error, "find_failed")),
+            Err(error) => return Err(map_uia_error(error, ErrorCode::FindFailed)),
         };
 
     let mut records = Vec::with_capacity(candidates.len());
@@ -753,7 +763,10 @@ pub fn inspect_impl(
     let stored = store.resolve_ref_or_stale(reference)?;
     let element = resolve_stored_element(session, &stored)?;
     let record = project_element_allow_text(&element, None, 0, &[]).ok_or_else(|| {
-        CommandError::new("inspect_failed", "Could not project accessibility element")
+        CommandError::new(
+            ErrorCode::InspectFailed,
+            "Could not project accessibility element",
+        )
     })?;
 
     let mut patterns = Vec::new();
@@ -834,13 +847,13 @@ pub fn get_selection_impl(
     let element = resolve_stored_element(session, &stored)?;
     let pattern = element.get_pattern::<UISelectionPattern>().map_err(|_| {
         CommandError::new(
-            "selection_unavailable",
+            ErrorCode::SelectionUnavailable,
             "Selection pattern is not available on this element",
         )
     })?;
     let selected = pattern
         .get_selection()
-        .map_err(|error| map_uia_error(error, "get_selection_failed"))?;
+        .map_err(|error| map_uia_error(error, ErrorCode::GetSelectionFailed))?;
 
     let generation = store.begin_generation(stored.hwnd);
     let mut lines = Vec::new();
@@ -878,14 +891,14 @@ pub fn get_focused_impl(
     let element = session
         .automation
         .get_focused_element_build_cache(&session.live_cache)
-        .map_err(|error| map_uia_error(error, "get_focused_failed"))?;
+        .map_err(|error| map_uia_error(error, ErrorCode::GetFocusedFailed))?;
 
     if let Some(filter) = hwnd {
         let filter_pid = process_id_for_hwnd(filter);
         let elem_pid = element.get_process_id().ok();
         if filter_pid.is_none() || filter_pid != elem_pid {
             return Err(CommandError::new(
-                "focus_mismatch",
+                ErrorCode::FocusMismatch,
                 "Focused element is not in the requested window",
             ));
         }
@@ -906,14 +919,14 @@ pub fn element_at_point_impl(
     let element = session
         .automation
         .element_from_point_build_cache(Point::new(x, y), &session.live_cache)
-        .map_err(|error| map_uia_error(error, "element_at_point_failed"))?;
+        .map_err(|error| map_uia_error(error, ErrorCode::ElementAtPointFailed))?;
 
     if let Some(filter) = hwnd {
         let filter_pid = process_id_for_hwnd(filter);
         let elem_pid = element.get_process_id().ok();
         if filter_pid.is_none() || filter_pid != elem_pid {
             return Err(CommandError::new(
-                "point_mismatch",
+                ErrorCode::PointMismatch,
                 "Element at point is not in the requested window",
             ));
         }
@@ -935,14 +948,14 @@ fn collect_text_descendant_names(
             Variant::from(ControlType::Text as i32),
             None,
         )
-        .map_err(|error| map_uia_error(error, "get_text_failed"))?;
+        .map_err(|error| map_uia_error(error, ErrorCode::GetTextFailed))?;
 
     let elements =
         match root.find_all_build_cache(TreeScope::Descendants, &condition, &session.subtree_cache)
         {
             Ok(elements) => elements,
             Err(error) if error.code() == ERR_NOTFOUND => Vec::new(),
-            Err(error) => return Err(map_uia_error(error, "get_text_failed")),
+            Err(error) => return Err(map_uia_error(error, ErrorCode::GetTextFailed)),
         };
 
     let mut names = Vec::new();
@@ -1014,7 +1027,7 @@ fn resolve_element_hwnd(
     }
 
     Err(CommandError::new(
-        "resolve_failed",
+        ErrorCode::ResolveFailed,
         "Could not resolve window handle for element",
     ))
 }
@@ -1027,11 +1040,17 @@ fn mint_projected_element(
     let process_id = process_id_for_hwnd(hwnd)
         .or_else(|| element.get_process_id().ok())
         .ok_or_else(|| {
-            CommandError::new("resolve_failed", "Could not resolve process id for element")
+            CommandError::new(
+                ErrorCode::ResolveFailed,
+                "Could not resolve process id for element",
+            )
         })?;
 
     let record = project_element_allow_text(element, None, 0, &[]).ok_or_else(|| {
-        CommandError::new("resolve_failed", "Could not project accessibility element")
+        CommandError::new(
+            ErrorCode::ResolveFailed,
+            "Could not project accessibility element",
+        )
     })?;
 
     let generation = store.begin_generation(hwnd);
@@ -1123,7 +1142,7 @@ fn fetch_tree(
             // Fall back to BFS on other bulk failures (provider quirks).
             match fetch_tree_bfs(session, hwnd, max_depth, deadline) {
                 Ok(tree) => Ok(tree),
-                Err(_) => Err(map_uia_error(error, "snapshot_failed")),
+                Err(_) => Err(map_uia_error(error, ErrorCode::SnapshotFailed)),
             }
         }
     }
@@ -1180,7 +1199,7 @@ fn fetch_tree_bfs(
     let root = session
         .automation
         .element_from_handle_build_cache(handle, &session.children_cache)
-        .map_err(|error| map_uia_error(error, "snapshot_failed"))?;
+        .map_err(|error| map_uia_error(error, ErrorCode::SnapshotFailed))?;
     let mut nodes = Vec::new();
     let mut budget = SearchBudget::until(deadline, SNAPSHOT_MAX_NODES);
     extract_via_bfs_from(session, &root, max_depth, &mut nodes, &mut budget)?;
@@ -1249,7 +1268,7 @@ fn extract_via_bfs_from(
     let true_condition = session
         .automation
         .create_true_condition()
-        .map_err(|error| map_uia_error(error, "snapshot_failed"))?;
+        .map_err(|error| map_uia_error(error, ErrorCode::SnapshotFailed))?;
 
     let Some(root_record) = project_element_allow_text(root, None, 0, &[]) else {
         return Ok(());
@@ -1754,7 +1773,7 @@ pub fn click_impl(
 
     target
         .click()
-        .map_err(|error| map_uia_error(error, "click_failed"))?;
+        .map_err(|error| map_uia_error(error, ErrorCode::ClickFailed))?;
     Ok(ActionResult {
         ok: true,
         method: "synthetic_click".to_string(),
@@ -1833,7 +1852,7 @@ fn try_invoke(
             foregrounded,
         })),
         Err(error) if is_recoverable_click_pattern_error(&error) => None,
-        Err(error) => Some(Err(map_uia_error(error, "click_failed"))),
+        Err(error) => Some(Err(map_uia_error(error, ErrorCode::ClickFailed))),
     }
 }
 
@@ -1849,7 +1868,7 @@ fn try_toggle(
             foregrounded,
         })),
         Err(error) if is_recoverable_click_pattern_error(&error) => None,
-        Err(error) => Some(Err(map_uia_error(error, "click_failed"))),
+        Err(error) => Some(Err(map_uia_error(error, ErrorCode::ClickFailed))),
     }
 }
 
@@ -1865,7 +1884,7 @@ fn try_legacy_action(
             foregrounded,
         })),
         Err(error) if is_recoverable_click_pattern_error(&error) => None,
-        Err(error) => Some(Err(map_uia_error(error, "click_failed"))),
+        Err(error) => Some(Err(map_uia_error(error, ErrorCode::ClickFailed))),
     }
 }
 
@@ -1882,7 +1901,7 @@ fn try_keyboard_enter(
                 method: "enter".to_string(),
                 foregrounded,
             })
-            .map_err(|error| map_uia_error(error, "click_failed")),
+            .map_err(|error| map_uia_error(error, ErrorCode::ClickFailed)),
     )
 }
 
@@ -1899,7 +1918,7 @@ pub fn set_value_impl(
     if let Ok(pattern) = element.get_pattern::<UIValuePattern>() {
         pattern
             .set_value(text)
-            .map_err(|error| map_uia_error(error, "set_value_failed"))?;
+            .map_err(|error| map_uia_error(error, ErrorCode::SetValueFailed))?;
         return Ok(ActionResult {
             ok: true,
             method: "value_pattern".to_string(),
@@ -1910,7 +1929,7 @@ pub fn set_value_impl(
     if let Ok(pattern) = element.get_pattern::<UILegacyIAccessiblePattern>() {
         pattern
             .set_value(text)
-            .map_err(|error| map_uia_error(error, "set_value_failed"))?;
+            .map_err(|error| map_uia_error(error, ErrorCode::SetValueFailed))?;
         return Ok(ActionResult {
             ok: true,
             method: "legacy".to_string(),
@@ -1920,10 +1939,10 @@ pub fn set_value_impl(
 
     element
         .set_focus()
-        .map_err(|error| map_uia_error(error, "set_value_failed"))?;
+        .map_err(|error| map_uia_error(error, ErrorCode::SetValueFailed))?;
     element
         .send_keys(text, 10)
-        .map_err(|error| map_uia_error(error, "set_value_failed"))?;
+        .map_err(|error| map_uia_error(error, ErrorCode::SetValueFailed))?;
     Ok(ActionResult {
         ok: true,
         method: "send_keys".to_string(),
@@ -1939,7 +1958,10 @@ pub fn send_keys_impl(
     reference: Option<&str>,
 ) -> Result<ActionResult, CommandError> {
     if text.is_empty() {
-        return Err(CommandError::new("invalid_input", "text must not be empty"));
+        return Err(CommandError::new(
+            ErrorCode::InvalidInput,
+            "text must not be empty",
+        ));
     }
 
     let foregrounded = foreground_window(session, hwnd)?;
@@ -1947,7 +1969,7 @@ pub fn send_keys_impl(
         let stored = store.resolve_ref_or_stale(ref_str)?;
         if stored.hwnd != hwnd {
             return Err(CommandError::new(
-                "invalid_input",
+                ErrorCode::InvalidInput,
                 "reference does not belong to the provided hwnd",
             ));
         }
@@ -1956,13 +1978,13 @@ pub fn send_keys_impl(
         session
             .automation
             .element_from_handle(hwnd_from_i64(hwnd)?)
-            .map_err(|error| map_uia_error(error, "send_keys_failed"))?
+            .map_err(|error| map_uia_error(error, ErrorCode::SendKeysFailed))?
     };
 
     let _ = element.set_focus();
     element
         .send_keys(text, 10)
-        .map_err(|error| map_uia_error(error, "send_keys_failed"))?;
+        .map_err(|error| map_uia_error(error, ErrorCode::SendKeysFailed))?;
     Ok(ActionResult {
         ok: true,
         method: "send_keys".to_string(),
@@ -1980,7 +2002,7 @@ pub fn focus_impl(
     let foregrounded = foreground_window(session, stored.hwnd)?;
     element
         .set_focus()
-        .map_err(|error| map_uia_error(error, "focus_failed"))?;
+        .map_err(|error| map_uia_error(error, ErrorCode::FocusFailed))?;
     Ok(ActionResult {
         ok: true,
         method: "focus".to_string(),
@@ -2013,7 +2035,7 @@ pub fn get_value_impl(
     if let Ok(pattern) = element.get_pattern::<UIRangeValuePattern>() {
         let value = pattern
             .get_value()
-            .map_err(|error| map_uia_error(error, "get_value_failed"))?;
+            .map_err(|error| map_uia_error(error, ErrorCode::GetValueFailed))?;
         let min = pattern.get_minimum().ok();
         let max = pattern.get_maximum().ok();
         return Ok(GetValueResult {
@@ -2063,9 +2085,9 @@ pub fn scroll_element_impl(
 
     target
         .get_pattern::<UIScrollPattern>()
-        .map_err(|error| map_uia_error(error, "scroll_unavailable"))?
+        .map_err(|error| map_uia_error(error, ErrorCode::ScrollUnavailable))?
         .scroll(horizontal, vertical)
-        .map_err(|error| map_uia_error(error, "scroll_failed"))?;
+        .map_err(|error| map_uia_error(error, ErrorCode::ScrollFailed))?;
 
     Ok(ActionResult {
         ok: true,
@@ -2085,7 +2107,7 @@ pub fn right_click_element_impl(
     prepare_for_click(&element)?;
     element
         .right_click()
-        .map_err(|error| map_uia_error(error, "right_click_failed"))?;
+        .map_err(|error| map_uia_error(error, ErrorCode::RightClickFailed))?;
     Ok(ActionResult {
         ok: true,
         method: "right_click".to_string(),
@@ -2108,67 +2130,67 @@ pub fn invoke_action_impl(
         "press" => {
             let pattern = element.get_pattern::<UIInvokePattern>().map_err(|_| {
                 CommandError::new(
-                    "action_unavailable",
+                    ErrorCode::ActionUnavailable,
                     "Invoke pattern is not available on this element",
                 )
             })?;
             pattern
                 .invoke()
-                .map_err(|error| map_uia_error(error, "invoke_action_failed"))?;
+                .map_err(|error| map_uia_error(error, ErrorCode::InvokeActionFailed))?;
         }
         "toggle" => {
             let pattern = element.get_pattern::<UITogglePattern>().map_err(|_| {
                 CommandError::new(
-                    "action_unavailable",
+                    ErrorCode::ActionUnavailable,
                     "Toggle pattern is not available on this element",
                 )
             })?;
             pattern
                 .toggle()
-                .map_err(|error| map_uia_error(error, "invoke_action_failed"))?;
+                .map_err(|error| map_uia_error(error, ErrorCode::InvokeActionFailed))?;
         }
         "expand" => {
             let pattern = element
                 .get_pattern::<UIExpandCollapsePattern>()
                 .map_err(|_| {
                     CommandError::new(
-                        "action_unavailable",
+                        ErrorCode::ActionUnavailable,
                         "ExpandCollapse pattern is not available on this element",
                     )
                 })?;
             pattern
                 .expand()
-                .map_err(|error| map_uia_error(error, "invoke_action_failed"))?;
+                .map_err(|error| map_uia_error(error, ErrorCode::InvokeActionFailed))?;
         }
         "collapse" => {
             let pattern = element
                 .get_pattern::<UIExpandCollapsePattern>()
                 .map_err(|_| {
                     CommandError::new(
-                        "action_unavailable",
+                        ErrorCode::ActionUnavailable,
                         "ExpandCollapse pattern is not available on this element",
                     )
                 })?;
             pattern
                 .collapse()
-                .map_err(|error| map_uia_error(error, "invoke_action_failed"))?;
+                .map_err(|error| map_uia_error(error, ErrorCode::InvokeActionFailed))?;
         }
         "select" => {
             let pattern = element
                 .get_pattern::<UISelectionItemPattern>()
                 .map_err(|_| {
                     CommandError::new(
-                        "action_unavailable",
+                        ErrorCode::ActionUnavailable,
                         "SelectionItem pattern is not available on this element",
                     )
                 })?;
             pattern
                 .select()
-                .map_err(|error| map_uia_error(error, "invoke_action_failed"))?;
+                .map_err(|error| map_uia_error(error, ErrorCode::InvokeActionFailed))?;
         }
         _ => {
             return Err(CommandError::new(
-                "invalid_input",
+                ErrorCode::InvalidInput,
                 format!("Unknown action: {action}"),
             ));
         }
@@ -2189,7 +2211,7 @@ fn parse_invoke_action(action: &str) -> Result<&'static str, CommandError> {
         "press" => Ok("press"),
         "select" => Ok("select"),
         _ => Err(CommandError::new(
-            "invalid_input",
+            ErrorCode::InvalidInput,
             format!("action must be one of toggle, expand, collapse, press, select; got {action}"),
         )),
     }
@@ -2204,7 +2226,7 @@ fn scroll_amounts(
         "small" | "" => "small",
         other => {
             return Err(CommandError::new(
-                "invalid_input",
+                ErrorCode::InvalidInput,
                 format!("amount must be small or large; got {other}"),
             ));
         }
@@ -2227,7 +2249,7 @@ fn scroll_amounts(
         "left" => Ok((decrement, ScrollAmount::NoAmount)),
         "right" => Ok((increment, ScrollAmount::NoAmount)),
         other => Err(CommandError::new(
-            "invalid_input",
+            ErrorCode::InvalidInput,
             format!("direction must be up, down, left, or right; got {other}"),
         )),
     }
@@ -2258,7 +2280,7 @@ fn find_scrollable_element(
     }
 
     Err(CommandError::new(
-        "scroll_unavailable",
+        ErrorCode::ScrollUnavailable,
         "No scrollable ancestor found for this element",
     ))
 }
@@ -2275,7 +2297,7 @@ impl UiaSession {
     /// Build the long-lived session on the a11y worker thread after COM is initialized.
     pub fn init_on_worker_thread() -> Result<Self, CommandError> {
         let automation = UIAutomation::new_direct()
-            .map_err(|error| CommandError::new("uia_init_failed", error.to_string()))?;
+            .map_err(|error| CommandError::new(ErrorCode::UiaInitFailed, error.to_string()))?;
         configure_timeouts(&automation);
 
         let subtree_cache =
@@ -2287,7 +2309,7 @@ impl UiaSession {
 
         let control_walker = automation
             .get_control_view_walker()
-            .map_err(|error| map_uia_error(error, "uia_init_failed"))?;
+            .map_err(|error| map_uia_error(error, ErrorCode::UiaInitFailed))?;
 
         Ok(Self {
             automation,
@@ -2307,13 +2329,13 @@ fn build_cache_request(
 ) -> Result<uiautomation::core::UICacheRequest, CommandError> {
     let cache_request = automation
         .create_cache_request()
-        .map_err(|error| map_uia_error(error, "uia_init_failed"))?;
+        .map_err(|error| map_uia_error(error, ErrorCode::UiaInitFailed))?;
     cache_request
         .set_tree_scope(scope)
-        .map_err(|error| map_uia_error(error, "uia_init_failed"))?;
+        .map_err(|error| map_uia_error(error, ErrorCode::UiaInitFailed))?;
     cache_request
         .set_element_mode(mode)
-        .map_err(|error| map_uia_error(error, "uia_init_failed"))?;
+        .map_err(|error| map_uia_error(error, ErrorCode::UiaInitFailed))?;
 
     let mut properties = vec![
         UIProperty::Name,
@@ -2335,7 +2357,7 @@ fn build_cache_request(
     for property in properties {
         cache_request
             .add_property(property)
-            .map_err(|error| map_uia_error(error, "uia_init_failed"))?;
+            .map_err(|error| map_uia_error(error, ErrorCode::UiaInitFailed))?;
     }
     for pattern in [
         UIPatternType::Invoke,
@@ -2345,7 +2367,7 @@ fn build_cache_request(
     ] {
         cache_request
             .add_pattern(pattern)
-            .map_err(|error| map_uia_error(error, "uia_init_failed"))?;
+            .map_err(|error| map_uia_error(error, ErrorCode::UiaInitFailed))?;
     }
     Ok(cache_request)
 }
@@ -2481,7 +2503,10 @@ fn resolve_stored_element_with_stats(
     }
 
     Err(last_error.unwrap_or_else(|| {
-        CommandError::new("resolve_failed", "Failed to resolve accessibility element")
+        CommandError::new(
+            ErrorCode::ResolveFailed,
+            "Failed to resolve accessibility element",
+        )
     }))
 }
 
@@ -2493,7 +2518,7 @@ fn resolve_stored_element_once(
     let root = session
         .automation
         .element_from_handle_build_cache(handle, &session.live_cache)
-        .map_err(|error| map_uia_error(error, "resolve_failed"))?;
+        .map_err(|error| map_uia_error(error, ErrorCode::ResolveFailed))?;
 
     if let Some(element) = find_by_runtime_id(session, &root, &stored.runtime_id)? {
         return Ok((element, ResolveStats { nodes_visited: 1 }));
@@ -2508,8 +2533,7 @@ fn resolve_element_by_fingerprint(
     window: &UIElement,
 ) -> Result<(UIElement, ResolveStats), CommandError> {
     if stored.name.trim().is_empty() && stored.automation_id.is_empty() {
-        return Err(CommandError::new(
-            "stale_reference",
+        return Err(CommandError::new(ErrorCode::StaleReference,
             "Element no longer exists in the target window; take a new snapshot or find_element call",
         ));
     }
@@ -2522,17 +2546,17 @@ fn resolve_element_by_fingerprint(
                 Variant::from(stored.automation_id.as_str()),
                 None,
             )
-            .map_err(|error| map_uia_error(error, "resolve_failed"))?
+            .map_err(|error| map_uia_error(error, ErrorCode::ResolveFailed))?
     } else if let Some(role) = stored.role.as_deref().and_then(parse_role_label) {
         session
             .automation
             .create_property_condition(UIProperty::ControlType, Variant::from(role as i32), None)
-            .map_err(|error| map_uia_error(error, "resolve_failed"))?
+            .map_err(|error| map_uia_error(error, ErrorCode::ResolveFailed))?
     } else {
         session
             .automation
             .create_true_condition()
-            .map_err(|error| map_uia_error(error, "resolve_failed"))?
+            .map_err(|error| map_uia_error(error, ErrorCode::ResolveFailed))?
     };
 
     let candidates = match window.find_all_build_cache(
@@ -2542,7 +2566,7 @@ fn resolve_element_by_fingerprint(
     ) {
         Ok(elements) => elements,
         Err(error) if error.code() == ERR_NOTFOUND => Vec::new(),
-        Err(error) => return Err(map_uia_error(error, "resolve_failed")),
+        Err(error) => return Err(map_uia_error(error, ErrorCode::ResolveFailed)),
     };
 
     let mut scored: Vec<(i32, UIElement)> = Vec::new();
@@ -2555,8 +2579,7 @@ fn resolve_element_by_fingerprint(
     scored.sort_by(|a, b| b.0.cmp(&a.0));
 
     match scored.as_slice() {
-        [] => Err(CommandError::new(
-            "stale_reference",
+        [] => Err(CommandError::new(ErrorCode::StaleReference,
             "Element no longer exists in the target window; take a new snapshot or find_element call",
         )),
         [(_best_score, element)] => Ok((
@@ -2571,8 +2594,7 @@ fn resolve_element_by_fingerprint(
                 nodes_visited: 1,
             },
         )),
-        _ => Err(CommandError::new(
-            "ambiguous_reference",
+        _ => Err(CommandError::new(ErrorCode::AmbiguousReference,
             "Multiple elements match the stored fingerprint; take a new snapshot",
         )),
     }
@@ -2692,12 +2714,12 @@ fn find_by_runtime_id(
     let condition = session
         .automation
         .create_property_condition(UIProperty::RuntimeId, variant, None)
-        .map_err(|error| map_uia_error(error, "resolve_failed"))?;
+        .map_err(|error| map_uia_error(error, ErrorCode::ResolveFailed))?;
 
     match root.find_first_build_cache(TreeScope::Subtree, &condition, &session.live_cache) {
         Ok(element) => Ok(Some(element)),
         Err(error) if error.code() == ERR_NOTFOUND => Ok(None),
-        Err(error) => Err(map_uia_error(error, "resolve_failed")),
+        Err(error) => Err(map_uia_error(error, ErrorCode::ResolveFailed)),
     }
 }
 
@@ -2706,12 +2728,12 @@ fn foreground_window(session: &UiaSession, hwnd: i64) -> Result<bool, CommandErr
     let element = session
         .automation
         .element_from_handle(handle)
-        .map_err(|error| map_uia_error(error, "focus_denied"))?;
-    let window =
-        WindowControl::try_from(&element).map_err(|error| map_uia_error(error, "focus_denied"))?;
+        .map_err(|error| map_uia_error(error, ErrorCode::FocusDenied))?;
+    let window = WindowControl::try_from(&element)
+        .map_err(|error| map_uia_error(error, ErrorCode::FocusDenied))?;
     window.set_foregrand().map_err(|_| {
         CommandError::new(
-            "focus_denied",
+            ErrorCode::FocusDenied,
             "Could not bring target window to foreground",
         )
     })
@@ -2736,7 +2758,7 @@ fn parse_role(role: &str) -> Result<ControlType, CommandError> {
         "pane" => Ok(ControlType::Pane),
         "window" => Ok(ControlType::Window),
         other => Err(CommandError::new(
-            "invalid_input",
+            ErrorCode::InvalidInput,
             format!("Unsupported role filter: {other}"),
         )),
     }
@@ -2786,18 +2808,18 @@ fn should_skip_control(control_type: ControlType) -> bool {
 fn hwnd_from_i64(hwnd: i64) -> Result<Handle, CommandError> {
     if hwnd == 0 {
         return Err(CommandError::new(
-            "invalid_hwnd",
+            ErrorCode::InvalidHwnd,
             "Window handle must not be zero",
         ));
     }
     Ok(Handle::from(HWND(hwnd as isize as *mut _)))
 }
 
-fn map_uia_error(error: uiautomation::Error, code: &str) -> CommandError {
+fn map_uia_error(error: uiautomation::Error, code: ErrorCode) -> CommandError {
     if let Some(result) = error.result() {
         if result.0 == windows::Win32::Foundation::E_ACCESSDENIED.0 {
             return CommandError::new(
-                "elevation_required",
+                ErrorCode::ElevationRequired,
                 "Target window is elevated or otherwise inaccessible",
             );
         }
@@ -2869,7 +2891,7 @@ mod tests {
         );
         assert!(is_transient_subscriber_error(&error));
         assert!(is_transient_command_error(&CommandError::new(
-            "resolve_failed",
+            ErrorCode::ResolveFailed,
             "An event was unable to invoke any of the subscribers"
         )));
     }

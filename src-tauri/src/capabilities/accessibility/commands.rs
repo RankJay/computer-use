@@ -2,7 +2,9 @@ use std::time::Duration;
 
 use tauri::State;
 
-use crate::capabilities::path_utils::CommandError;
+#[cfg(not(target_os = "windows"))]
+use crate::capabilities::error::unsupported_platform;
+use crate::capabilities::error::{CommandError, ErrorCode};
 
 use super::state::SnapshotStore;
 use super::types::{
@@ -13,15 +15,6 @@ use super::worker::{map_worker_outcome, run, WorkerOutcome};
 
 #[cfg(target_os = "windows")]
 use super::windows_impl;
-
-#[cfg(not(target_os = "windows"))]
-#[allow(dead_code)]
-fn unsupported_platform<T>() -> Result<T, CommandError> {
-    Err(CommandError::new(
-        "unsupported_platform",
-        "Accessibility automation is only supported on Windows",
-    ))
-}
 
 #[tauri::command]
 pub async fn accessibility_snapshot(
@@ -37,7 +30,7 @@ pub async fn accessibility_snapshot(
 
         if hwnd.is_none() && reference.is_none() {
             return Err(CommandError::new(
-                "invalid_input",
+                ErrorCode::InvalidInput,
                 "accessibility_snapshot requires hwnd or reference",
             ));
         }
@@ -80,7 +73,7 @@ pub async fn accessibility_snapshot(
                     store.mark_process_timeout(process_id);
                 }
                 Err(CommandError::new(
-                    "snapshot_timeout",
+                    ErrorCode::SnapshotTimeout,
                     "Accessibility snapshot timed out",
                 ))
             }
@@ -90,7 +83,7 @@ pub async fn accessibility_snapshot(
     #[cfg(not(target_os = "windows"))]
     {
         let _ = (hwnd, reference, max_depth, max_elements);
-        unsupported_platform()
+        Err(unsupported_platform("Accessibility automation"))
     }
 }
 
@@ -142,7 +135,7 @@ pub async fn accessibility_find_element(
                     store.mark_process_find_timeout(process_id);
                 }
                 Err(CommandError::new(
-                    "find_element_timeout",
+                    ErrorCode::FindElementTimeout,
                     "Finding accessibility element timed out",
                 ))
             }
@@ -150,7 +143,7 @@ pub async fn accessibility_find_element(
     }
 
     #[cfg(not(target_os = "windows"))]
-    unsupported_platform()
+    Err(unsupported_platform("Accessibility automation"))
 }
 
 #[tauri::command]
@@ -209,7 +202,7 @@ pub async fn accessibility_query(
                     store.mark_process_find_timeout(process_id);
                 }
                 Err(CommandError::new(
-                    "query_timeout",
+                    ErrorCode::QueryTimeout,
                     "Accessibility query timed out",
                 ))
             }
@@ -230,7 +223,7 @@ pub async fn accessibility_query(
             wait_ms,
             scope_reference,
         );
-        unsupported_platform()
+        Err(unsupported_platform("Accessibility automation"))
     }
 }
 
@@ -289,7 +282,7 @@ pub async fn accessibility_wait(
                     store.mark_process_find_timeout(process_id);
                 }
                 Err(CommandError::new(
-                    "wait_timeout",
+                    ErrorCode::WaitTimeout,
                     "Timed out waiting for accessibility query match",
                 ))
             }
@@ -310,7 +303,7 @@ pub async fn accessibility_wait(
             timeout_ms,
             scope_reference,
         );
-        unsupported_platform()
+        Err(unsupported_platform("Accessibility automation"))
     }
 }
 
@@ -329,13 +322,13 @@ pub async fn accessibility_get_text(
         .await;
         return map_worker_outcome(
             outcome,
-            "get_text_timeout",
+            ErrorCode::GetTextTimeout,
             "Reading accessibility text timed out",
         );
     }
 
     #[cfg(not(target_os = "windows"))]
-    unsupported_platform()
+    Err(unsupported_platform("Accessibility automation"))
 }
 
 #[tauri::command]
@@ -353,7 +346,7 @@ pub async fn accessibility_get_focused(
         .await;
         return map_worker_outcome(
             outcome,
-            "get_focused_timeout",
+            ErrorCode::GetFocusedTimeout,
             "Getting focused accessibility element timed out",
         );
     }
@@ -361,7 +354,7 @@ pub async fn accessibility_get_focused(
     #[cfg(not(target_os = "windows"))]
     {
         let _ = hwnd;
-        unsupported_platform()
+        Err(unsupported_platform("Accessibility automation"))
     }
 }
 
@@ -382,7 +375,7 @@ pub async fn accessibility_element_at_point(
         .await;
         return map_worker_outcome(
             outcome,
-            "element_at_point_timeout",
+            ErrorCode::ElementAtPointTimeout,
             "Element-at-point lookup timed out",
         );
     }
@@ -390,7 +383,7 @@ pub async fn accessibility_element_at_point(
     #[cfg(not(target_os = "windows"))]
     {
         let _ = (x, y, hwnd);
-        unsupported_platform()
+        Err(unsupported_platform("Accessibility automation"))
     }
 }
 
@@ -409,13 +402,13 @@ pub async fn accessibility_inspect(
         .await;
         return map_worker_outcome(
             outcome,
-            "inspect_timeout",
+            ErrorCode::InspectTimeout,
             "Accessibility inspect timed out",
         );
     }
 
     #[cfg(not(target_os = "windows"))]
-    unsupported_platform()
+    Err(unsupported_platform("Accessibility automation"))
 }
 
 #[tauri::command]
@@ -433,13 +426,13 @@ pub async fn accessibility_get_selection(
         .await;
         return map_worker_outcome(
             outcome,
-            "get_selection_timeout",
+            ErrorCode::GetSelectionTimeout,
             "Reading accessibility selection timed out",
         );
     }
 
     #[cfg(not(target_os = "windows"))]
-    unsupported_platform()
+    Err(unsupported_platform("Accessibility automation"))
 }
 
 #[tauri::command]
@@ -455,11 +448,15 @@ pub async fn accessibility_click(
             windows_impl::click_impl(session, &store, &reference)
         })
         .await;
-        return map_worker_outcome(outcome, "click_timeout", "Accessibility click timed out");
+        return map_worker_outcome(
+            outcome,
+            ErrorCode::ClickTimeout,
+            "Accessibility click timed out",
+        );
     }
 
     #[cfg(not(target_os = "windows"))]
-    unsupported_platform()
+    Err(unsupported_platform("Accessibility automation"))
 }
 
 #[tauri::command]
@@ -478,13 +475,13 @@ pub async fn accessibility_set_value(
         .await;
         return map_worker_outcome(
             outcome,
-            "set_value_timeout",
+            ErrorCode::SetValueTimeout,
             "Setting accessibility value timed out",
         );
     }
 
     #[cfg(not(target_os = "windows"))]
-    unsupported_platform()
+    Err(unsupported_platform("Accessibility automation"))
 }
 
 #[tauri::command]
@@ -504,13 +501,13 @@ pub async fn accessibility_send_keys(
         .await;
         return map_worker_outcome(
             outcome,
-            "send_keys_timeout",
+            ErrorCode::SendKeysTimeout,
             "Accessibility send_keys timed out",
         );
     }
 
     #[cfg(not(target_os = "windows"))]
-    unsupported_platform()
+    Err(unsupported_platform("Accessibility automation"))
 }
 
 #[tauri::command]
@@ -526,11 +523,15 @@ pub async fn accessibility_focus(
             windows_impl::focus_impl(session, &store, &reference)
         })
         .await;
-        return map_worker_outcome(outcome, "focus_timeout", "Accessibility focus timed out");
+        return map_worker_outcome(
+            outcome,
+            ErrorCode::FocusTimeout,
+            "Accessibility focus timed out",
+        );
     }
 
     #[cfg(not(target_os = "windows"))]
-    unsupported_platform()
+    Err(unsupported_platform("Accessibility automation"))
 }
 
 #[tauri::command]
@@ -548,13 +549,13 @@ pub async fn accessibility_get_value(
         .await;
         return map_worker_outcome(
             outcome,
-            "get_value_timeout",
+            ErrorCode::GetValueTimeout,
             "Reading accessibility value timed out",
         );
     }
 
     #[cfg(not(target_os = "windows"))]
-    unsupported_platform()
+    Err(unsupported_platform("Accessibility automation"))
 }
 
 #[tauri::command]
@@ -575,13 +576,13 @@ pub async fn accessibility_scroll_element(
         .await;
         return map_worker_outcome(
             outcome,
-            "scroll_element_timeout",
+            ErrorCode::ScrollElementTimeout,
             "Accessibility scroll timed out",
         );
     }
 
     #[cfg(not(target_os = "windows"))]
-    unsupported_platform()
+    Err(unsupported_platform("Accessibility automation"))
 }
 
 #[tauri::command]
@@ -599,13 +600,13 @@ pub async fn accessibility_right_click_element(
         .await;
         return map_worker_outcome(
             outcome,
-            "right_click_timeout",
+            ErrorCode::RightClickTimeout,
             "Accessibility right-click timed out",
         );
     }
 
     #[cfg(not(target_os = "windows"))]
-    unsupported_platform()
+    Err(unsupported_platform("Accessibility automation"))
 }
 
 #[tauri::command]
@@ -624,11 +625,11 @@ pub async fn accessibility_invoke_action(
         .await;
         return map_worker_outcome(
             outcome,
-            "invoke_action_timeout",
+            ErrorCode::InvokeActionTimeout,
             "Accessibility invoke_action timed out",
         );
     }
 
     #[cfg(not(target_os = "windows"))]
-    unsupported_platform()
+    Err(unsupported_platform("Accessibility automation"))
 }

@@ -1,6 +1,7 @@
 use std::fs;
 
-use crate::capabilities::path_utils::{self, CommandError};
+use crate::capabilities::error::{CommandError, ErrorCode};
+use crate::capabilities::path_utils;
 
 #[tauri::command]
 pub fn write_file(
@@ -13,14 +14,17 @@ pub fn write_file(
     if let Some(parent) = resolved.parent() {
         fs::create_dir_all(parent).map_err(|error| {
             CommandError::new(
-                "write_failed",
+                ErrorCode::WriteFailed,
                 format!("Failed to create directories: {error}"),
             )
         })?;
     }
 
     fs::write(&resolved, content).map_err(|error| {
-        CommandError::new("write_failed", format!("Failed to write file: {error}"))
+        CommandError::new(
+            ErrorCode::WriteFailed,
+            format!("Failed to write file: {error}"),
+        )
     })?;
 
     Ok(())

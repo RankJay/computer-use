@@ -1,37 +1,14 @@
 use std::path::{Component, Path, PathBuf};
 
-use serde::Serialize;
+use crate::capabilities::error::{CommandError, ErrorCode};
 
 pub const MAX_READ_BYTES: u64 = 1_048_576;
-
-#[derive(Debug, Serialize, Clone)]
-pub struct CommandError {
-    pub code: String,
-    pub message: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub details: Option<String>,
-}
-
-impl CommandError {
-    pub fn new(code: &str, message: impl Into<String>) -> Self {
-        Self {
-            code: code.to_string(),
-            message: message.into(),
-            details: None,
-        }
-    }
-
-    pub fn with_details(mut self, details: impl Into<String>) -> Self {
-        self.details = Some(details.into());
-        self
-    }
-}
 
 pub fn resolve_root(workspace_root: &str) -> Result<PathBuf, CommandError> {
     let trimmed = workspace_root.trim();
     if trimmed.is_empty() {
         return Err(CommandError::new(
-            "workspace_unconfigured",
+            ErrorCode::WorkspaceUnconfigured,
             "Workspace root is not configured in Settings",
         ));
     }
@@ -39,14 +16,14 @@ pub fn resolve_root(workspace_root: &str) -> Result<PathBuf, CommandError> {
     let root = PathBuf::from(trimmed);
     if !root.is_absolute() {
         return Err(CommandError::new(
-            "workspace_invalid",
+            ErrorCode::WorkspaceInvalid,
             "Workspace root must be an absolute path",
         ));
     }
 
     root.canonicalize().map_err(|error| {
         CommandError::new(
-            "workspace_invalid",
+            ErrorCode::WorkspaceInvalid,
             format!("Workspace root does not exist: {error}"),
         )
     })
@@ -64,13 +41,16 @@ fn join_within_root(root: &Path, relative_path: &str) -> Result<PathBuf, Command
     let relative = Path::new(relative_path.trim_start_matches(['/', '\\']));
 
     if relative.as_os_str().is_empty() {
-        return Err(CommandError::new("invalid_path", "Path must not be empty"));
+        return Err(CommandError::new(
+            ErrorCode::InvalidPath,
+            "Path must not be empty",
+        ));
     }
 
     for component in relative.components() {
         if matches!(component, Component::ParentDir) {
             return Err(CommandError::new(
-                "path_traversal",
+                ErrorCode::PathTraversal,
                 "Path must not contain parent directory segments",
             ));
         }
@@ -81,7 +61,7 @@ fn join_within_root(root: &Path, relative_path: &str) -> Result<PathBuf, Command
 
     if !normalized.starts_with(root) {
         return Err(CommandError::new(
-            "path_traversal",
+            ErrorCode::PathTraversal,
             "Path escapes the workspace root",
         ));
     }
@@ -92,24 +72,27 @@ fn join_within_root(root: &Path, relative_path: &str) -> Result<PathBuf, Command
 fn normalize_existing_path(path: &Path) -> Result<PathBuf, CommandError> {
     if path.exists() {
         return path.canonicalize().map_err(|error| {
-            CommandError::new("io_error", format!("Failed to resolve path: {error}"))
+            CommandError::new(
+                ErrorCode::IoError,
+                format!("Failed to resolve path: {error}"),
+            )
         });
     }
 
     let parent = path
         .parent()
-        .ok_or_else(|| CommandError::new("invalid_path", "Path has no parent directory"))?;
+        .ok_or_else(|| CommandError::new(ErrorCode::InvalidPath, "Path has no parent directory"))?;
 
     let file_name = path
         .file_name()
-        .ok_or_else(|| CommandError::new("invalid_path", "Path has no file name"))?;
+        .ok_or_else(|| CommandError::new(ErrorCode::InvalidPath, "Path has no file name"))?;
 
     let canonical_parent = if parent.as_os_str().is_empty() {
         PathBuf::from(".")
     } else if parent.exists() {
         parent.canonicalize().map_err(|error| {
             CommandError::new(
-                "io_error",
+                ErrorCode::IoError,
                 format!("Failed to resolve parent path: {error}"),
             )
         })?
