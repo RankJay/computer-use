@@ -4,8 +4,15 @@ mod launch;
 mod process_info;
 mod process_kill;
 mod process_list;
+mod resolver;
 mod run_shell;
 mod system_info;
+
+#[cfg(windows)]
+mod win_resolver;
+
+#[cfg(not(windows))]
+mod unsupported_resolver;
 
 pub use env::{get_env, set_env};
 pub use launch::launch;
