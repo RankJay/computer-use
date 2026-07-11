@@ -5,8 +5,6 @@ mod accessibility;
 mod clipboard;
 mod file_system;
 mod input;
-mod keyboard;
-mod mouse;
 mod shared;
 mod shell;
 mod window;
@@ -30,9 +28,9 @@ pub use file_system::{
     create_directory, delete_path, duplicate_path, move_path, patch_file, read_directory,
     read_file, search_files, stat_path, write_file,
 };
-pub use keyboard::{hotkey, key_down, key_press, key_up};
-pub use mouse::{
-    mouse_click, mouse_down, mouse_drag, mouse_hover, mouse_move, mouse_scroll, mouse_up,
+pub use input::{
+    hotkey, key_down, key_press, key_up, mouse_click, mouse_down, mouse_drag, mouse_hover,
+    mouse_move, mouse_scroll, mouse_up,
 };
 pub use shared::wait;
 pub use shell::{

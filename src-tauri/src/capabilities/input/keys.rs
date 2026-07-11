@@ -1,86 +1,216 @@
 use crate::capabilities::error::{CommandError, ErrorCode};
 
-/// Resolve a key name to a Windows virtual-key code.
-pub fn parse_key(name: &str) -> Result<u16, CommandError> {
-    let key = name.trim().to_ascii_lowercase();
-    if key.is_empty() {
+/// Platform-neutral key identity. Name parsing stays here; OS codes live in adapters.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Key {
+    Ctrl,
+    Shift,
+    Alt,
+    Win,
+    Enter,
+    Tab,
+    Escape,
+    Space,
+    Backspace,
+    Delete,
+    Up,
+    Down,
+    Left,
+    Right,
+    Home,
+    End,
+    PageUp,
+    PageDown,
+    Insert,
+    CapsLock,
+    F1,
+    F2,
+    F3,
+    F4,
+    F5,
+    F6,
+    F7,
+    F8,
+    F9,
+    F10,
+    F11,
+    F12,
+    A,
+    B,
+    C,
+    D,
+    E,
+    F,
+    G,
+    H,
+    I,
+    J,
+    K,
+    L,
+    M,
+    N,
+    O,
+    P,
+    Q,
+    R,
+    S,
+    T,
+    U,
+    V,
+    W,
+    X,
+    Y,
+    Z,
+    Digit0,
+    Digit1,
+    Digit2,
+    Digit3,
+    Digit4,
+    Digit5,
+    Digit6,
+    Digit7,
+    Digit8,
+    Digit9,
+    Slash,
+    Backslash,
+    Period,
+    Comma,
+    Minus,
+    Equals,
+    Semicolon,
+    Quote,
+    Backtick,
+    LBracket,
+    RBracket,
+}
+
+impl Key {
+    /// Same accepted spellings as the former `parse_key` table.
+    pub fn from_name(name: &str) -> Option<Key> {
+        let key = name.trim().to_ascii_lowercase();
+        if key.is_empty() {
+            return None;
+        }
+
+        Some(match key.as_str() {
+            "ctrl" | "control" => Key::Ctrl,
+            "shift" => Key::Shift,
+            "alt" => Key::Alt,
+            "win" | "meta" | "super" => Key::Win,
+            "enter" | "return" => Key::Enter,
+            "tab" => Key::Tab,
+            "escape" | "esc" => Key::Escape,
+            "space" => Key::Space,
+            "backspace" => Key::Backspace,
+            "delete" | "del" => Key::Delete,
+            "up" => Key::Up,
+            "down" => Key::Down,
+            "left" => Key::Left,
+            "right" => Key::Right,
+            "home" => Key::Home,
+            "end" => Key::End,
+            "pageup" | "pgup" => Key::PageUp,
+            "pagedown" | "pgdn" => Key::PageDown,
+            "insert" | "ins" => Key::Insert,
+            "capslock" => Key::CapsLock,
+            "f1" => Key::F1,
+            "f2" => Key::F2,
+            "f3" => Key::F3,
+            "f4" => Key::F4,
+            "f5" => Key::F5,
+            "f6" => Key::F6,
+            "f7" => Key::F7,
+            "f8" => Key::F8,
+            "f9" => Key::F9,
+            "f10" => Key::F10,
+            "f11" => Key::F11,
+            "f12" => Key::F12,
+            "slash" | "/" => Key::Slash,
+            "backslash" | "\\" => Key::Backslash,
+            "period" | "dot" | "." => Key::Period,
+            "comma" | "," => Key::Comma,
+            "minus" | "dash" | "hyphen" | "-" => Key::Minus,
+            "equals" | "equal" | "=" => Key::Equals,
+            "semicolon" | ";" => Key::Semicolon,
+            "quote" | "apostrophe" | "'" => Key::Quote,
+            "backtick" | "`" => Key::Backtick,
+            "lbracket" | "[" => Key::LBracket,
+            "rbracket" | "]" => Key::RBracket,
+            other if other.len() == 1 => {
+                let ch = other.chars().next().expect("len checked");
+                match ch {
+                    'a'..='z' => letter_key(ch),
+                    '0'..='9' => digit_key(ch),
+                    _ => return None,
+                }
+            }
+            _ => return None,
+        })
+    }
+}
+
+fn letter_key(ch: char) -> Key {
+    match ch {
+        'a' => Key::A,
+        'b' => Key::B,
+        'c' => Key::C,
+        'd' => Key::D,
+        'e' => Key::E,
+        'f' => Key::F,
+        'g' => Key::G,
+        'h' => Key::H,
+        'i' => Key::I,
+        'j' => Key::J,
+        'k' => Key::K,
+        'l' => Key::L,
+        'm' => Key::M,
+        'n' => Key::N,
+        'o' => Key::O,
+        'p' => Key::P,
+        'q' => Key::Q,
+        'r' => Key::R,
+        's' => Key::S,
+        't' => Key::T,
+        'u' => Key::U,
+        'v' => Key::V,
+        'w' => Key::W,
+        'x' => Key::X,
+        'y' => Key::Y,
+        'z' => Key::Z,
+        _ => unreachable!("caller checks a..=z"),
+    }
+}
+
+fn digit_key(ch: char) -> Key {
+    match ch {
+        '0' => Key::Digit0,
+        '1' => Key::Digit1,
+        '2' => Key::Digit2,
+        '3' => Key::Digit3,
+        '4' => Key::Digit4,
+        '5' => Key::Digit5,
+        '6' => Key::Digit6,
+        '7' => Key::Digit7,
+        '8' => Key::Digit8,
+        '9' => Key::Digit9,
+        _ => unreachable!("caller checks 0..=9"),
+    }
+}
+
+/// Resolve a key name with the same error codes/messages as before.
+pub fn parse_key(name: &str) -> Result<Key, CommandError> {
+    if name.trim().is_empty() {
         return Err(CommandError::new(
             ErrorCode::InvalidKey,
             "Key name must not be empty",
         ));
     }
-
-    let vk = match key.as_str() {
-        "ctrl" | "control" => 0x11,       // VK_CONTROL
-        "shift" => 0x10,                  // VK_SHIFT
-        "alt" => 0x12,                    // VK_MENU
-        "win" | "meta" | "super" => 0x5B, // VK_LWIN
-        "enter" | "return" => 0x0D,       // VK_RETURN
-        "tab" => 0x09,                    // VK_TAB
-        "escape" | "esc" => 0x1B,         // VK_ESCAPE
-        "space" => 0x20,                  // VK_SPACE
-        "backspace" => 0x08,              // VK_BACK
-        "delete" | "del" => 0x2E,         // VK_DELETE
-        "up" => 0x26,                     // VK_UP
-        "down" => 0x28,                   // VK_DOWN
-        "left" => 0x25,                   // VK_LEFT
-        "right" => 0x27,                  // VK_RIGHT
-        "home" => 0x24,                   // VK_HOME
-        "end" => 0x23,                    // VK_END
-        "pageup" | "pgup" => 0x21,        // VK_PRIOR
-        "pagedown" | "pgdn" => 0x22,      // VK_NEXT
-        "insert" | "ins" => 0x2D,         // VK_INSERT
-        "capslock" => 0x14,               // VK_CAPITAL
-        "f1" => 0x70,
-        "f2" => 0x71,
-        "f3" => 0x72,
-        "f4" => 0x73,
-        "f5" => 0x74,
-        "f6" => 0x75,
-        "f7" => 0x76,
-        "f8" => 0x77,
-        "f9" => 0x78,
-        "f10" => 0x79,
-        "f11" => 0x7A,
-        "f12" => 0x7B,
-        // US-layout OEM punctuation (names + single-char forms)
-        "slash" | "/" => 0xBF,                     // VK_OEM_2
-        "backslash" | "\\" => 0xDC,                // VK_OEM_5
-        "period" | "dot" | "." => 0xBE,            // VK_OEM_PERIOD
-        "comma" | "," => 0xBC,                     // VK_OEM_COMMA
-        "minus" | "dash" | "hyphen" | "-" => 0xBD, // VK_OEM_MINUS
-        "equals" | "equal" | "=" => 0xBB,          // VK_OEM_PLUS
-        "semicolon" | ";" => 0xBA,                 // VK_OEM_1
-        "quote" | "apostrophe" | "'" => 0xDE,      // VK_OEM_7
-        "backtick" | "`" => 0xC0,                  // VK_OEM_3
-        "lbracket" | "[" => 0xDB,                  // VK_OEM_4
-        "rbracket" | "]" => 0xDD,                  // VK_OEM_6
-        other if other.len() == 1 => {
-            let ch = other.chars().next().expect("len checked");
-            match ch {
-                'a'..='z' => (ch as u8 - b'a' + 0x41) as u16, // VK_A..VK_Z
-                '0'..='9' => (ch as u8) as u16,               // VK_0..VK_9
-                _ => {
-                    return Err(CommandError::new(
-                        ErrorCode::InvalidKey,
-                        format!("Unsupported key: {name}"),
-                    ));
-                }
-            }
-        }
-        _ => {
-            return Err(CommandError::new(
-                ErrorCode::InvalidKey,
-                format!("Unsupported key: {name}"),
-            ));
-        }
-    };
-
-    Ok(vk)
+    Key::from_name(name)
+        .ok_or_else(|| CommandError::new(ErrorCode::InvalidKey, format!("Unsupported key: {name}")))
 }
 
-/// Parse an ordered list of key names into virtual-key codes.
-pub fn parse_keys(names: &[String]) -> Result<Vec<u16>, CommandError> {
+/// Parse an ordered list of key names.
+pub fn parse_keys(names: &[String]) -> Result<Vec<Key>, CommandError> {
     if names.is_empty() {
         return Err(CommandError::new(
             ErrorCode::InvalidKeys,
@@ -96,17 +226,17 @@ mod tests {
 
     #[test]
     fn parses_modifiers_and_letters() {
-        assert_eq!(parse_key("ctrl").unwrap(), 0x11);
-        assert_eq!(parse_key("CONTROL").unwrap(), 0x11);
-        assert_eq!(parse_key("c").unwrap(), 0x43);
-        assert_eq!(parse_key("Win").unwrap(), 0x5B);
-        assert_eq!(parse_key("f4").unwrap(), 0x73);
-        assert_eq!(parse_key("escape").unwrap(), 0x1B);
-        assert_eq!(parse_key("esc").unwrap(), 0x1B);
-        assert_eq!(parse_key("slash").unwrap(), 0xBF);
-        assert_eq!(parse_key("/").unwrap(), 0xBF);
-        assert_eq!(parse_key("comma").unwrap(), 0xBC);
-        assert_eq!(parse_key(".").unwrap(), 0xBE);
+        assert_eq!(Key::from_name("ctrl"), Some(Key::Ctrl));
+        assert_eq!(Key::from_name("CONTROL"), Some(Key::Ctrl));
+        assert_eq!(Key::from_name("c"), Some(Key::C));
+        assert_eq!(Key::from_name("Win"), Some(Key::Win));
+        assert_eq!(Key::from_name("f4"), Some(Key::F4));
+        assert_eq!(Key::from_name("escape"), Some(Key::Escape));
+        assert_eq!(Key::from_name("esc"), Some(Key::Escape));
+        assert_eq!(Key::from_name("slash"), Some(Key::Slash));
+        assert_eq!(Key::from_name("/"), Some(Key::Slash));
+        assert_eq!(Key::from_name("comma"), Some(Key::Comma));
+        assert_eq!(Key::from_name("."), Some(Key::Period));
     }
 
     #[test]
@@ -122,6 +252,6 @@ mod tests {
         let error = parse_keys(&[]).expect_err("empty");
         assert_eq!(error.code, "invalid_keys");
         let keys = parse_keys(&["ctrl".into(), "c".into()]).unwrap();
-        assert_eq!(keys, vec![0x11, 0x43]);
+        assert_eq!(keys, vec![Key::Ctrl, Key::C]);
     }
 }
