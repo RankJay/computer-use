@@ -90,8 +90,8 @@ fn bench_snapshot(fixture: &str, hwnd: i64) -> BenchSummary {
         let store_for_worker = store.clone();
         let started = Instant::now();
         let outcome = block_on_worker(Duration::from_secs(30), move |ctx| {
-            let session = ctx.session()?;
-            snapshot_with_stats(session, &store_for_worker, input, ctx.deadline)
+            let (session, arenas, deadline) = ctx.resources()?;
+            snapshot_with_stats(session, arenas, &store_for_worker, input, deadline)
         });
         let duration_ms = started.elapsed().as_millis() as u64;
         match outcome {
@@ -148,8 +148,8 @@ fn bench_resolve(fixture: &str, hwnd: i64) -> BenchSummary {
     };
     let store_for_snapshot = store.clone();
     let snapshot_outcome = block_on_worker(Duration::from_secs(30), move |ctx| {
-        let session = ctx.session()?;
-        snapshot_with_stats(session, &store_for_snapshot, input, ctx.deadline)
+        let (session, arenas, deadline) = ctx.resources()?;
+        snapshot_with_stats(session, arenas, &store_for_snapshot, input, deadline)
     });
     let Ok((text, _)) = (match snapshot_outcome {
         WorkerOutcome::Ok(value) => Ok(value),

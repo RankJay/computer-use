@@ -26,12 +26,16 @@ export type AccessibilityFindElementInput = z.infer<typeof accessibilityFindElem
 export type AccessibilityTextOutput = {
   text: string;
   generation: number | null;
+  visited?: number | null;
+  emitted?: number | null;
+  truncated?: boolean | null;
+  truncationReason?: string | null;
 };
 
 export const accessibilityFindElementCapability = defineCapability({
   name: "accessibility_find_element",
   description:
-    "Find up to five matching accessibility elements by name substring. Returns compact text lines with refs. Prefer role=hyperlink for YouTube video links; if none match, retries without role. Searches inside the page Document when present.",
+    "Find up to five matching accessibility elements by name. Tries exact name+role, then substring+role, then name-only (labeled match=name_only — never silent). Prefer role=hyperlink for YouTube video links. Returns compact text lines with refs.",
   risk: "high",
   inputSchema: accessibilityFindElementInputSchema,
   enabledWhen: uiAutomationEnabled,

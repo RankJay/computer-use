@@ -6,12 +6,15 @@
 //! `CoInitializeEx`. All `UIElement` / walker / cache objects must live and die
 //! on this thread — nothing COM crosses a thread seam.
 
+use std::collections::HashMap;
 use std::sync::mpsc::{sync_channel, Receiver, SyncSender, TrySendError};
 use std::sync::OnceLock;
 use std::thread;
 use std::time::{Duration, Instant};
 
 use crate::capabilities::path_utils::CommandError;
+
+use super::arena::HwndArena;
 
 const QUEUE_CAPACITY: usize = 8;
 
@@ -25,9 +28,30 @@ pub struct WorkerCtx {
     pub deadline: Instant,
     #[cfg(windows)]
     session: Result<super::windows_impl::UiaSession, CommandError>,
+    /// Last extracted tree per HWND (worker-thread-local).
+    pub arenas: HashMap<i64, HwndArena>,
 }
 
 impl WorkerCtx {
+    #[cfg(windows)]
+    pub fn resources(
+        &mut self,
+    ) -> Result<
+        (
+            &super::windows_impl::UiaSession,
+            &mut HashMap<i64, HwndArena>,
+            Instant,
+        ),
+        CommandError,
+    > {
+        let deadline = self.deadline;
+        let session = match &self.session {
+            Ok(session) => session,
+            Err(error) => return Err(error.clone()),
+        };
+        Ok((session, &mut self.arenas, deadline))
+    }
+
     #[cfg(windows)]
     pub fn session(&self) -> Result<&super::windows_impl::UiaSession, CommandError> {
         match &self.session {
@@ -90,6 +114,7 @@ fn worker_loop(rx: Receiver<Job>) {
         deadline: Instant::now(),
         #[cfg(windows)]
         session,
+        arenas: HashMap::new(),
     };
 
     while let Ok(job) = rx.recv() {

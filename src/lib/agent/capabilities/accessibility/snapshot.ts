@@ -20,12 +20,16 @@ export type AccessibilitySnapshotInput = z.infer<typeof accessibilitySnapshotInp
 export type AccessibilityTextOutput = {
   text: string;
   generation: number | null;
+  visited?: number | null;
+  emitted?: number | null;
+  truncated?: boolean | null;
+  truncationReason?: string | null;
 };
 
 export const accessibilitySnapshotCapability = defineCapability({
   name: "accessibility_snapshot",
   description:
-    "Capture a compact accessibility outline for a window. Returns indented text lines with refs like e3@2. If the tree looks shallow (only Window/Pane), use accessibility_expand_node on a Pane ref or increase maxDepth.",
+    "Capture a compact accessibility outline for a window. Returns indented text lines with refs like e3@2:hwnd. Truncation is reported via truncated/truncationReason and a [truncated:…] footer line. If the tree looks shallow (only Window/Pane), use accessibility_expand_node on a Pane ref or increase maxDepth.",
   risk: "high",
   inputSchema: accessibilitySnapshotInputSchema,
   enabledWhen: uiAutomationEnabled,

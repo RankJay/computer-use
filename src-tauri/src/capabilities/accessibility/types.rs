@@ -5,6 +5,27 @@ use serde::{Deserialize, Serialize};
 pub struct TextResult {
     pub text: String,
     pub generation: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub visited: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub emitted: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub truncated: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub truncation_reason: Option<String>,
+}
+
+impl TextResult {
+    pub fn plain(text: String, generation: Option<u32>) -> Self {
+        Self {
+            text,
+            generation,
+            visited: None,
+            emitted: None,
+            truncated: None,
+            truncation_reason: None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -34,6 +55,14 @@ pub struct SnapshotInput {
     pub max_depth: u32,
     #[serde(default = "default_max_elements")]
     pub max_elements: u32,
+}
+
+impl SnapshotInput {
+    pub fn clamped(mut self) -> Self {
+        self.max_depth = self.max_depth.clamp(1, 20);
+        self.max_elements = self.max_elements.clamp(1, 300);
+        self
+    }
 }
 
 #[derive(Debug, Deserialize)]

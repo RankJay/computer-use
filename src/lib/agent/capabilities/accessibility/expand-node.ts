@@ -15,6 +15,10 @@ export type AccessibilityExpandNodeInput = z.infer<typeof accessibilityExpandNod
 export type AccessibilityTextOutput = {
   text: string;
   generation: number | null;
+  visited?: number | null;
+  emitted?: number | null;
+  truncated?: boolean | null;
+  truncationReason?: string | null;
 };
 
 export const accessibilityExpandNodeCapability = defineCapability({

@@ -13,6 +13,9 @@ pub struct StoredElement {
     pub process_id: u32,
     pub name: String,
     pub role: Option<String>,
+    pub automation_id: String,
+    pub rect: Option<(i32, i32, i32, i32)>,
+    pub ancestor_chain: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -61,10 +64,7 @@ impl SnapshotStore {
         hwnd: i64,
         generation: u32,
         reference: String,
-        runtime_id: Vec<i32>,
-        process_id: u32,
-        name: String,
-        role: Option<String>,
+        element: StoredElement,
     ) {
         let mut inner = self.inner.lock().expect("snapshot store poisoned");
         let Some(state) = inner.windows.get_mut(&hwnd) else {
@@ -73,16 +73,7 @@ impl SnapshotStore {
         let Some(entry) = state.generations.iter_mut().find(|g| g.id == generation) else {
             return;
         };
-        entry.elements.insert(
-            reference.clone(),
-            StoredElement {
-                hwnd,
-                runtime_id,
-                process_id,
-                name,
-                role,
-            },
-        );
+        entry.elements.insert(reference, element);
     }
 
     pub fn resolve_ref(&self, reference: &str) -> Option<StoredElement> {
@@ -180,6 +171,19 @@ pub fn parse_reference(reference: &str) -> Option<(u32, u32, i64)> {
 mod tests {
     use super::*;
 
+    fn sample_element(hwnd: i64, name: &str) -> StoredElement {
+        StoredElement {
+            hwnd,
+            runtime_id: vec![1, 2],
+            process_id: 100,
+            name: name.to_string(),
+            role: Some("Button".to_string()),
+            automation_id: String::new(),
+            rect: None,
+            ancestor_chain: Vec::new(),
+        }
+    }
+
     #[test]
     fn keeps_only_last_two_generations() {
         let store = SnapshotStore::default();
@@ -190,30 +194,21 @@ mod tests {
             hwnd,
             g1,
             make_reference(1, g1, hwnd),
-            vec![1, 2],
-            100,
-            "Compose".to_string(),
-            Some("Button".to_string()),
+            sample_element(hwnd, "Compose"),
         );
         let g2 = store.begin_generation(hwnd);
         store.store_element(
             hwnd,
             g2,
             make_reference(1, g2, hwnd),
-            vec![3, 4],
-            100,
-            "Compose".to_string(),
-            Some("Button".to_string()),
+            sample_element(hwnd, "Compose"),
         );
         let g3 = store.begin_generation(hwnd);
         store.store_element(
             hwnd,
             g3,
             make_reference(1, g3, hwnd),
-            vec![5, 6],
-            100,
-            "Compose".to_string(),
-            Some("Button".to_string()),
+            sample_element(hwnd, "Compose"),
         );
 
         assert!(store.resolve_ref(&make_reference(1, g1, hwnd)).is_none());
@@ -236,24 +231,8 @@ mod tests {
         let ref_b = make_reference(1, g_b, hwnd_b);
         assert_ne!(ref_a, ref_b);
 
-        store.store_element(
-            hwnd_a,
-            g_a,
-            ref_a.clone(),
-            vec![1],
-            10,
-            "A".to_string(),
-            None,
-        );
-        store.store_element(
-            hwnd_b,
-            g_b,
-            ref_b.clone(),
-            vec![2],
-            20,
-            "B".to_string(),
-            None,
-        );
+        store.store_element(hwnd_a, g_a, ref_a.clone(), sample_element(hwnd_a, "A"));
+        store.store_element(hwnd_b, g_b, ref_b.clone(), sample_element(hwnd_b, "B"));
 
         let resolved_a = store.resolve_ref(&ref_a).expect("ref_a");
         let resolved_b = store.resolve_ref(&ref_b).expect("ref_b");

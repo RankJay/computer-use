@@ -1,23 +1,25 @@
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::thread;
 use std::time::{Duration, Instant};
 
 use uiautomation::controls::WindowControl;
-use uiautomation::core::{UIAutomation, UIElement, UIMatcherMode, UITreeWalker};
+use uiautomation::core::{UIAutomation, UIElement, UITreeWalker};
 use uiautomation::errors::ERR_NOTFOUND;
 use uiautomation::patterns::{
     UIExpandCollapsePattern, UIInvokePattern, UILegacyIAccessiblePattern, UIPatternType,
     UIRangeValuePattern, UIScrollItemPattern, UIScrollPattern, UISelectionItemPattern,
     UITogglePattern, UIValuePattern,
 };
-use uiautomation::types::{ControlType, Handle, ScrollAmount, TreeScope, UIProperty};
+use uiautomation::types::{ControlType, ElementMode, Handle, ScrollAmount, TreeScope, UIProperty};
 use uiautomation::variants::{Value, Variant};
 use windows::Win32::Foundation::HWND;
 use windows::Win32::UI::WindowsAndMessaging::GetWindowThreadProcessId;
 
 use crate::capabilities::path_utils::CommandError;
 
+use super::arena::{HwndArena, NodeRecord};
 use super::budget::{SearchBudget, FIND_MAX_NODES, SNAPSHOT_MAX_NODES};
-use super::state::{make_reference, SnapshotStore, StoredElement};
+use super::state::{make_reference, parse_reference, SnapshotStore, StoredElement};
 use super::types::{
     ActionResult, FindElementInput, GetValueResult, SnapshotInput, TextResult, MAX_FIND_CANDIDATES,
     WAIT_POLL_MS,
@@ -51,10 +53,7 @@ pub fn process_id_for_hwnd_command(hwnd: i64) -> Option<u32> {
 
 const CONNECTION_TIMEOUT_MS: u32 = 500;
 const TRANSACTION_TIMEOUT_MS: u32 = 1_500;
-const FIND_WALK_MAX_DEPTH: u32 = 24;
-const FIND_MATCHER_MAX_DEPTH: u32 = 32;
 const MAX_SIBLING_REPEAT: u32 = 3;
-const FIND_MAX_SIBLING_REPEAT: u32 = 64;
 const RESOLVE_RETRY_ATTEMPTS: u32 = 3;
 const TRANSIENT_UIA_RETRY_MS: u64 = 120;
 
@@ -66,28 +65,26 @@ pub struct SnapshotStats {
 
 pub fn snapshot_impl(
     session: &UiaSession,
+    arenas: &mut HashMap<i64, HwndArena>,
     store: &SnapshotStore,
     input: SnapshotInput,
     deadline: Instant,
 ) -> Result<TextResult, CommandError> {
-    Ok(snapshot_with_stats(session, store, input, deadline)?.0)
+    Ok(snapshot_with_stats(session, arenas, store, input, deadline)?.0)
 }
 
 #[cfg_attr(not(feature = "a11y-bench"), allow(dead_code))]
 pub fn snapshot_with_stats(
     session: &UiaSession,
+    arenas: &mut HashMap<i64, HwndArena>,
     store: &SnapshotStore,
     input: SnapshotInput,
     deadline: Instant,
 ) -> Result<(TextResult, SnapshotStats), CommandError> {
-    let handle = hwnd_from_i64(input.hwnd)?;
-    let root = session
-        .automation
-        .element_from_handle_build_cache(handle, &session.cache_request)
-        .map_err(|error| map_uia_error(error, "snapshot_failed"))?;
-    let process_id = root
-        .get_process_id()
-        .map_err(|error| map_uia_error(error, "snapshot_failed"))?;
+    let input = input.clamped();
+    let process_id = process_id_for_hwnd(input.hwnd).ok_or_else(|| {
+        CommandError::new("snapshot_failed", "Could not resolve process id for hwnd")
+    })?;
 
     if store.is_process_degraded(process_id) {
         return Err(CommandError::new(
@@ -98,25 +95,57 @@ pub fn snapshot_with_stats(
 
     let _ = store.is_first_process_touch(process_id);
 
+    let extracted = fetch_tree(session, input.hwnd, input.max_depth, deadline)?;
     let generation = store.begin_generation(input.hwnd);
-    let mut budget = SearchBudget::until(deadline, SNAPSHOT_MAX_NODES);
-    let mut builder = OutlineBuilder::new(
+    let outline = emit_outline_from_arena(
         store,
         input.hwnd,
         generation,
         process_id,
+        &extracted.nodes,
+        0,
+        input.max_depth,
         input.max_elements,
+        false,
     );
-    builder.walk(session, &root, 0, input.max_depth, false, &mut budget)?;
+
+    arenas.insert(
+        input.hwnd,
+        HwndArena {
+            generation,
+            process_id,
+            nodes: extracted.nodes,
+        },
+    );
+
+    let mut text = outline.text;
+    if outline.truncated {
+        if let Some(reason) = &outline.truncation_reason {
+            if !text.is_empty() {
+                text.push('\n');
+            }
+            text.push_str(&format!("[truncated:{reason}]"));
+        }
+    }
+    if extracted.used_bfs {
+        if !text.is_empty() {
+            text.push('\n');
+        }
+        text.push_str("[fetch:bfs_fallback]");
+    }
 
     let stats = SnapshotStats {
-        nodes_visited: budget.nodes_visited(),
-        emitted: builder.emitted,
+        nodes_visited: outline.visited,
+        emitted: outline.emitted,
     };
     Ok((
         TextResult {
-            text: builder.finish(),
+            text,
             generation: Some(generation),
+            visited: Some(outline.visited),
+            emitted: Some(outline.emitted),
+            truncated: Some(outline.truncated),
+            truncation_reason: outline.truncation_reason,
         },
         stats,
     ))
@@ -148,10 +177,14 @@ pub fn find_element_impl(
 
 fn empty_find_result(store: &SnapshotStore, hwnd: i64) -> TextResult {
     let generation = store.begin_generation(hwnd);
-    TextResult {
-        text: String::new(),
-        generation: Some(generation),
-    }
+    TextResult::plain(String::new(), Some(generation))
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum MatchTier {
+    ExactNameRole,
+    SubstringRole,
+    NameOnly,
 }
 
 fn find_element_once(
@@ -161,13 +194,8 @@ fn find_element_once(
     deadline: Instant,
 ) -> Result<TextResult, CommandError> {
     let handle = hwnd_from_i64(input.hwnd)?;
-    let root = session
-        .automation
-        .element_from_handle_build_cache(handle, &session.cache_request)
-        .map_err(|error| map_uia_error(error, "find_failed"))?;
-    let process_id = root
-        .get_process_id()
-        .map_err(|error| map_uia_error(error, "find_failed"))?;
+    let process_id = process_id_for_hwnd(input.hwnd)
+        .ok_or_else(|| CommandError::new("find_failed", "Could not resolve process id for hwnd"))?;
 
     if store.is_process_degraded(process_id) {
         return Err(CommandError::new(
@@ -183,139 +211,769 @@ fn find_element_once(
             "nameContains must not be empty",
         ));
     }
-
+    let name_lower = name_filter.to_ascii_lowercase();
     let role_filter = input.role.as_deref().map(parse_role).transpose()?;
 
-    let search_root = find_web_search_root(session, &root);
-    let mut matches =
-        find_elements_via_matcher(session, &search_root, name_filter, role_filter, deadline)?;
-
-    if matches.is_empty() && role_filter.is_some() {
-        matches = find_elements_via_matcher(session, &search_root, name_filter, None, deadline)?;
+    if Instant::now() >= deadline {
+        return Ok(empty_find_result(store, input.hwnd));
     }
 
-    if matches.is_empty() {
-        let name_filter_lower = name_filter.to_lowercase();
-        let mut budget = SearchBudget::until(deadline, FIND_MAX_NODES);
-        let mut finder = ElementFinder::new(&name_filter_lower, role_filter);
-        finder.search(session, &search_root, 0, FIND_WALK_MAX_DEPTH, &mut budget)?;
-        matches = finder.matches;
+    let root = session
+        .automation
+        .element_from_handle_build_cache(handle, &session.subtree_cache)
+        .map_err(|error| map_uia_error(error, "find_failed"))?;
+
+    let condition = if let Some(role) = role_filter {
+        session
+            .automation
+            .create_property_condition(UIProperty::ControlType, Variant::from(role as i32), None)
+            .map_err(|error| map_uia_error(error, "find_failed"))?
+    } else {
+        session
+            .automation
+            .create_true_condition()
+            .map_err(|error| map_uia_error(error, "find_failed"))?
+    };
+
+    let candidates =
+        match root.find_all_build_cache(TreeScope::Descendants, &condition, &session.subtree_cache)
+        {
+            Ok(elements) => elements,
+            Err(error) if error.code() == ERR_NOTFOUND => Vec::new(),
+            Err(error) => return Err(map_uia_error(error, "find_failed")),
+        };
+
+    let mut records = Vec::with_capacity(candidates.len());
+    for (order, element) in candidates.into_iter().enumerate() {
+        if Instant::now() >= deadline || records.len() as u32 >= FIND_MAX_NODES {
+            break;
+        }
+        if let Some(record) = project_element(&element, None, 0, &[]) {
+            records.push((order, record));
+        }
     }
 
-    matches.sort_by_key(|element| find_candidate_priority(element));
+    // Prefer Document subtree when present (web content).
+    let search_records = prefer_document_scope(&records);
+
+    let (tier, mut matches) = select_find_matches(&search_records, &name_lower, role_filter);
+    matches.sort_by_key(|(order, record)| (find_record_priority(record), *order));
 
     let generation = store.begin_generation(input.hwnd);
     let mut lines = Vec::new();
-    for (index, element) in matches.into_iter().take(MAX_FIND_CANDIDATES).enumerate() {
-        let reference = make_reference((index + 1) as u32, generation, input.hwnd);
-        let runtime_id =
-            element_runtime_id(&element).map_err(|error| map_uia_error(error, "find_failed"))?;
-        let (name, role) = element_storage_hints(&element);
+    let mut seen_runtime = HashSet::new();
+    let mut emitted = 0usize;
+    for (_order, record) in matches {
+        if emitted >= MAX_FIND_CANDIDATES {
+            break;
+        }
+        if !record.runtime_id.is_empty() && !seen_runtime.insert(record.runtime_id.clone()) {
+            continue;
+        }
+        emitted += 1;
+        let reference = make_reference(emitted as u32, generation, input.hwnd);
         store.store_element(
             input.hwnd,
             generation,
             reference.clone(),
-            runtime_id,
-            process_id,
-            name,
-            role,
+            stored_from_record(input.hwnd, process_id, &record),
         );
-        lines.push(format_element_line(&element, 0, &reference)?);
+        let tier_label = match tier {
+            MatchTier::ExactNameRole => "exact",
+            MatchTier::SubstringRole => "substring",
+            MatchTier::NameOnly => "name_only",
+        };
+        lines.push(format_record_line(&record, 0, &reference, Some(tier_label)));
     }
 
     Ok(TextResult {
         text: lines.join("\n"),
         generation: Some(generation),
+        visited: Some(search_records.len() as u32),
+        emitted: Some(emitted as u32),
+        truncated: None,
+        truncation_reason: None,
     })
 }
 
-fn find_web_search_root(session: &UiaSession, window: &UIElement) -> UIElement {
-    for mode in [UIMatcherMode::Control, UIMatcherMode::Content] {
-        let matcher = session
-            .automation
-            .create_matcher()
-            .from(window.clone())
-            .control_type(ControlType::Document)
-            .mode(mode)
-            .depth(12)
-            .timeout(1_500)
-            .interval(100);
-        if let Ok(document) = matcher.find_first() {
-            return document;
-        }
+fn prefer_document_scope(records: &[(usize, NodeRecord)]) -> Vec<(usize, NodeRecord)> {
+    let Some((_, doc)) = records
+        .iter()
+        .find(|(_, r)| r.control_type_raw == ControlType::Document as i32)
+    else {
+        return records.to_vec();
+    };
+    let doc_runtime = doc.runtime_id.clone();
+    if doc_runtime.is_empty() {
+        return records.to_vec();
     }
-    window.clone()
+    // Keep document and nodes that list it in ancestor chain, or all if we can't tell.
+    let filtered: Vec<_> = records
+        .iter()
+        .filter(|(_, r)| {
+            r.runtime_id == doc_runtime
+                || r.ancestor_chain.iter().any(|a| a.starts_with("Document:"))
+        })
+        .cloned()
+        .collect();
+    if filtered.len() > 1 {
+        filtered
+    } else {
+        records.to_vec()
+    }
 }
 
-fn find_elements_via_matcher(
-    session: &UiaSession,
-    root: &UIElement,
-    name_filter: &str,
+fn select_find_matches(
+    records: &[(usize, NodeRecord)],
+    name_lower: &str,
     role_filter: Option<ControlType>,
-    deadline: std::time::Instant,
-) -> Result<Vec<UIElement>, CommandError> {
-    let remaining_ms = deadline
-        .saturating_duration_since(std::time::Instant::now())
-        .as_millis()
-        .min(u128::from(u64::MAX)) as u64;
-    if remaining_ms == 0 {
-        return Ok(Vec::new());
+) -> (MatchTier, Vec<(usize, NodeRecord)>) {
+    let exact_role: Vec<_> = records
+        .iter()
+        .filter(|(_, r)| role_matches(r, role_filter) && r.name.to_ascii_lowercase() == name_lower)
+        .cloned()
+        .collect();
+    if !exact_role.is_empty() {
+        return (MatchTier::ExactNameRole, exact_role);
     }
 
-    let mut collected = Vec::new();
-    for mode in [UIMatcherMode::Control, UIMatcherMode::Content] {
-        let mut matcher = session
-            .automation
-            .create_matcher()
-            .from(root.clone())
-            .contains_name(name_filter)
-            .mode(mode)
-            .depth(FIND_MATCHER_MAX_DEPTH)
-            .timeout(remaining_ms)
-            .interval(WAIT_POLL_MS);
-
-        if let Some(role) = role_filter {
-            matcher = matcher.control_type(role);
-        }
-
-        match matcher.find_all() {
-            Ok(elements) => {
-                collected.extend(elements);
-                if collected.len() >= MAX_FIND_CANDIDATES {
-                    break;
-                }
-            }
-            Err(error) if matcher_error_is_empty(&error) => {}
-            Err(error) => return Err(map_uia_error(error, "find_failed")),
-        }
+    let substring_role: Vec<_> = records
+        .iter()
+        .filter(|(_, r)| {
+            role_matches(r, role_filter) && r.name.to_ascii_lowercase().contains(name_lower)
+        })
+        .cloned()
+        .collect();
+    if !substring_role.is_empty() {
+        return (MatchTier::SubstringRole, substring_role);
     }
 
-    collected.sort_by_key(|element| find_candidate_priority(element));
-    collected.truncate(MAX_FIND_CANDIDATES);
-    Ok(collected)
+    // Explicit no-role fallback — never silent.
+    let name_only: Vec<_> = records
+        .iter()
+        .filter(|(_, r)| r.name.to_ascii_lowercase().contains(name_lower))
+        .cloned()
+        .collect();
+    (MatchTier::NameOnly, name_only)
 }
 
-fn matcher_error_is_empty(error: &uiautomation::Error) -> bool {
-    error.code() == ERR_NOTFOUND
+fn role_matches(record: &NodeRecord, role_filter: Option<ControlType>) -> bool {
+    match role_filter {
+        Some(role) => record.control_type_raw == role as i32,
+        None => true,
+    }
+}
+
+fn find_record_priority(record: &NodeRecord) -> (i32, i32, i32) {
+    let offscreen = if record.offscreen { 1 } else { 0 };
+    let disabled = if record.enabled { 0 } else { 1 };
+    let role = match record.control_type_raw {
+        x if x == ControlType::Hyperlink as i32 => 0,
+        x if x == ControlType::Button as i32 => 1,
+        x if x == ControlType::ListItem as i32 => 2,
+        x if x == ControlType::MenuItem as i32 => 3,
+        x if x == ControlType::TabItem as i32 => 4,
+        x if x == ControlType::TreeItem as i32 => 5,
+        x if x == ControlType::Edit as i32 => 6,
+        x if x == ControlType::ComboBox as i32 => 7,
+        x if x == ControlType::Group as i32 => 40,
+        x if x == ControlType::Text as i32 => 50,
+        x if x == ControlType::Image as i32 => 55,
+        _ => 20,
+    };
+    (role, offscreen, disabled)
 }
 
 pub fn expand_node_impl(
     session: &UiaSession,
+    arenas: &mut HashMap<i64, HwndArena>,
     store: &SnapshotStore,
     reference: &str,
     deadline: Instant,
 ) -> Result<TextResult, CommandError> {
     let stored = store.resolve_ref_or_stale(reference)?;
+    let (_index, ref_generation, _hwnd) = parse_reference(reference).ok_or_else(|| {
+        CommandError::new("invalid_reference", "Reference must look like e14@3:123456")
+    })?;
+
+    if let Some(arena) = arenas.get(&stored.hwnd) {
+        if arena.generation == ref_generation {
+            if let Some(root_idx) = arena.find_by_runtime_id(&stored.runtime_id) {
+                let generation = store.begin_generation(stored.hwnd);
+                let outline = emit_outline_from_arena(
+                    store,
+                    stored.hwnd,
+                    generation,
+                    stored.process_id,
+                    &arena.nodes,
+                    root_idx,
+                    10,
+                    150,
+                    true,
+                );
+                // Refresh arena generation tag to newest for this hwnd.
+                if let Some(arena_mut) = arenas.get_mut(&stored.hwnd) {
+                    arena_mut.generation = generation;
+                }
+                let mut text = outline.text;
+                if outline.truncated {
+                    if let Some(reason) = &outline.truncation_reason {
+                        if !text.is_empty() {
+                            text.push('\n');
+                        }
+                        text.push_str(&format!("[truncated:{reason}]"));
+                    }
+                }
+                return Ok(TextResult {
+                    text,
+                    generation: Some(generation),
+                    visited: Some(outline.visited),
+                    emitted: Some(outline.emitted),
+                    truncated: Some(outline.truncated),
+                    truncation_reason: outline.truncation_reason,
+                });
+            }
+        }
+    }
+
+    // Live resolve + subtree fetch from the element.
     let element = resolve_stored_element(session, &stored)?;
+    let extracted = fetch_tree_from_element(session, &element, 10, deadline)?;
     let generation = store.begin_generation(stored.hwnd);
-    let mut builder = OutlineBuilder::new(store, stored.hwnd, generation, stored.process_id, 150);
-    let mut budget = SearchBudget::until(deadline, SNAPSHOT_MAX_NODES);
-    builder.walk(session, &element, 0, 10, true, &mut budget)?;
+    let outline = emit_outline_from_arena(
+        store,
+        stored.hwnd,
+        generation,
+        stored.process_id,
+        &extracted.nodes,
+        0,
+        10,
+        150,
+        true,
+    );
+    arenas.insert(
+        stored.hwnd,
+        HwndArena {
+            generation,
+            process_id: stored.process_id,
+            nodes: extracted.nodes,
+        },
+    );
+
+    let mut text = outline.text;
+    if outline.truncated {
+        if let Some(reason) = &outline.truncation_reason {
+            if !text.is_empty() {
+                text.push('\n');
+            }
+            text.push_str(&format!("[truncated:{reason}]"));
+        }
+    }
 
     Ok(TextResult {
-        text: builder.finish(),
+        text,
         generation: Some(generation),
+        visited: Some(outline.visited),
+        emitted: Some(outline.emitted),
+        truncated: Some(outline.truncated),
+        truncation_reason: outline.truncation_reason,
     })
+}
+
+struct ExtractedTree {
+    nodes: Vec<NodeRecord>,
+    used_bfs: bool,
+}
+
+fn fetch_tree(
+    session: &UiaSession,
+    hwnd: i64,
+    max_depth: u32,
+    deadline: Instant,
+) -> Result<ExtractedTree, CommandError> {
+    let handle = hwnd_from_i64(hwnd)?;
+    match session
+        .automation
+        .element_from_handle_build_cache(handle, &session.subtree_cache)
+    {
+        Ok(root) => {
+            let mut nodes = Vec::new();
+            let mut budget = SearchBudget::until(deadline, SNAPSHOT_MAX_NODES);
+            extract_cached_subtree(&root, None, 0, max_depth, &[], &mut nodes, &mut budget)?;
+            Ok(ExtractedTree {
+                nodes,
+                used_bfs: false,
+            })
+        }
+        Err(error) if is_transaction_timeout(&error) || Instant::now() >= deadline => {
+            fetch_tree_bfs(session, hwnd, max_depth, deadline)
+        }
+        Err(error) => {
+            // Fall back to BFS on other bulk failures (provider quirks).
+            match fetch_tree_bfs(session, hwnd, max_depth, deadline) {
+                Ok(tree) => Ok(tree),
+                Err(_) => Err(map_uia_error(error, "snapshot_failed")),
+            }
+        }
+    }
+}
+
+fn fetch_tree_from_element(
+    session: &UiaSession,
+    element: &UIElement,
+    max_depth: u32,
+    deadline: Instant,
+) -> Result<ExtractedTree, CommandError> {
+    // Re-cache the live element with subtree scope.
+    let runtime_id = element_runtime_id(element).unwrap_or_default();
+    if runtime_id.is_empty() {
+        let mut nodes = Vec::new();
+        let mut budget = SearchBudget::until(deadline, SNAPSHOT_MAX_NODES);
+        extract_via_bfs_from(session, element, max_depth, &mut nodes, &mut budget)?;
+        return Ok(ExtractedTree {
+            nodes,
+            used_bfs: true,
+        });
+    }
+
+    let handle = element.get_native_window_handle().ok().and_then(|h| {
+        let raw: isize = h.into();
+        if raw == 0 {
+            None
+        } else {
+            Some(raw as i64)
+        }
+    });
+
+    if let Some(hwnd) = handle {
+        return fetch_tree(session, hwnd, max_depth, deadline);
+    }
+
+    // Resolve via runtime id from a live window root if possible — else BFS from element.
+    let mut nodes = Vec::new();
+    let mut budget = SearchBudget::until(deadline, SNAPSHOT_MAX_NODES);
+    extract_via_bfs_from(session, element, max_depth, &mut nodes, &mut budget)?;
+    Ok(ExtractedTree {
+        nodes,
+        used_bfs: true,
+    })
+}
+
+fn fetch_tree_bfs(
+    session: &UiaSession,
+    hwnd: i64,
+    max_depth: u32,
+    deadline: Instant,
+) -> Result<ExtractedTree, CommandError> {
+    let handle = hwnd_from_i64(hwnd)?;
+    let root = session
+        .automation
+        .element_from_handle_build_cache(handle, &session.children_cache)
+        .map_err(|error| map_uia_error(error, "snapshot_failed"))?;
+    let mut nodes = Vec::new();
+    let mut budget = SearchBudget::until(deadline, SNAPSHOT_MAX_NODES);
+    extract_via_bfs_from(session, &root, max_depth, &mut nodes, &mut budget)?;
+    Ok(ExtractedTree {
+        nodes,
+        used_bfs: true,
+    })
+}
+
+fn extract_cached_subtree(
+    element: &UIElement,
+    parent: Option<u32>,
+    depth: u32,
+    max_depth: u32,
+    ancestors: &[String],
+    nodes: &mut Vec<NodeRecord>,
+    budget: &mut SearchBudget,
+) -> Result<(), CommandError> {
+    if budget.exhausted() || depth > max_depth {
+        return Ok(());
+    }
+    if !budget.visit_soft() {
+        return Ok(());
+    }
+
+    let Some(record) = project_element(element, parent, depth, ancestors) else {
+        return Ok(());
+    };
+    let idx = nodes.len() as u32;
+    if let Some(parent_idx) = parent {
+        if let Some(parent_node) = nodes.get_mut(parent_idx as usize) {
+            parent_node.children.push(idx);
+        }
+    }
+    let label = ancestor_label(&record);
+    let mut child_ancestors = ancestors.to_vec();
+    child_ancestors.push(label);
+    nodes.push(record);
+
+    if depth >= max_depth {
+        return Ok(());
+    }
+
+    let children = element.get_cached_children().unwrap_or_default();
+    for child in children {
+        extract_cached_subtree(
+            &child,
+            Some(idx),
+            depth + 1,
+            max_depth,
+            &child_ancestors,
+            nodes,
+            budget,
+        )?;
+    }
+    Ok(())
+}
+
+fn extract_via_bfs_from(
+    session: &UiaSession,
+    root: &UIElement,
+    max_depth: u32,
+    nodes: &mut Vec<NodeRecord>,
+    budget: &mut SearchBudget,
+) -> Result<(), CommandError> {
+    let true_condition = session
+        .automation
+        .create_true_condition()
+        .map_err(|error| map_uia_error(error, "snapshot_failed"))?;
+
+    let Some(root_record) = project_element(root, None, 0, &[]) else {
+        return Ok(());
+    };
+    if !budget.visit_soft() {
+        return Ok(());
+    }
+    nodes.push(root_record);
+
+    // Queue: (parent_idx, live_or_cached parent element for Children find)
+    let mut queue: VecDeque<(u32, UIElement)> = VecDeque::new();
+    queue.push_back((0, root.clone()));
+
+    while let Some((parent_idx, parent_el)) = queue.pop_front() {
+        if budget.exhausted() {
+            break;
+        }
+        let parent_depth = nodes[parent_idx as usize].depth;
+        if parent_depth >= max_depth {
+            continue;
+        }
+
+        let children = match parent_el.find_all_build_cache(
+            TreeScope::Children,
+            &true_condition,
+            &session.children_cache,
+        ) {
+            Ok(c) => c,
+            Err(error) if error.code() == ERR_NOTFOUND => continue,
+            Err(_) => continue,
+        };
+
+        let ancestors = {
+            let node = &nodes[parent_idx as usize];
+            let mut chain = node.ancestor_chain.clone();
+            chain.push(ancestor_label(node));
+            chain
+        };
+
+        for child in children {
+            if budget.exhausted() || !budget.visit_soft() {
+                break;
+            }
+            let depth = parent_depth + 1;
+            let Some(record) = project_element(&child, Some(parent_idx), depth, &ancestors) else {
+                continue;
+            };
+            let idx = nodes.len() as u32;
+            nodes[parent_idx as usize].children.push(idx);
+            nodes.push(record);
+            if depth < max_depth {
+                queue.push_back((idx, child));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn project_element(
+    element: &UIElement,
+    parent: Option<u32>,
+    depth: u32,
+    ancestors: &[String],
+) -> Option<NodeRecord> {
+    let control_type = element_control_type(element).ok()?;
+    if should_skip_control(control_type) {
+        return None;
+    }
+    let name = element_name(element);
+    let automation_id = element_automation_id(element);
+    let runtime_id = element_runtime_id(element).unwrap_or_default();
+    let enabled = element_is_enabled(element).unwrap_or(true);
+    let offscreen = element_is_offscreen(element).unwrap_or(false);
+    let rect = element_rect(element);
+    let value = element_value_text(element).filter(|v| is_useful_value(v));
+    Some(NodeRecord {
+        parent,
+        children: Vec::new(),
+        runtime_id,
+        automation_id,
+        name,
+        role: Some(control_type.to_string()),
+        control_type_raw: control_type as i32,
+        enabled,
+        offscreen,
+        rect,
+        value,
+        ancestor_chain: ancestors.to_vec(),
+        depth,
+    })
+}
+
+fn ancestor_label(record: &NodeRecord) -> String {
+    let role = record.role.as_deref().unwrap_or("unknown");
+    format!("{role}:{}", record.name)
+}
+
+struct OutlineEmit {
+    text: String,
+    visited: u32,
+    emitted: u32,
+    truncated: bool,
+    truncation_reason: Option<String>,
+}
+
+fn emit_outline_from_arena(
+    store: &SnapshotStore,
+    hwnd: i64,
+    generation: u32,
+    process_id: u32,
+    nodes: &[NodeRecord],
+    root_idx: usize,
+    max_depth: u32,
+    max_elements: u32,
+    force_children: bool,
+) -> OutlineEmit {
+    let mut lines = Vec::new();
+    let mut next_index = 0u32;
+    let mut emitted = 0u32;
+    let mut visited = 0u32;
+    let mut truncated = false;
+    let mut truncation_reason = None;
+
+    if root_idx >= nodes.len() {
+        return OutlineEmit {
+            text: String::new(),
+            visited: 0,
+            emitted: 0,
+            truncated: false,
+            truncation_reason: None,
+        };
+    }
+
+    fn walk(
+        store: &SnapshotStore,
+        hwnd: i64,
+        generation: u32,
+        process_id: u32,
+        nodes: &[NodeRecord],
+        idx: usize,
+        depth: u32,
+        max_depth: u32,
+        max_elements: u32,
+        force_children: bool,
+        lines: &mut Vec<String>,
+        next_index: &mut u32,
+        emitted: &mut u32,
+        visited: &mut u32,
+        truncated: &mut bool,
+        truncation_reason: &mut Option<String>,
+    ) {
+        if *emitted >= max_elements {
+            *truncated = true;
+            *truncation_reason = Some("max_elements".to_string());
+            return;
+        }
+        *visited = visited.saturating_add(1);
+        let node = &nodes[idx];
+        let control_type = control_type_from_raw(node.control_type_raw);
+        let collapse = !force_children && should_collapse_control(control_type, depth);
+        let interactive = is_interactive_control(control_type) || !node.name.trim().is_empty();
+
+        if interactive || collapse {
+            *next_index = next_index.saturating_add(1);
+            let reference = make_reference(*next_index, generation, hwnd);
+            store.store_element(
+                hwnd,
+                generation,
+                reference.clone(),
+                stored_from_record(hwnd, process_id, node),
+            );
+            lines.push(format_record_line(node, depth, &reference, None));
+            *emitted = emitted.saturating_add(1);
+        }
+
+        if collapse {
+            return;
+        }
+        if depth >= max_depth {
+            if !node.children.is_empty() {
+                *truncated = true;
+                *truncation_reason = Some("max_depth".to_string());
+            }
+            return;
+        }
+        if *emitted >= max_elements {
+            *truncated = true;
+            *truncation_reason = Some("max_elements".to_string());
+            return;
+        }
+
+        let mut sibling_count = 0u32;
+        for &child in &node.children {
+            if *emitted >= max_elements {
+                lines.push(format!(
+                    "{:indent$}+more elements omitted",
+                    "",
+                    indent = (depth as usize + 1) * 2
+                ));
+                *truncated = true;
+                *truncation_reason = Some("max_elements".to_string());
+                break;
+            }
+            walk(
+                store,
+                hwnd,
+                generation,
+                process_id,
+                nodes,
+                child as usize,
+                depth + 1,
+                max_depth,
+                max_elements,
+                false,
+                lines,
+                next_index,
+                emitted,
+                visited,
+                truncated,
+                truncation_reason,
+            );
+            sibling_count += 1;
+            if sibling_count >= MAX_SIBLING_REPEAT {
+                lines.push(format!(
+                    "{:indent$}+more siblings like this",
+                    "",
+                    indent = (depth as usize + 1) * 2
+                ));
+                *truncated = true;
+                *truncation_reason = Some("sibling_cap".to_string());
+                break;
+            }
+        }
+    }
+
+    walk(
+        store,
+        hwnd,
+        generation,
+        process_id,
+        nodes,
+        root_idx,
+        0,
+        max_depth,
+        max_elements,
+        force_children,
+        &mut lines,
+        &mut next_index,
+        &mut emitted,
+        &mut visited,
+        &mut truncated,
+        &mut truncation_reason,
+    );
+
+    OutlineEmit {
+        text: lines.join("\n"),
+        visited,
+        emitted,
+        truncated,
+        truncation_reason,
+    }
+}
+
+fn stored_from_record(hwnd: i64, process_id: u32, node: &NodeRecord) -> StoredElement {
+    StoredElement {
+        hwnd,
+        runtime_id: node.runtime_id.clone(),
+        process_id,
+        name: node.name.clone(),
+        role: node.role.clone(),
+        automation_id: node.automation_id.clone(),
+        rect: node.rect,
+        ancestor_chain: node.ancestor_chain.clone(),
+    }
+}
+
+fn format_record_line(
+    node: &NodeRecord,
+    depth: u32,
+    reference: &str,
+    match_tier: Option<&str>,
+) -> String {
+    let role = node.role.as_deref().unwrap_or("unknown");
+    let name = node.name.replace('"', "'");
+    let mut state: Vec<String> = Vec::new();
+    if !node.enabled {
+        state.push("disabled".to_string());
+    }
+    if node.offscreen {
+        state.push("offscreen".to_string());
+    }
+    if let Some(value) = &node.value {
+        state.push(format!("value=\"{}\"", value.replace('"', "'")));
+    }
+    if let Some(tier) = match_tier {
+        state.push(format!("match={tier}"));
+    }
+    let state_suffix = if state.is_empty() {
+        String::new()
+    } else {
+        format!(" [{}]", state.join(", "))
+    };
+    format!(
+        "{:indent$}{reference} {role} \"{name}\"{state_suffix}",
+        "",
+        indent = depth as usize * 2
+    )
+}
+
+fn control_type_from_raw(raw: i32) -> ControlType {
+    // ControlType is repr(i32); fall back to Custom on unknown.
+    match raw {
+        x if x == ControlType::Button as i32 => ControlType::Button,
+        x if x == ControlType::Edit as i32 => ControlType::Edit,
+        x if x == ControlType::ComboBox as i32 => ControlType::ComboBox,
+        x if x == ControlType::CheckBox as i32 => ControlType::CheckBox,
+        x if x == ControlType::RadioButton as i32 => ControlType::RadioButton,
+        x if x == ControlType::MenuItem as i32 => ControlType::MenuItem,
+        x if x == ControlType::Hyperlink as i32 => ControlType::Hyperlink,
+        x if x == ControlType::TabItem as i32 => ControlType::TabItem,
+        x if x == ControlType::ListItem as i32 => ControlType::ListItem,
+        x if x == ControlType::TreeItem as i32 => ControlType::TreeItem,
+        x if x == ControlType::Slider as i32 => ControlType::Slider,
+        x if x == ControlType::Spinner as i32 => ControlType::Spinner,
+        x if x == ControlType::Document as i32 => ControlType::Document,
+        x if x == ControlType::Pane as i32 => ControlType::Pane,
+        x if x == ControlType::Window as i32 => ControlType::Window,
+        x if x == ControlType::SplitButton as i32 => ControlType::SplitButton,
+        x if x == ControlType::Text as i32 => ControlType::Text,
+        x if x == ControlType::Image as i32 => ControlType::Image,
+        x if x == ControlType::Separator as i32 => ControlType::Separator,
+        x if x == ControlType::ToolTip as i32 => ControlType::ToolTip,
+        x if x == ControlType::Group as i32 => ControlType::Group,
+        _ => ControlType::Custom,
+    }
 }
 
 pub fn click_impl(
@@ -385,7 +1043,7 @@ fn resolve_click_target(
     for _ in 0..8 {
         match session
             .control_walker
-            .get_parent_build_cache(&current, &session.cache_request)
+            .get_parent_build_cache(&current, &session.live_cache)
         {
             Ok(parent) => {
                 chain.push(parent.clone());
@@ -490,32 +1148,6 @@ fn try_keyboard_enter(
             })
             .map_err(|error| map_uia_error(error, "click_failed")),
     )
-}
-
-fn find_candidate_priority(element: &UIElement) -> (i32, i32) {
-    let offscreen = if element.is_offscreen().ok() == Some(true) {
-        1
-    } else {
-        0
-    };
-    let role = element
-        .get_control_type()
-        .map(|control_type| match control_type {
-            ControlType::Hyperlink => 0,
-            ControlType::Button => 1,
-            ControlType::ListItem => 2,
-            ControlType::MenuItem => 3,
-            ControlType::TabItem => 4,
-            ControlType::TreeItem => 5,
-            ControlType::Edit => 6,
-            ControlType::ComboBox => 7,
-            ControlType::Group => 40,
-            ControlType::Text => 50,
-            ControlType::Image => 55,
-            _ => 20,
-        })
-        .unwrap_or(30);
-    (role, offscreen)
 }
 
 pub fn set_value_impl(
@@ -877,7 +1509,7 @@ fn find_scrollable_element(
     for _ in 0..8 {
         match session
             .control_walker
-            .get_parent_build_cache(&current, &session.cache_request)
+            .get_parent_build_cache(&current, &session.live_cache)
         {
             Ok(parent) => {
                 if parent.get_pattern::<UIScrollPattern>().is_ok() {
@@ -897,7 +1529,9 @@ fn find_scrollable_element(
 
 pub struct UiaSession {
     pub automation: UIAutomation,
-    pub cache_request: uiautomation::core::UICacheRequest,
+    pub subtree_cache: uiautomation::core::UICacheRequest,
+    pub children_cache: uiautomation::core::UICacheRequest,
+    pub live_cache: uiautomation::core::UICacheRequest,
     pub control_walker: UITreeWalker,
 }
 
@@ -908,37 +1542,12 @@ impl UiaSession {
             .map_err(|error| CommandError::new("uia_init_failed", error.to_string()))?;
         configure_timeouts(&automation);
 
-        let cache_request = automation
-            .create_cache_request()
-            .map_err(|error| map_uia_error(error, "uia_init_failed"))?;
-        for property in [
-            UIProperty::Name,
-            UIProperty::ControlType,
-            UIProperty::AutomationId,
-            UIProperty::IsEnabled,
-            UIProperty::IsOffscreen,
-            UIProperty::BoundingRectangle,
-            UIProperty::ValueValue,
-            UIProperty::RuntimeId,
-            UIProperty::IsInvokePatternAvailable,
-            UIProperty::IsValuePatternAvailable,
-            UIProperty::IsTogglePatternAvailable,
-            UIProperty::IsLegacyIAccessiblePatternAvailable,
-        ] {
-            cache_request
-                .add_property(property)
-                .map_err(|error| map_uia_error(error, "uia_init_failed"))?;
-        }
-        for pattern in [
-            UIPatternType::Invoke,
-            UIPatternType::Value,
-            UIPatternType::Toggle,
-            UIPatternType::LegacyIAccessible,
-        ] {
-            cache_request
-                .add_pattern(pattern)
-                .map_err(|error| map_uia_error(error, "uia_init_failed"))?;
-        }
+        let subtree_cache =
+            build_cache_request(&automation, TreeScope::Subtree, ElementMode::None, true)?;
+        let children_cache =
+            build_cache_request(&automation, TreeScope::Element, ElementMode::None, true)?;
+        let live_cache =
+            build_cache_request(&automation, TreeScope::Element, ElementMode::Full, false)?;
 
         let control_walker = automation
             .get_control_view_walker()
@@ -946,10 +1555,63 @@ impl UiaSession {
 
         Ok(Self {
             automation,
-            cache_request,
+            subtree_cache,
+            children_cache,
+            live_cache,
             control_walker,
         })
     }
+}
+
+fn build_cache_request(
+    automation: &UIAutomation,
+    scope: TreeScope,
+    mode: ElementMode,
+    include_process_id: bool,
+) -> Result<uiautomation::core::UICacheRequest, CommandError> {
+    let cache_request = automation
+        .create_cache_request()
+        .map_err(|error| map_uia_error(error, "uia_init_failed"))?;
+    cache_request
+        .set_tree_scope(scope)
+        .map_err(|error| map_uia_error(error, "uia_init_failed"))?;
+    cache_request
+        .set_element_mode(mode)
+        .map_err(|error| map_uia_error(error, "uia_init_failed"))?;
+
+    let mut properties = vec![
+        UIProperty::Name,
+        UIProperty::ControlType,
+        UIProperty::AutomationId,
+        UIProperty::IsEnabled,
+        UIProperty::IsOffscreen,
+        UIProperty::BoundingRectangle,
+        UIProperty::ValueValue,
+        UIProperty::RuntimeId,
+        UIProperty::IsInvokePatternAvailable,
+        UIProperty::IsValuePatternAvailable,
+        UIProperty::IsTogglePatternAvailable,
+        UIProperty::IsLegacyIAccessiblePatternAvailable,
+    ];
+    if include_process_id {
+        properties.push(UIProperty::ProcessId);
+    }
+    for property in properties {
+        cache_request
+            .add_property(property)
+            .map_err(|error| map_uia_error(error, "uia_init_failed"))?;
+    }
+    for pattern in [
+        UIPatternType::Invoke,
+        UIPatternType::Value,
+        UIPatternType::Toggle,
+        UIPatternType::LegacyIAccessible,
+    ] {
+        cache_request
+            .add_pattern(pattern)
+            .map_err(|error| map_uia_error(error, "uia_init_failed"))?;
+    }
+    Ok(cache_request)
 }
 
 fn configure_timeouts(automation: &UIAutomation) {
@@ -964,258 +1626,17 @@ fn configure_timeouts(automation: &UIAutomation) {
     }
 }
 
-struct OutlineBuilder<'a> {
-    store: &'a SnapshotStore,
-    hwnd: i64,
-    generation: u32,
-    process_id: u32,
-    max_elements: u32,
-    next_index: u32,
-    emitted: u32,
-    lines: Vec<String>,
-}
-
-impl<'a> OutlineBuilder<'a> {
-    fn new(
-        store: &'a SnapshotStore,
-        hwnd: i64,
-        generation: u32,
-        process_id: u32,
-        max_elements: u32,
-    ) -> Self {
-        Self {
-            store,
-            hwnd,
-            generation,
-            process_id,
-            max_elements,
-            next_index: 0,
-            emitted: 0,
-            lines: Vec::new(),
-        }
-    }
-
-    fn finish(self) -> String {
-        self.lines.join("\n")
-    }
-
-    fn walk(
-        &mut self,
-        session: &UiaSession,
-        element: &UIElement,
-        depth: u32,
-        max_depth: u32,
-        force_children: bool,
-        budget: &mut SearchBudget,
-    ) -> Result<(), CommandError> {
-        if self.emitted >= self.max_elements || budget.exhausted() {
-            return Ok(());
-        }
-
-        if !budget.visit_soft() {
-            return Ok(());
-        }
-
-        let control_type = element_control_type(element)
-            .map_err(|error| map_uia_error(error, "snapshot_failed"))?;
-
-        if should_skip_control(control_type) {
-            return Ok(());
-        }
-
-        let collapse = !force_children && should_collapse_control(control_type, depth);
-        if is_interactive_or_named(element, control_type)? || collapse {
-            self.next_index += 1;
-            let reference = make_reference(self.next_index, self.generation, self.hwnd);
-            let runtime_id = element_runtime_id(element)
-                .map_err(|error| map_uia_error(error, "snapshot_failed"))?;
-            let (name, role) = element_storage_hints(element);
-            self.store.store_element(
-                self.hwnd,
-                self.generation,
-                reference.clone(),
-                runtime_id,
-                self.process_id,
-                name,
-                role,
-            );
-            self.lines
-                .push(format_element_line(element, depth, &reference)?);
-            self.emitted += 1;
-        }
-
-        if collapse || depth >= max_depth || self.emitted >= self.max_elements {
-            return Ok(());
-        }
-
-        let walker = &session.control_walker;
-        let mut child = walker
-            .get_first_child_build_cache(element, &session.cache_request)
-            .ok();
-        let mut sibling_count = 0u32;
-        while let Some(current) = child {
-            if self.emitted >= self.max_elements || budget.exhausted() {
-                self.lines.push(format!(
-                    "{:indent$}+more elements omitted",
-                    "",
-                    indent = depth as usize + 1
-                ));
-                break;
-            }
-            self.walk(session, &current, depth + 1, max_depth, false, budget)?;
-            sibling_count += 1;
-            if sibling_count >= MAX_SIBLING_REPEAT {
-                self.lines.push(format!(
-                    "{:indent$}+more siblings like this",
-                    "",
-                    indent = depth as usize + 1
-                ));
-                break;
-            }
-            child = walker
-                .get_next_sibling_build_cache(&current, &session.cache_request)
-                .ok();
-        }
-
-        Ok(())
-    }
-}
-
-struct ElementFinder<'a> {
-    name_filter: &'a str,
-    role_filter: Option<ControlType>,
-    matches: Vec<UIElement>,
-}
-
-impl<'a> ElementFinder<'a> {
-    fn new(name_filter: &'a str, role_filter: Option<ControlType>) -> Self {
-        Self {
-            name_filter,
-            role_filter,
-            matches: Vec::new(),
-        }
-    }
-
-    fn search(
-        &mut self,
-        session: &UiaSession,
-        element: &UIElement,
-        depth: u32,
-        max_depth: u32,
-        budget: &mut SearchBudget,
-    ) -> Result<(), CommandError> {
-        if self.matches.len() >= MAX_FIND_CANDIDATES || budget.exhausted() {
-            return Ok(());
-        }
-
-        if !budget.visit_soft() {
-            return Ok(());
-        }
-
-        let control_type =
-            element_control_type(element).map_err(|error| map_uia_error(error, "find_failed"))?;
-
-        if should_skip_control(control_type) {
-            return Ok(());
-        }
-
-        if element_matches(element, control_type, self.name_filter, self.role_filter)? {
-            self.matches.push(element.clone());
-            if self.matches.len() >= MAX_FIND_CANDIDATES {
-                return Ok(());
-            }
-        }
-
-        if should_collapse_control(control_type, depth) || depth >= max_depth {
-            return Ok(());
-        }
-
-        let walker = &session.control_walker;
-        let mut child = walker
-            .get_first_child_build_cache(element, &session.cache_request)
-            .ok();
-        let mut sibling_count = 0u32;
-        while let Some(current) = child {
-            if self.matches.len() >= MAX_FIND_CANDIDATES || budget.exhausted() {
-                break;
-            }
-            self.search(session, &current, depth + 1, max_depth, budget)?;
-            sibling_count += 1;
-            if sibling_count >= FIND_MAX_SIBLING_REPEAT {
-                break;
-            }
-            child = walker
-                .get_next_sibling_build_cache(&current, &session.cache_request)
-                .ok();
-        }
-
-        Ok(())
-    }
-}
-
-fn element_matches(
-    element: &UIElement,
-    control_type: ControlType,
-    name_filter: &str,
-    role_filter: Option<ControlType>,
-) -> Result<bool, CommandError> {
-    if let Some(role) = role_filter {
-        if control_type != role {
-            return Ok(false);
-        }
-    }
-
-    let name = element_name(element).to_ascii_lowercase();
-    Ok(name.contains(name_filter))
-}
-
-fn format_element_line(
-    element: &UIElement,
-    depth: u32,
-    reference: &str,
-) -> Result<String, CommandError> {
-    let role = element_control_type(element)
-        .map(|control_type| control_type.to_string())
-        .unwrap_or_else(|_| "unknown".to_string());
-    let name = element_name(element).replace('"', "'");
-    let mut state: Vec<String> = Vec::new();
-    if element_is_enabled(element) == Some(false) {
-        state.push("disabled".to_string());
-    }
-    if element_is_offscreen(element) == Some(true) {
-        state.push("offscreen".to_string());
-    }
-    if let Some(value_text) = element_value_text(element) {
-        if is_useful_value(&value_text) {
-            state.push(format!("value=\"{}\"", value_text.replace('"', "'")));
-        }
-    }
-
-    let state_suffix = if state.is_empty() {
-        String::new()
-    } else {
-        format!(" [{}]", state.join(", "))
-    };
-
-    Ok(format!(
-        "{:indent$}{reference} {role} \"{name}\"{state_suffix}",
-        "",
-        indent = depth as usize * 2
-    ))
-}
-
-fn element_storage_hints(element: &UIElement) -> (String, Option<String>) {
-    let name = element_name(element);
-    let role = element_control_type(element)
-        .ok()
-        .map(|control_type| control_type.to_string());
-    (name, role)
-}
-
 fn element_name(element: &UIElement) -> String {
     element
         .get_cached_name()
         .or_else(|_| element.get_name())
+        .unwrap_or_default()
+}
+
+fn element_automation_id(element: &UIElement) -> String {
+    element
+        .get_cached_automation_id()
+        .or_else(|_| element.get_automation_id())
         .unwrap_or_default()
 }
 
@@ -1245,6 +1666,19 @@ fn element_value_text(element: &UIElement) -> Option<String> {
         .or_else(|_| element.get_property_value(UIProperty::ValueValue))
         .ok()
         .map(|value| value.to_string())
+}
+
+fn element_rect(element: &UIElement) -> Option<(i32, i32, i32, i32)> {
+    let rect = element
+        .get_cached_bounding_rectangle()
+        .or_else(|_| element.get_bounding_rectangle())
+        .ok()?;
+    Some((
+        rect.get_left(),
+        rect.get_top(),
+        rect.get_right(),
+        rect.get_bottom(),
+    ))
 }
 
 fn element_runtime_id(element: &UIElement) -> Result<Vec<i32>, uiautomation::Error> {
@@ -1322,51 +1756,153 @@ fn resolve_stored_element_once(
     let handle = hwnd_from_i64(stored.hwnd)?;
     let root = session
         .automation
-        .element_from_handle_build_cache(handle, &session.cache_request)
+        .element_from_handle_build_cache(handle, &session.live_cache)
         .map_err(|error| map_uia_error(error, "resolve_failed"))?;
 
     if let Some(element) = find_by_runtime_id(session, &root, &stored.runtime_id)? {
         return Ok((element, ResolveStats { nodes_visited: 1 }));
     }
 
-    if !stored.name.trim().is_empty() {
-        if let Some(element) = resolve_element_by_hints(session, stored, &root) {
-            return Ok((element, ResolveStats { nodes_visited: 0 }));
-        }
-    }
-
-    Err(CommandError::new(
-        "stale_reference",
-        "Element no longer exists in the target window; take a new snapshot or find_element call",
-    ))
+    resolve_element_by_fingerprint(session, stored, &root)
 }
 
-fn resolve_element_by_hints(
+fn resolve_element_by_fingerprint(
     session: &UiaSession,
     stored: &StoredElement,
     window: &UIElement,
-) -> Option<UIElement> {
-    let search_root = find_web_search_root(session, window);
-    for mode in [UIMatcherMode::Control, UIMatcherMode::Content] {
-        let mut matcher = session
+) -> Result<(UIElement, ResolveStats), CommandError> {
+    if stored.name.trim().is_empty() && stored.automation_id.is_empty() {
+        return Err(CommandError::new(
+            "stale_reference",
+            "Element no longer exists in the target window; take a new snapshot or find_element call",
+        ));
+    }
+
+    let condition = if !stored.automation_id.is_empty() {
+        session
             .automation
-            .create_matcher()
-            .from(search_root.clone())
-            .match_name(stored.name.trim())
-            .mode(mode)
-            .depth(FIND_MATCHER_MAX_DEPTH)
-            .timeout(2_000)
-            .interval(100);
+            .create_property_condition(
+                UIProperty::AutomationId,
+                Variant::from(stored.automation_id.as_str()),
+                None,
+            )
+            .map_err(|error| map_uia_error(error, "resolve_failed"))?
+    } else if let Some(role) = stored.role.as_deref().and_then(parse_role_label) {
+        session
+            .automation
+            .create_property_condition(UIProperty::ControlType, Variant::from(role as i32), None)
+            .map_err(|error| map_uia_error(error, "resolve_failed"))?
+    } else {
+        session
+            .automation
+            .create_true_condition()
+            .map_err(|error| map_uia_error(error, "resolve_failed"))?
+    };
 
-        if let Some(role) = stored.role.as_deref().and_then(parse_role_label) {
-            matcher = matcher.control_type(role);
-        }
+    let candidates = match window.find_all_build_cache(
+        TreeScope::Descendants,
+        &condition,
+        &session.live_cache,
+    ) {
+        Ok(elements) => elements,
+        Err(error) if error.code() == ERR_NOTFOUND => Vec::new(),
+        Err(error) => return Err(map_uia_error(error, "resolve_failed")),
+    };
 
-        if let Ok(element) = matcher.find_first() {
-            return Some(element);
+    let mut scored: Vec<(i32, UIElement)> = Vec::new();
+    for element in candidates {
+        let score = fingerprint_score(stored, &element);
+        if score > 0 {
+            scored.push((score, element));
         }
     }
-    None
+    scored.sort_by(|a, b| b.0.cmp(&a.0));
+
+    match scored.as_slice() {
+        [] => Err(CommandError::new(
+            "stale_reference",
+            "Element no longer exists in the target window; take a new snapshot or find_element call",
+        )),
+        [(_best_score, element)] => Ok((
+            element.clone(),
+            ResolveStats {
+                nodes_visited: 1,
+            },
+        )),
+        [(best_score, element), (second, _), ..] if *best_score > *second => Ok((
+            element.clone(),
+            ResolveStats {
+                nodes_visited: 1,
+            },
+        )),
+        _ => Err(CommandError::new(
+            "ambiguous_reference",
+            "Multiple elements match the stored fingerprint; take a new snapshot",
+        )),
+    }
+}
+
+fn fingerprint_score(stored: &StoredElement, element: &UIElement) -> i32 {
+    let mut score = 0i32;
+    let name = element_name(element);
+    let automation_id = element_automation_id(element);
+    let role = element_control_type(element).ok().map(|c| c.to_string());
+    let rect = element_rect(element);
+
+    if !stored.automation_id.is_empty() && stored.automation_id == automation_id {
+        score += 100;
+    }
+    if !stored.name.is_empty() && stored.name == name {
+        score += 40;
+    } else if !stored.name.is_empty()
+        && name
+            .to_ascii_lowercase()
+            .contains(&stored.name.to_ascii_lowercase())
+    {
+        score += 15;
+    }
+    if stored.role.is_some() && stored.role == role {
+        score += 25;
+    }
+    if let (Some(a), Some(b)) = (stored.rect, rect) {
+        let overlap = rect_overlap_score(a, b);
+        score += overlap;
+    }
+    if !stored.ancestor_chain.is_empty() {
+        // Weak signal: reward if any ancestor label appears in the name path — limited without tree.
+        if stored
+            .ancestor_chain
+            .iter()
+            .any(|a| a.contains(&name) && !name.is_empty())
+        {
+            score += 5;
+        }
+    }
+    score
+}
+
+fn rect_overlap_score(a: (i32, i32, i32, i32), b: (i32, i32, i32, i32)) -> i32 {
+    let (al, at, ar, ab) = a;
+    let (bl, bt, br, bb) = b;
+    let ix = (ar.min(br)).saturating_sub(al.max(bl)).max(0);
+    let iy = (ab.min(bb)).saturating_sub(at.max(bt)).max(0);
+    if ix == 0 || iy == 0 {
+        // Center distance fallback
+        let acx = (al + ar) / 2;
+        let acy = (at + ab) / 2;
+        let bcx = (bl + br) / 2;
+        let bcy = (bt + bb) / 2;
+        let dist = ((acx - bcx).abs() + (acy - bcy).abs()) as i32;
+        if dist < 20 {
+            10
+        } else if dist < 80 {
+            3
+        } else {
+            0
+        }
+    } else {
+        20
+    }
 }
 
 fn parse_role_label(role: &str) -> Option<ControlType> {
@@ -1388,7 +1924,7 @@ fn find_by_runtime_id(
         .create_property_condition(UIProperty::RuntimeId, variant, None)
         .map_err(|error| map_uia_error(error, "resolve_failed"))?;
 
-    match root.find_first_build_cache(TreeScope::Subtree, &condition, &session.cache_request) {
+    match root.find_first_build_cache(TreeScope::Subtree, &condition, &session.live_cache) {
         Ok(element) => Ok(Some(element)),
         Err(error) if error.code() == ERR_NOTFOUND => Ok(None),
         Err(error) => Err(map_uia_error(error, "resolve_failed")),
@@ -1435,17 +1971,6 @@ fn parse_role(role: &str) -> Result<ControlType, CommandError> {
     }
 }
 
-fn is_interactive_or_named(
-    element: &UIElement,
-    control_type: ControlType,
-) -> Result<bool, CommandError> {
-    if is_interactive_control(control_type) {
-        return Ok(true);
-    }
-    let name = element_name(element);
-    Ok(!name.trim().is_empty())
-}
-
 fn is_interactive_control(control_type: ControlType) -> bool {
     matches!(
         control_type,
@@ -1475,7 +2000,6 @@ fn is_useful_value(value_text: &str) -> bool {
     if value_text.is_empty() || value_text == "EMPTY" {
         return false;
     }
-    // uiautomation placeholder when ValueValue is unset
     !(value_text.starts_with("STRING(")
         || value_text.starts_with("INT(")
         || value_text.starts_with("BOOL("))
@@ -1508,6 +2032,11 @@ fn map_uia_error(error: uiautomation::Error, code: &str) -> CommandError {
         }
     }
     CommandError::new(code, error.to_string())
+}
+
+fn is_transaction_timeout(error: &uiautomation::Error) -> bool {
+    let message = error.message().to_ascii_lowercase();
+    message.contains("timeout") || message.contains("timed out")
 }
 
 fn is_transient_subscriber_error(error: &uiautomation::Error) -> bool {
@@ -1586,5 +2115,71 @@ mod tests {
         assert_eq!(parse_invoke_action("press").unwrap(), "press");
         assert_eq!(parse_invoke_action("toggle").unwrap(), "toggle");
         assert!(parse_invoke_action("click").is_err());
+    }
+
+    #[test]
+    fn find_match_tiers_are_deterministic() {
+        let records = vec![
+            (
+                0,
+                NodeRecord {
+                    parent: None,
+                    children: vec![],
+                    runtime_id: vec![1],
+                    automation_id: String::new(),
+                    name: "Save As".to_string(),
+                    role: Some("Button".to_string()),
+                    control_type_raw: ControlType::Button as i32,
+                    enabled: true,
+                    offscreen: false,
+                    rect: None,
+                    value: None,
+                    ancestor_chain: vec![],
+                    depth: 1,
+                },
+            ),
+            (
+                1,
+                NodeRecord {
+                    parent: None,
+                    children: vec![],
+                    runtime_id: vec![2],
+                    automation_id: String::new(),
+                    name: "Save".to_string(),
+                    role: Some("Button".to_string()),
+                    control_type_raw: ControlType::Button as i32,
+                    enabled: true,
+                    offscreen: false,
+                    rect: None,
+                    value: None,
+                    ancestor_chain: vec![],
+                    depth: 1,
+                },
+            ),
+        ];
+        let (tier, matches) = select_find_matches(&records, "sav", Some(ControlType::Button));
+        assert_eq!(tier, MatchTier::SubstringRole);
+        assert_eq!(matches.len(), 2);
+
+        let (tier, matches) = select_find_matches(&records, "save", Some(ControlType::Edit));
+        assert_eq!(tier, MatchTier::NameOnly);
+        assert_eq!(matches.len(), 2);
+
+        let (tier, matches) = select_find_matches(&records, "save", Some(ControlType::Button));
+        assert_eq!(tier, MatchTier::ExactNameRole);
+        assert_eq!(matches.len(), 1);
+        assert_eq!(matches[0].1.name, "Save");
+    }
+
+    #[test]
+    fn snapshot_input_clamps_bounds() {
+        let input = SnapshotInput {
+            hwnd: 1,
+            max_depth: 100,
+            max_elements: 999,
+        }
+        .clamped();
+        assert_eq!(input.max_depth, 20);
+        assert_eq!(input.max_elements, 300);
     }
 }

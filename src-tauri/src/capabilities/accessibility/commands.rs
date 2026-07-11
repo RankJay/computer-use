@@ -45,8 +45,8 @@ pub async fn accessibility_snapshot(
         let store_for_worker = store.clone();
 
         let outcome = run(Duration::from_millis(timeout_ms), move |ctx| {
-            let session = ctx.session()?;
-            windows_impl::snapshot_impl(session, &store_for_worker, input, ctx.deadline)
+            let (session, arenas, deadline) = ctx.resources()?;
+            windows_impl::snapshot_impl(session, arenas, &store_for_worker, input, deadline)
         })
         .await;
 
@@ -99,8 +99,8 @@ pub async fn accessibility_find_element(
         let store_for_worker = store.clone();
 
         let outcome = run(Duration::from_millis(timeout_budget), move |ctx| {
-            let session = ctx.session()?;
-            windows_impl::find_element_impl(session, &store_for_worker, input, ctx.deadline)
+            let (session, _arenas, deadline) = ctx.resources()?;
+            windows_impl::find_element_impl(session, &store_for_worker, input, deadline)
         })
         .await;
 
@@ -137,8 +137,8 @@ pub async fn accessibility_expand_node(
     {
         let store = store.inner().clone();
         let outcome = run(Duration::from_millis(TIMEOUT_EXPAND_MS), move |ctx| {
-            let session = ctx.session()?;
-            windows_impl::expand_node_impl(session, &store, &reference, ctx.deadline)
+            let (session, arenas, deadline) = ctx.resources()?;
+            windows_impl::expand_node_impl(session, arenas, &store, &reference, deadline)
         })
         .await;
         return map_worker_outcome(

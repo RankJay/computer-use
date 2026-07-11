@@ -1,3 +1,4 @@
+mod arena;
 mod budget;
 mod commands;
 mod state;
