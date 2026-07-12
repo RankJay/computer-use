@@ -15,6 +15,7 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<HomePage />} />
+          <Route path="/chat/:chatId" element={<HomePage />} />
           <Route
             path="/settings"
             element={

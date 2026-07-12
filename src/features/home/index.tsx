@@ -13,6 +13,7 @@ import {
   useAgentTranscript,
   type AgentSessionControls,
 } from "./hooks/use-agent-session";
+import { useChatPersistence } from "./hooks/use-chat-persistence";
 import { SessionStatusBar } from "./SessionStatusBar";
 
 const HomeComposer = memo(function HomeComposer({
@@ -62,8 +63,9 @@ const HomeChatComposer = memo(function HomeChatComposer({
   );
 });
 
-function HomePageInner(): ReactElement {
+function HomePageInner({ chatId }: { readonly chatId: string | undefined }): ReactElement {
   const store = useAgentSessionStore();
+  useChatPersistence(store, chatId);
   const { rows, streamingMessageId, pendingPermissions } = useAgentTranscript(store);
   const controls = useAgentSessionControls(store);
 
@@ -103,10 +105,10 @@ function HomePageInner(): ReactElement {
   );
 }
 
-export function HomePageContent(): ReactElement {
+export function HomePageContent({ chatId }: { readonly chatId?: string }): ReactElement {
   return (
     <Suspense fallback={null}>
-      <HomePageInner />
+      <HomePageInner chatId={chatId} />
     </Suspense>
   );
 }
