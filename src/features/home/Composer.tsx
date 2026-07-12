@@ -1,3 +1,4 @@
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { ArrowUp, RotateCcw, Square } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { ChangeEvent, KeyboardEvent, ReactElement, SubmitEvent } from "react";
@@ -20,7 +21,9 @@ import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -45,9 +48,20 @@ export function TaskPromptComposer(props: TaskPromptComposerProps): ReactElement
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [canSubmit, setCanSubmit] = useState(false);
   const models = getAvailableAgentModels();
+  const anthropicModels = models.filter((model) => model.provider === "Anthropic");
+  const openAiModels = models.filter((model) => model.provider === "OpenAI");
 
   useEffect(() => {
-    textareaRef.current?.focus();
+    const focus = () => textareaRef.current?.focus();
+    focus();
+
+    const listening = getCurrentWindow().onFocusChanged(({ payload: focused }) => {
+      if (focused) focus();
+    });
+
+    return () => {
+      void listening.then((unlisten) => unlisten());
+    };
   }, []);
 
   function readPrompt(): string {
@@ -114,20 +128,36 @@ export function TaskPromptComposer(props: TaskPromptComposerProps): ReactElement
             <SelectValue />
           </SelectTrigger>
           <SelectContent align="start" className="p-0.5 w-52! bg-[#161616] text-[#CDCDCD]">
-            {models.map((model) => (
-              <SelectItem
-                key={model.id}
-                value={model.id}
-                className="flex gap-2 items-center w-full"
-              >
-                {model.provider === "Anthropic" ? (
+            <SelectGroup className="p-0">
+              <SelectLabel className="px-1.5 py-1 text-[10px] font-medium tracking-wide text-[#767676]">
+                Anthropic
+              </SelectLabel>
+              {anthropicModels.map((model) => (
+                <SelectItem
+                  key={model.id}
+                  value={model.id}
+                  className="flex gap-2 items-center w-full"
+                >
                   <Anthropic className="size-3 flex self-center items-center" />
-                ) : (
+                  <span>{model.name}</span>
+                </SelectItem>
+              ))}
+            </SelectGroup>
+            <SelectGroup className="p-0">
+              <SelectLabel className="px-1.5 py-1 text-[10px] font-medium tracking-wide text-[#767676]">
+                OpenAI
+              </SelectLabel>
+              {openAiModels.map((model) => (
+                <SelectItem
+                  key={model.id}
+                  value={model.id}
+                  className="flex gap-2 items-center w-full"
+                >
                   <OpenAI className="size-3 flex self-center items-center" />
-                )}
-                <span>{model.name}</span>
-              </SelectItem>
-            ))}
+                  <span>{model.name}</span>
+                </SelectItem>
+              ))}
+            </SelectGroup>
           </SelectContent>
         </Select>
 

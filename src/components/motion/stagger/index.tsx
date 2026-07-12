@@ -18,14 +18,14 @@ const item: Variants = {
   hidden: {
     opacity: 0,
     transform: "translateY(12px) scale(0.98)",
-    filter: "blur(2px)",
+    filter: "blur(6px)",
   },
   show: {
     opacity: 1,
     transform: "translateY(0px) scale(1)",
     filter: "blur(0px)",
     transition: {
-      duration: 0.22,
+      duration: 0.42,
       ease: easeOut,
     },
   },

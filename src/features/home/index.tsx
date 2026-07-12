@@ -1,5 +1,6 @@
 ﻿import { Suspense, memo, useCallback, useEffect, type ReactElement } from "react";
 
+import { Container, Item } from "@/components/motion/stagger";
 import { signalAppReady } from "@/lib/app-ready";
 import type { PermissionDecision } from "@/lib/session";
 
@@ -83,13 +84,24 @@ function HomePageInner(): ReactElement {
       <div>
         <HomePageHeader />
       </div>
-      <AgentTranscript
-        rows={rows}
-        streamingMessageId={streamingMessageId}
-        pendingPermissions={pendingPermissions}
-        permissionMode={controls.permissionMode}
-        onResolvePermission={onResolvePermission}
-      />
+      {rows.length === 0 ? (
+        <Container className="flex min-h-0 flex-1 flex-col justify-center px-4">
+          <Item className="text-[22px] font-[445] text-foreground">
+            Welcome to Actuate
+          </Item>
+          <Item className="text-muted-foreground text-xl">
+            Ready to run your errands?
+          </Item>
+        </Container>
+      ) : (
+        <AgentTranscript
+          rows={rows}
+          streamingMessageId={streamingMessageId}
+          pendingPermissions={pendingPermissions}
+          permissionMode={controls.permissionMode}
+          onResolvePermission={onResolvePermission}
+        />
+      )}
       <HomeChatComposer controls={controls} />
     </div>
   );
