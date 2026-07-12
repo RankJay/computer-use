@@ -2,6 +2,7 @@ use tauri::Manager;
 
 mod capabilities;
 mod commands;
+mod db;
 
 pub use capabilities::{
     accessibility_click, accessibility_element_at_point, accessibility_find_element,
@@ -131,6 +132,11 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
+        .plugin(
+            tauri_plugin_sql::Builder::default()
+                .add_migrations("sqlite:chats.db", db::migrations())
+                .build(),
+        )
         .invoke_handler(tauri::generate_handler![
             commands::maintenance::open_logs_folder,
             commands::maintenance::clear_logs,

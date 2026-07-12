@@ -7,10 +7,7 @@ import { createContext, useContext, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { Progress } from "@/components/ui/progress";
-import {
-  estimateUsageCostUsd,
-  type UsageCostBreakdown,
-} from "@/lib/agent/mode-usage";
+import { estimateUsageCostUsd, type UsageCostBreakdown } from "@/lib/agent/mode-usage";
 import { cn } from "@/lib/utils";
 
 const PERCENT_MAX = 100;
@@ -59,8 +56,7 @@ const useContextValue = () => {
   return context;
 };
 
-export type ContextProps = ComponentProps<typeof HoverCard> &
-  Omit<ContextSchema, "costs">;
+export type ContextProps = ComponentProps<typeof HoverCard> & Omit<ContextSchema, "costs">;
 
 export const Context = ({ usedTokens, maxTokens, usage, modelId, ...props }: ContextProps) => {
   const inputTokens = usage?.inputTokens ?? 0;

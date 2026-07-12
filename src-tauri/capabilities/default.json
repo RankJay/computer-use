@@ -12,6 +12,7 @@
     "stronghold:default",
     "dialog:default",
     "notification:default",
+    "sql:default",
     {
       "identifier": "http:default",
       "allow": [

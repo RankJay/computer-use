@@ -86,12 +86,8 @@ function HomePageInner(): ReactElement {
       </div>
       {rows.length === 0 ? (
         <Container className="flex min-h-0 flex-1 flex-col justify-center px-4">
-          <Item className="text-[22px] font-[445] text-foreground">
-            Welcome to Actuate
-          </Item>
-          <Item className="text-muted-foreground text-xl">
-            Ready to run your errands?
-          </Item>
+          <Item className="text-[22px] font-[445] text-foreground">Welcome to Actuate</Item>
+          <Item className="text-muted-foreground text-xl">Ready to run your errands?</Item>
         </Container>
       ) : (
         <AgentTranscript
