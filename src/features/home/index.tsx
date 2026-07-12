@@ -84,7 +84,7 @@ function HomePageInner({ chatId }: { readonly chatId: string | undefined }): Rea
   return (
     <div className="flex flex-col h-full w-full gap-0 overflow-hidden box-border overscroll-contain">
       <div>
-        <HomePageHeader />
+        <HomePageHeader navDisabled={controls.inputDisabled} />
       </div>
       {rows.length === 0 ? (
         <Container className="flex min-h-0 flex-1 flex-col justify-center px-4">
