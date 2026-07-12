@@ -37,6 +37,16 @@ export function createFoldState(
   };
 }
 
+/** Seed fold state from persisted messages — bypasses the RuntimeEvent log. */
+export function foldStateFromMessages(messages: readonly UIMessage[]): FoldState {
+  const rows: AgentMessageRowData[] = messages.map((message) => ({
+    type: "message",
+    id: message.id,
+    message,
+  }));
+  return createFoldState({ ...createEmptySessionProjection(), rows, chatMessages: [...messages] });
+}
+
 function findRowIndex(rows: readonly AgentTranscriptRow[], id: string): number {
   return rows.findIndex((row) => row.id === id);
 }

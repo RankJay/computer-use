@@ -1,3 +1,5 @@
+import type { UIMessage } from "ai";
+
 import {
   createRunController,
   type PermissionDecision,
@@ -10,7 +12,13 @@ import {
   type RuntimeEvent,
   type RuntimeEventPayload,
 } from "./events";
-import { createFoldState, reduceSession, toProjection, type FoldState } from "./project-session";
+import {
+  createFoldState,
+  foldStateFromMessages,
+  reduceSession,
+  toProjection,
+  type FoldState,
+} from "./project-session";
 import { createEmptySessionProjection, type SessionProjection } from "./projection";
 
 export type SessionEngineListener = () => void;
@@ -22,6 +30,8 @@ export type SessionEngine = {
   subscribe: (listener: SessionEngineListener) => () => void;
   /** Cancel any in-flight run, then clear projection and event log. */
   reset: () => Promise<void>;
+  /** Replace fold/projection from stored messages. Does not touch eventLog. */
+  hydrate: (messages: readonly UIMessage[]) => void;
   start: (config: RunConfig) => Promise<void>;
   cancel: () => Promise<void>;
   resolvePermission: (
@@ -108,6 +118,11 @@ export function createSessionEngine(deps: SessionEngineDeps): SessionEngine {
       eventLog = [];
       eventSeq = 0;
       activeTaskId = null;
+      notify();
+    },
+    hydrate(messages) {
+      fold = foldStateFromMessages(messages);
+      projection = toProjection(fold);
       notify();
     },
     beginTask(taskId) {

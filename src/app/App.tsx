@@ -2,7 +2,6 @@ import { lazy, Suspense } from "react";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 
 import { RouteErrorBoundary } from "@/components/boundaries/ErrorBoundary";
-import { SettingsPageSkeleton } from "@/features/settings/SettingsPageSkeleton";
 
 import HistoryPage from "./pages/history";
 import HomePage from "./pages/home";

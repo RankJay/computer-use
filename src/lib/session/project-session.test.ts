@@ -5,7 +5,13 @@ import {
   type RuntimeEvent,
   type RuntimeEventPayload,
 } from "./events";
-import { createFoldState, projectSession, reduceSession, toProjection } from "./project-session";
+import {
+  createFoldState,
+  foldStateFromMessages,
+  projectSession,
+  reduceSession,
+  toProjection,
+} from "./project-session";
 
 const TASK_ID = "task-1";
 
@@ -282,5 +288,31 @@ describe("project-session", () => {
     expect(projection.status).toBe("failed");
     expect(projection.failure?.recoverable).toBe(true);
     expect(projection.failure?.code).toBe("budget_exceeded");
+  });
+
+  test("foldStateFromMessages seeds rows and chatMessages without events", () => {
+    const messages = [
+      {
+        id: "u1",
+        role: "user" as const,
+        parts: [{ type: "text" as const, text: "hello" }],
+      },
+      {
+        id: "a1",
+        role: "assistant" as const,
+        parts: [{ type: "text" as const, text: "hi" }],
+      },
+    ];
+
+    const fold = foldStateFromMessages(messages);
+    const projection = toProjection(fold);
+
+    expect(fold.status).toBe("idle");
+    expect(fold.seenEventIds.size).toBe(0);
+    expect(projection.rows).toEqual([
+      { type: "message", id: "u1", message: messages[0] },
+      { type: "message", id: "a1", message: messages[1] },
+    ]);
+    expect(projection.chatMessages).toEqual(messages);
   });
 });

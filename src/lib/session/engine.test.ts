@@ -161,6 +161,41 @@ describe("SessionEngine", () => {
     expect(count).toBe(2);
   });
 
+  test("hydrate seeds projection from messages without touching eventLog", () => {
+    const engine = createSessionEngine({ produceRun: async () => {} });
+    engine.beginTask("task-pre");
+    engine.append({
+      type: "task.started",
+      prompt: "prior",
+      modelId: "openai/gpt-5.4",
+      agentMode: "demo",
+    });
+    const priorLog = engine.getEventLog();
+    expect(priorLog).toHaveLength(1);
+
+    let notified = 0;
+    engine.subscribe(() => {
+      notified += 1;
+    });
+
+    const messages = [
+      {
+        id: "u1",
+        role: "user" as const,
+        parts: [{ type: "text" as const, text: "resume me" }],
+      },
+    ];
+    engine.hydrate(messages);
+
+    expect(notified).toBe(1);
+    expect(engine.getEventLog()).toEqual(priorLog);
+    expect(engine.getProjection().status).toBe("idle");
+    expect(engine.getProjection().chatMessages).toEqual(messages);
+    expect(engine.getProjection().rows).toEqual([
+      { type: "message", id: "u1", message: messages[0] },
+    ]);
+  });
+
   test("two producers with same payloads yield identical projections", async () => {
     const payloads = createDemoPayloads("Same");
 

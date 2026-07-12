@@ -32,6 +32,7 @@ export {
 
 export {
   createFoldState,
+  foldStateFromMessages,
   reduceSession,
   projectSession,
   toProjection,
