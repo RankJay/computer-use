@@ -1,7 +1,9 @@
+import HistoryPageContent from "@/features/history";
+
 export default function HistoryPage() {
   return (
-    <div>
-      <h1>History</h1>
-    </div>
+    <main className="flex h-screen w-screen flex-col items-center justify-start bg-background text-white shadow-none ring-0">
+      <HistoryPageContent />
+    </main>
   );
 }

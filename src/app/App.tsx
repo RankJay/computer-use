@@ -3,10 +3,10 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 
 import { RouteErrorBoundary } from "@/components/boundaries/ErrorBoundary";
 
-import HistoryPage from "./pages/history";
 import HomePage from "./pages/home";
 import { AppQueryProvider } from "./providers/QueryProvider";
 
+const HistoryPage = lazy(() => import("./pages/history"));
 const SettingsPage = lazy(() => import("./pages/settings"));
 
 function App() {
@@ -26,7 +26,16 @@ function App() {
               </RouteErrorBoundary>
             }
           />
-          <Route path="/history" element={<HistoryPage />} />
+          <Route
+            path="/history"
+            element={
+              <RouteErrorBoundary>
+                <Suspense>
+                  <HistoryPage />
+                </Suspense>
+              </RouteErrorBoundary>
+            }
+          />
         </Routes>
       </BrowserRouter>
     </AppQueryProvider>
