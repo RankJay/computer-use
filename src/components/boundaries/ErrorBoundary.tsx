@@ -15,17 +15,44 @@ type ErrorBoundaryProps = {
 
 type ErrorBoundaryState = {
   error: Error | null;
+  resetKeys: readonly unknown[] | undefined;
 };
 
 function errorMessage(error: Error): string {
   return error.message.trim().length > 0 ? error.message : "An unexpected error occurred.";
 }
 
-export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  state: ErrorBoundaryState = { error: null };
+function resetKeysChanged(
+  prev: readonly unknown[] | undefined,
+  next: readonly unknown[] | undefined,
+): boolean {
+  if (prev === next) {
+    return false;
+  }
+  if (prev === undefined || next === undefined) {
+    return prev !== next;
+  }
+  return prev.length !== next.length || next.some((key, index) => key !== prev[index]);
+}
 
-  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  state: ErrorBoundaryState = { error: null, resetKeys: undefined };
+
+  static getDerivedStateFromError(error: Error): Partial<ErrorBoundaryState> {
     return { error };
+  }
+
+  static getDerivedStateFromProps(
+    props: ErrorBoundaryProps,
+    state: ErrorBoundaryState,
+  ): Partial<ErrorBoundaryState> | null {
+    if (!resetKeysChanged(state.resetKeys, props.resetKeys)) {
+      return null;
+    }
+    if (state.error !== null) {
+      return { error: null, resetKeys: props.resetKeys };
+    }
+    return { resetKeys: props.resetKeys };
   }
 
   componentDidCatch(error: Error, info: ErrorInfo): void {
@@ -33,22 +60,6 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
       description: errorMessage(error),
     });
     console.error("[ErrorBoundary]", error, info.componentStack);
-  }
-
-  componentDidUpdate(prevProps: ErrorBoundaryProps): void {
-    const { resetKeys } = this.props;
-    if (this.state.error === null || resetKeys === undefined) {
-      return;
-    }
-
-    const prevKeys = prevProps.resetKeys ?? [];
-    const keysChanged =
-      resetKeys.length !== prevKeys.length ||
-      resetKeys.some((key, index) => key !== prevKeys[index]);
-
-    if (keysChanged) {
-      this.setState({ error: null });
-    }
   }
 
   private handleRetry = (): void => {

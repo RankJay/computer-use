@@ -73,7 +73,7 @@ function HomePageInner({ chatId }: { readonly chatId: string | undefined }): Rea
     (callId: string, decision: PermissionDecision, persist?: boolean) => {
       void controls.resolvePermission(callId, decision, persist);
     },
-    [controls.resolvePermission],
+    [controls],
   );
 
   // Settings (incl. model id) are loaded before this mounts; reveal window after paint.

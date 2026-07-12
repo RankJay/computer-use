@@ -32,9 +32,11 @@ export type ToolPartProps = {
   ) => void;
 };
 
+const EMPTY_PENDING_PERMISSIONS: readonly PendingPermission[] = [];
+
 export const ToolPart = memo(function ToolPart({
   part,
-  pendingPermissions = [],
+  pendingPermissions = EMPTY_PENDING_PERMISSIONS,
   permissionMode = "risky",
   onResolvePermission,
 }: ToolPartProps): ReactElement {

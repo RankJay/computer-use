@@ -140,8 +140,11 @@ export function useAgentSessionStore(): BatchedEngine {
   }
 
   useEffect(() => {
-    const { engine } = storeRef.current!;
-    setActiveSessionEngine(engine);
+    const store = storeRef.current;
+    if (store === null) {
+      return;
+    }
+    setActiveSessionEngine(store.engine);
     return () => {
       setActiveSessionEngine(null);
     };

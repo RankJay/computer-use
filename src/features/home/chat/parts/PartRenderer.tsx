@@ -101,7 +101,7 @@ function renderMessageParts(
       elements.push(
         <ReasoningPart
           key={`reasoning-${startIndex}`}
-          text={reasoningParts.map((part) => part.text).join("\n\n")}
+          text={reasoningParts.map((reasoningPart) => reasoningPart.text).join("\n\n")}
           isStreaming={isStreaming && last?.state === "streaming"}
         />,
       );

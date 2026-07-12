@@ -39,7 +39,9 @@
     ".vscode/**",
     ".idea/**",
     "public/browser-samples/**",
-    "*.min.*"
+    "*.min.*",
+    "src/components/ai-elements/**",
+    "src/components/ui/**"
   ],
 
   "options": {
@@ -132,13 +134,28 @@
         "es2020": true
       },
       "rules": {
+        "no-console": "off",
+        "no-await-in-loop": "off",
+        "typescript/no-non-null-assertion": "off",
+        "unicorn/consistent-function-scoping": "off",
+        "promise/no-multiple-resolved": "off"
+      }
+    },
+    {
+      "files": [
+        "src/components/boundaries/ErrorBoundary.tsx"
+      ],
+      "rules": {
         "no-console": "off"
       }
     },
     {
-      "files": ["src/components/ui/**/*.{ts,tsx}"],
+      "files": [
+        "src/lib/session/producers/demo-replay.ts",
+        "src/lib/session/fixtures/demo-payloads.ts"
+      ],
       "rules": {
-        "react/no-array-index-key": "off"
+        "no-await-in-loop": "off"
       }
     }
   ]

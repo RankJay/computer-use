@@ -22,7 +22,7 @@ export const accessibilitySnapshotInputSchema = z
       .optional()
       .describe("Maximum interactive elements to include"),
   })
-  .refine((value) => value.hwnd != null || value.reference != null, {
+  .refine((value) => value.hwnd !== undefined || value.reference !== undefined, {
     message: "Provide hwnd and/or reference",
   });
 

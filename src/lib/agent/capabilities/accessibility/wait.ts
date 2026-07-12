@@ -24,10 +24,10 @@ export const accessibilityWaitInputSchema = z
   })
   .refine(
     (value) =>
-      value.name != null ||
-      value.nameContains != null ||
-      value.automationId != null ||
-      value.role != null,
+      value.name !== undefined ||
+      value.nameContains !== undefined ||
+      value.automationId !== undefined ||
+      value.role !== undefined,
     { message: "Provide at least one of name, nameContains, automationId, or role" },
   );
 

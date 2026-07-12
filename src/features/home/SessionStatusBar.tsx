@@ -26,9 +26,8 @@ export function SessionStatusBar({
   return (
     <div className="flex flex-col gap-1.5 pb-0 pt-1">
       {showBanner ? (
-        <div
-          className="rounded-xl ring-1 ring-border/60 bg-muted/40 px-3 py-2 text-xs text-muted-foreground"
-          role="status"
+        <output
+          className="block rounded-xl ring-1 ring-border/60 bg-muted/40 px-3 py-2 text-xs text-muted-foreground"
           data-testid="multi-pending-banner"
         >
           <span className="font-medium text-foreground">
@@ -36,7 +35,7 @@ export function SessionStatusBar({
           </span>
           <span className="mx-1.5 text-border">·</span>
           <span>{capabilityNames.join(", ")}</span>
-        </div>
+        </output>
       ) : null}
       {showFailure ? (
         <div

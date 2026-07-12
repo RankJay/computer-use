@@ -10,15 +10,16 @@ import { estimateUsageCostUsd } from "@/lib/agent/mode-usage";
 
 describe("agent-models catalog", () => {
   test("every curated model has context window and pricing", () => {
-    for (const model of [
+    const models = [
       getDefaultAgentModel(),
       getAgentModel("openai/gpt-5.5"),
       getAgentModel("anthropic/claude-haiku-4-5"),
-    ]) {
-      expect(model).toBeDefined();
-      expect(model!.contextWindowTokens).toBeGreaterThan(0);
-      expect(model!.pricing.inputPerMillion).toBeGreaterThan(0);
-      expect(model!.pricing.outputPerMillion).toBeGreaterThan(0);
+    ].filter((model): model is NonNullable<typeof model> => model !== undefined);
+    expect(models).toHaveLength(3);
+    for (const model of models) {
+      expect(model.contextWindowTokens).toBeGreaterThan(0);
+      expect(model.pricing.inputPerMillion).toBeGreaterThan(0);
+      expect(model.pricing.outputPerMillion).toBeGreaterThan(0);
     }
   });
 
