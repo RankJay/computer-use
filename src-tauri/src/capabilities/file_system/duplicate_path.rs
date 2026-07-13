@@ -1,5 +1,4 @@
 use std::fs;
-use std::io::ErrorKind;
 use std::path::Path;
 
 use serde::Serialize;
@@ -31,9 +30,10 @@ fn copy_symlink(
     source_meta: &fs::Metadata,
 ) -> Result<(), CommandError> {
     let target = fs::read_link(source).map_err(|error| {
-        CommandError::new(
+        path_utils::map_fs_io_error(
+            error,
             ErrorCode::DuplicateFailed,
-            format!("Failed to read symlink target: {error}"),
+            "Failed to read symlink target",
         )
     })?;
 
@@ -41,9 +41,10 @@ fn copy_symlink(
     {
         let _ = source_meta;
         std::os::unix::fs::symlink(&target, destination).map_err(|error| {
-            CommandError::new(
+            path_utils::map_fs_io_error(
+                error,
                 ErrorCode::DuplicateFailed,
-                format!("Failed to recreate symlink: {error}"),
+                "Failed to recreate symlink",
             )
         })?;
     }
@@ -56,9 +57,10 @@ fn copy_symlink(
             std::os::windows::fs::symlink_file(&target, destination)
         };
         result.map_err(|error| {
-            CommandError::new(
+            path_utils::map_fs_io_error(
+                error,
                 ErrorCode::DuplicateFailed,
-                format!("Failed to recreate symlink: {error}"),
+                "Failed to recreate symlink",
             )
         })?;
     }
@@ -77,31 +79,31 @@ fn copy_symlink(
 
 fn copy_directory(source: &Path, destination: &Path) -> Result<(), CommandError> {
     fs::create_dir_all(destination).map_err(|error| {
-        CommandError::new(
+        path_utils::map_fs_io_error(
+            error,
             ErrorCode::DuplicateFailed,
-            format!("Failed to create destination directory: {error}"),
+            "Failed to create destination directory",
         )
     })?;
 
     for entry in fs::read_dir(source).map_err(|error| {
-        CommandError::new(
+        path_utils::map_fs_io_error(
+            error,
             ErrorCode::DuplicateFailed,
-            format!("Failed to read source directory: {error}"),
+            "Failed to read source directory",
         )
     })? {
         let entry = entry.map_err(|error| {
-            CommandError::new(
-                ErrorCode::DuplicateFailed,
-                format!("Failed to read entry: {error}"),
-            )
+            path_utils::map_fs_io_error(error, ErrorCode::DuplicateFailed, "Failed to read entry")
         })?;
         let entry_path = entry.path();
         let target_path = destination.join(entry.file_name());
 
         let metadata = fs::symlink_metadata(&entry_path).map_err(|error| {
-            CommandError::new(
+            path_utils::map_fs_io_error(
+                error,
                 ErrorCode::DuplicateFailed,
-                format!("Failed to read entry metadata: {error}"),
+                "Failed to read entry metadata",
             )
         })?;
 
@@ -111,9 +113,10 @@ fn copy_directory(source: &Path, destination: &Path) -> Result<(), CommandError>
             copy_directory(&entry_path, &target_path)?;
         } else {
             fs::copy(&entry_path, &target_path).map_err(|error| {
-                CommandError::new(
+                path_utils::map_fs_io_error(
+                    error,
                     ErrorCode::DuplicateFailed,
-                    format!("Failed to copy file: {error}"),
+                    "Failed to copy file",
                 )
             })?;
         }
@@ -132,14 +135,7 @@ pub fn duplicate_path(
     let destination = path_utils::resolve_workspace_path(&workspace_root, &to)?;
 
     let metadata = fs::symlink_metadata(&source).map_err(|error| {
-        if error.kind() == ErrorKind::NotFound {
-            CommandError::new(ErrorCode::NotFound, "Source path does not exist")
-        } else {
-            CommandError::new(
-                ErrorCode::IoError,
-                format!("Failed to read source metadata: {error}"),
-            )
-        }
+        path_utils::map_fs_io_error(error, ErrorCode::IoError, "Failed to read source metadata")
     })?;
 
     if path_utils::path_lexists(&destination) {
@@ -174,10 +170,7 @@ pub fn duplicate_path(
         }
 
         fs::copy(&source, &destination).map_err(|error| {
-            CommandError::new(
-                ErrorCode::DuplicateFailed,
-                format!("Failed to copy file: {error}"),
-            )
+            path_utils::map_fs_io_error(error, ErrorCode::DuplicateFailed, "Failed to copy file")
         })?;
     }
 

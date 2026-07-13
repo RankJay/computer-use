@@ -75,6 +75,7 @@ pub enum ErrorCode {
     NotADirectory,
     NotAFile,
     NotFound,
+    OsPermissionDenied,
     ParentMissing,
     PatchApplyFailed,
     PatchInvalidDiff,
@@ -191,6 +192,7 @@ impl ErrorCode {
             Self::NotADirectory => "not_a_directory",
             Self::NotAFile => "not_a_file",
             Self::NotFound => "not_found",
+            Self::OsPermissionDenied => "os_permission_denied",
             Self::ParentMissing => "parent_missing",
             Self::PatchApplyFailed => "patch_apply_failed",
             Self::PatchInvalidDiff => "patch_invalid_diff",
@@ -404,6 +406,10 @@ mod tests {
         assert_eq!(ErrorCode::NotADirectory.as_str(), "not_a_directory");
         assert_eq!(ErrorCode::NotAFile.as_str(), "not_a_file");
         assert_eq!(ErrorCode::NotFound.as_str(), "not_found");
+        assert_eq!(
+            ErrorCode::OsPermissionDenied.as_str(),
+            "os_permission_denied"
+        );
         assert_eq!(ErrorCode::ParentMissing.as_str(), "parent_missing");
         assert_eq!(ErrorCode::PatchApplyFailed.as_str(), "patch_apply_failed");
         assert_eq!(ErrorCode::PatchInvalidDiff.as_str(), "patch_invalid_diff");
@@ -738,6 +744,10 @@ mod tests {
         assert_eq!(
             serde_json::to_value(ErrorCode::NotFound).unwrap(),
             json!("not_found")
+        );
+        assert_eq!(
+            serde_json::to_value(ErrorCode::OsPermissionDenied).unwrap(),
+            json!("os_permission_denied")
         );
         assert_eq!(
             serde_json::to_value(ErrorCode::ParentMissing).unwrap(),

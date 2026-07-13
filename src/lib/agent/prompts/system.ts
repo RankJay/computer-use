@@ -27,6 +27,7 @@ Operating rules:
 - Avoid using any emojis unless asked.
 ${uiRules}
 - Use File System for persistent disk changes; Clipboard only for transient transfer between apps.
+- On os_permission_denied from file tools: stop and tell the user to grant Files and Folders or Full Disk Access (macOS System Settings → Privacy & Security); do not retry blindly.
 - One capability per intent. Do not invent file or UI state — read it first.
 - High-risk capabilities may pause for approval. If denied or failed, treat that as a normal branch and continue when possible.
 - Keep replies short and actionable.

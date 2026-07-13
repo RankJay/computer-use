@@ -1,5 +1,4 @@
 use std::fs;
-use std::io::ErrorKind;
 use std::path::Path;
 use std::time::SystemTime;
 
@@ -89,14 +88,7 @@ pub fn stat_path(path: String, workspace_root: String) -> Result<StatPathResult,
     let resolved = path_utils::resolve_workspace_path(&workspace_root, &path)?;
 
     let metadata = fs::symlink_metadata(&resolved).map_err(|error| {
-        if error.kind() == ErrorKind::NotFound {
-            CommandError::new(ErrorCode::NotFound, "Path does not exist")
-        } else {
-            CommandError::new(
-                ErrorCode::IoError,
-                format!("Failed to read path metadata: {error}"),
-            )
-        }
+        path_utils::map_fs_io_error(error, ErrorCode::IoError, "Failed to read path metadata")
     })?;
 
     let kind = path_kind(&metadata);
@@ -104,9 +96,10 @@ pub fn stat_path(path: String, workspace_root: String) -> Result<StatPathResult,
         Some(
             fs::read_link(&resolved)
                 .map_err(|error| {
-                    CommandError::new(
+                    path_utils::map_fs_io_error(
+                        error,
                         ErrorCode::IoError,
-                        format!("Failed to read symlink target: {error}"),
+                        "Failed to read symlink target",
                     )
                 })?
                 .to_string_lossy()
@@ -117,10 +110,7 @@ pub fn stat_path(path: String, workspace_root: String) -> Result<StatPathResult,
     };
 
     let modified_at = format_timestamp(metadata.modified().map_err(|error| {
-        CommandError::new(
-            ErrorCode::IoError,
-            format!("Failed to read modified time: {error}"),
-        )
+        path_utils::map_fs_io_error(error, ErrorCode::IoError, "Failed to read modified time")
     })?)
     .ok_or_else(|| CommandError::new(ErrorCode::IoError, "Failed to format modified timestamp"))?;
 

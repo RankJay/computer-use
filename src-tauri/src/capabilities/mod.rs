@@ -44,3 +44,4 @@ pub use window::WindowId;
 pub use window::{
     get_active_window, window_focus, window_list, window_move, window_resize, window_state,
 };
+pub use window::WindowStateOp;

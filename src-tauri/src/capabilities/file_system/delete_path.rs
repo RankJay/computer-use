@@ -1,21 +1,13 @@
 use crate::capabilities::error::{CommandError, ErrorCode};
 use crate::capabilities::path_utils;
 use std::fs;
-use std::io::ErrorKind;
 
 #[tauri::command]
 pub fn delete_path(path: String, workspace_root: String) -> Result<(), CommandError> {
     let resolved = path_utils::resolve_workspace_path(&workspace_root, &path)?;
 
     let metadata = fs::symlink_metadata(&resolved).map_err(|error| {
-        if error.kind() == ErrorKind::NotFound {
-            CommandError::new(ErrorCode::NotFound, "Path does not exist")
-        } else {
-            CommandError::new(
-                ErrorCode::IoError,
-                format!("Failed to read path metadata: {error}"),
-            )
-        }
+        path_utils::map_fs_io_error(error, ErrorCode::IoError, "Failed to read path metadata")
     })?;
 
     // Symlinks are never directories in lstat metadata on Unix; remove_file unlinks the link.
@@ -30,24 +22,23 @@ pub fn delete_path(path: String, workspace_root: String) -> Result<(), CommandEr
                 }
             })
             .map_err(|error| {
-                CommandError::new(
+                path_utils::map_fs_io_error(
+                    error,
                     ErrorCode::DeleteFailed,
-                    format!("Failed to delete symlink: {error}"),
+                    "Failed to delete symlink",
                 )
             })?;
     } else if metadata.is_dir() {
         fs::remove_dir_all(&resolved).map_err(|error| {
-            CommandError::new(
+            path_utils::map_fs_io_error(
+                error,
                 ErrorCode::DeleteFailed,
-                format!("Failed to delete directory: {error}"),
+                "Failed to delete directory",
             )
         })?;
     } else {
         fs::remove_file(&resolved).map_err(|error| {
-            CommandError::new(
-                ErrorCode::DeleteFailed,
-                format!("Failed to delete file: {error}"),
-            )
+            path_utils::map_fs_io_error(error, ErrorCode::DeleteFailed, "Failed to delete file")
         })?;
     }
 

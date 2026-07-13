@@ -14,7 +14,7 @@ mod unsupported;
 pub use commands::{
     get_active_window, window_focus, window_list, window_move, window_resize, window_state,
 };
-pub use types::WindowId;
+pub use types::{WindowId, WindowStateOp};
 
 use manager::WindowManager;
 

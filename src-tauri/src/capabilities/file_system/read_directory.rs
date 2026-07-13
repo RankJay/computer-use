@@ -1,6 +1,5 @@
 use serde::Serialize;
 use std::fs;
-use std::io::ErrorKind;
 
 use crate::capabilities::error::{CommandError, ErrorCode};
 use crate::capabilities::path_utils;
@@ -41,14 +40,7 @@ pub fn read_directory(
     let resolved = path_utils::resolve_workspace_path(&workspace_root, &path)?;
 
     let metadata = fs::symlink_metadata(&resolved).map_err(|error| {
-        if error.kind() == ErrorKind::NotFound {
-            CommandError::new(ErrorCode::NotFound, "Directory does not exist")
-        } else {
-            CommandError::new(
-                ErrorCode::IoError,
-                format!("Failed to read path metadata: {error}"),
-            )
-        }
+        path_utils::map_fs_io_error(error, ErrorCode::IoError, "Failed to read path metadata")
     })?;
 
     if metadata.is_symlink() {
@@ -69,21 +61,16 @@ pub fn read_directory(
 
     let mut entries = Vec::new();
     for entry in fs::read_dir(&resolved).map_err(|error| {
-        CommandError::new(
-            ErrorCode::ReadFailed,
-            format!("Failed to read directory: {error}"),
-        )
+        path_utils::map_fs_io_error(error, ErrorCode::ReadFailed, "Failed to read directory")
     })? {
         let entry = entry.map_err(|error| {
-            CommandError::new(
-                ErrorCode::ReadFailed,
-                format!("Failed to read entry: {error}"),
-            )
+            path_utils::map_fs_io_error(error, ErrorCode::ReadFailed, "Failed to read entry")
         })?;
         let metadata = fs::symlink_metadata(entry.path()).map_err(|error| {
-            CommandError::new(
+            path_utils::map_fs_io_error(
+                error,
                 ErrorCode::ReadFailed,
-                format!("Failed to read entry metadata: {error}"),
+                "Failed to read entry metadata",
             )
         })?;
 

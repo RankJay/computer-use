@@ -45,10 +45,7 @@ pub fn move_path(
     }
 
     fs::rename(&source, &destination).map_err(|error| {
-        CommandError::new(
-            ErrorCode::MoveFailed,
-            format!("Failed to move path: {error}"),
-        )
+        path_utils::map_fs_io_error(error, ErrorCode::MoveFailed, "Failed to move path")
     })?;
 
     Ok(MovePathResult { from, to })

@@ -14,18 +14,16 @@ pub fn write_file(
 
     if let Some(parent) = resolved.parent() {
         fs::create_dir_all(parent).map_err(|error| {
-            CommandError::new(
+            path_utils::map_fs_io_error(
+                error,
                 ErrorCode::WriteFailed,
-                format!("Failed to create directories: {error}"),
+                "Failed to create directories",
             )
         })?;
     }
 
     fs::write(&resolved, content).map_err(|error| {
-        CommandError::new(
-            ErrorCode::WriteFailed,
-            format!("Failed to write file: {error}"),
-        )
+        path_utils::map_fs_io_error(error, ErrorCode::WriteFailed, "Failed to write file")
     })?;
 
     Ok(())

@@ -57,10 +57,7 @@ pub fn patch_file(
     }
 
     let original = fs::read_to_string(&resolved).map_err(|error| {
-        CommandError::new(
-            ErrorCode::ReadFailed,
-            format!("Failed to read file: {error}"),
-        )
+        path_utils::map_fs_io_error(error, ErrorCode::ReadFailed, "Failed to read file")
     })?;
 
     let (patched, hunks_applied) =
@@ -75,9 +72,10 @@ pub fn patch_file(
     }
 
     fs::write(&resolved, patched).map_err(|error| {
-        CommandError::new(
+        path_utils::map_fs_io_error(
+            error,
             ErrorCode::WriteFailed,
-            format!("Failed to write patched file: {error}"),
+            "Failed to write patched file",
         )
     })?;
 
