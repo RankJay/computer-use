@@ -8,12 +8,13 @@ use objc2_core_graphics::{
 };
 
 use crate::capabilities::error::{CommandError, ErrorCode};
-use crate::capabilities::input::{mouse_click, mouse_scroll};
+use crate::capabilities::input::{mouse_click, mouse_scroll, synthesizer};
 use crate::capabilities::window::WindowId;
 
 use super::super::outline::{
     CT_BUTTON, CT_EDIT, CT_HYPERLINK, CT_LIST_ITEM, CT_MENU_ITEM, CT_TAB_ITEM,
 };
+use super::super::send_keys_syntax::{parse_send_keys, Segment};
 use super::super::state::SnapshotStore;
 use super::super::types::{ActionResult, GetValueResult};
 use super::resolve::resolve_stored_element;
@@ -151,12 +152,46 @@ pub(super) fn send_keys_impl(
         let _ = set_focused(&element);
     }
 
-    type_unicode(text)?;
+    play_send_keys(text)?;
     Ok(ActionResult {
         ok: true,
         method: "send_keys".to_string(),
         foregrounded,
     })
+}
+
+/// Play the agent SendKeys dialect (`^v`, `{ENTER}`, plain text, …).
+fn play_send_keys(text: &str) -> Result<(), CommandError> {
+    let segments = parse_send_keys(text)?;
+    let synth = synthesizer();
+    for segment in segments {
+        match segment {
+            Segment::Text(run) => type_unicode(&run)?,
+            Segment::Press { key, count } => {
+                synth
+                    .key_press(key, count)
+                    .map_err(|error| CommandError::new(ErrorCode::SendKeysFailed, error.message))?;
+            }
+            Segment::Chord { modifiers, keys } => {
+                for modifier in &modifiers {
+                    synth.key_down(*modifier).map_err(|error| {
+                        CommandError::new(ErrorCode::SendKeysFailed, error.message)
+                    })?;
+                }
+                for key in &keys {
+                    synth.key_press(*key, 1).map_err(|error| {
+                        CommandError::new(ErrorCode::SendKeysFailed, error.message)
+                    })?;
+                }
+                for modifier in modifiers.iter().rev() {
+                    synth.key_up(*modifier).map_err(|error| {
+                        CommandError::new(ErrorCode::SendKeysFailed, error.message)
+                    })?;
+                }
+            }
+        }
+    }
+    Ok(())
 }
 
 pub(super) fn focus_impl(
@@ -404,7 +439,9 @@ fn type_unicode(text: &str) -> Result<(), CommandError> {
 
 #[cfg(test)]
 mod tests {
+    use super::super::send_keys_syntax::{parse_send_keys, Segment};
     use super::*;
+    use crate::capabilities::input::keys::Key;
 
     #[test]
     fn parses_invoke_actions() {
@@ -418,5 +455,17 @@ mod tests {
         assert_eq!(scroll_deltas("down", "small").unwrap(), (0, -1));
         assert_eq!(scroll_deltas("up", "large").unwrap(), (0, 5));
         assert!(scroll_deltas("diagonal", "small").is_err());
+    }
+
+    #[test]
+    fn send_keys_caret_v_is_command_chord_on_macos() {
+        let segments = parse_send_keys("^v").expect("parse");
+        assert_eq!(
+            segments,
+            vec![Segment::Chord {
+                modifiers: vec![Key::Win],
+                keys: vec![Key::V],
+            }]
+        );
     }
 }

@@ -1,7 +1,7 @@
 //! Mouse and keyboard input synthesis behind [`InputSynthesizer`].
 
 mod commands;
-mod keys;
+pub(crate) mod keys;
 mod synthesizer;
 mod types;
 

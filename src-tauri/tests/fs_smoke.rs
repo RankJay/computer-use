@@ -50,11 +50,9 @@ fn symlink_stat_duplicate_delete_roundtrip() {
     let duplicated = duplicate_path("link.txt".into(), "link-copy.txt".into(), root_s.clone())
         .expect("duplicate link");
     assert_eq!(duplicated.kind, "symlink");
-    assert!(
-        fs::symlink_metadata(root.join("link-copy.txt"))
-            .expect("lstat copy")
-            .is_symlink()
-    );
+    assert!(fs::symlink_metadata(root.join("link-copy.txt"))
+        .expect("lstat copy")
+        .is_symlink());
 
     delete_path("link.txt".into(), root_s).expect("delete link");
     assert!(!fs::symlink_metadata(root.join("link.txt")).is_ok());
