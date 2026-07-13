@@ -18,7 +18,7 @@ pub use accessibility::{
     accessibility_snapshot, accessibility_wait, SnapshotStore,
 };
 
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "macos"))]
 pub use accessibility::a11y_live_smoke;
 #[cfg(all(windows, feature = "a11y-bench"))]
 pub use accessibility::bench;

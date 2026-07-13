@@ -11,7 +11,10 @@ mod worker;
 #[cfg(windows)]
 mod uia;
 
-#[cfg(not(windows))]
+#[cfg(target_os = "macos")]
+mod ax;
+
+#[cfg(not(any(windows, target_os = "macos")))]
 mod unsupported;
 
 #[cfg(test)]
@@ -20,7 +23,7 @@ mod fake;
 #[cfg(all(windows, feature = "a11y-bench"))]
 pub mod bench;
 
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "macos"))]
 pub mod live_smoke;
 
 pub use commands::{
@@ -33,7 +36,7 @@ pub use commands::{
 };
 pub use state::SnapshotStore;
 
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "macos"))]
 pub use live_smoke as a11y_live_smoke;
 
 use provider::AccessibilityProvider;
@@ -45,7 +48,12 @@ pub fn provider() -> &'static dyn AccessibilityProvider {
         static PROVIDER: uia::UiaProvider = uia::UiaProvider;
         &PROVIDER
     }
-    #[cfg(not(windows))]
+    #[cfg(target_os = "macos")]
+    {
+        static PROVIDER: ax::AxProvider = ax::AxProvider;
+        &PROVIDER
+    }
+    #[cfg(not(any(windows, target_os = "macos")))]
     {
         static PROVIDER: unsupported::UnsupportedAccessibilityProvider =
             unsupported::UnsupportedAccessibilityProvider;

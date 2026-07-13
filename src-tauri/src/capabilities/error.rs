@@ -267,7 +267,7 @@ pub struct OkResult {
 pub fn unsupported_platform(capability: &str) -> CommandError {
     CommandError::new(
         ErrorCode::UnsupportedPlatform,
-        format!("{capability} is only supported on Windows"),
+        format!("{capability} is only supported on Windows and macOS"),
     )
 }
 
@@ -893,7 +893,7 @@ mod tests {
         assert_eq!(err.code, "unsupported_platform");
         assert_eq!(
             err.message,
-            "Accessibility automation is only supported on Windows"
+            "Accessibility automation is only supported on Windows and macOS"
         );
     }
 }

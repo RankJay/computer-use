@@ -1,6 +1,6 @@
-#![cfg(windows)]
+#![cfg(any(windows, target_os = "macos"))]
 
-//! Live desktop smoke: snapshot → query → click on Notepad.
+//! Live desktop smoke: snapshot → query → click.
 //!
 //! ```text
 //! cargo test --manifest-path src-tauri/Cargo.toml --test a11y_smoke -- --ignored --nocapture
@@ -20,11 +20,21 @@ impl Drop for KillOnDrop {
     }
 }
 
-fn find_notepad_hwnd() -> Option<WindowId> {
+#[cfg(windows)]
+fn find_target_hwnd() -> Option<WindowId> {
+    find_hwnd_containing("notepad")
+}
+
+#[cfg(target_os = "macos")]
+fn find_target_hwnd() -> Option<WindowId> {
+    find_hwnd_containing("textedit")
+}
+
+fn find_hwnd_containing(needle: &str) -> Option<WindowId> {
     let list = actuate_lib::window_list().ok()?;
     for line in list.text.lines() {
         let lower = line.to_ascii_lowercase();
-        if !lower.contains("notepad") {
+        if !lower.contains(needle) {
             continue;
         }
         let id = line.split_whitespace().next()?.parse::<i64>().ok()?;
@@ -35,18 +45,36 @@ fn find_notepad_hwnd() -> Option<WindowId> {
     None
 }
 
+#[cfg(windows)]
+fn launch_exe() -> &'static str {
+    "notepad"
+}
+
+#[cfg(target_os = "macos")]
+fn launch_exe() -> &'static str {
+    "TextEdit"
+}
+
 #[test]
-#[ignore = "requires interactive Windows desktop; run with --ignored"]
-fn notepad_snapshot_query_click_smoke() {
-    let launched = actuate_lib::launch("notepad".into(), None, None, None).expect("launch");
+#[ignore = "requires interactive desktop + Accessibility on macOS; run with --ignored"]
+fn snapshot_query_click_smoke() {
+    let launched = actuate_lib::launch(launch_exe().into(), None, None, None).expect("launch");
     let _guard = KillOnDrop(Some(launched.pid));
+
+    // `open -a` ensures a visible document window even when the app was already running.
+    #[cfg(target_os = "macos")]
+    {
+        let _ = std::process::Command::new("open")
+            .args(["-a", "TextEdit"])
+            .status();
+    }
 
     let hwnd = (0..40)
         .find_map(|_| {
             std::thread::sleep(Duration::from_millis(250));
-            find_notepad_hwnd()
+            find_target_hwnd()
         })
-        .expect("notepad window hwnd");
+        .expect("target window hwnd");
 
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()

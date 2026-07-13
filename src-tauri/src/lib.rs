@@ -20,7 +20,7 @@ pub use capabilities::{
     WindowId,
 };
 
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "macos"))]
 pub use capabilities::a11y_live_smoke;
 
 #[cfg(all(windows, feature = "a11y-bench"))]
