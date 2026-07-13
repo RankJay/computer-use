@@ -398,6 +398,7 @@ fn bench_resolve(fixture: &str, hwnd: WindowId) -> BenchSummary {
             }
             #[cfg(target_os = "macos")]
             {
+                let deadline = ctx.deadline;
                 let ax = session
                     .as_any_mut()
                     .downcast_mut::<AxAccessibilitySession>()
@@ -411,6 +412,7 @@ fn bench_resolve(fixture: &str, hwnd: WindowId) -> BenchSummary {
                     &ax.inner,
                     &store_for_worker,
                     &reference_for_worker,
+                    deadline,
                 )?;
                 Ok((stats, Some(take_ax_ipc_calls())))
             }

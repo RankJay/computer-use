@@ -149,7 +149,7 @@ fn query_once(
                 "scopeReference does not belong to the provided hwnd",
             ));
         }
-        resolve_stored_element(session, &stored)?
+        resolve_stored_element(session, &stored, deadline)?
     } else {
         ax_window_for_hwnd(input.hwnd).map_err(|error| {
             if error.code == ErrorCode::AccessibilityPermissionDenied.as_str()

@@ -1,5 +1,7 @@
 //! AX actions: click, focus, set_value, send_keys, scroll, invoke.
 
+use std::time::Instant;
+
 use objc2_application_services::AXUIElement;
 use objc2_core_foundation::CFRetained;
 use objc2_core_graphics::{
@@ -28,9 +30,10 @@ pub(super) fn click_impl(
     session: &AxSession,
     store: &SnapshotStore,
     reference: &str,
+    deadline: Instant,
 ) -> Result<ActionResult, CommandError> {
     let stored = store.resolve_ref_or_stale(reference)?;
-    let element = resolve_stored_element(session, &stored)?;
+    let element = resolve_stored_element(session, &stored, deadline)?;
     let foregrounded = foreground_window(stored.hwnd)?;
     let target = resolve_click_target(&element);
     let _ = set_focused(&target);
@@ -103,9 +106,10 @@ pub(super) fn set_value_impl(
     store: &SnapshotStore,
     reference: &str,
     text: &str,
+    deadline: Instant,
 ) -> Result<ActionResult, CommandError> {
     let stored = store.resolve_ref_or_stale(reference)?;
-    let element = resolve_stored_element(session, &stored)?;
+    let element = resolve_stored_element(session, &stored, deadline)?;
     let foregrounded = foreground_window(stored.hwnd)?;
 
     if set_value_string(&element, text).is_ok() {
@@ -131,6 +135,7 @@ pub(super) fn send_keys_impl(
     hwnd: WindowId,
     text: &str,
     reference: Option<&str>,
+    deadline: Instant,
 ) -> Result<ActionResult, CommandError> {
     if text.is_empty() {
         return Err(CommandError::new(
@@ -148,7 +153,7 @@ pub(super) fn send_keys_impl(
                 "reference does not belong to the provided hwnd",
             ));
         }
-        let element = resolve_stored_element(session, &stored)?;
+        let element = resolve_stored_element(session, &stored, deadline)?;
         let _ = set_focused(&element);
     }
 
@@ -198,9 +203,10 @@ pub(super) fn focus_impl(
     session: &AxSession,
     store: &SnapshotStore,
     reference: &str,
+    deadline: Instant,
 ) -> Result<ActionResult, CommandError> {
     let stored = store.resolve_ref_or_stale(reference)?;
-    let element = resolve_stored_element(session, &stored)?;
+    let element = resolve_stored_element(session, &stored, deadline)?;
     let foregrounded = foreground_window(stored.hwnd)?;
     set_focused(&element).map_err(|error| {
         if error.code == ErrorCode::AccessibilityPermissionDenied.as_str() {
@@ -220,9 +226,10 @@ pub(super) fn get_value_impl(
     session: &AxSession,
     store: &SnapshotStore,
     reference: &str,
+    deadline: Instant,
 ) -> Result<GetValueResult, CommandError> {
     let stored = store.resolve_ref_or_stale(reference)?;
-    let element = resolve_stored_element(session, &stored)?;
+    let element = resolve_stored_element(session, &stored, deadline)?;
 
     if let Some(value) = element_value_text(&element) {
         if is_useful_value(&value) {
@@ -251,9 +258,10 @@ pub(super) fn scroll_element_impl(
     reference: &str,
     direction: &str,
     amount: &str,
+    deadline: Instant,
 ) -> Result<ActionResult, CommandError> {
     let stored = store.resolve_ref_or_stale(reference)?;
-    let element = resolve_stored_element(session, &stored)?;
+    let element = resolve_stored_element(session, &stored, deadline)?;
     let foregrounded = foreground_window(stored.hwnd)?;
 
     let (dx, dy) = scroll_deltas(direction, amount)?;
@@ -318,9 +326,10 @@ pub(super) fn right_click_element_impl(
     session: &AxSession,
     store: &SnapshotStore,
     reference: &str,
+    deadline: Instant,
 ) -> Result<ActionResult, CommandError> {
     let stored = store.resolve_ref_or_stale(reference)?;
-    let element = resolve_stored_element(session, &stored)?;
+    let element = resolve_stored_element(session, &stored, deadline)?;
     let foregrounded = foreground_window(stored.hwnd)?;
     let _ = set_focused(&element);
 
@@ -344,9 +353,10 @@ pub(super) fn invoke_action_impl(
     store: &SnapshotStore,
     reference: &str,
     action: &str,
+    deadline: Instant,
 ) -> Result<ActionResult, CommandError> {
     let stored = store.resolve_ref_or_stale(reference)?;
-    let element = resolve_stored_element(session, &stored)?;
+    let element = resolve_stored_element(session, &stored, deadline)?;
     let foregrounded = foreground_window(stored.hwnd)?;
     let method = parse_invoke_action(action)?;
 

@@ -1,7 +1,7 @@
 //! Resolve stored refs back to live AXUIElement handles.
 
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use objc2_application_services::AXUIElement;
 use objc2_core_foundation::CFRetained;
@@ -9,6 +9,7 @@ use objc2_core_foundation::CFRetained;
 use crate::capabilities::error::{CommandError, ErrorCode};
 use crate::capabilities::window::WindowId;
 
+use super::super::budget::{SearchBudget, RESOLVE_MAX_NODES};
 use super::super::outline::{format_record_line, stored_from_record};
 use super::super::state::{make_reference, SnapshotStore, StoredElement};
 use super::super::types::TextResult;
@@ -23,24 +24,28 @@ use super::tree_extract::{project_element_allow_text, walk_path};
 pub(super) fn resolve_stored_element(
     _session: &AxSession,
     stored: &StoredElement,
+    deadline: Instant,
 ) -> Result<CFRetained<AXUIElement>, CommandError> {
-    Ok(resolve_stored_element_with_stats(stored)?.0)
+    Ok(resolve_stored_element_with_stats(stored, deadline)?.0)
 }
 
 fn resolve_stored_element_with_stats(
     stored: &StoredElement,
+    deadline: Instant,
 ) -> Result<(CFRetained<AXUIElement>, ResolveStats), CommandError> {
     let mut last_error: Option<CommandError> = None;
     for attempt in 0..RESOLVE_RETRY_ATTEMPTS {
-        match resolve_stored_element_once(stored) {
+        match resolve_stored_element_once(stored, deadline) {
             Ok(result) => return Ok(result),
             Err(error)
                 if is_transient_command_error(&error) && attempt + 1 < RESOLVE_RETRY_ATTEMPTS =>
             {
+                let backoff = Duration::from_millis(TRANSIENT_AX_RETRY_MS * (attempt as u64 + 1));
+                if !backoff_fits_before_deadline(Instant::now(), deadline, backoff) {
+                    return Err(error);
+                }
                 last_error = Some(error);
-                thread::sleep(Duration::from_millis(
-                    TRANSIENT_AX_RETRY_MS * (attempt as u64 + 1),
-                ));
+                thread::sleep(backoff);
             }
             Err(error) => return Err(error),
         }
@@ -54,8 +59,14 @@ fn resolve_stored_element_with_stats(
     }))
 }
 
+/// True when sleeping `backoff` still leaves time before `deadline`.
+fn backoff_fits_before_deadline(now: Instant, deadline: Instant, backoff: Duration) -> bool {
+    now.checked_add(backoff).is_some_and(|wake| wake < deadline)
+}
+
 fn resolve_stored_element_once(
     stored: &StoredElement,
+    deadline: Instant,
 ) -> Result<(CFRetained<AXUIElement>, ResolveStats), CommandError> {
     let root = ax_window_for_hwnd(stored.hwnd).map_err(|error| {
         if error.code == ErrorCode::AccessibilityPermissionDenied.as_str()
@@ -73,12 +84,14 @@ fn resolve_stored_element_once(
         }
     }
 
-    resolve_element_by_fingerprint(stored, &root)
+    let mut budget = SearchBudget::until(deadline, RESOLVE_MAX_NODES);
+    resolve_element_by_fingerprint(stored, &root, &mut budget)
 }
 
 fn resolve_element_by_fingerprint(
     stored: &StoredElement,
     window: &AXUIElement,
+    budget: &mut SearchBudget,
 ) -> Result<(CFRetained<AXUIElement>, ResolveStats), CommandError> {
     if stored.name.trim().is_empty() && stored.automation_id.is_empty() {
         return Err(CommandError::new(
@@ -89,23 +102,30 @@ fn resolve_element_by_fingerprint(
 
     let mut scored: Vec<(i32, CFRetained<AXUIElement>)> = Vec::new();
     let mut stack = vec![CFRetained::from(window)];
-    let mut visited = 0u32;
     while let Some(element) = stack.pop() {
-        visited = visited.saturating_add(1);
-        if visited > 8_000 {
+        if !budget.visit_soft() {
             break;
         }
         let attrs = element_node_attrs(&element);
-        let score = fingerprint_score(stored, &element, &attrs);
-        if score > 0 {
-            scored.push((score, element));
+        if fingerprint_prescreen(stored, &attrs) {
+            let score = fingerprint_score_base(stored, &attrs);
+            if score > 0 {
+                scored.push((score, element));
+            }
         }
         for child in attrs.children {
             stack.push(child);
         }
     }
+
+    if !stored.ancestor_chain.is_empty() {
+        for (score, element) in &mut scored {
+            *score = score.saturating_add(ancestor_chain_bonus(stored, element));
+        }
+    }
     scored.sort_by_key(|b| std::cmp::Reverse(b.0));
 
+    let nodes_visited = budget.nodes_visited();
     match scored.as_slice() {
         [] => Err(CommandError::new(
             ErrorCode::StaleReference,
@@ -113,15 +133,11 @@ fn resolve_element_by_fingerprint(
         )),
         [(_best, element)] => Ok((
             element.clone(),
-            ResolveStats {
-                nodes_visited: visited,
-            },
+            ResolveStats { nodes_visited },
         )),
         [(best, element), (second, _), ..] if *best > *second => Ok((
             element.clone(),
-            ResolveStats {
-                nodes_visited: visited,
-            },
+            ResolveStats { nodes_visited },
         )),
         _ => Err(CommandError::new(
             ErrorCode::AmbiguousReference,
@@ -130,7 +146,33 @@ fn resolve_element_by_fingerprint(
     }
 }
 
-fn fingerprint_score(stored: &StoredElement, element: &AXUIElement, attrs: &NodeAttrs) -> i32 {
+/// Role / automation-id gate before name+rect scoring.
+///
+/// With batched [`element_node_attrs`], pruning avoids ancestor climbs (second pass)
+/// and keeps non-matching roles out of the candidate list. Automation id still wins
+/// over a role mismatch when present.
+fn fingerprint_prescreen(stored: &StoredElement, attrs: &NodeAttrs) -> bool {
+    let (_, label) = map_ax_role(&attrs.role);
+    let role_mismatch = stored
+        .role
+        .as_ref()
+        .is_some_and(|expected| expected.as_str() != label);
+
+    if role_mismatch && stored.automation_id.is_empty() {
+        return false;
+    }
+
+    if !stored.automation_id.is_empty() {
+        let id_mismatch = stored.automation_id != attrs.automation_id;
+        if id_mismatch && role_mismatch {
+            return false;
+        }
+    }
+
+    true
+}
+
+fn fingerprint_score_base(stored: &StoredElement, attrs: &NodeAttrs) -> i32 {
     let mut score = 0i32;
     let (_, label) = map_ax_role(&attrs.role);
     let role = Some(label.to_string());
@@ -154,18 +196,19 @@ fn fingerprint_score(stored: &StoredElement, element: &AXUIElement, attrs: &Node
     if let (Some(a), Some(b)) = (stored.rect, attrs.rect) {
         score += rect_overlap_score(a, b);
     }
-    if !stored.ancestor_chain.is_empty() {
-        let live_chain = collect_ancestor_labels(element, stored.ancestor_chain.len());
-        let common = stored
-            .ancestor_chain
-            .iter()
-            .rev()
-            .zip(live_chain.iter().rev())
-            .take_while(|(a, b)| a == b)
-            .count();
-        score += (common as i32) * 12;
-    }
     score
+}
+
+fn ancestor_chain_bonus(stored: &StoredElement, element: &AXUIElement) -> i32 {
+    let live_chain = collect_ancestor_labels(element, stored.ancestor_chain.len());
+    let common = stored
+        .ancestor_chain
+        .iter()
+        .rev()
+        .zip(live_chain.iter().rev())
+        .take_while(|(a, b)| a == b)
+        .count();
+    (common as i32) * 12
 }
 
 fn collect_ancestor_labels(element: &AXUIElement, max_len: usize) -> Vec<String> {
@@ -287,7 +330,83 @@ pub fn resolve_reference_with_stats(
     _session: &AxSession,
     store: &SnapshotStore,
     reference: &str,
+    deadline: Instant,
 ) -> Result<ResolveStats, CommandError> {
     let stored = store.resolve_ref_or_stale(reference)?;
-    Ok(resolve_stored_element_with_stats(&stored)?.1)
+    Ok(resolve_stored_element_with_stats(&stored, deadline)?.1)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn backoff_rejected_when_it_would_pass_deadline() {
+        let now = Instant::now();
+        let deadline = now + Duration::from_millis(50);
+        assert!(!backoff_fits_before_deadline(
+            now,
+            deadline,
+            Duration::from_millis(120)
+        ));
+    }
+
+    #[test]
+    fn backoff_allowed_when_deadline_has_room() {
+        let now = Instant::now();
+        let deadline = now + Duration::from_secs(2);
+        assert!(backoff_fits_before_deadline(
+            now,
+            deadline,
+            Duration::from_millis(120)
+        ));
+    }
+
+    #[test]
+    fn fingerprint_prescreen_skips_role_mismatch_without_automation_id() {
+        let stored = StoredElement {
+            hwnd: WindowId(1),
+            runtime_id: vec![],
+            process_id: 1,
+            name: "Save".to_string(),
+            role: Some("Button".to_string()),
+            automation_id: String::new(),
+            rect: None,
+            ancestor_chain: vec![],
+        };
+        let attrs = NodeAttrs {
+            role: "AXStaticText".to_string(),
+            name: "Save".to_string(),
+            automation_id: String::new(),
+            enabled: true,
+            rect: None,
+            value: None,
+            children: vec![],
+        };
+        assert!(!fingerprint_prescreen(&stored, &attrs));
+    }
+
+    #[test]
+    fn fingerprint_prescreen_keeps_automation_id_match_on_role_mismatch() {
+        let stored = StoredElement {
+            hwnd: WindowId(1),
+            runtime_id: vec![],
+            process_id: 1,
+            name: "Save".to_string(),
+            role: Some("Button".to_string()),
+            automation_id: "save-btn".to_string(),
+            rect: None,
+            ancestor_chain: vec![],
+        };
+        let attrs = NodeAttrs {
+            role: "AXGroup".to_string(),
+            name: "Save".to_string(),
+            automation_id: "save-btn".to_string(),
+            enabled: true,
+            rect: None,
+            value: None,
+            children: vec![],
+        };
+        assert!(fingerprint_prescreen(&stored, &attrs));
+    }
 }

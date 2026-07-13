@@ -1,3 +1,4 @@
+use std::time::Instant;
 use uiautomation::core::UIElement;
 use uiautomation::patterns::{
     UIExpandCollapsePattern, UIInvokePattern, UILegacyIAccessiblePattern, UIRangeValuePattern,
@@ -19,6 +20,7 @@ pub(super) fn click_impl(
     session: &UiaSession,
     store: &SnapshotStore,
     reference: &str,
+    _deadline: Instant,
 ) -> Result<ActionResult, CommandError> {
     let stored = store.resolve_ref_or_stale(reference)?;
     let element = resolve_stored_element(session, &stored)?;
@@ -198,6 +200,7 @@ pub(super) fn set_value_impl(
     store: &SnapshotStore,
     reference: &str,
     text: &str,
+    _deadline: Instant,
 ) -> Result<ActionResult, CommandError> {
     let stored = store.resolve_ref_or_stale(reference)?;
     let element = resolve_stored_element(session, &stored)?;
@@ -244,6 +247,7 @@ pub(super) fn send_keys_impl(
     hwnd: WindowId,
     text: &str,
     reference: Option<&str>,
+    _deadline: Instant,
 ) -> Result<ActionResult, CommandError> {
     if text.is_empty() {
         return Err(CommandError::new(
@@ -284,6 +288,7 @@ pub(super) fn focus_impl(
     session: &UiaSession,
     store: &SnapshotStore,
     reference: &str,
+    _deadline: Instant,
 ) -> Result<ActionResult, CommandError> {
     let stored = store.resolve_ref_or_stale(reference)?;
     let element = resolve_stored_element(session, &stored)?;
@@ -302,6 +307,7 @@ pub(super) fn get_value_impl(
     session: &UiaSession,
     store: &SnapshotStore,
     reference: &str,
+    _deadline: Instant,
 ) -> Result<GetValueResult, CommandError> {
     let stored = store.resolve_ref_or_stale(reference)?;
     let element = resolve_stored_element(session, &stored)?;
@@ -364,6 +370,7 @@ pub(super) fn scroll_element_impl(
     reference: &str,
     direction: &str,
     amount: &str,
+    _deadline: Instant,
 ) -> Result<ActionResult, CommandError> {
     let stored = store.resolve_ref_or_stale(reference)?;
     let element = resolve_stored_element(session, &stored)?;
@@ -388,6 +395,7 @@ pub(super) fn right_click_element_impl(
     session: &UiaSession,
     store: &SnapshotStore,
     reference: &str,
+    _deadline: Instant,
 ) -> Result<ActionResult, CommandError> {
     let stored = store.resolve_ref_or_stale(reference)?;
     let element = resolve_stored_element(session, &stored)?;
@@ -408,6 +416,7 @@ pub(super) fn invoke_action_impl(
     store: &SnapshotStore,
     reference: &str,
     action: &str,
+    _deadline: Instant,
 ) -> Result<ActionResult, CommandError> {
     let stored = store.resolve_ref_or_stale(reference)?;
     let element = resolve_stored_element(session, &stored)?;

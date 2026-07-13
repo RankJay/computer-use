@@ -257,6 +257,7 @@ impl AccessibilitySession for FakeSession {
         &mut self,
         _store: &SnapshotStore,
         _reference: &str,
+        _deadline: Instant,
     ) -> Result<GetTextResult, CommandError> {
         Err(CommandError::new(
             ErrorCode::GetTextFailed,
@@ -292,6 +293,7 @@ impl AccessibilitySession for FakeSession {
         &mut self,
         _store: &SnapshotStore,
         _reference: &str,
+        _deadline: Instant,
     ) -> Result<InspectResult, CommandError> {
         Err(CommandError::new(
             ErrorCode::InspectFailed,
@@ -303,6 +305,7 @@ impl AccessibilitySession for FakeSession {
         &mut self,
         _store: &SnapshotStore,
         _reference: &str,
+        _deadline: Instant,
     ) -> Result<TextResult, CommandError> {
         Err(CommandError::new(
             ErrorCode::GetSelectionFailed,
@@ -314,6 +317,7 @@ impl AccessibilitySession for FakeSession {
         &mut self,
         _store: &SnapshotStore,
         _reference: &str,
+        _deadline: Instant,
     ) -> Result<ActionResult, CommandError> {
         Err(CommandError::new(
             ErrorCode::ClickFailed,
@@ -326,6 +330,7 @@ impl AccessibilitySession for FakeSession {
         _store: &SnapshotStore,
         _reference: &str,
         _text: &str,
+        _deadline: Instant,
     ) -> Result<ActionResult, CommandError> {
         Err(CommandError::new(
             ErrorCode::ActionUnavailable,
@@ -339,6 +344,7 @@ impl AccessibilitySession for FakeSession {
         _hwnd: WindowId,
         _text: &str,
         _reference: Option<&str>,
+        _deadline: Instant,
     ) -> Result<ActionResult, CommandError> {
         Err(CommandError::new(
             ErrorCode::ActionUnavailable,
@@ -350,6 +356,7 @@ impl AccessibilitySession for FakeSession {
         &mut self,
         _store: &SnapshotStore,
         _reference: &str,
+        _deadline: Instant,
     ) -> Result<ActionResult, CommandError> {
         Err(CommandError::new(
             ErrorCode::FocusFailed,
@@ -361,6 +368,7 @@ impl AccessibilitySession for FakeSession {
         &mut self,
         _store: &SnapshotStore,
         _reference: &str,
+        _deadline: Instant,
     ) -> Result<GetValueResult, CommandError> {
         Err(CommandError::new(
             ErrorCode::GetValueFailed,
@@ -374,6 +382,7 @@ impl AccessibilitySession for FakeSession {
         _reference: &str,
         _direction: &str,
         _amount: &str,
+        _deadline: Instant,
     ) -> Result<ActionResult, CommandError> {
         Err(CommandError::new(
             ErrorCode::ActionUnavailable,
@@ -385,6 +394,7 @@ impl AccessibilitySession for FakeSession {
         &mut self,
         _store: &SnapshotStore,
         _reference: &str,
+        _deadline: Instant,
     ) -> Result<ActionResult, CommandError> {
         Err(CommandError::new(
             ErrorCode::ActionUnavailable,
@@ -397,6 +407,7 @@ impl AccessibilitySession for FakeSession {
         _store: &SnapshotStore,
         _reference: &str,
         _action: &str,
+        _deadline: Instant,
     ) -> Result<ActionResult, CommandError> {
         Err(CommandError::new(
             ErrorCode::InvokeActionFailed,

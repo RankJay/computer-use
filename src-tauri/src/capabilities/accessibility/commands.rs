@@ -272,8 +272,9 @@ pub async fn accessibility_get_text(
         ErrorCode::GetTextTimeout,
         "Reading accessibility text timed out",
         move |ctx| {
+            let deadline = ctx.deadline;
             let session = ctx.session_mut()?;
-            session.get_text(&store, &reference)
+            session.get_text(&store, &reference, deadline)
         },
     )
     .await
@@ -328,8 +329,9 @@ pub async fn accessibility_inspect(
         ErrorCode::InspectTimeout,
         "Accessibility inspect timed out",
         move |ctx| {
+            let deadline = ctx.deadline;
             let session = ctx.session_mut()?;
-            session.inspect(&store, &reference)
+            session.inspect(&store, &reference, deadline)
         },
     )
     .await
@@ -346,8 +348,9 @@ pub async fn accessibility_get_selection(
         ErrorCode::GetSelectionTimeout,
         "Reading accessibility selection timed out",
         move |ctx| {
+            let deadline = ctx.deadline;
             let session = ctx.session_mut()?;
-            session.get_selection(&store, &reference)
+            session.get_selection(&store, &reference, deadline)
         },
     )
     .await
@@ -364,8 +367,9 @@ pub async fn accessibility_click(
         ErrorCode::ClickTimeout,
         "Accessibility click timed out",
         move |ctx| {
+            let deadline = ctx.deadline;
             let session = ctx.session_mut()?;
-            session.click(&store, &reference)
+            session.click(&store, &reference, deadline)
         },
     )
     .await
@@ -383,8 +387,9 @@ pub async fn accessibility_set_value(
         ErrorCode::SetValueTimeout,
         "Setting accessibility value timed out",
         move |ctx| {
+            let deadline = ctx.deadline;
             let session = ctx.session_mut()?;
-            session.set_value(&store, &reference, &text)
+            session.set_value(&store, &reference, &text, deadline)
         },
     )
     .await
@@ -403,8 +408,9 @@ pub async fn accessibility_send_keys(
         ErrorCode::SendKeysTimeout,
         "Accessibility send_keys timed out",
         move |ctx| {
+            let deadline = ctx.deadline;
             let session = ctx.session_mut()?;
-            session.send_keys(&store, window_id, &text, reference.as_deref())
+            session.send_keys(&store, window_id, &text, reference.as_deref(), deadline)
         },
     )
     .await
@@ -421,8 +427,9 @@ pub async fn accessibility_focus(
         ErrorCode::FocusTimeout,
         "Accessibility focus timed out",
         move |ctx| {
+            let deadline = ctx.deadline;
             let session = ctx.session_mut()?;
-            session.focus(&store, &reference)
+            session.focus(&store, &reference, deadline)
         },
     )
     .await
@@ -439,8 +446,9 @@ pub async fn accessibility_get_value(
         ErrorCode::GetValueTimeout,
         "Reading accessibility value timed out",
         move |ctx| {
+            let deadline = ctx.deadline;
             let session = ctx.session_mut()?;
-            session.get_value(&store, &reference)
+            session.get_value(&store, &reference, deadline)
         },
     )
     .await
@@ -460,8 +468,9 @@ pub async fn accessibility_scroll_element(
         ErrorCode::ScrollElementTimeout,
         "Accessibility scroll timed out",
         move |ctx| {
+            let deadline = ctx.deadline;
             let session = ctx.session_mut()?;
-            session.scroll_element(&store, &reference, &direction, &amount)
+            session.scroll_element(&store, &reference, &direction, &amount, deadline)
         },
     )
     .await
@@ -478,8 +487,9 @@ pub async fn accessibility_right_click_element(
         ErrorCode::RightClickTimeout,
         "Accessibility right-click timed out",
         move |ctx| {
+            let deadline = ctx.deadline;
             let session = ctx.session_mut()?;
-            session.right_click_element(&store, &reference)
+            session.right_click_element(&store, &reference, deadline)
         },
     )
     .await
@@ -497,8 +507,9 @@ pub async fn accessibility_invoke_action(
         ErrorCode::InvokeActionTimeout,
         "Accessibility invoke_action timed out",
         move |ctx| {
+            let deadline = ctx.deadline;
             let session = ctx.session_mut()?;
-            session.invoke_action(&store, &reference, &action)
+            session.invoke_action(&store, &reference, &action, deadline)
         },
     )
     .await
