@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>NSAccessibilityUsageDescription</key>
+	<string>Actuate needs Accessibility to inspect and control UI elements for desktop automation.</string>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>Actuate may use Apple Events to automate and focus other applications.</string>
+	<key>NSScreenCaptureUsageDescription</key>
+	<string>Actuate may capture the screen for future screenshot-based tools.</string>
+</dict>
+</plist>

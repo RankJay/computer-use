@@ -85,6 +85,9 @@ fn setup_desktop(app: &mut tauri::App) -> tauri::Result<()> {
         })
         .build(app)?;
 
+    #[cfg(target_os = "macos")]
+    let toggle_shortcut = Shortcut::new(Some(Modifiers::SUPER | Modifiers::SHIFT), Code::KeyA);
+    #[cfg(not(target_os = "macos"))]
     let toggle_shortcut = Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::KeyA);
     app.handle().plugin(
         tauri_plugin_global_shortcut::Builder::new()
@@ -234,6 +237,16 @@ pub fn run() {
                 .app_local_data_dir()
                 .expect("could not resolve app local data path")
                 .join("salt.txt");
+            // Stronghold writes salt.txt without creating the parent dir.
+            if let Some(parent) = salt_path.parent() {
+                std::fs::create_dir_all(parent)?;
+            }
+            // Vault lives under app data dir (`appDataDir()` on the frontend).
+            let app_data_dir = app
+                .path()
+                .app_data_dir()
+                .expect("could not resolve app data path");
+            std::fs::create_dir_all(&app_data_dir)?;
             app.handle()
                 .plugin(tauri_plugin_stronghold::Builder::with_argon2(&salt_path).build())?;
 

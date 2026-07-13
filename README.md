@@ -69,7 +69,14 @@ src-tauri/tests/      launch / window / input / a11y smoke tests
 - Stable [Rust](https://www.rust-lang.org/tools/install)
 - [Tauri 2 platform deps](https://v2.tauri.app/start/prerequisites/) for your OS
 
+### macOS
 
+For UI automation (accessibility, mouse, keyboard) once those adapters land, grant Actuate under **System Settings → Privacy & Security**:
+
+- **Accessibility** — inspect and drive UI elements
+- **Input Monitoring** — synthetic mouse and keyboard
+
+Usage strings live in `src-tauri/Info.plist`. App Sandbox stays off (`Entitlements.plist`) so shell, workspace files, and app launch keep working.
 
 ## Run
 
@@ -78,7 +85,7 @@ bun install
 bun run tauri dev
 ```
 
-`Ctrl+Shift+A` toggles the window. Close hides to the tray; quit from the tray menu.
+`Ctrl+Shift+A` toggles the window on Windows; `Cmd+Shift+A` on macOS. Close hides to the tray; quit from the tray menu.
 
 In Settings: set a workspace root (file tools are scoped to it), paste Anthropic and/or OpenAI keys (Stronghold), optionally turn on UI automation.
 
