@@ -12,6 +12,9 @@ mod system_info;
 mod win_resolver;
 
 #[cfg(target_os = "macos")]
+mod mac_launch;
+
+#[cfg(target_os = "macos")]
 mod mac_resolver;
 
 #[cfg(not(any(windows, target_os = "macos")))]

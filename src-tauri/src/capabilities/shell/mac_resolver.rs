@@ -11,20 +11,18 @@ pub struct MacResolver;
 impl ExecutableResolver for MacResolver {
     fn resolve(&self, name: &str) -> Result<ResolvedExecutable, CommandError> {
         if let Some(path) = as_path_literal(name) {
-            return Ok(ResolvedExecutable { path });
+            return Ok(ResolvedExecutable::cli(path));
         }
 
         let trimmed = name.trim();
         for bundle_name in candidate_bundle_names(trimmed) {
-            if let Some(exe) = find_app_executable(&bundle_name) {
-                return Ok(ResolvedExecutable { path: exe });
+            if let Some((exe, bundle)) = find_app_executable(&bundle_name) {
+                return Ok(ResolvedExecutable::bundle(exe, bundle));
             }
         }
 
         // Prefer bare name for CreateProcess-style PATH search (no .exe suffixing).
-        Ok(ResolvedExecutable {
-            path: trimmed.to_string(),
-        })
+        Ok(ResolvedExecutable::cli(trimmed.to_string()))
     }
 }
 
@@ -79,14 +77,17 @@ fn search_dirs() -> Vec<PathBuf> {
     dirs
 }
 
-fn find_app_executable(bundle_name: &str) -> Option<String> {
+fn find_app_executable(bundle_name: &str) -> Option<(String, String)> {
     for dir in search_dirs() {
         let bundle = dir.join(bundle_name);
         if !bundle.is_dir() {
             continue;
         }
         if let Some(exe) = resolve_bundle_executable(&bundle) {
-            return Some(exe.to_string_lossy().into_owned());
+            return Some((
+                exe.to_string_lossy().into_owned(),
+                bundle.to_string_lossy().into_owned(),
+            ));
         }
     }
     None
@@ -126,10 +127,9 @@ mod tests {
     #[test]
     fn resolve_passes_through_absolute_paths() {
         let r = MacResolver;
-        assert_eq!(
-            r.resolve("/usr/bin/true").expect("resolve").path,
-            "/usr/bin/true"
-        );
+        let true_resolved = r.resolve("/usr/bin/true").expect("resolve");
+        assert_eq!(true_resolved.path, "/usr/bin/true");
+        assert_eq!(true_resolved.app_bundle, None);
         assert_eq!(r.resolve("/bin/ls").expect("resolve").path, "/bin/ls");
     }
 
@@ -183,14 +183,20 @@ mod tests {
             return;
         }
 
-        let resolved = resolver().resolve("TextEdit").expect("resolve").path;
+        let resolved = resolver().resolve("TextEdit").expect("resolve");
         assert!(
-            resolved.ends_with("Contents/MacOS/TextEdit"),
-            "expected TextEdit MacOS binary, got {resolved}"
+            resolved.path.ends_with("Contents/MacOS/TextEdit"),
+            "expected TextEdit MacOS binary, got {}",
+            resolved.path
         );
         assert!(
-            Path::new(&resolved).is_file(),
-            "resolved path should exist: {resolved}"
+            Path::new(&resolved.path).is_file(),
+            "resolved path should exist: {}",
+            resolved.path
+        );
+        assert_eq!(
+            resolved.app_bundle.as_deref(),
+            Some("/System/Applications/TextEdit.app")
         );
     }
 
@@ -201,12 +207,17 @@ mod tests {
             return;
         }
 
-        let resolved = resolver().resolve("terminal").expect("resolve").path;
+        let resolved = resolver().resolve("terminal").expect("resolve");
         assert!(
-            resolved.ends_with("Contents/MacOS/Terminal"),
-            "expected Terminal MacOS binary, got {resolved}"
+            resolved.path.ends_with("Contents/MacOS/Terminal"),
+            "expected Terminal MacOS binary, got {}",
+            resolved.path
         );
-        assert!(Path::new(&resolved).is_file());
+        assert!(Path::new(&resolved.path).is_file());
+        assert_eq!(
+            resolved.app_bundle.as_deref(),
+            Some("/System/Applications/Utilities/Terminal.app")
+        );
     }
 
     #[test]
@@ -216,11 +227,16 @@ mod tests {
             return;
         }
 
-        let resolved = resolver().resolve("chrome").expect("resolve").path;
+        let resolved = resolver().resolve("chrome").expect("resolve");
         assert!(
-            resolved.contains("Google Chrome.app/Contents/MacOS/"),
-            "expected Chrome MacOS binary, got {resolved}"
+            resolved.path.contains("Google Chrome.app/Contents/MacOS/"),
+            "expected Chrome MacOS binary, got {}",
+            resolved.path
         );
-        assert!(Path::new(&resolved).is_file());
+        assert!(Path::new(&resolved.path).is_file());
+        assert_eq!(
+            resolved.app_bundle.as_deref(),
+            Some("/Applications/Google Chrome.app")
+        );
     }
 }

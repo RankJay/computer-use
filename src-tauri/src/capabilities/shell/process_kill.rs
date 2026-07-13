@@ -126,26 +126,27 @@ fn kill_process_windows(pid: u32) -> Result<ProcessKillResult, CommandError> {
 
 #[cfg(any(target_os = "linux", target_os = "macos"))]
 fn kill_process_unix(pid: u32) -> Result<ProcessKillResult, CommandError> {
-    use std::process::Command;
-
-    let status = Command::new("kill")
-        .arg(pid.to_string())
-        .status()
-        .map_err(|error| {
-            CommandError::new(
-                ErrorCode::KillFailed,
-                format!("Failed to run kill: {error}"),
-            )
-        })?;
-
-    if !status.success() {
-        return Err(CommandError::new(
-            ErrorCode::KillFailed,
-            format!("kill command failed for pid {pid}"),
-        ));
+    // SAFETY: pid is validated non-zero (u32 > 0), so this signals exactly one process;
+    // kill(2) with SIGTERM has no memory-safety concerns.
+    let rc = unsafe { libc::kill(pid as libc::pid_t, libc::SIGTERM) };
+    if rc == 0 {
+        return Ok(ProcessKillResult { pid, name: None });
     }
-
-    Ok(ProcessKillResult { pid, name: None })
+    let err = std::io::Error::last_os_error();
+    match err.raw_os_error() {
+        Some(libc::ESRCH) => Err(CommandError::new(
+            ErrorCode::ProcessNotFound,
+            format!("Process {pid} was not found"),
+        )),
+        Some(libc::EPERM) => Err(CommandError::new(
+            ErrorCode::OsPermissionDenied,
+            format!("Not permitted to signal process {pid}"),
+        )),
+        _ => Err(CommandError::new(
+            ErrorCode::KillFailed,
+            format!("kill({pid}, SIGTERM) failed: {err}"),
+        )),
+    }
 }
 
 #[cfg(test)]
@@ -162,5 +163,12 @@ mod tests {
     fn rejects_both_selectors() {
         let error = process_kill(Some(1), Some("notepad".to_string())).expect_err("both selectors");
         assert_eq!(error.code, "invalid_input");
+    }
+
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    #[test]
+    fn missing_pid_returns_process_not_found() {
+        let error = process_kill(Some(u32::MAX), None).expect_err("huge pid");
+        assert_eq!(error.code, "process_not_found");
     }
 }

@@ -158,37 +158,77 @@ fn list_processes_linux() -> Result<ProcessListResult, CommandError> {
 }
 
 #[cfg(target_os = "macos")]
-fn list_processes_macos() -> Result<ProcessListResult, CommandError> {
-    use std::process::Command;
+const PROC_ALL_PIDS: u32 = 1; // bsd/sys/proc_info.h; not exported by the libc crate
 
-    let output = Command::new("ps")
-        .args(["-ax", "-o", "pid=,comm="])
-        .output()
-        .map_err(|error| {
-            CommandError::new(
-                ErrorCode::ProcessEnumFailed,
-                format!("Failed to run ps: {error}"),
-            )
-        })?;
+#[cfg(target_os = "macos")]
+fn macos_list_pids() -> Result<Vec<u32>, CommandError> {
+    use std::mem::size_of;
 
-    if !output.status.success() {
+    // SAFETY: NULL buffer is the documented "how many bytes do I need" call.
+    let needed = unsafe { libc::proc_listpids(PROC_ALL_PIDS, 0, std::ptr::null_mut(), 0) };
+    if needed <= 0 {
         return Err(CommandError::new(
             ErrorCode::ProcessEnumFailed,
-            "ps command failed",
+            format!(
+                "proc_listpids sizing failed: {}",
+                std::io::Error::last_os_error()
+            ),
         ));
     }
-
-    let mut lines = Vec::new();
-    for line in String::from_utf8_lossy(&output.stdout).lines() {
-        let Some((pid, name)) = parse_process_list_line(line) else {
-            continue;
-        };
-        lines.push(format!("{pid}  {name}"));
-        if lines.len() >= MAX_PROCESSES {
-            break;
-        }
+    // Kernel pads the estimate by 20 pids; add our own slack for the race window.
+    let mut buf = vec![0 as libc::c_int; needed as usize / size_of::<libc::c_int>() + 16];
+    let cap_bytes = (buf.len() * size_of::<libc::c_int>()) as libc::c_int;
+    // SAFETY: buffer is valid for cap_bytes bytes; kernel writes at most that many.
+    let written =
+        unsafe { libc::proc_listpids(PROC_ALL_PIDS, 0, buf.as_mut_ptr().cast(), cap_bytes) };
+    if written <= 0 {
+        return Err(CommandError::new(
+            ErrorCode::ProcessEnumFailed,
+            format!("proc_listpids failed: {}", std::io::Error::last_os_error()),
+        ));
     }
+    buf.truncate(written as usize / size_of::<libc::c_int>());
+    Ok(buf
+        .into_iter()
+        .filter(|p| *p > 0)
+        .map(|p| p as u32)
+        .collect())
+}
 
+#[cfg(target_os = "macos")]
+fn macos_process_path(pid: u32) -> Option<String> {
+    let mut buf = [0i8; 4096]; // PROC_PIDPATHINFO_MAXSIZE
+                               // SAFETY: buffer is a writable C-string buffer within [PIDPATHINFO_SIZE, MAXSIZE].
+    let len = unsafe {
+        libc::proc_pidpath(
+            pid as libc::pid_t,
+            buf.as_mut_ptr().cast(),
+            buf.len() as u32,
+        )
+    };
+    if len <= 0 {
+        return None;
+    }
+    // SAFETY: proc_pidpath null-terminates on success.
+    Some(
+        unsafe { std::ffi::CStr::from_ptr(buf.as_ptr()) }
+            .to_string_lossy()
+            .into_owned(),
+    )
+}
+
+#[cfg(target_os = "macos")]
+fn list_processes_macos() -> Result<ProcessListResult, CommandError> {
+    let mut pids = macos_list_pids()?;
+    pids.sort_unstable();
+    pids.truncate(MAX_PROCESSES);
+    let lines: Vec<String> = pids
+        .into_iter()
+        .map(|pid| {
+            let name = macos_process_path(pid).unwrap_or_else(|| format!("pid:{pid}"));
+            format!("{pid}  {name}")
+        })
+        .collect();
     let count = lines.len();
     Ok(ProcessListResult {
         text: lines.join("\n"),
@@ -222,5 +262,29 @@ mod tests {
             full.to_ascii_lowercase().as_str()
         ));
         assert!(!process_name_matches(full, "chrome"));
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn macos_list_includes_current_process() {
+        let result = process_list().expect("list processes");
+        assert!(result.count >= 1);
+        let self_pid = std::process::id();
+        let self_line = result
+            .text
+            .lines()
+            .find_map(|line| {
+                let (pid, name) = parse_process_list_line(line)?;
+                (pid == self_pid).then_some(name)
+            })
+            .expect("current process in list");
+        assert!(
+            Path::new(&self_line).is_absolute(),
+            "expected absolute path, got {self_line}"
+        );
+        assert!(result
+            .text
+            .lines()
+            .all(|line| parse_process_list_line(line).is_some()));
     }
 }
