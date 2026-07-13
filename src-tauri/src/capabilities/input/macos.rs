@@ -13,15 +13,20 @@
 //! Each synthesizer operation creates one `CGEventSource` and runs one
 //! `CGPreflightPostEventAccess` check, then reuses them for every event in the
 //! gesture (same pattern as `type_unicode` in the a11y adapter).
+//!
+//! Keyboard chords stamp `CGEventFlags` on posted events (and track held
+//! modifiers across separate `key_down`/`key_up` commands). Sequencing
+//! modifier keycodes alone is not enough on Core Graphics.
 
+use std::sync::Mutex;
 use std::thread;
 use std::time::Duration;
 
 use objc2_core_foundation::CGPoint;
 use objc2_core_graphics::{
-    CGDisplayBounds, CGError, CGEvent, CGEventField, CGEventSource, CGEventSourceStateID,
-    CGEventTapLocation, CGEventType, CGKeyCode, CGMainDisplayID, CGMouseButton,
-    CGPreflightPostEventAccess, CGRequestPostEventAccess, CGScrollEventUnit,
+    CGDisplayBounds, CGError, CGEvent, CGEventField, CGEventFlags, CGEventSource,
+    CGEventSourceStateID, CGEventTapLocation, CGEventType, CGKeyCode, CGMainDisplayID,
+    CGMouseButton, CGPreflightPostEventAccess, CGRequestPostEventAccess, CGScrollEventUnit,
     CGWarpMouseCursorPosition,
 };
 
@@ -34,7 +39,26 @@ use super::types::MouseButton;
 const INPUT_PERMISSION_HINT: &str =
     "Grant Accessibility for Actuate in System Settings → Privacy & Security → Accessibility (Input Monitoring may also be required)";
 
-pub struct MacosInputSynthesizer;
+/// Tracks held modifier flags across separate `key_down`/`key_up` commands so
+/// chords like `key_down(Win); key_press(C); key_up(Win)` stamp `MaskCommand`
+/// on the `C` event (Core Graphics does not accumulate synthetic modifiers).
+pub struct MacosInputSynthesizer {
+    held: Mutex<CGEventFlags>,
+}
+
+impl MacosInputSynthesizer {
+    pub const fn new() -> Self {
+        Self {
+            held: Mutex::new(CGEventFlags::empty()),
+        }
+    }
+}
+
+impl Default for MacosInputSynthesizer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl InputSynthesizer for MacosInputSynthesizer {
     fn mouse_move(&self, x: i32, y: i32) -> Result<OkResult, CommandError> {
@@ -160,14 +184,24 @@ impl InputSynthesizer for MacosInputSynthesizer {
     fn key_down(&self, key: Key) -> Result<OkResult, CommandError> {
         require_post_access()?;
         let source = event_source()?;
-        post_key(&source, virtual_key(key), true)?;
+        let mut held = self.held.lock().expect("poisoned");
+        if let Some(flag) = modifier_flag(key) {
+            held.insert(flag);
+        }
+        let flags = *held;
+        post_key(&source, virtual_key(key), true, flags)?;
         Ok(OkResult { ok: true })
     }
 
     fn key_up(&self, key: Key) -> Result<OkResult, CommandError> {
         require_post_access()?;
         let source = event_source()?;
-        post_key(&source, virtual_key(key), false)?;
+        let mut held = self.held.lock().expect("poisoned");
+        if let Some(flag) = modifier_flag(key) {
+            held.remove(flag);
+        }
+        let flags = *held;
+        post_key(&source, virtual_key(key), false, flags)?;
         Ok(OkResult { ok: true })
     }
 
@@ -176,8 +210,17 @@ impl InputSynthesizer for MacosInputSynthesizer {
         let source = event_source()?;
         let code = virtual_key(key);
         for _ in 0..count {
-            post_key(&source, code, true)?;
-            post_key(&source, code, false)?;
+            let mut held = self.held.lock().expect("poisoned");
+            if let Some(flag) = modifier_flag(key) {
+                held.insert(flag);
+            }
+            let down_flags = *held;
+            post_key(&source, code, true, down_flags)?;
+            if let Some(flag) = modifier_flag(key) {
+                held.remove(flag);
+            }
+            let up_flags = *held;
+            post_key(&source, code, false, up_flags)?;
         }
         Ok(OkResult { ok: true })
     }
@@ -185,15 +228,52 @@ impl InputSynthesizer for MacosInputSynthesizer {
     fn hotkey(&self, keys: &[Key]) -> Result<OkResult, CommandError> {
         require_post_access()?;
         let source = event_source()?;
-        let codes: Vec<CGKeyCode> = keys.iter().copied().map(virtual_key).collect();
-        for code in &codes {
-            post_key(&source, *code, true)?;
+        let held = *self.held.lock().expect("poisoned");
+        let full = held | chord_mask(keys);
+
+        let mut accumulating = held;
+        for &key in keys {
+            if let Some(flag) = modifier_flag(key) {
+                accumulating.insert(flag);
+                post_key(&source, virtual_key(key), true, accumulating)?;
+            } else {
+                post_key(&source, virtual_key(key), true, full)?;
+            }
         }
-        for code in codes.iter().rev() {
-            post_key(&source, *code, false)?;
+
+        let mut remaining = full;
+        for &key in keys.iter().rev() {
+            if let Some(flag) = modifier_flag(key) {
+                remaining.remove(flag);
+                post_key(&source, virtual_key(key), false, remaining)?;
+            } else {
+                post_key(&source, virtual_key(key), false, full)?;
+            }
         }
         Ok(OkResult { ok: true })
     }
+}
+
+/// Held-modifier flag for a key, `None` for non-modifiers.
+/// CapsLock is a toggle, not a held modifier — deliberately excluded.
+fn modifier_flag(key: Key) -> Option<CGEventFlags> {
+    match key {
+        Key::Ctrl => Some(CGEventFlags::MaskControl),
+        Key::Shift => Some(CGEventFlags::MaskShift),
+        Key::Alt => Some(CGEventFlags::MaskAlternate),
+        Key::Win => Some(CGEventFlags::MaskCommand),
+        _ => None,
+    }
+}
+
+fn chord_mask(keys: &[Key]) -> CGEventFlags {
+    let mut flags = CGEventFlags::empty();
+    for &key in keys {
+        if let Some(flag) = modifier_flag(key) {
+            flags.insert(flag);
+        }
+    }
+    flags
 }
 
 fn virtual_key(key: Key) -> CGKeyCode {
@@ -367,13 +447,23 @@ fn post_mouse(
     Ok(())
 }
 
-fn post_key(source: &CGEventSource, code: CGKeyCode, key_down: bool) -> Result<(), CommandError> {
+fn post_key(
+    source: &CGEventSource,
+    code: CGKeyCode,
+    key_down: bool,
+    flags: CGEventFlags,
+) -> Result<(), CommandError> {
     let event = CGEvent::new_keyboard_event(Some(source), code, key_down).ok_or_else(|| {
         CommandError::new(
             ErrorCode::SendInputFailed,
             format!("CGEventCreateKeyboardEvent failed. {INPUT_PERMISSION_HINT}"),
         )
     })?;
+    // Only stamp when non-empty so physically-held user modifiers are preserved
+    // on plain key events (set_flags replaces the whole mask).
+    if !flags.is_empty() {
+        CGEvent::set_flags(Some(&event), flags);
+    }
     post_event(&event);
     Ok(())
 }
@@ -414,15 +504,17 @@ fn set_cursor_pos(source: &CGEventSource, x: i32, y: i32) -> Result<(), CommandE
         ));
     }
     // Also post a moved event so apps observe the cursor change.
-    post_mouse(source, CGEventType::MouseMoved, MouseButton::Left, location, 1)?;
+    post_mouse(
+        source,
+        CGEventType::MouseMoved,
+        MouseButton::Left,
+        location,
+        1,
+    )?;
     Ok(())
 }
 
-fn maybe_move(
-    source: &CGEventSource,
-    x: Option<i32>,
-    y: Option<i32>,
-) -> Result<(), CommandError> {
+fn maybe_move(source: &CGEventSource, x: Option<i32>, y: Option<i32>) -> Result<(), CommandError> {
     match (x, y) {
         (Some(x), Some(y)) => set_cursor_pos(source, x, y),
         (None, None) => Ok(()),
@@ -469,5 +561,25 @@ mod tests {
     #[test]
     fn letter_c_keycode() {
         assert_eq!(virtual_key(Key::C), 0x08);
+    }
+
+    #[test]
+    fn modifier_flag_maps_held_modifiers() {
+        assert_eq!(modifier_flag(Key::Win), Some(CGEventFlags::MaskCommand));
+        assert_eq!(modifier_flag(Key::Ctrl), Some(CGEventFlags::MaskControl));
+        assert_eq!(modifier_flag(Key::Shift), Some(CGEventFlags::MaskShift));
+        assert_eq!(modifier_flag(Key::Alt), Some(CGEventFlags::MaskAlternate));
+        assert_eq!(modifier_flag(Key::C), None);
+        assert_eq!(modifier_flag(Key::CapsLock), None);
+        assert_eq!(modifier_flag(Key::F5), None);
+    }
+
+    #[test]
+    fn chord_mask_ors_modifiers_only() {
+        assert_eq!(
+            chord_mask(&[Key::Win, Key::Shift, Key::Digit4]),
+            CGEventFlags::MaskCommand | CGEventFlags::MaskShift
+        );
+        assert_eq!(chord_mask(&[Key::A]), CGEventFlags::empty());
     }
 }

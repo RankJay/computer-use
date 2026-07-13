@@ -16,9 +16,8 @@ use super::super::types::TextResult;
 use super::roles::map_ax_role;
 use super::session::{
     ax_window_for_info, element_ancestor_hop, element_cg_window_id, element_node_attrs,
-    element_parent, element_pid, is_transient_command_error, lookup_cg_window,
-    process_id_for_hwnd, AxSession, CgWindowInfo, NodeAttrs, RESOLVE_RETRY_ATTEMPTS,
-    TRANSIENT_AX_RETRY_MS,
+    element_parent, element_pid, is_transient_command_error, lookup_cg_window, process_id_for_hwnd,
+    AxSession, CgWindowInfo, NodeAttrs, RESOLVE_RETRY_ATTEMPTS, TRANSIENT_AX_RETRY_MS,
 };
 use super::tree_extract::{project_element_allow_text, walk_path};
 
@@ -96,7 +95,12 @@ fn resolve_stored_element_once(
 
 /// Accept a path-walked element only if its live attributes still match the
 /// snapshot. Empty stored fields impose no constraint (see doc 03).
-fn fingerprint_matches(stored: &StoredElement, role: &str, name: &str, automation_id: &str) -> bool {
+fn fingerprint_matches(
+    stored: &StoredElement,
+    role: &str,
+    name: &str,
+    automation_id: &str,
+) -> bool {
     if stored.role.as_deref().is_some_and(|r| r != role) {
         return false;
     }
@@ -439,11 +443,7 @@ mod tests {
         assert!(fingerprint_prescreen(&stored, &attrs));
     }
 
-    fn stored_for_match(
-        role: Option<&str>,
-        name: &str,
-        automation_id: &str,
-    ) -> StoredElement {
+    fn stored_for_match(role: Option<&str>, name: &str, automation_id: &str) -> StoredElement {
         StoredElement {
             hwnd: WindowId(1),
             runtime_id: vec![0, 1],

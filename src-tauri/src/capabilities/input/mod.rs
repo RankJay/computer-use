@@ -33,7 +33,7 @@ pub fn synthesizer() -> &'static dyn InputSynthesizer {
     }
     #[cfg(target_os = "macos")]
     {
-        static SYNTH: macos::MacosInputSynthesizer = macos::MacosInputSynthesizer;
+        static SYNTH: macos::MacosInputSynthesizer = macos::MacosInputSynthesizer::new();
         &SYNTH
     }
     #[cfg(not(any(windows, target_os = "macos")))]

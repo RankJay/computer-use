@@ -23,8 +23,7 @@ use super::resolve::resolve_stored_element;
 use super::roles::map_ax_role;
 use super::session::{
     ax_press, ax_show_menu, element_parent, element_rect, element_role, element_value_text,
-    foreground_window, is_useful_value, lookup_cg_window, set_focused, set_value_string,
-    AxSession,
+    foreground_window, is_useful_value, lookup_cg_window, set_focused, set_value_string, AxSession,
 };
 
 pub(super) fn click_impl(
