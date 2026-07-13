@@ -1,11 +1,12 @@
 import { z } from "zod";
 
+import { SCREEN_COORD_DESC } from "../shared/screen-coords";
 import { uiAutomationEnabled } from "../shared/ui-automation";
 import { defineCapability } from "../types";
 
 export const mouseHoverInputSchema = z.object({
-  x: z.number().int().describe("Screen x in physical pixels"),
-  y: z.number().int().describe("Screen y in physical pixels"),
+  x: z.number().int().describe(`Screen x. ${SCREEN_COORD_DESC}`),
+  y: z.number().int().describe(`Screen y. ${SCREEN_COORD_DESC}`),
   ms: z
     .number()
     .int()

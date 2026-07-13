@@ -96,7 +96,7 @@ impl Key {
             "ctrl" | "control" => Key::Ctrl,
             "shift" => Key::Shift,
             "alt" => Key::Alt,
-            "win" | "meta" | "super" => Key::Win,
+            "win" | "meta" | "super" | "cmd" | "command" => Key::Win,
             "enter" | "return" => Key::Enter,
             "tab" => Key::Tab,
             "escape" | "esc" => Key::Escape,
@@ -230,6 +230,9 @@ mod tests {
         assert_eq!(Key::from_name("CONTROL"), Some(Key::Ctrl));
         assert_eq!(Key::from_name("c"), Some(Key::C));
         assert_eq!(Key::from_name("Win"), Some(Key::Win));
+        assert_eq!(Key::from_name("cmd"), Some(Key::Win));
+        assert_eq!(Key::from_name("command"), Some(Key::Win));
+        assert_eq!(Key::from_name("meta"), Some(Key::Win));
         assert_eq!(Key::from_name("f4"), Some(Key::F4));
         assert_eq!(Key::from_name("escape"), Some(Key::Escape));
         assert_eq!(Key::from_name("esc"), Some(Key::Escape));

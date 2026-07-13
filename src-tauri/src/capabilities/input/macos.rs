@@ -2,8 +2,9 @@
 //!
 //! Posts Core Graphics events via `CGEventPost`. Coordinates use **global display
 //! space with origin at the top-left of the main display** (same convention as
-//! `CGEventCreateMouseEvent` / AX window positions), matching the agent-friendly
-//! top-left expectation used by the window manager.
+//! `CGEventCreateMouseEvent` / AX window positions / `window_move`). On Retina
+//! displays these are **points (logical)**, not device pixels — keep agent tools
+//! and window geometry in that same space.
 //!
 //! Prefer `kCGHIDEventTap`. If events are ignored under HID-only delivery, switch
 //! the post site to `kCGSessionEventTap` (CGEventPost has no error return).
