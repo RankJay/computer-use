@@ -5,7 +5,10 @@ mod types;
 #[cfg(windows)]
 mod win32;
 
-#[cfg(not(windows))]
+#[cfg(target_os = "macos")]
+mod macos;
+
+#[cfg(not(any(windows, target_os = "macos")))]
 mod unsupported;
 
 pub use commands::{
@@ -22,7 +25,12 @@ pub fn manager() -> &'static dyn WindowManager {
         static MANAGER: win32::Win32WindowManager = win32::Win32WindowManager;
         &MANAGER
     }
-    #[cfg(not(windows))]
+    #[cfg(target_os = "macos")]
+    {
+        static MANAGER: macos::MacosWindowManager = macos::MacosWindowManager;
+        &MANAGER
+    }
+    #[cfg(not(any(windows, target_os = "macos")))]
     {
         static MANAGER: unsupported::UnsupportedWindowManager =
             unsupported::UnsupportedWindowManager;

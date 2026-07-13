@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 /// Opaque window identity on the wire as a bare i64 (`hwnd` JSON key).
-/// Windows: HWND. Future macOS: CGWindowID.
+/// Windows: HWND. macOS: CGWindowID.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct WindowId(pub i64);

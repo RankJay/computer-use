@@ -1,4 +1,4 @@
-#![cfg(windows)]
+#![cfg(any(windows, target_os = "macos"))]
 
 //! Live desktop smoke: window list + active window wire shape.
 //!
@@ -7,7 +7,7 @@
 //! ```
 
 #[test]
-#[ignore = "requires interactive Windows desktop; run with --ignored"]
+#[ignore = "requires interactive desktop + Accessibility on macOS; run with --ignored"]
 fn window_list_and_active_smoke() {
     let list = actuate_lib::window_list().expect("window_list");
     assert!(
