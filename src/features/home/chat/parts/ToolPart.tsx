@@ -18,6 +18,7 @@ import {
   ToolInput,
   ToolOutput,
 } from "@/components/ai-elements/tool";
+import { isMacOsClient } from "@/lib/platform";
 import type { PendingPermission } from "@/lib/session";
 import type { PermissionMode } from "@/lib/settings/types";
 
@@ -33,6 +34,36 @@ export type ToolPartProps = {
 };
 
 const EMPTY_PENDING_PERMISSIONS: readonly PendingPermission[] = [];
+
+function toolNameFromPart(part: ToolUIPart | DynamicToolUIPart): string {
+  if (isDynamicToolUIPart(part)) {
+    return part.toolName;
+  }
+  if (part.type.startsWith("tool-")) {
+    return part.type.slice("tool-".length);
+  }
+  return part.type;
+}
+
+/** Tools that observe or control other apps (OS privacy / Accessibility impact). */
+function needsOsPrivacyNotice(toolName: string): boolean {
+  return (
+    toolName.startsWith("accessibility_") ||
+    toolName.startsWith("mouse_") ||
+    toolName.startsWith("key_") ||
+    toolName === "hotkey" ||
+    toolName.startsWith("window_")
+  );
+}
+
+function approvalRequestCopy(toolName: string): string {
+  if (needsOsPrivacyNotice(toolName)) {
+    return isMacOsClient()
+      ? "This tool can observe or control other apps (macOS Accessibility / input). Approve execution?"
+      : "This tool can observe or control other apps. Approve execution?";
+  }
+  return "This tool wants to run. Approve execution?";
+}
 
 export const ToolPart = memo(function ToolPart({
   part,
@@ -52,6 +83,7 @@ export const ToolPart = memo(function ToolPart({
   const canAct =
     part.state === "approval-requested" && isPending && typeof onResolvePermission === "function";
   const showAlwaysAllow = canAct && permissionMode === "once-per-class";
+  const toolName = toolNameFromPart(part);
 
   const headerProps = isDynamicToolUIPart(part)
     ? { type: part.type, state: part.state, toolName: part.toolName }
@@ -79,7 +111,7 @@ export const ToolPart = memo(function ToolPart({
           state={part.state}
         >
           <ConfirmationTitle>
-            <ConfirmationRequest>This tool wants to run. Approve execution?</ConfirmationRequest>
+            <ConfirmationRequest>{approvalRequestCopy(toolName)}</ConfirmationRequest>
             <ConfirmationAccepted>
               <CheckIcon className="size-4" />
               <span>You approved this tool execution</span>

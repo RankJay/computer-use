@@ -168,7 +168,7 @@ pub(super) fn focus_impl(
     let element = resolve_stored_element(session, &stored)?;
     let foregrounded = foreground_window(stored.hwnd)?;
     set_focused(&element).map_err(|error| {
-        if error.code == ErrorCode::ElevationRequired.as_str() {
+        if error.code == ErrorCode::AccessibilityPermissionDenied.as_str() {
             error
         } else {
             CommandError::new(ErrorCode::FocusFailed, error.message)
@@ -330,7 +330,7 @@ pub(super) fn invoke_action_impl(
     };
 
     super::session::ax_perform(&element, ax_action).map_err(|error| {
-        if error.code == ErrorCode::ElevationRequired.as_str() {
+        if error.code == ErrorCode::AccessibilityPermissionDenied.as_str() {
             error
         } else {
             CommandError::new(
@@ -365,7 +365,7 @@ fn type_unicode(text: &str) -> Result<(), CommandError> {
     if !CGPreflightPostEventAccess() {
         let _ = CGRequestPostEventAccess();
         return Err(CommandError::new(
-            ErrorCode::ElevationRequired,
+            ErrorCode::AccessibilityPermissionDenied,
             "Posting input events was denied. Grant Accessibility for Actuate in System Settings → Privacy & Security → Accessibility",
         ));
     }

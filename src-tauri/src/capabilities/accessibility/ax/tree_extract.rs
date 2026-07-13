@@ -29,7 +29,7 @@ pub(super) fn fetch_tree(
     deadline: Instant,
 ) -> Result<ExtractedTree, CommandError> {
     let root = ax_window_for_hwnd(hwnd).map_err(|error| {
-        if error.code == ErrorCode::ElevationRequired.as_str()
+        if error.code == ErrorCode::AccessibilityPermissionDenied.as_str()
             || error.code == ErrorCode::InvalidHwnd.as_str()
         {
             error

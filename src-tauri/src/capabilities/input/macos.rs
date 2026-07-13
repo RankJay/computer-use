@@ -309,7 +309,7 @@ fn require_post_access() -> Result<(), CommandError> {
     // Prompt once; still fail so the caller sees a clear grant message.
     let _ = CGRequestPostEventAccess();
     Err(CommandError::new(
-        ErrorCode::ElevationRequired,
+        ErrorCode::AccessibilityPermissionDenied,
         format!("Posting input events was denied. {INPUT_PERMISSION_HINT}"),
     ))
 }

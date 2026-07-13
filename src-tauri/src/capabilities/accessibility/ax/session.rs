@@ -87,7 +87,7 @@ pub(super) fn require_accessibility() -> Result<(), CommandError> {
         return Ok(());
     }
     Err(CommandError::new(
-        ErrorCode::ElevationRequired,
+        ErrorCode::AccessibilityPermissionDenied,
         format!("Accessibility permission required. {ACCESSIBILITY_HINT}"),
     ))
 }
@@ -300,7 +300,7 @@ pub(super) fn focused_element(
     session: &AxSession,
 ) -> Result<CFRetained<AXUIElement>, CommandError> {
     ax_copy_element(&session.system_wide, AX_FOCUSED_UI_ELEMENT).map_err(|error| {
-        if error.code == ErrorCode::ElevationRequired.as_str() {
+        if error.code == ErrorCode::AccessibilityPermissionDenied.as_str() {
             error
         } else {
             CommandError::new(ErrorCode::GetFocusedFailed, error.message)
@@ -370,7 +370,7 @@ pub(super) fn map_ax_error(err: AXError, context: &str) -> Result<(), CommandErr
     }
     if err == AXError::APIDisabled {
         return Err(CommandError::new(
-            ErrorCode::ElevationRequired,
+            ErrorCode::AccessibilityPermissionDenied,
             format!("Accessibility API disabled while handling {context}. {ACCESSIBILITY_HINT}"),
         ));
     }

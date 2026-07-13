@@ -6,6 +6,7 @@ use serde::Serialize;
 #[serde(rename_all = "snake_case")]
 pub enum ErrorCode {
     A11yBusy,
+    AccessibilityPermissionDenied,
     ActionUnavailable,
     AlreadyExists,
     AmbiguousProcessName,
@@ -121,6 +122,7 @@ impl ErrorCode {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::A11yBusy => "a11y_busy",
+            Self::AccessibilityPermissionDenied => "accessibility_permission_denied",
             Self::ActionUnavailable => "action_unavailable",
             Self::AlreadyExists => "already_exists",
             Self::AmbiguousProcessName => "ambiguous_process_name",
@@ -279,6 +281,10 @@ mod tests {
     #[test]
     fn error_code_as_str_matches_legacy_wire_strings() {
         assert_eq!(ErrorCode::A11yBusy.as_str(), "a11y_busy");
+        assert_eq!(
+            ErrorCode::AccessibilityPermissionDenied.as_str(),
+            "accessibility_permission_denied"
+        );
         assert_eq!(ErrorCode::ActionUnavailable.as_str(), "action_unavailable");
         assert_eq!(ErrorCode::AlreadyExists.as_str(), "already_exists");
         assert_eq!(
@@ -456,6 +462,10 @@ mod tests {
         assert_eq!(
             serde_json::to_value(ErrorCode::A11yBusy).unwrap(),
             json!("a11y_busy")
+        );
+        assert_eq!(
+            serde_json::to_value(ErrorCode::AccessibilityPermissionDenied).unwrap(),
+            json!("accessibility_permission_denied")
         );
         assert_eq!(
             serde_json::to_value(ErrorCode::ActionUnavailable).unwrap(),

@@ -58,7 +58,7 @@ fn resolve_stored_element_once(
     stored: &StoredElement,
 ) -> Result<(CFRetained<AXUIElement>, ResolveStats), CommandError> {
     let root = ax_window_for_hwnd(stored.hwnd).map_err(|error| {
-        if error.code == ErrorCode::ElevationRequired.as_str()
+        if error.code == ErrorCode::AccessibilityPermissionDenied.as_str()
             || error.code == ErrorCode::InvalidHwnd.as_str()
         {
             error

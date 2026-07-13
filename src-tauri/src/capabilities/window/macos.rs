@@ -68,7 +68,9 @@ impl WindowManager for MacosWindowManager {
         let window = ax_window_for_cg(&info)?;
         match ax_perform(&window, AX_RAISE) {
             Ok(()) => Ok(WindowActionResult { ok: true, id }),
-            Err(error) if error.code == ErrorCode::ElevationRequired.as_str() => Err(error),
+            Err(error) if error.code == ErrorCode::AccessibilityPermissionDenied.as_str() => {
+                Err(error)
+            }
             Err(_) => Err(CommandError::new(
                 ErrorCode::FocusFailed,
                 format!("Could not bring window to foreground. {ACCESSIBILITY_HINT}"),
@@ -82,7 +84,7 @@ impl WindowManager for MacosWindowManager {
         let window = ax_window_for_cg(&info)?;
         let point = CGPoint::new(x as f64, y as f64);
         set_ax_point(&window, AX_POSITION, point).map_err(|error| {
-            if error.code == ErrorCode::ElevationRequired.as_str() {
+            if error.code == ErrorCode::AccessibilityPermissionDenied.as_str() {
                 error
             } else {
                 CommandError::new(ErrorCode::MoveFailed, error.message)
@@ -108,7 +110,7 @@ impl WindowManager for MacosWindowManager {
         let window = ax_window_for_cg(&info)?;
         let size = CGSize::new(width as f64, height as f64);
         set_ax_size(&window, AX_SIZE, size).map_err(|error| {
-            if error.code == ErrorCode::ElevationRequired.as_str() {
+            if error.code == ErrorCode::AccessibilityPermissionDenied.as_str() {
                 error
             } else {
                 CommandError::new(ErrorCode::ResizeFailed, error.message)
@@ -153,7 +155,7 @@ impl WindowManager for MacosWindowManager {
             WindowStateOp::Maximize | WindowStateOp::Restore => unreachable!(),
             WindowStateOp::Close => {
                 press_ax_button(&window, AX_CLOSE_BUTTON).map_err(|error| {
-                    if error.code == ErrorCode::ElevationRequired.as_str() {
+                    if error.code == ErrorCode::AccessibilityPermissionDenied.as_str() {
                         error
                     } else {
                         CommandError::new(ErrorCode::CloseFailed, error.message)
@@ -334,7 +336,7 @@ fn require_accessibility() -> Result<(), CommandError> {
         return Ok(());
     }
     Err(CommandError::new(
-        ErrorCode::ElevationRequired,
+        ErrorCode::AccessibilityPermissionDenied,
         format!("Accessibility permission required. {ACCESSIBILITY_HINT}"),
     ))
 }
@@ -527,7 +529,7 @@ fn map_ax_error(err: AXError, context: &str) -> Result<(), CommandError> {
     }
     if err == AXError::APIDisabled {
         return Err(CommandError::new(
-            ErrorCode::ElevationRequired,
+            ErrorCode::AccessibilityPermissionDenied,
             format!("Accessibility API disabled while handling {context}. {ACCESSIBILITY_HINT}"),
         ));
     }

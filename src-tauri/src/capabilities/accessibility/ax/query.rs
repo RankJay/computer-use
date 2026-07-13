@@ -152,7 +152,7 @@ fn query_once(
         resolve_stored_element(session, &stored)?
     } else {
         ax_window_for_hwnd(input.hwnd).map_err(|error| {
-            if error.code == ErrorCode::ElevationRequired.as_str()
+            if error.code == ErrorCode::AccessibilityPermissionDenied.as_str()
                 || error.code == ErrorCode::InvalidHwnd.as_str()
             {
                 error

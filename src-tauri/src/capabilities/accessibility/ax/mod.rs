@@ -465,7 +465,7 @@ pub struct AxProvider;
 impl AccessibilityProvider for AxProvider {
     fn create_session(&self) -> Result<Box<dyn AccessibilitySession>, CommandError> {
         let inner = SessionInner::init_on_worker_thread().map_err(|error| {
-            if error.code == ErrorCode::ElevationRequired.as_str() {
+            if error.code == ErrorCode::AccessibilityPermissionDenied.as_str() {
                 error
             } else {
                 CommandError::new(ErrorCode::UiaInitFailed, error.message)
