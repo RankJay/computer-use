@@ -22,6 +22,8 @@ pub use capabilities::{
 
 #[cfg(any(windows, target_os = "macos"))]
 pub use capabilities::a11y_live_smoke;
+#[cfg(any(windows, target_os = "macos"))]
+pub use capabilities::smoke_support;
 
 #[cfg(all(windows, feature = "a11y-bench"))]
 pub use capabilities::bench as a11y_bench;

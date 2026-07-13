@@ -47,6 +47,9 @@ fn launch_notepad_by_name_and_path() {
 #[test]
 #[ignore = "requires interactive macOS desktop; run with --ignored"]
 fn launch_textedit_by_name_and_path() {
+    // Launch itself does not need Accessibility; keep the assert for dogfood host setup.
+    actuate_lib::smoke_support::require_macos_automation(false);
+
     {
         let launched =
             actuate_lib::launch("TextEdit".into(), None, None, None).expect("launch name");

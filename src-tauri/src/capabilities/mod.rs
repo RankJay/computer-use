@@ -7,6 +7,8 @@ mod file_system;
 mod input;
 mod shared;
 mod shell;
+#[cfg(any(windows, target_os = "macos"))]
+pub mod smoke_support;
 mod window;
 
 pub use accessibility::{

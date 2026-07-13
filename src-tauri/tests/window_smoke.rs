@@ -9,6 +9,8 @@
 #[test]
 #[ignore = "requires interactive desktop + Accessibility on macOS; run with --ignored"]
 fn window_list_and_active_smoke() {
+    actuate_lib::smoke_support::require_macos_automation(false);
+
     let list = actuate_lib::window_list().expect("window_list");
     assert!(
         list.text.lines().any(|line| !line.trim().is_empty()),

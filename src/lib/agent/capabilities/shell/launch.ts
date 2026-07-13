@@ -22,7 +22,7 @@ export type LaunchOutput = {
 export const launchCapability = defineCapability({
   name: "launch",
   description:
-    "Launch an executable without capturing stdout/stderr. Accepts absolute paths or short names (chrome, TextEdit, notepad) resolved via platform install locations (Windows App Paths / macOS Applications). Returns the spawned process id.",
+    "Launch an executable without capturing stdout/stderr. Accepts absolute paths or short names (e.g. chrome, TextEdit, notepad) resolved via the platform app resolver. Returns the spawned process id.",
   risk: "high",
   inputSchema: launchInputSchema,
 });

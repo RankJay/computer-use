@@ -62,7 +62,7 @@ export function GeneralSettings(): ReactElement {
             <InputGroupInput
               id="workspace-root"
               type="text"
-              placeholder="C:\Users\...\Projects"
+              placeholder={isMac ? "/Users/.../Projects" : "C:\\Users\\...\\Projects"}
               key={settings.workspaceRoot}
               defaultValue={settings.workspaceRoot}
               onBlur={(event) => {

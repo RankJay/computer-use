@@ -77,6 +77,9 @@ describe("capability catalog", () => {
   test("filters accessibility tools when uiAutomation is off", () => {
     const off = getCapabilityNamesByRisk({ ...DEFAULT_SETTINGS, uiAutomation: false });
     const on = getCapabilityNamesByRisk({ ...DEFAULT_SETTINGS, uiAutomation: true });
+    const hostSupports =
+      typeof process !== "undefined" &&
+      (process.platform === "win32" || process.platform === "darwin");
 
     expect(off.high).not.toContain("accessibility_snapshot");
     expect(off.high).not.toContain("accessibility_click");
@@ -85,6 +88,14 @@ describe("capability catalog", () => {
     expect(off.high).not.toContain("mouse_move");
     expect(off.high).not.toContain("hotkey");
     expect(off.high).not.toContain("key_press");
+
+    if (!hostSupports) {
+      expect(on.high).not.toContain("accessibility_snapshot");
+      expect(on.high).not.toContain("mouse_click");
+      expect(on.high).not.toContain("hotkey");
+      return;
+    }
+
     expect(on.high).toContain("accessibility_snapshot");
     expect(on.high).toContain("accessibility_query");
     expect(on.high).toContain("accessibility_wait");

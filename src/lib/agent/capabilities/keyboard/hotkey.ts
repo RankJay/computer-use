@@ -8,7 +8,7 @@ export const hotkeyInputSchema = z.object({
     .array(z.string().min(1))
     .min(1)
     .describe(
-      'Ordered key chord, e.g. ["ctrl","c"], ["alt","f4"], ["win","r"], ["ctrl","shift","t"]',
+      'Ordered key chord, e.g. ["ctrl","c"], ["cmd","c"], ["alt","f4"], ["win","r"], ["ctrl","shift","t"]',
     ),
 });
 

@@ -9,6 +9,8 @@
 #[test]
 #[ignore = "requires interactive desktop + Accessibility/Input Monitoring on macOS; run with --ignored"]
 fn mouse_move_and_key_press_smoke() {
+    actuate_lib::smoke_support::require_macos_automation(true);
+
     actuate_lib::mouse_move(200, 200).expect("mouse_move");
     actuate_lib::key_press("a".into(), Some(1)).expect("key_press");
 }

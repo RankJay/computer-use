@@ -58,6 +58,8 @@ fn launch_exe() -> &'static str {
 #[test]
 #[ignore = "requires interactive desktop + Accessibility on macOS; run with --ignored"]
 fn snapshot_query_click_smoke() {
+    actuate_lib::smoke_support::require_macos_automation(false);
+
     let launched = actuate_lib::launch(launch_exe().into(), None, None, None).expect("launch");
     let _guard = KillOnDrop(Some(launched.pid));
 
