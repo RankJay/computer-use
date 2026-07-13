@@ -59,6 +59,12 @@ objc2-core-foundation = "0.3.2"
 objc2-core-graphics = { version = "0.3.2", default-features = false, features = [
     "std",
     "CGWindow",
+    "CGEvent",
+    "CGEventSource",
+    "CGEventTypes",
+    "CGDirectDisplay",
+    "CGRemoteOperation",
+    "CGError",
 ] }
 objc2-foundation = { version = "0.3.2", default-features = false, features = [
     "NSArray",
