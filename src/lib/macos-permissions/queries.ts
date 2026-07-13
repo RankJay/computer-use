@@ -2,6 +2,7 @@ import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/r
 import { useEffect } from "react";
 import { toast } from "sonner";
 
+import { mapInvokeError } from "@/lib/agent/capabilities/native-invoke";
 import { isTauriRuntime } from "@/lib/agent/is-tauri-runtime";
 import {
   getMacOsPermissionStatus,
@@ -9,17 +10,27 @@ import {
   requestMacOsPermission,
 } from "@/lib/macos-permissions/commands";
 import type { MacOsPermissionKind } from "@/lib/macos-permissions/types";
+import { isMacOsClient } from "@/lib/platform";
 
 export const macosPermissionKeys = {
   all: ["macos-permissions"] as const,
   status: () => [...macosPermissionKeys.all, "status"] as const,
 };
 
+/** Map invoke rejection; toast unless the platform has no TCC permissions. */
+export function reportMacOsPermissionError(error: unknown): { code: string; message: string } {
+  const mapped = mapInvokeError(error);
+  if (mapped.code !== "unsupported_platform") {
+    toast.error(mapped.message);
+  }
+  return { code: mapped.code, message: mapped.message };
+}
+
 export function macosPermissionStatusQueryOptions() {
   return queryOptions({
     queryKey: macosPermissionKeys.status(),
     queryFn: getMacOsPermissionStatus,
-    enabled: isTauriRuntime(),
+    enabled: isTauriRuntime() && isMacOsClient(),
     staleTime: 5_000,
     refetchOnWindowFocus: true,
   });
@@ -50,8 +61,8 @@ export function useRequestMacOsPermission() {
     onSuccess: (status) => {
       queryClient.setQueryData(macosPermissionKeys.status(), status);
     },
-    onError: () => {
-      toast.error("Could not request permission. Try again.");
+    onError: (error) => {
+      reportMacOsPermissionError(error);
     },
   });
 }
@@ -59,8 +70,8 @@ export function useRequestMacOsPermission() {
 export function useOpenMacOsPrivacySettings() {
   return useMutation({
     mutationFn: (kind: MacOsPermissionKind) => openMacOsPrivacySettings(kind),
-    onError: () => {
-      toast.error("Could not open System Settings.");
+    onError: (error) => {
+      reportMacOsPermissionError(error);
     },
   });
 }

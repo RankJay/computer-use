@@ -7,7 +7,7 @@
 //! ```
 
 #[test]
-#[ignore = "requires interactive desktop + Accessibility/Input Monitoring on macOS; run with --ignored"]
+#[ignore = "requires interactive desktop + Accessibility on macOS; run with --ignored"]
 fn mouse_move_and_key_press_smoke() {
     actuate_lib::smoke_support::require_macos_automation(true);
 
@@ -16,7 +16,7 @@ fn mouse_move_and_key_press_smoke() {
 }
 
 #[test]
-#[ignore = "requires interactive desktop + Accessibility/Input Monitoring on macOS; run with --ignored"]
+#[ignore = "requires interactive desktop + Accessibility on macOS; run with --ignored"]
 fn modifier_hotkey_smoke() {
     actuate_lib::smoke_support::require_macos_automation(true);
 

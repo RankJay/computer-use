@@ -5,6 +5,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { SettingsRow } from "@/features/settings/SettingsRow";
 import { SettingsSection } from "@/features/settings/SettingsSection";
 import { settingsGhostButtonClassName } from "@/features/settings/styles";
+import { mapInvokeError } from "@/lib/agent/capabilities/native-invoke";
 import {
   useMacOsPermissionStatus,
   useRequestMacOsPermission,
@@ -29,7 +30,7 @@ function MacOsPermissionsSkeleton(): ReactElement {
 }
 
 export function MacOsPermissionsSettings(): ReactElement | null {
-  const { data, isPending, isError, refetch, isFetching } = useMacOsPermissionStatus();
+  const { data, isPending, isError, error, refetch, isFetching } = useMacOsPermissionStatus();
   const requestPermission = useRequestMacOsPermission();
 
   if (isPending) {
@@ -37,6 +38,10 @@ export function MacOsPermissionsSettings(): ReactElement | null {
   }
 
   if (isError) {
+    if (mapInvokeError(error).code === "unsupported_platform") {
+      return null;
+    }
+
     return (
       <SettingsSection title="macOS permissions">
         <SettingsRow

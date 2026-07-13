@@ -4,7 +4,7 @@ Self-driving software for computers. You describe a task; Actuate runs an agent 
 
 The goal is to knock out tedious desktop work so people can stay on reasoning, not clicking through the same chores. Privacy and local durability matter more here than bolting on another cloud integration.
 
-Dogfoods on Windows and macOS. File / shell / clipboard / process work on both; launch / window / input / accessibility need the OS adapters plus (on macOS) Accessibility and Input Monitoring grants. Other platforms still return `unsupported_platform` for those UI seams.
+Dogfoods on Windows and macOS. File / shell / clipboard / process work on both; launch / window / input / accessibility need the OS adapters plus (on macOS) Accessibility grants. Other platforms still return `unsupported_platform` for those UI seams.
 
 ## Stack
 
@@ -74,7 +74,6 @@ src-tauri/tests/      launch / window / input / a11y / fs smoke tests
 For UI automation (window / accessibility / mouse / keyboard), grant Actuate — and your terminal or IDE when running `tauri dev` / ignored smokes — under **System Settings → Privacy & Security**:
 
 - **Accessibility** — inspect and drive UI elements; also needed for synthetic input
-- **Input Monitoring** — may be required for mouse / keyboard posting
 
 Usage strings live in `src-tauri/Info.plist`. App Sandbox stays off (`Entitlements.plist`) so shell, workspace files, and app launch keep working.
 

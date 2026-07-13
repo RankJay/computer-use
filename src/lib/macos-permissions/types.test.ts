@@ -6,17 +6,15 @@ describe("missingMacOsPermissions", () => {
   test("returns only permissions that are not granted", () => {
     const status: MacOsPermissionStatus = {
       accessibility: true,
-      inputMonitoring: false,
-      screenRecording: true,
+      screenRecording: false,
     };
 
-    expect(missingMacOsPermissions(status).map((entry) => entry.kind)).toEqual(["inputMonitoring"]);
+    expect(missingMacOsPermissions(status).map((entry) => entry.kind)).toEqual(["screenRecording"]);
   });
 
   test("returns empty when all granted", () => {
     const status: MacOsPermissionStatus = {
       accessibility: true,
-      inputMonitoring: true,
       screenRecording: true,
     };
 

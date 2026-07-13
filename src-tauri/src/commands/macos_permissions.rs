@@ -3,11 +3,14 @@
 use serde::{Deserialize, Serialize};
 use tauri::AppHandle;
 
+use crate::capabilities::error::{CommandError, ErrorCode};
+
+const MACOS_ONLY: &str = "macOS permissions are only available on macOS";
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum MacOsPermissionKind {
     Accessibility,
-    InputMonitoring,
     ScreenRecording,
 }
 
@@ -15,19 +18,21 @@ pub enum MacOsPermissionKind {
 #[serde(rename_all = "camelCase")]
 pub struct MacOsPermissionStatus {
     pub accessibility: bool,
-    pub input_monitoring: bool,
     pub screen_recording: bool,
 }
 
 #[tauri::command]
-pub fn get_macos_permission_status() -> Result<MacOsPermissionStatus, String> {
+pub fn get_macos_permission_status() -> Result<MacOsPermissionStatus, CommandError> {
     #[cfg(target_os = "macos")]
     {
         Ok(macos::read_status())
     }
     #[cfg(not(target_os = "macos"))]
     {
-        Err("macOS permissions are only available on macOS".into())
+        Err(CommandError::new(
+            ErrorCode::UnsupportedPlatform,
+            MACOS_ONLY,
+        ))
     }
 }
 
@@ -36,7 +41,7 @@ pub fn get_macos_permission_status() -> Result<MacOsPermissionStatus, String> {
 pub fn request_macos_permission(
     app: AppHandle,
     kind: MacOsPermissionKind,
-) -> Result<MacOsPermissionStatus, String> {
+) -> Result<MacOsPermissionStatus, CommandError> {
     #[cfg(target_os = "macos")]
     {
         macos::request(kind);
@@ -46,7 +51,10 @@ pub fn request_macos_permission(
     #[cfg(not(target_os = "macos"))]
     {
         let _ = (app, kind);
-        Err("macOS permissions are only available on macOS".into())
+        Err(CommandError::new(
+            ErrorCode::UnsupportedPlatform,
+            MACOS_ONLY,
+        ))
     }
 }
 
@@ -55,7 +63,7 @@ pub fn request_macos_permission(
 pub fn open_macos_privacy_settings(
     app: AppHandle,
     kind: MacOsPermissionKind,
-) -> Result<(), String> {
+) -> Result<(), CommandError> {
     #[cfg(target_os = "macos")]
     {
         macos::open_privacy_pane(&app, kind)
@@ -63,7 +71,10 @@ pub fn open_macos_privacy_settings(
     #[cfg(not(target_os = "macos"))]
     {
         let _ = (app, kind);
-        Err("macOS permissions are only available on macOS".into())
+        Err(CommandError::new(
+            ErrorCode::UnsupportedPlatform,
+            MACOS_ONLY,
+        ))
     }
 }
 
@@ -73,19 +84,16 @@ mod macos {
         kAXTrustedCheckOptionPrompt, AXIsProcessTrusted, AXIsProcessTrustedWithOptions,
     };
     use objc2_core_foundation::{CFBoolean, CFDictionary, CFString};
-    use objc2_core_graphics::{
-        CGPreflightListenEventAccess, CGPreflightScreenCaptureAccess, CGRequestListenEventAccess,
-        CGRequestScreenCaptureAccess,
-    };
+    use objc2_core_graphics::{CGPreflightScreenCaptureAccess, CGRequestScreenCaptureAccess};
     use tauri::AppHandle;
     use tauri_plugin_opener::OpenerExt;
 
     use super::{MacOsPermissionKind, MacOsPermissionStatus};
+    use crate::capabilities::error::{CommandError, ErrorCode};
 
     pub(super) fn read_status() -> MacOsPermissionStatus {
         MacOsPermissionStatus {
             accessibility: unsafe { AXIsProcessTrusted() },
-            input_monitoring: CGPreflightListenEventAccess(),
             screen_recording: CGPreflightScreenCaptureAccess(),
         }
     }
@@ -93,9 +101,6 @@ mod macos {
     pub(super) fn request(kind: MacOsPermissionKind) {
         match kind {
             MacOsPermissionKind::Accessibility => prompt_accessibility(),
-            MacOsPermissionKind::InputMonitoring => {
-                let _ = CGRequestListenEventAccess();
-            }
             MacOsPermissionKind::ScreenRecording => {
                 let _ = CGRequestScreenCaptureAccess();
             }
@@ -116,9 +121,6 @@ mod macos {
             MacOsPermissionKind::Accessibility => {
                 "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Privacy_Accessibility"
             }
-            MacOsPermissionKind::InputMonitoring => {
-                "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Privacy_ListenEvent"
-            }
             MacOsPermissionKind::ScreenRecording => {
                 "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Privacy_ScreenCapture"
             }
@@ -128,9 +130,12 @@ mod macos {
     pub(super) fn open_privacy_pane(
         app: &AppHandle,
         kind: MacOsPermissionKind,
-    ) -> Result<(), String> {
+    ) -> Result<(), CommandError> {
         app.opener()
             .open_url(privacy_url(kind), None::<&str>)
-            .map_err(|error| format!("Failed to open System Settings: {error}"))
+            .map_err(|error| {
+                CommandError::new(ErrorCode::OpenFailed, "Failed to open System Settings")
+                    .with_details(error.to_string())
+            })
     }
 }

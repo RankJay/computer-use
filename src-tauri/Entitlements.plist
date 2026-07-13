@@ -3,7 +3,7 @@
 <plist version="1.0">
 <!--
   No App Sandbox: shell, workspace files, and launching arbitrary apps need full FS access.
-  Accessibility and Input Monitoring are user TCC grants in System Settings, not entitlements.
+  Accessibility is a user TCC grant in System Settings, not an entitlement.
 -->
 <dict/>
 </plist>

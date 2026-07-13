@@ -14,7 +14,7 @@ pub fn require_macos_automation(need_post_events: bool) {
     if need_post_events {
         assert!(
             CGPreflightPostEventAccess(),
-            "Grant Accessibility (and Input Monitoring if prompted) to the process running cargo test under System Settings → Privacy & Security"
+            "Grant Accessibility to the process running cargo test under System Settings → Privacy & Security → Accessibility"
         );
     }
 }

@@ -1,8 +1,7 @@
-export type MacOsPermissionKind = "accessibility" | "inputMonitoring" | "screenRecording";
+export type MacOsPermissionKind = "accessibility" | "screenRecording";
 
 export type MacOsPermissionStatus = {
   accessibility: boolean;
-  inputMonitoring: boolean;
   screenRecording: boolean;
 };
 
@@ -19,12 +18,6 @@ export const MACOS_PERMISSIONS: readonly MacOsPermissionMeta[] = [
     label: "Accessibility",
     description: "Read UI and control other apps (required for click, type, and window tools).",
     granted: (status) => status.accessibility,
-  },
-  {
-    kind: "inputMonitoring",
-    label: "Input Monitoring",
-    description: "Observe keyboard input used by some automation paths.",
-    granted: (status) => status.inputMonitoring,
   },
   {
     kind: "screenRecording",

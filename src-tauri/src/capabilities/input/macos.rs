@@ -37,7 +37,7 @@ use super::synthesizer::InputSynthesizer;
 use super::types::MouseButton;
 
 const INPUT_PERMISSION_HINT: &str =
-    "Grant Accessibility for Actuate in System Settings → Privacy & Security → Accessibility (Input Monitoring may also be required)";
+    "Grant Accessibility for Actuate in System Settings → Privacy & Security → Accessibility";
 
 /// Tracks held modifier flags across separate `key_down`/`key_up` commands so
 /// chords like `key_down(Win); key_press(C); key_up(Win)` stamp `MaskCommand`

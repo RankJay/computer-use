@@ -1,6 +1,8 @@
 use tauri::{AppHandle, Manager};
 use tauri_plugin_notification::NotificationExt;
 
+use crate::capabilities::error::{CommandError, ErrorCode};
+
 #[cfg(desktop)]
 use std::sync::Once;
 
@@ -125,7 +127,7 @@ pub fn notify(
     title: String,
     body: String,
     only_if_unfocused: bool,
-) -> Result<NotifyResult, String> {
+) -> Result<NotifyResult, CommandError> {
     if only_if_unfocused {
         let Some(window) = app.get_webview_window("main") else {
             return Ok(NotifyResult { notified: false });
@@ -140,7 +142,10 @@ pub fn notify(
         .title(title)
         .body(body)
         .show()
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| {
+            CommandError::new(ErrorCode::NotifyFailed, "Failed to show notification")
+                .with_details(e.to_string())
+        })?;
 
     Ok(NotifyResult { notified: true })
 }
