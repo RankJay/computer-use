@@ -80,12 +80,36 @@ fn resolve_stored_element_once(
 
     if !stored.runtime_id.is_empty() {
         if let Some(element) = walk_path(&root, &stored.runtime_id) {
-            return Ok((element, ResolveStats { nodes_visited: 1 }));
+            if verify_walked_element(stored, &element) {
+                return Ok((element, ResolveStats { nodes_visited: 1 }));
+            }
         }
     }
 
     let mut budget = SearchBudget::until(deadline, RESOLVE_MAX_NODES);
     resolve_element_by_fingerprint(stored, &root, &mut budget)
+}
+
+/// Accept a path-walked element only if its live attributes still match the
+/// snapshot. Empty stored fields impose no constraint (see doc 03).
+fn fingerprint_matches(stored: &StoredElement, role: &str, name: &str, automation_id: &str) -> bool {
+    if stored.role.as_deref().is_some_and(|r| r != role) {
+        return false;
+    }
+    if !stored.automation_id.is_empty() && stored.automation_id != automation_id {
+        return false;
+    }
+    if !stored.name.is_empty() && stored.name != name {
+        return false;
+    }
+    true
+}
+
+/// One batched attr read, then exact role/name/id check against the snapshot.
+fn verify_walked_element(stored: &StoredElement, element: &AXUIElement) -> bool {
+    let attrs = element_node_attrs(element);
+    let (_, label) = map_ax_role(&attrs.role);
+    fingerprint_matches(stored, label, &attrs.name, &attrs.automation_id)
 }
 
 fn resolve_element_by_fingerprint(
@@ -408,5 +432,68 @@ mod tests {
             children: vec![],
         };
         assert!(fingerprint_prescreen(&stored, &attrs));
+    }
+
+    fn stored_for_match(
+        role: Option<&str>,
+        name: &str,
+        automation_id: &str,
+    ) -> StoredElement {
+        StoredElement {
+            hwnd: WindowId(1),
+            runtime_id: vec![0, 1],
+            process_id: 1,
+            name: name.to_string(),
+            role: role.map(str::to_string),
+            automation_id: automation_id.to_string(),
+            rect: None,
+            ancestor_chain: vec![],
+        }
+    }
+
+    #[test]
+    fn fingerprint_matches_rejects_role_mismatch() {
+        let stored = stored_for_match(Some("Button"), "Delete draft", "");
+        assert!(!fingerprint_matches(
+            &stored,
+            "ListItem",
+            "Delete draft",
+            ""
+        ));
+    }
+
+    #[test]
+    fn fingerprint_matches_rejects_automation_id_mismatch() {
+        let stored = stored_for_match(Some("Button"), "Save", "save-btn");
+        assert!(!fingerprint_matches(&stored, "Button", "Save", "other-btn"));
+    }
+
+    #[test]
+    fn fingerprint_matches_rejects_name_mismatch() {
+        let stored = stored_for_match(Some("ListItem"), "Delete draft", "");
+        assert!(!fingerprint_matches(
+            &stored,
+            "ListItem",
+            "Reply to boss",
+            ""
+        ));
+    }
+
+    #[test]
+    fn fingerprint_matches_accepts_role_only_when_name_and_id_empty() {
+        let stored = stored_for_match(Some("Group"), "", "");
+        assert!(fingerprint_matches(&stored, "Group", "whatever", "id"));
+    }
+
+    #[test]
+    fn fingerprint_matches_accepts_all_fields() {
+        let stored = stored_for_match(Some("Button"), "Save", "save-btn");
+        assert!(fingerprint_matches(&stored, "Button", "Save", "save-btn"));
+    }
+
+    #[test]
+    fn fingerprint_matches_ignores_empty_stored_role() {
+        let stored = stored_for_match(None, "Save", "");
+        assert!(fingerprint_matches(&stored, "Button", "Save", ""));
     }
 }
