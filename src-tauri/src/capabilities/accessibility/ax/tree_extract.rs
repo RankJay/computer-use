@@ -13,8 +13,7 @@ use super::super::arena::NodeRecord;
 use super::super::budget::{SearchBudget, SNAPSHOT_MAX_NODES};
 use super::roles::{map_ax_role, should_skip_role_allow_text};
 use super::session::{
-    ax_window_for_hwnd, element_automation_id, element_children, element_is_enabled, element_name,
-    element_rect, element_role, element_value_text, AxSession,
+    ax_window_for_hwnd, element_children, element_node_attrs, AxSession, NodeAttrs,
 };
 
 pub(super) struct ExtractedTree {
@@ -60,7 +59,8 @@ fn extract_via_bfs(
     nodes: &mut Vec<NodeRecord>,
     budget: &mut SearchBudget,
 ) -> Result<(), CommandError> {
-    let Some(root_record) = project_element_allow_text(root, None, 0, &[], &[]) else {
+    let Some((root_record, root_children)) = project_element_with_children(root, None, 0, &[], &[])
+    else {
         return Ok(());
     };
     if !budget.visit_soft() {
@@ -68,11 +68,11 @@ fn extract_via_bfs(
     }
     nodes.push(root_record);
 
-    // Queue: (parent_idx, path_from_root, element)
-    let mut queue: VecDeque<(u32, Vec<i32>, CFRetained<AXUIElement>)> = VecDeque::new();
-    queue.push_back((0, Vec::new(), CFRetained::from(root)));
+    // Queue: (parent_idx, path_from_root, batched children)
+    let mut queue: VecDeque<(u32, Vec<i32>, Vec<CFRetained<AXUIElement>>)> = VecDeque::new();
+    queue.push_back((0, Vec::new(), root_children));
 
-    while let Some((parent_idx, path, parent_el)) = queue.pop_front() {
+    while let Some((parent_idx, path, children)) = queue.pop_front() {
         if budget.exhausted() {
             break;
         }
@@ -88,7 +88,6 @@ fn extract_via_bfs(
             chain
         };
 
-        let children = element_children(&parent_el);
         for (child_index, child) in children.into_iter().enumerate() {
             if budget.exhausted() || !budget.visit_soft() {
                 break;
@@ -96,7 +95,7 @@ fn extract_via_bfs(
             let depth = parent_depth + 1;
             let mut child_path = path.clone();
             child_path.push(child_index as i32);
-            let Some(record) = project_element_allow_text(
+            let Some((record, grandchildren)) = project_element_with_children(
                 &child,
                 Some(parent_idx),
                 depth,
@@ -109,7 +108,7 @@ fn extract_via_bfs(
             nodes[parent_idx as usize].children.push(idx);
             nodes.push(record);
             if depth < max_depth {
-                queue.push_back((idx, child_path, child));
+                queue.push_back((idx, child_path, grandchildren));
             }
         }
     }
@@ -135,45 +134,48 @@ pub(super) fn project_element_allow_text(
     ancestors: &[String],
     path: &[i32],
 ) -> Option<NodeRecord> {
-    let role = element_role(element);
-    if should_skip_role_allow_text(&role) {
-        return None;
-    }
-    Some(project_inner(
-        element, parent, depth, ancestors, path, &role,
-    ))
+    project_element_with_children(element, parent, depth, ancestors, path).map(|(record, _)| record)
 }
 
-fn project_inner(
+fn project_element_with_children(
     element: &AXUIElement,
     parent: Option<u32>,
     depth: u32,
     ancestors: &[String],
     path: &[i32],
-    ax_role: &str,
-) -> NodeRecord {
-    let (control_type_raw, label) = map_ax_role(ax_role);
-    let name = element_name(element);
-    let automation_id = element_automation_id(element);
-    let enabled = element_is_enabled(element);
-    let rect = element_rect(element);
-    let offscreen = rect.is_none_or(|(l, t, r, b)| r <= l || b <= t);
-    let value = element_value_text(element);
-    NodeRecord {
+) -> Option<(NodeRecord, Vec<CFRetained<AXUIElement>>)> {
+    let attrs = element_node_attrs(element);
+    if should_skip_role_allow_text(&attrs.role) {
+        return None;
+    }
+    Some((project_from_attrs(attrs, parent, depth, ancestors, path)))
+}
+
+fn project_from_attrs(
+    attrs: NodeAttrs,
+    parent: Option<u32>,
+    depth: u32,
+    ancestors: &[String],
+    path: &[i32],
+) -> (NodeRecord, Vec<CFRetained<AXUIElement>>) {
+    let (control_type_raw, label) = map_ax_role(&attrs.role);
+    let offscreen = attrs.rect.is_none_or(|(l, t, r, b)| r <= l || b <= t);
+    let record = NodeRecord {
         parent,
         children: Vec::new(),
         runtime_id: path.to_vec(),
-        automation_id,
-        name,
+        automation_id: attrs.automation_id,
+        name: attrs.name,
         role: Some(label.to_string()),
         control_type_raw,
-        enabled,
+        enabled: attrs.enabled,
         offscreen,
-        rect,
-        value,
+        rect: attrs.rect,
+        value: attrs.value,
         ancestor_chain: ancestors.to_vec(),
         depth,
-    }
+    };
+    (record, attrs.children)
 }
 
 fn ancestor_label(record: &NodeRecord) -> String {

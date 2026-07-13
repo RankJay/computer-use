@@ -3,11 +3,17 @@
 use std::ffi::c_void;
 use std::ptr::NonNull;
 
+#[cfg(feature = "a11y-bench")]
+use std::cell::Cell;
+
 use libc::pid_t;
 use objc2_app_kit::{NSApplicationActivationOptions, NSRunningApplication};
-use objc2_application_services::{AXError, AXIsProcessTrusted, AXUIElement, AXValue, AXValueType};
+use objc2_application_services::{
+    AXCopyMultipleAttributeOptions, AXError, AXIsProcessTrusted, AXUIElement, AXValue, AXValueType,
+};
 use objc2_core_foundation::{
-    CFArray, CFBoolean, CFDictionary, CFNumber, CFRetained, CFString, CFType, CGPoint, CGSize,
+    CFArray, CFBoolean, CFDictionary, CFNull, CFNumber, CFRetained, CFString, CFType, CGPoint,
+    CGSize,
 };
 use objc2_core_graphics::{
     kCGNullWindowID, kCGWindowLayer, kCGWindowName, kCGWindowNumber, kCGWindowOwnerName,
@@ -46,6 +52,36 @@ const AX_PARENT: &str = "AXParent";
 
 const ACCESSIBILITY_HINT: &str =
     "Grant Accessibility for Actuate in System Settings → Privacy & Security → Accessibility";
+
+/// Projection / BFS attribute set — one IPC via [`ax_copy_attributes`].
+const NODE_ATTRS: &[&str] = &[
+    AX_ROLE,
+    AX_TITLE,
+    AX_DESCRIPTION,
+    AX_IDENTIFIER,
+    AX_ENABLED,
+    AX_POSITION,
+    AX_SIZE,
+    AX_VALUE,
+    AX_CHILDREN,
+];
+
+#[cfg(feature = "a11y-bench")]
+thread_local! {
+    static IPC_CALLS: Cell<u64> = const { Cell::new(0) };
+}
+
+#[inline]
+fn record_ax_ipc() {
+    #[cfg(feature = "a11y-bench")]
+    IPC_CALLS.with(|c| c.set(c.get().saturating_add(1)));
+}
+
+/// Reset and return the thread-local AX IPC call counter (a11y-bench only).
+#[cfg(feature = "a11y-bench")]
+pub fn take_ax_ipc_calls() -> u64 {
+    IPC_CALLS.with(|c| c.replace(0))
+}
 
 pub struct AxSession {
     pub system_wide: CFRetained<AXUIElement>,
@@ -259,6 +295,105 @@ pub(super) fn element_children(element: &AXUIElement) -> Vec<CFRetained<AXUIElem
         .unwrap_or_default()
 }
 
+/// Batched attributes for one AX node (tree walk / fingerprint scan).
+pub(super) struct NodeAttrs {
+    pub role: String,
+    pub name: String,
+    pub automation_id: String,
+    pub enabled: bool,
+    pub rect: Option<(i32, i32, i32, i32)>,
+    pub value: Option<String>,
+    pub children: Vec<CFRetained<AXUIElement>>,
+}
+
+/// One IPC for the projection attribute set; falls back to singles if batch fails.
+pub(super) fn element_node_attrs(element: &AXUIElement) -> NodeAttrs {
+    match ax_copy_attributes(element, NODE_ATTRS) {
+        Ok(slots) if slots.len() == NODE_ATTRS.len() => node_attrs_from_slots(slots),
+        _ => element_node_attrs_fallback(element),
+    }
+}
+
+fn element_node_attrs_fallback(element: &AXUIElement) -> NodeAttrs {
+    NodeAttrs {
+        role: element_role(element),
+        name: element_name(element),
+        automation_id: element_automation_id(element),
+        enabled: element_is_enabled(element),
+        rect: element_rect(element),
+        value: element_value_text(element),
+        children: element_children(element),
+    }
+}
+
+fn node_attrs_from_slots(mut slots: Vec<Option<CFRetained<CFType>>>) -> NodeAttrs {
+    // Indices match NODE_ATTRS.
+    let children_slot = slots.pop().flatten();
+    let value_slot = slots.pop().flatten();
+    let size_slot = slots.pop().flatten();
+    let position_slot = slots.pop().flatten();
+    let enabled_slot = slots.pop().flatten();
+    let identifier_slot = slots.pop().flatten();
+    let description_slot = slots.pop().flatten();
+    let title_slot = slots.pop().flatten();
+    let role_slot = slots.pop().flatten();
+
+    let role = slot_string(role_slot).unwrap_or_default();
+    let name = slot_string(title_slot)
+        .or_else(|| slot_string(description_slot))
+        .unwrap_or_default();
+    let automation_id = slot_string(identifier_slot).unwrap_or_default();
+    let enabled = slot_bool(enabled_slot).unwrap_or(true);
+    let rect = match (slot_point(position_slot), slot_size(size_slot)) {
+        (Some(pos), Some(size)) => {
+            let left = pos.x.round() as i32;
+            let top = pos.y.round() as i32;
+            let right = left + size.width.round() as i32;
+            let bottom = top + size.height.round() as i32;
+            Some((left, top, right, bottom))
+        }
+        _ => None,
+    };
+    let value = slot_string(value_slot).filter(|v| is_useful_value(v));
+    let children = slot_element_array(children_slot).unwrap_or_default();
+
+    NodeAttrs {
+        role,
+        name,
+        automation_id,
+        enabled,
+        rect,
+        value,
+        children,
+    }
+}
+
+/// One hop of ancestor labeling: role/name of `element`, plus its parent for the next hop.
+pub(super) fn element_ancestor_hop(
+    element: &AXUIElement,
+) -> (String, String, Option<CFRetained<AXUIElement>>) {
+    const ATTRS: &[&str] = &[AX_PARENT, AX_ROLE, AX_TITLE, AX_DESCRIPTION];
+    match ax_copy_attributes(element, ATTRS) {
+        Ok(mut slots) if slots.len() == ATTRS.len() => {
+            let description_slot = slots.pop().flatten();
+            let title_slot = slots.pop().flatten();
+            let role_slot = slots.pop().flatten();
+            let parent_slot = slots.pop().flatten();
+            let parent = slot_element(parent_slot);
+            let role = slot_string(role_slot).unwrap_or_default();
+            let name = slot_string(title_slot)
+                .or_else(|| slot_string(description_slot))
+                .unwrap_or_default();
+            (role, name, parent)
+        }
+        _ => (
+            element_role(element),
+            element_name(element),
+            element_parent(element),
+        ),
+    }
+}
+
 pub(super) fn element_parent(element: &AXUIElement) -> Option<CFRetained<AXUIElement>> {
     ax_copy_element(element, AX_PARENT).ok()
 }
@@ -393,6 +528,7 @@ fn ax_copy_attribute(
     element: &AXUIElement,
     attribute: &str,
 ) -> Result<CFRetained<CFType>, CommandError> {
+    record_ax_ipc();
     let attr = CFString::from_str(attribute);
     let mut value: *const CFType = std::ptr::null();
     let err = unsafe { element.copy_attribute_value(&attr, NonNull::from(&mut value)) };
@@ -404,6 +540,109 @@ fn ax_copy_attribute(
         ));
     };
     Ok(unsafe { CFRetained::from_raw(ptr) })
+}
+
+/// One IPC round trip for N attributes. Result is positional: `out[i]` matches
+/// `attributes[i]`; `None` means missing/unsupported (CFNull or AXError sentinel).
+pub(super) fn ax_copy_attributes(
+    element: &AXUIElement,
+    attributes: &[&str],
+) -> Result<Vec<Option<CFRetained<CFType>>>, CommandError> {
+    if attributes.is_empty() {
+        return Ok(Vec::new());
+    }
+    record_ax_ipc();
+    let attr_objs: Vec<CFRetained<CFString>> = attributes
+        .iter()
+        .map(|name| CFString::from_str(name))
+        .collect();
+    let typed = CFArray::from_retained_objects(&attr_objs);
+    // Binding takes untyped CFArray; strings are CFTypes so the cast is sound.
+    let attrs: CFRetained<CFArray> = unsafe { CFRetained::cast_unchecked(typed) };
+    let mut values: *const CFArray = std::ptr::null();
+    let err = unsafe {
+        element.copy_multiple_attribute_values(
+            &attrs,
+            AXCopyMultipleAttributeOptions::empty(),
+            NonNull::from(&mut values),
+        )
+    };
+    map_ax_error(err, "copy_multiple_attribute_values")?;
+    let Some(ptr) = NonNull::new(values.cast_mut()) else {
+        return Err(CommandError::new(
+            ErrorCode::ActionUnavailable,
+            "Accessibility copy_multiple_attribute_values returned null",
+        ));
+    };
+    // Create rule: take ownership of the returned array.
+    let values: CFRetained<CFArray<CFType>> =
+        unsafe { CFRetained::cast_unchecked(CFRetained::from_raw(ptr)) };
+    if values.len() != attributes.len() {
+        return Err(CommandError::new(
+            ErrorCode::ActionUnavailable,
+            format!(
+                "Accessibility batch returned {} values for {} attributes",
+                values.len(),
+                attributes.len()
+            ),
+        ));
+    }
+    Ok(values.iter().map(decode_slot).collect())
+}
+
+/// CFNull / kAXValueAXErrorType → None; otherwise retain the value.
+fn decode_slot(value: CFRetained<CFType>) -> Option<CFRetained<CFType>> {
+    if value.downcast_ref::<CFNull>().is_some() {
+        return None;
+    }
+    if let Some(ax_value) = value.downcast_ref::<AXValue>() {
+        if unsafe { ax_value.r#type() } == AXValueType::AXError {
+            return None;
+        }
+    }
+    Some(value)
+}
+
+fn slot_string(slot: Option<CFRetained<CFType>>) -> Option<String> {
+    slot?.downcast::<CFString>().ok().map(|s| s.to_string())
+}
+
+fn slot_bool(slot: Option<CFRetained<CFType>>) -> Option<bool> {
+    slot?.downcast::<CFBoolean>().ok().map(|b| b.as_bool())
+}
+
+fn slot_point(slot: Option<CFRetained<CFType>>) -> Option<CGPoint> {
+    let ax_value = slot?.downcast::<AXValue>().ok()?;
+    let mut point = CGPoint::new(0.0, 0.0);
+    let ok = unsafe {
+        ax_value.value(
+            AXValueType::CGPoint,
+            NonNull::from(&mut point).cast::<c_void>(),
+        )
+    };
+    ok.then_some(point)
+}
+
+fn slot_size(slot: Option<CFRetained<CFType>>) -> Option<CGSize> {
+    let ax_value = slot?.downcast::<AXValue>().ok()?;
+    let mut size = CGSize::new(0.0, 0.0);
+    let ok = unsafe {
+        ax_value.value(
+            AXValueType::CGSize,
+            NonNull::from(&mut size).cast::<c_void>(),
+        )
+    };
+    ok.then_some(size)
+}
+
+fn slot_element(slot: Option<CFRetained<CFType>>) -> Option<CFRetained<AXUIElement>> {
+    slot?.downcast::<AXUIElement>().ok()
+}
+
+fn slot_element_array(slot: Option<CFRetained<CFType>>) -> Option<Vec<CFRetained<AXUIElement>>> {
+    let array = slot?.downcast::<CFArray>().ok()?;
+    let typed: CFRetained<CFArray<AXUIElement>> = unsafe { CFRetained::cast_unchecked(array) };
+    Some(typed.iter().collect())
 }
 
 fn ax_copy_string(element: &AXUIElement, attribute: &str) -> Result<String, CommandError> {
@@ -509,5 +748,38 @@ mod tests {
     fn rejects_non_positive_hwnd() {
         let error = lookup_cg_window(WindowId(0)).expect_err("zero id");
         assert_eq!(error.code, "invalid_hwnd");
+    }
+
+    #[test]
+    fn decode_slot_treats_cfnull_as_absent() {
+        let Some(null) = objc2_core_foundation::kCFNull else {
+            return;
+        };
+        let retained: CFRetained<CFType> = CFRetained::from(null);
+        assert!(decode_slot(retained).is_none());
+    }
+
+    #[test]
+    fn decode_slot_treats_ax_error_sentinel_as_absent() {
+        let mut err = AXError::NoValue;
+        let Some(ax_value) = (unsafe {
+            AXValue::new(
+                AXValueType::AXError,
+                NonNull::from(&mut err).cast::<c_void>(),
+            )
+        }) else {
+            return;
+        };
+        let retained: CFRetained<CFType> = CFRetained::from(ax_value);
+        assert!(decode_slot(retained).is_none());
+    }
+
+    #[test]
+    fn decode_slot_keeps_real_values() {
+        let s = CFString::from_str("hello");
+        let retained: CFRetained<CFType> = CFRetained::from(s);
+        let kept = decode_slot(retained).expect("string slot");
+        let text = kept.downcast::<CFString>().expect("CFString").to_string();
+        assert_eq!(text, "hello");
     }
 }

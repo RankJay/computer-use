@@ -22,7 +22,7 @@ pub use accessibility::{
 
 #[cfg(any(windows, target_os = "macos"))]
 pub use accessibility::a11y_live_smoke;
-#[cfg(all(windows, feature = "a11y-bench"))]
+#[cfg(all(any(windows, target_os = "macos"), feature = "a11y-bench"))]
 pub use accessibility::bench;
 pub use clipboard::{
     read_clipboard, read_clipboard_html, read_clipboard_image, write_clipboard,

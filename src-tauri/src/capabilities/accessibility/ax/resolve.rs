@@ -14,9 +14,9 @@ use super::super::state::{make_reference, SnapshotStore, StoredElement};
 use super::super::types::TextResult;
 use super::roles::map_ax_role;
 use super::session::{
-    ax_window_for_hwnd, element_automation_id, element_cg_window_id, element_name, element_parent,
-    element_pid, element_rect, element_role, is_transient_command_error, process_id_for_hwnd,
-    AxSession, RESOLVE_RETRY_ATTEMPTS, TRANSIENT_AX_RETRY_MS,
+    ax_window_for_hwnd, element_ancestor_hop, element_cg_window_id, element_node_attrs,
+    element_parent, element_pid, is_transient_command_error, process_id_for_hwnd, AxSession,
+    NodeAttrs, RESOLVE_RETRY_ATTEMPTS, TRANSIENT_AX_RETRY_MS,
 };
 use super::tree_extract::{project_element_allow_text, walk_path};
 
@@ -95,11 +95,12 @@ fn resolve_element_by_fingerprint(
         if visited > 8_000 {
             break;
         }
-        let score = fingerprint_score(stored, &element);
+        let attrs = element_node_attrs(&element);
+        let score = fingerprint_score(stored, &element, &attrs);
         if score > 0 {
-            scored.push((score, element.clone()));
+            scored.push((score, element));
         }
-        for child in super::session::element_children(&element) {
+        for child in attrs.children {
             stack.push(child);
         }
     }
@@ -129,22 +130,19 @@ fn resolve_element_by_fingerprint(
     }
 }
 
-fn fingerprint_score(stored: &StoredElement, element: &AXUIElement) -> i32 {
+fn fingerprint_score(stored: &StoredElement, element: &AXUIElement, attrs: &NodeAttrs) -> i32 {
     let mut score = 0i32;
-    let name = element_name(element);
-    let automation_id = element_automation_id(element);
-    let ax_role = element_role(element);
-    let (_, label) = map_ax_role(&ax_role);
+    let (_, label) = map_ax_role(&attrs.role);
     let role = Some(label.to_string());
-    let rect = element_rect(element);
 
-    if !stored.automation_id.is_empty() && stored.automation_id == automation_id {
+    if !stored.automation_id.is_empty() && stored.automation_id == attrs.automation_id {
         score += 100;
     }
-    if !stored.name.is_empty() && stored.name == name {
+    if !stored.name.is_empty() && stored.name == attrs.name {
         score += 40;
     } else if !stored.name.is_empty()
-        && name
+        && attrs
+            .name
             .to_ascii_lowercase()
             .contains(&stored.name.to_ascii_lowercase())
     {
@@ -153,7 +151,7 @@ fn fingerprint_score(stored: &StoredElement, element: &AXUIElement) -> i32 {
     if stored.role.is_some() && stored.role == role {
         score += 25;
     }
-    if let (Some(a), Some(b)) = (stored.rect, rect) {
+    if let (Some(a), Some(b)) = (stored.rect, attrs.rect) {
         score += rect_overlap_score(a, b);
     }
     if !stored.ancestor_chain.is_empty() {
@@ -172,15 +170,15 @@ fn fingerprint_score(stored: &StoredElement, element: &AXUIElement) -> i32 {
 
 fn collect_ancestor_labels(element: &AXUIElement, max_len: usize) -> Vec<String> {
     let mut chain = Vec::new();
-    let mut current = CFRetained::from(element);
+    let Some(mut current) = element_parent(element) else {
+        return chain;
+    };
     for _ in 0..max_len.saturating_add(2).min(24) {
-        match element_parent(&current) {
-            Some(parent) => {
-                let ax_role = element_role(&parent);
-                let (_, label) = map_ax_role(&ax_role);
-                chain.push(format!("{}:{}", label, element_name(&parent)));
-                current = parent;
-            }
+        let (ax_role, name, parent) = element_ancestor_hop(&current);
+        let (_, label) = map_ax_role(&ax_role);
+        chain.push(format!("{label}:{name}"));
+        match parent {
+            Some(next) => current = next,
             None => break,
         }
     }
@@ -281,4 +279,15 @@ pub(super) fn resolve_element_hwnd(
 #[cfg_attr(not(feature = "a11y-bench"), allow(dead_code))]
 pub struct ResolveStats {
     pub nodes_visited: u32,
+}
+
+/// Resolve a stored reference and return visit stats (for a11y-bench).
+#[cfg_attr(not(feature = "a11y-bench"), allow(dead_code))]
+pub fn resolve_reference_with_stats(
+    _session: &AxSession,
+    store: &SnapshotStore,
+    reference: &str,
+) -> Result<ResolveStats, CommandError> {
+    let stored = store.resolve_ref_or_stale(reference)?;
+    Ok(resolve_stored_element_with_stats(&stored)?.1)
 }

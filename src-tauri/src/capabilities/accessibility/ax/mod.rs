@@ -7,7 +7,15 @@ mod roles;
 mod session;
 mod tree_extract;
 
+#[cfg(feature = "a11y-bench")]
+pub use resolve::{resolve_reference_with_stats, ResolveStats};
 pub use session::snapshot_timeout_ms;
+#[cfg(feature = "a11y-bench")]
+pub use session::{take_ax_ipc_calls, SnapshotStats};
+#[cfg(feature = "a11y-bench")]
+pub use snapshot_with_stats;
+#[cfg(feature = "a11y-bench")]
+pub use AxAccessibilitySession;
 
 use std::collections::HashMap;
 use std::time::Instant;
@@ -49,7 +57,8 @@ pub fn snapshot_impl(
     Ok(snapshot_with_stats(session, arenas, store, input, deadline)?.0)
 }
 
-fn snapshot_with_stats(
+#[cfg_attr(not(feature = "a11y-bench"), allow(dead_code))]
+pub fn snapshot_with_stats(
     session: &SessionInner,
     arenas: &mut HashMap<WindowId, ElementArena>,
     store: &SnapshotStore,
@@ -487,8 +496,8 @@ impl AccessibilityProvider for AxProvider {
 }
 
 pub struct AxAccessibilitySession {
-    inner: SessionInner,
-    arenas: HashMap<WindowId, ElementArena>,
+    pub(crate) inner: SessionInner,
+    pub(crate) arenas: HashMap<WindowId, ElementArena>,
 }
 
 // SAFETY: Lives only on the a11y worker thread; AX handles never crossed.

@@ -22,7 +22,7 @@ mod unsupported;
 #[cfg(test)]
 mod fake;
 
-#[cfg(all(windows, feature = "a11y-bench"))]
+#[cfg(all(any(windows, target_os = "macos"), feature = "a11y-bench"))]
 pub mod bench;
 
 #[cfg(any(windows, target_os = "macos"))]
