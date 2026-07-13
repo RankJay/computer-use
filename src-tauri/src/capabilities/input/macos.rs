@@ -9,6 +9,10 @@
 //! Prefer `kCGHIDEventTap`. If events are ignored under HID-only delivery, switch
 //! the post site to `kCGSessionEventTap` (CGEventPost has no error return).
 //! Posting requires Accessibility (`CGPreflightPostEventAccess`).
+//!
+//! Each synthesizer operation creates one `CGEventSource` and runs one
+//! `CGPreflightPostEventAccess` check, then reuses them for every event in the
+//! gesture (same pattern as `type_unicode` in the a11y adapter).
 
 use std::thread;
 use std::time::Duration;
@@ -34,7 +38,9 @@ pub struct MacosInputSynthesizer;
 
 impl InputSynthesizer for MacosInputSynthesizer {
     fn mouse_move(&self, x: i32, y: i32) -> Result<OkResult, CommandError> {
-        set_cursor_pos(x, y)?;
+        require_post_access()?;
+        let source = event_source()?;
+        set_cursor_pos(&source, x, y)?;
         Ok(OkResult { ok: true })
     }
 
@@ -44,8 +50,10 @@ impl InputSynthesizer for MacosInputSynthesizer {
         x: Option<i32>,
         y: Option<i32>,
     ) -> Result<OkResult, CommandError> {
+        require_post_access()?;
+        let source = event_source()?;
         let point = resolve_point(x, y)?;
-        post_mouse(button_down_type(button), button, point, 1)?;
+        post_mouse(&source, button_down_type(button), button, point, 1)?;
         Ok(OkResult { ok: true })
     }
 
@@ -55,8 +63,10 @@ impl InputSynthesizer for MacosInputSynthesizer {
         x: Option<i32>,
         y: Option<i32>,
     ) -> Result<OkResult, CommandError> {
+        require_post_access()?;
+        let source = event_source()?;
         let point = resolve_point(x, y)?;
-        post_mouse(button_up_type(button), button, point, 1)?;
+        post_mouse(&source, button_up_type(button), button, point, 1)?;
         Ok(OkResult { ok: true })
     }
 
@@ -67,12 +77,14 @@ impl InputSynthesizer for MacosInputSynthesizer {
         x: Option<i32>,
         y: Option<i32>,
     ) -> Result<OkResult, CommandError> {
+        require_post_access()?;
+        let source = event_source()?;
         let point = resolve_point(x, y)?;
         let down = button_down_type(button);
         let up = button_up_type(button);
         for click in 1..=count {
-            post_mouse(down, button, point, click)?;
-            post_mouse(up, button, point, click)?;
+            post_mouse(&source, down, button, point, click)?;
+            post_mouse(&source, up, button, point, click)?;
             if click < count {
                 thread::sleep(Duration::from_millis(40));
             }
@@ -87,9 +99,9 @@ impl InputSynthesizer for MacosInputSynthesizer {
         x: Option<i32>,
         y: Option<i32>,
     ) -> Result<OkResult, CommandError> {
-        maybe_move(x, y)?;
         require_post_access()?;
         let source = event_source()?;
+        maybe_move(&source, x, y)?;
         // Axis 1 = vertical (positive = up), axis 2 = horizontal.
         let event =
             CGEvent::new_scroll_wheel_event2(Some(&source), CGScrollEventUnit::Line, 2, dy, dx, 0)
@@ -115,9 +127,11 @@ impl InputSynthesizer for MacosInputSynthesizer {
         button: MouseButton,
         steps: u32,
     ) -> Result<OkResult, CommandError> {
+        require_post_access()?;
+        let source = event_source()?;
         let steps = steps.max(1);
-        set_cursor_pos(x0, y0)?;
-        post_mouse(button_down_type(button), button, point(x0, y0), 1)?;
+        set_cursor_pos(&source, x0, y0)?;
+        post_mouse(&source, button_down_type(button), button, point(x0, y0), 1)?;
 
         let drag_type = button_drag_type(button);
         for step in 1..=steps {
@@ -125,16 +139,18 @@ impl InputSynthesizer for MacosInputSynthesizer {
             let x = (x0 as f64 + (x1 - x0) as f64 * t).round() as i32;
             let y = (y0 as f64 + (y1 - y0) as f64 * t).round() as i32;
             validate_coords(x, y)?;
-            post_mouse(drag_type, button, point(x, y), 1)?;
+            post_mouse(&source, drag_type, button, point(x, y), 1)?;
             thread::sleep(Duration::from_millis(8));
         }
 
-        post_mouse(button_up_type(button), button, point(x1, y1), 1)?;
+        post_mouse(&source, button_up_type(button), button, point(x1, y1), 1)?;
         Ok(OkResult { ok: true })
     }
 
     fn mouse_hover(&self, x: i32, y: i32, ms: u64) -> Result<OkResult, CommandError> {
-        set_cursor_pos(x, y)?;
+        require_post_access()?;
+        let source = event_source()?;
+        set_cursor_pos(&source, x, y)?;
         if ms > 0 {
             thread::sleep(Duration::from_millis(ms.min(30_000)));
         }
@@ -142,31 +158,39 @@ impl InputSynthesizer for MacosInputSynthesizer {
     }
 
     fn key_down(&self, key: Key) -> Result<OkResult, CommandError> {
-        post_key(virtual_key(key), true)?;
+        require_post_access()?;
+        let source = event_source()?;
+        post_key(&source, virtual_key(key), true)?;
         Ok(OkResult { ok: true })
     }
 
     fn key_up(&self, key: Key) -> Result<OkResult, CommandError> {
-        post_key(virtual_key(key), false)?;
+        require_post_access()?;
+        let source = event_source()?;
+        post_key(&source, virtual_key(key), false)?;
         Ok(OkResult { ok: true })
     }
 
     fn key_press(&self, key: Key, count: u32) -> Result<OkResult, CommandError> {
+        require_post_access()?;
+        let source = event_source()?;
         let code = virtual_key(key);
         for _ in 0..count {
-            post_key(code, true)?;
-            post_key(code, false)?;
+            post_key(&source, code, true)?;
+            post_key(&source, code, false)?;
         }
         Ok(OkResult { ok: true })
     }
 
     fn hotkey(&self, keys: &[Key]) -> Result<OkResult, CommandError> {
+        require_post_access()?;
+        let source = event_source()?;
         let codes: Vec<CGKeyCode> = keys.iter().copied().map(virtual_key).collect();
         for code in &codes {
-            post_key(*code, true)?;
+            post_key(&source, *code, true)?;
         }
         for code in codes.iter().rev() {
-            post_key(*code, false)?;
+            post_key(&source, *code, false)?;
         }
         Ok(OkResult { ok: true })
     }
@@ -319,35 +343,32 @@ fn post_event(event: &CGEvent) {
 }
 
 fn post_mouse(
+    source: &CGEventSource,
     event_type: CGEventType,
     button: MouseButton,
     location: CGPoint,
     click_state: u32,
 ) -> Result<(), CommandError> {
-    require_post_access()?;
-    let source = event_source()?;
-    let event = CGEvent::new_mouse_event(Some(&source), event_type, location, cg_button(button))
+    let event = CGEvent::new_mouse_event(Some(source), event_type, location, cg_button(button))
         .ok_or_else(|| {
             CommandError::new(
                 ErrorCode::SendInputFailed,
                 format!("CGEventCreateMouseEvent failed. {INPUT_PERMISSION_HINT}"),
             )
         })?;
-    if click_state > 1 {
-        CGEvent::set_integer_value_field(
-            Some(&event),
-            CGEventField::MouseEventClickState,
-            click_state as i64,
-        );
-    }
+    // Always set click state (1 = single). Relying on CGEventCreateMouseEvent's
+    // undocumented default of 1 fails for some apps when the field is left unset.
+    CGEvent::set_integer_value_field(
+        Some(&event),
+        CGEventField::MouseEventClickState,
+        click_state as i64,
+    );
     post_event(&event);
     Ok(())
 }
 
-fn post_key(code: CGKeyCode, key_down: bool) -> Result<(), CommandError> {
-    require_post_access()?;
-    let source = event_source()?;
-    let event = CGEvent::new_keyboard_event(Some(&source), code, key_down).ok_or_else(|| {
+fn post_key(source: &CGEventSource, code: CGKeyCode, key_down: bool) -> Result<(), CommandError> {
+    let event = CGEvent::new_keyboard_event(Some(source), code, key_down).ok_or_else(|| {
         CommandError::new(
             ErrorCode::SendInputFailed,
             format!("CGEventCreateKeyboardEvent failed. {INPUT_PERMISSION_HINT}"),
@@ -382,9 +403,8 @@ fn validate_coords(x: i32, y: i32) -> Result<(), CommandError> {
     Ok(())
 }
 
-fn set_cursor_pos(x: i32, y: i32) -> Result<(), CommandError> {
+fn set_cursor_pos(source: &CGEventSource, x: i32, y: i32) -> Result<(), CommandError> {
     validate_coords(x, y)?;
-    require_post_access()?;
     let location = point(x, y);
     let warp = CGWarpMouseCursorPosition(location);
     if warp != CGError::Success {
@@ -394,13 +414,17 @@ fn set_cursor_pos(x: i32, y: i32) -> Result<(), CommandError> {
         ));
     }
     // Also post a moved event so apps observe the cursor change.
-    post_mouse(CGEventType::MouseMoved, MouseButton::Left, location, 1)?;
+    post_mouse(source, CGEventType::MouseMoved, MouseButton::Left, location, 1)?;
     Ok(())
 }
 
-fn maybe_move(x: Option<i32>, y: Option<i32>) -> Result<(), CommandError> {
+fn maybe_move(
+    source: &CGEventSource,
+    x: Option<i32>,
+    y: Option<i32>,
+) -> Result<(), CommandError> {
     match (x, y) {
-        (Some(x), Some(y)) => set_cursor_pos(x, y),
+        (Some(x), Some(y)) => set_cursor_pos(source, x, y),
         (None, None) => Ok(()),
         _ => Err(CommandError::new(
             ErrorCode::InvalidCoordinates,
