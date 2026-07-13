@@ -57,9 +57,12 @@ impl WindowManager for MacosWindowManager {
     }
 
     fn focus(&self, id: WindowId) -> Result<WindowActionResult, CommandError> {
-        require_accessibility()?;
+        // App activation does not require Accessibility. Specific-window AXRaise does.
         let info = lookup_cg_window(id)?;
         activate_app(info.pid)?;
+        if !unsafe { AXIsProcessTrusted() } {
+            return Ok(WindowActionResult { ok: true, id });
+        }
         let window = ax_window_for_cg(&info)?;
         match ax_perform(&window, AX_RAISE) {
             Ok(()) => Ok(WindowActionResult { ok: true, id }),

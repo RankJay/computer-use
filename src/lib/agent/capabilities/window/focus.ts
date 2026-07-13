@@ -13,7 +13,8 @@ export type WindowFocusOutput = {
 
 export const windowFocusCapability = defineCapability({
   name: "window_focus",
-  description: "Bring a top-level window to the foreground by handle.",
+  description:
+    "Bring a top-level window to the foreground by handle. On macOS, activates the app without Accessibility; raising a specific window uses Accessibility when granted.",
   risk: "medium",
   inputSchema: windowFocusInputSchema,
 });

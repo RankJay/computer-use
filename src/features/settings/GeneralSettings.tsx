@@ -25,17 +25,17 @@ import {
   settingsInputGroupInputClassName,
   settingsSelectTriggerClassName,
 } from "@/features/settings/styles";
+import { isMacOsClient } from "@/lib/platform";
 import { useSettingsSelector, useUpdateSettings } from "@/lib/settings/queries";
 import { selectGeneralSettings } from "@/lib/settings/selectors";
 import { parsePermissionMode, PERMISSION_MODE_OPTIONS } from "@/lib/settings/utils";
 import { pickWorkspaceFolder } from "@/lib/settings/workspace-picker";
 
-const isMac = navigator.userAgent.includes("Mac");
+const isMac = isMacOsClient();
 
 const UI_AUTOMATION_DESCRIPTION = isMac
-  ? "Allow pointer, click, and type tools. On macOS, also grant Accessibility and Input Monitoring in System Settings → Privacy & Security."
+  ? "Allow pointer, click, and type tools. Grant macOS permissions below when prompted."
   : "Allow pointer, click, and type tools.";
-
 export function GeneralSettings(): ReactElement {
   const settings = useSettingsSelector(selectGeneralSettings);
   const updateSettings = useUpdateSettings();
