@@ -4,11 +4,11 @@ import { defineCapability } from "../types";
 import { uiAutomationEnabled } from "./shared";
 
 export const accessibilityGetFocusedInputSchema = z.object({
-  hwnd: z
+  windowId: z
     .number()
     .int()
     .optional()
-    .describe("Optional window handle to require the focused element belong to that process"),
+    .describe("Optional window id to require the focused element belong to that process"),
 });
 
 export const accessibilityGetFocusedCapability = defineCapability({

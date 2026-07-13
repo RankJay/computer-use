@@ -5,7 +5,7 @@ import { uiAutomationEnabled } from "./shared";
 
 export const accessibilityQueryInputSchema = z
   .object({
-    hwnd: z.number().int().describe("Native window handle from window_list"),
+    windowId: z.number().int().describe("Native window id from window_list"),
     name: z.string().min(1).optional().describe("Exact name match (case-insensitive)"),
     nameContains: z.string().min(1).optional().describe("Substring name match"),
     automationId: z.string().min(1).optional().describe("Exact AutomationId"),

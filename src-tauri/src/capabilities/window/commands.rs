@@ -12,27 +12,30 @@ pub fn window_list() -> Result<WindowListResult, CommandError> {
 }
 
 #[tauri::command]
-pub fn window_focus(hwnd: WindowId) -> Result<WindowActionResult, CommandError> {
-    manager().focus(hwnd)
+pub fn window_focus(window_id: WindowId) -> Result<WindowActionResult, CommandError> {
+    manager().focus(window_id)
 }
 
 #[tauri::command]
-pub fn window_move(hwnd: WindowId, x: i32, y: i32) -> Result<WindowMoveResult, CommandError> {
-    manager().move_window(hwnd, x, y)
+pub fn window_move(window_id: WindowId, x: i32, y: i32) -> Result<WindowMoveResult, CommandError> {
+    manager().move_window(window_id, x, y)
 }
 
 #[tauri::command]
 pub fn window_resize(
-    hwnd: WindowId,
+    window_id: WindowId,
     width: i32,
     height: i32,
 ) -> Result<WindowResizeResult, CommandError> {
-    manager().resize(hwnd, width, height)
+    manager().resize(window_id, width, height)
 }
 
 #[tauri::command]
-pub fn window_state(hwnd: WindowId, op: WindowStateOp) -> Result<WindowStateResult, CommandError> {
-    manager().set_state(hwnd, op)
+pub fn window_state(
+    window_id: WindowId,
+    op: WindowStateOp,
+) -> Result<WindowStateResult, CommandError> {
+    manager().set_state(window_id, op)
 }
 
 #[tauri::command]
@@ -164,14 +167,15 @@ mod tests {
     }
 
     #[test]
-    fn wire_json_keeps_hwnd_keys() {
+    fn wire_json_uses_window_id_keys() {
         let action = WindowActionResult {
             ok: true,
             id: WindowId(99),
         };
         let json = serde_json::to_value(&action).expect("serialize");
         assert_eq!(json["ok"], true);
-        assert_eq!(json["hwnd"], 99);
+        assert_eq!(json["windowId"], 99);
+        assert!(json.get("hwnd").is_none());
         assert!(json.get("id").is_none());
 
         let active = ActiveWindowResult {
@@ -180,7 +184,7 @@ mod tests {
             process_name: None,
         };
         let json = serde_json::to_value(&active).expect("serialize");
-        assert_eq!(json["hwnd"], 7);
+        assert_eq!(json["windowId"], 7);
         assert_eq!(json["title"], "Hi");
     }
 }

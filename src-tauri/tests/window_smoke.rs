@@ -17,19 +17,19 @@ fn window_list_and_active_smoke() {
         "expected at least one window line"
     );
     let first = list.text.lines().next().expect("line");
-    let hwnd_token = first.split_whitespace().next().expect("hwnd token");
+    let window_id_token = first.split_whitespace().next().expect("window id token");
     assert!(
-        hwnd_token.parse::<i64>().is_ok_and(|v| v > 0),
-        "expected positive hwnd id in list line, got {first:?}"
+        window_id_token.parse::<i64>().is_ok_and(|v| v > 0),
+        "expected positive window id in list line, got {first:?}"
     );
 
     let active = actuate_lib::get_active_window().expect("get_active_window");
-    assert!(active.id.0 > 0, "active hwnd must be positive");
+    assert!(active.id.0 > 0, "active windowId must be positive");
     let json = serde_json::to_value(&active).expect("serialize");
     assert!(
-        json.get("hwnd")
+        json.get("windowId")
             .and_then(|v| v.as_i64())
             .is_some_and(|v| v > 0),
-        "active window JSON must keep hwnd key: {json}"
+        "active window JSON must use windowId key: {json}"
     );
 }

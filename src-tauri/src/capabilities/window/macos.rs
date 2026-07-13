@@ -1,11 +1,14 @@
 //! macOS adapter for [`super::manager::WindowManager`].
 //!
-//! `WindowId` stores a `CGWindowID` as `i64` (wire key remains `hwnd`).
+//! `WindowId` stores a `CGWindowID` as `i64` (wire key `windowId`).
 //!
 //! List uses `CGWindowListCopyWindowInfo` (on-screen, exclude desktop, layer 0).
 //! Geometry / raise / state use Accessibility (`AXUIElement`). Matching a
 //! `CGWindowID` to an AX window uses the undocumented `_AXUIElementGetWindow`
 //! helper (isolated below); title+bounds fallback if that fails.
+//!
+//! Maximize/restore return `action_unavailable` — macOS has no Win32 maximize twin;
+//! do not map maximize to zoom.
 //!
 //! Known limits: Multi-Space / Stage Manager edge cases are best-effort.
 //! Window titles may be blank without Screen Recording; we fall back to owner name.
@@ -41,7 +44,6 @@ const AX_POSITION: &str = "AXPosition";
 const AX_SIZE: &str = "AXSize";
 const AX_MINIMIZED: &str = "AXMinimized";
 const AX_CLOSE_BUTTON: &str = "AXCloseButton";
-const AX_ZOOM_BUTTON: &str = "AXZoomButton";
 const AX_FOCUSED_WINDOW: &str = "AXFocusedWindow";
 const AX_RAISE: &str = "AXRaise";
 const AX_PRESS: &str = "AXPress";
@@ -125,6 +127,20 @@ impl WindowManager for MacosWindowManager {
         id: WindowId,
         op: WindowStateOp,
     ) -> Result<WindowStateResult, CommandError> {
+        if matches!(op, WindowStateOp::Maximize | WindowStateOp::Restore) {
+            let op_name = match op {
+                WindowStateOp::Maximize => "maximize",
+                WindowStateOp::Restore => "restore",
+                WindowStateOp::Minimize | WindowStateOp::Close => unreachable!(),
+            };
+            return Err(CommandError::new(
+                ErrorCode::ActionUnavailable,
+                format!(
+                    "{op_name} is not available on macOS (no Win32 {op_name} equivalent). Use minimize/close or resize instead."
+                ),
+            ));
+        }
+
         require_accessibility()?;
         let info = lookup_cg_window(id)?;
         let window = ax_window_for_cg(&info)?;
@@ -134,15 +150,7 @@ impl WindowManager for MacosWindowManager {
                 set_ax_bool(&window, AX_MINIMIZED, true)?;
                 "minimize"
             }
-            WindowStateOp::Maximize => {
-                // macOS zoom ≈ Windows maximize for standard AppKit windows.
-                press_ax_button(&window, AX_ZOOM_BUTTON)?;
-                "maximize"
-            }
-            WindowStateOp::Restore => {
-                set_ax_bool(&window, AX_MINIMIZED, false)?;
-                "restore"
-            }
+            WindowStateOp::Maximize | WindowStateOp::Restore => unreachable!(),
             WindowStateOp::Close => {
                 press_ax_button(&window, AX_CLOSE_BUTTON).map_err(|error| {
                     if error.code == ErrorCode::ElevationRequired.as_str() {

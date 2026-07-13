@@ -3,14 +3,14 @@ import { z } from "zod";
 import { defineCapability } from "../types";
 
 export const windowResizeInputSchema = z.object({
-  hwnd: z.number().int().describe("Native window handle from window_list"),
+  windowId: z.number().int().describe("Native window id from window_list"),
   width: z.number().int().positive().describe("Target client area width in pixels"),
   height: z.number().int().positive().describe("Target client area height in pixels"),
 });
 
 export type WindowResizeOutput = {
   ok: boolean;
-  hwnd: number;
+  windowId: number;
   width: number;
   height: number;
 };

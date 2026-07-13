@@ -4,7 +4,7 @@ import { defineCapability } from "../types";
 import { uiAutomationEnabled } from "./shared";
 
 export const accessibilitySendKeysInputSchema = z.object({
-  hwnd: z.number().int().describe("Native window handle from window_list"),
+  windowId: z.number().int().describe("Native window id from window_list"),
   text: z
     .string()
     .min(1)

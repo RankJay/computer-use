@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-/// Opaque window identity on the wire as a bare i64 (`hwnd` JSON key).
+/// Opaque window identity on the wire as a bare i64 (`windowId` JSON key; `hwnd` accepted as alias).
 /// Windows: HWND. macOS: CGWindowID.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
@@ -22,7 +22,7 @@ pub struct WindowListResult {
 #[serde(rename_all = "camelCase")]
 pub struct WindowActionResult {
     pub ok: bool,
-    #[serde(rename = "hwnd")]
+    #[serde(rename = "windowId", alias = "hwnd")]
     pub id: WindowId,
 }
 
@@ -39,7 +39,7 @@ pub enum WindowStateOp {
 #[serde(rename_all = "camelCase")]
 pub struct WindowStateResult {
     pub ok: bool,
-    #[serde(rename = "hwnd")]
+    #[serde(rename = "windowId", alias = "hwnd")]
     pub id: WindowId,
     pub op: String,
 }
@@ -48,7 +48,7 @@ pub struct WindowStateResult {
 #[serde(rename_all = "camelCase")]
 pub struct WindowMoveResult {
     pub ok: bool,
-    #[serde(rename = "hwnd")]
+    #[serde(rename = "windowId", alias = "hwnd")]
     pub id: WindowId,
     pub x: i32,
     pub y: i32,
@@ -58,7 +58,7 @@ pub struct WindowMoveResult {
 #[serde(rename_all = "camelCase")]
 pub struct WindowResizeResult {
     pub ok: bool,
-    #[serde(rename = "hwnd")]
+    #[serde(rename = "windowId", alias = "hwnd")]
     pub id: WindowId,
     pub width: i32,
     pub height: i32,
@@ -67,7 +67,7 @@ pub struct WindowResizeResult {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ActiveWindowResult {
-    #[serde(rename = "hwnd")]
+    #[serde(rename = "windowId", alias = "hwnd")]
     pub id: WindowId,
     pub title: Option<String>,
     pub process_name: Option<String>,

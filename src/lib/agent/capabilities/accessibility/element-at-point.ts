@@ -6,11 +6,11 @@ import { uiAutomationEnabled } from "./shared";
 export const accessibilityElementAtPointInputSchema = z.object({
   x: z.number().int().describe("Screen X coordinate"),
   y: z.number().int().describe("Screen Y coordinate"),
-  hwnd: z
+  windowId: z
     .number()
     .int()
     .optional()
-    .describe("Optional window handle to require the hit element belong to that process"),
+    .describe("Optional window id to require the hit element belong to that process"),
 });
 
 export const accessibilityElementAtPointCapability = defineCapability({
