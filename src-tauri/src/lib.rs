@@ -33,11 +33,22 @@ fn apply_frameless_window(window: &tauri::WebviewWindow) {
     let _ = window.set_decorations(false);
 }
 
-/// macOS routes Cmd+C/V/X/A through the app Edit menu. Removing the default menu
-/// without restoring those PredefinedMenuItems breaks paste in inputs.
+/// macOS menu bar: App menu (About/Hide/Quit) + Edit (clipboard shortcuts for WKWebView).
 #[cfg(all(desktop, target_os = "macos"))]
-fn install_edit_menu(app: &tauri::App) -> tauri::Result<()> {
+fn install_macos_menu(app: &tauri::App) -> tauri::Result<()> {
     use tauri::menu::{MenuBuilder, SubmenuBuilder};
+
+    let app_menu = SubmenuBuilder::new(app, "Actuate")
+        .about(None)
+        .separator()
+        .services()
+        .separator()
+        .hide()
+        .hide_others()
+        .show_all()
+        .separator()
+        .quit()
+        .build()?;
 
     let edit = SubmenuBuilder::new(app, "Edit")
         .undo()
@@ -48,15 +59,25 @@ fn install_edit_menu(app: &tauri::App) -> tauri::Result<()> {
         .paste()
         .select_all()
         .build()?;
-    let menu = MenuBuilder::new(app).item(&edit).build()?;
+
+    let menu = MenuBuilder::new(app).item(&app_menu).item(&edit).build()?;
     let _ = app.set_menu(menu);
     Ok(())
+}
+
+/// Dock-visible regular app (not LSUIElement accessory). Close still hides to tray.
+#[cfg(all(desktop, target_os = "macos"))]
+fn configure_macos_dock_app(app: &tauri::App, window: &tauri::WebviewWindow) {
+    let _ = app
+        .handle()
+        .set_activation_policy(tauri::ActivationPolicy::Regular);
+    let _ = window.set_skip_taskbar(false);
 }
 
 #[cfg(desktop)]
 fn setup_desktop(app: &mut tauri::App) -> tauri::Result<()> {
     #[cfg(target_os = "macos")]
-    install_edit_menu(app)?;
+    install_macos_menu(app)?;
     #[cfg(not(target_os = "macos"))]
     let _ = app.remove_menu();
 
@@ -132,6 +153,8 @@ fn setup_desktop(app: &mut tauri::App) -> tauri::Result<()> {
         .expect("main window not found");
 
     apply_frameless_window(&window);
+    #[cfg(target_os = "macos")]
+    configure_macos_dock_app(app, &window);
 
     let window_for_close = window.clone();
     window.on_window_event(move |event| {
