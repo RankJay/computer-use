@@ -16,6 +16,7 @@ pub struct ReadFileResult {
 #[tauri::command]
 pub fn read_file(path: String, workspace_root: String) -> Result<ReadFileResult, CommandError> {
     let resolved = path_utils::resolve_workspace_path(&workspace_root, &path)?;
+    path_utils::ensure_io_target_within_root(&workspace_root, &resolved)?;
 
     let metadata = fs::metadata(&resolved).map_err(|error| {
         CommandError::new(ErrorCode::NotFound, format!("File not found: {error}"))

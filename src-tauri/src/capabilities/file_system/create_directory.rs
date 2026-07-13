@@ -20,7 +20,7 @@ pub fn create_directory(
 ) -> Result<CreateDirectoryResult, CommandError> {
     let resolved = path_utils::resolve_workspace_path(&workspace_root, &path)?;
 
-    if resolved.exists() {
+    if path_utils::path_lexists(&resolved) {
         return Err(CommandError::new(
             ErrorCode::AlreadyExists,
             "Directory already exists",

@@ -43,8 +43,9 @@ pub fn patch_file(
     workspace_root: String,
 ) -> Result<PatchFileResult, CommandError> {
     let resolved = path_utils::resolve_workspace_path(&workspace_root, &path)?;
+    path_utils::ensure_io_target_within_root(&workspace_root, &resolved)?;
 
-    if !resolved.exists() {
+    if !path_utils::path_lexists(&resolved) {
         return Err(CommandError::new(
             ErrorCode::NotFound,
             "File does not exist",

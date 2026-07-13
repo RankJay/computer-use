@@ -21,14 +21,14 @@ pub fn move_path(
     let source = path_utils::resolve_workspace_path(&workspace_root, &from)?;
     let destination = path_utils::resolve_workspace_path(&workspace_root, &to)?;
 
-    if !source.exists() {
+    if !path_utils::path_lexists(&source) {
         return Err(CommandError::new(
             ErrorCode::NotFound,
             "Source path does not exist",
         ));
     }
 
-    if destination.exists() {
+    if path_utils::path_lexists(&destination) {
         return Err(CommandError::new(
             ErrorCode::DestExists,
             "Destination path already exists",

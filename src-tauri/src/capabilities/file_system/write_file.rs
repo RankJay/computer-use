@@ -10,6 +10,7 @@ pub fn write_file(
     workspace_root: String,
 ) -> Result<(), CommandError> {
     let resolved = path_utils::resolve_workspace_path(&workspace_root, &path)?;
+    path_utils::ensure_io_target_within_root(&workspace_root, &resolved)?;
 
     if let Some(parent) = resolved.parent() {
         fs::create_dir_all(parent).map_err(|error| {
