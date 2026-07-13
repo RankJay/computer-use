@@ -40,8 +40,7 @@ pub use shared::wait;
 pub use shell::{
     get_env, get_system_info, launch, process_info, process_kill, process_list, run_shell, set_env,
 };
-pub use window::WindowId;
 pub use window::{
     get_active_window, window_focus, window_list, window_move, window_resize, window_state,
+    WindowId, WindowStateOp,
 };
-pub use window::WindowStateOp;

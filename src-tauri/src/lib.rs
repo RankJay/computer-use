@@ -17,7 +17,7 @@ pub use capabilities::{
     read_clipboard_html, read_clipboard_image, read_directory, read_file, run_shell, search_files,
     set_env, stat_path, wait, window_focus, window_list, window_move, window_resize, window_state,
     write_clipboard, write_clipboard_html, write_clipboard_image, write_file, SnapshotStore,
-    WindowId,
+    WindowId, WindowStateOp,
 };
 
 #[cfg(any(windows, target_os = "macos"))]

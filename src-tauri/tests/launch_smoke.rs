@@ -70,4 +70,21 @@ fn launch_textedit_by_name_and_path() {
         let _guard = KillOnDrop(Some(launched.pid));
         std::thread::sleep(std::time::Duration::from_millis(200));
     }
+
+    {
+        let app = if std::path::Path::new("/System/Applications/TextEdit.app").exists() {
+            "/System/Applications/TextEdit.app"
+        } else {
+            "/Applications/TextEdit.app"
+        };
+        let launched = actuate_lib::launch(app.into(), None, None, None).expect("launch .app");
+        assert!(launched.pid > 0);
+        assert!(
+            launched.exe.contains("TextEdit"),
+            "resolved exe: {}",
+            launched.exe
+        );
+        let _guard = KillOnDrop(Some(launched.pid));
+        std::thread::sleep(std::time::Duration::from_millis(400));
+    }
 }

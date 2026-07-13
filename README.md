@@ -58,7 +58,7 @@ src/lib/agent/        run loop, models, capability catalog + TS wrappers
 src/lib/session/      events, projection, control, budgets
 src/lib/settings/     store + stronghold adapters
 src-tauri/src/        tray, shortcuts, Rust capability commands
-src-tauri/tests/      launch / window / input / a11y smoke tests
+src-tauri/tests/      launch / window / input / a11y / fs smoke tests
 ```
 
 
@@ -78,6 +78,8 @@ For UI automation (window / accessibility / mouse / keyboard), grant Actuate —
 
 Usage strings live in `src-tauri/Info.plist`. App Sandbox stays off (`Entitlements.plist`) so shell, workspace files, and app launch keep working.
 
+**Dock vs taskbar:** `tauri.conf.json` keeps `"skipTaskbar": true` for Windows (tray-style, no taskbar button). On macOS, startup overrides that with `ActivationPolicy::Regular` and `set_skip_taskbar(false)` so Actuate shows in the Dock; hide/show does not remove the Dock icon. Close still hides the window (tray remains a fast path).
+
 Ignored live smokes (desktop + permissions required):
 
 ```bash
@@ -85,6 +87,12 @@ cargo test --manifest-path src-tauri/Cargo.toml --test launch_smoke -- --ignored
 cargo test --manifest-path src-tauri/Cargo.toml --test window_smoke -- --ignored --nocapture
 cargo test --manifest-path src-tauri/Cargo.toml --test input_smoke -- --ignored --nocapture
 cargo test --manifest-path src-tauri/Cargo.toml --test a11y_smoke -- --ignored --nocapture
+```
+
+Filesystem symlink roundtrip (no desktop; runs in normal CI):
+
+```bash
+cargo test --manifest-path src-tauri/Cargo.toml --test fs_smoke
 ```
 
 ## Run
