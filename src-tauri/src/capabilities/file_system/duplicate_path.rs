@@ -25,7 +25,11 @@ fn path_kind(metadata: &fs::Metadata) -> &'static str {
     }
 }
 
-fn copy_symlink(source: &Path, destination: &Path, source_meta: &fs::Metadata) -> Result<(), CommandError> {
+fn copy_symlink(
+    source: &Path,
+    destination: &Path,
+    source_meta: &fs::Metadata,
+) -> Result<(), CommandError> {
     let target = fs::read_link(source).map_err(|error| {
         CommandError::new(
             ErrorCode::DuplicateFailed,

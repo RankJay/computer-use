@@ -256,7 +256,13 @@ fn process_info_linux(pid: u32) -> Result<ProcessInfoResult, CommandError> {
 }
 
 #[cfg(target_os = "macos")]
-fn macos_cpu_seconds(pid: u32) -> Result<f64, CommandError> {
+struct MacosTaskSnapshot {
+    resident_size: u64,
+    cpu_seconds: f64,
+}
+
+#[cfg(target_os = "macos")]
+fn macos_task_snapshot(pid: u32) -> Result<MacosTaskSnapshot, CommandError> {
     use std::ffi::c_void;
     use std::mem::{size_of, MaybeUninit};
 
@@ -326,52 +332,57 @@ fn macos_cpu_seconds(pid: u32) -> Result<f64, CommandError> {
     let _ = unsafe { mach_timebase_info(&mut timebase) };
     let ticks = info.pti_total_user.saturating_add(info.pti_total_system);
     let nanos = ticks as f64 * f64::from(timebase.numer) / f64::from(timebase.denom.max(1));
-    Ok(nanos / 1_000_000_000.0)
+
+    Ok(MacosTaskSnapshot {
+        resident_size: info.pti_resident_size,
+        cpu_seconds: nanos / 1_000_000_000.0,
+    })
 }
 
 #[cfg(target_os = "macos")]
-fn process_info_macos(pid: u32) -> Result<ProcessInfoResult, CommandError> {
-    use std::process::Command;
+fn macos_process_name(pid: u32) -> Result<String, CommandError> {
+    use std::ffi::c_char;
+    use std::path::Path;
 
-    let output = Command::new("ps")
-        .args(["-p", &pid.to_string(), "-o", "comm=,rss="])
-        .output()
-        .map_err(|error| {
-            CommandError::new(
-                ErrorCode::ProcessInfoFailed,
-                format!("Failed to run ps: {error}"),
-            )
-        })?;
+    extern "C" {
+        fn proc_pidpath(pid: i32, buffer: *mut c_char, buffersize: u32) -> i32;
+    }
 
-    if !output.status.success() {
+    let mut buffer = [0i8; 4096];
+    // SAFETY: buffer is a writable C string buffer of known size.
+    let written = unsafe { proc_pidpath(pid as i32, buffer.as_mut_ptr(), buffer.len() as u32) };
+    if written <= 0 {
         return Err(CommandError::new(
             ErrorCode::ProcessNotFound,
             format!("Process {pid} was not found"),
         ));
     }
 
-    let line = String::from_utf8_lossy(&output.stdout);
-    let mut parts = line.split_whitespace();
-    let name = parts
-        .next()
-        .ok_or_else(|| CommandError::new(ErrorCode::ProcessInfoFailed, "Unexpected ps output"))?
-        .to_string();
-    let rss_kb = parts
-        .next()
-        .and_then(|value| value.parse::<u64>().ok())
-        .unwrap_or(0);
+    // SAFETY: proc_pidpath null-terminates on success.
+    let path = unsafe { std::ffi::CStr::from_ptr(buffer.as_ptr()) }
+        .to_string_lossy()
+        .into_owned();
 
-    let first = macos_cpu_seconds(pid)?;
+    Ok(Path::new(&path)
+        .file_name()
+        .map(|value| value.to_string_lossy().into_owned())
+        .unwrap_or(path))
+}
+
+#[cfg(target_os = "macos")]
+fn process_info_macos(pid: u32) -> Result<ProcessInfoResult, CommandError> {
+    let name = macos_process_name(pid)?;
+    let first = macos_task_snapshot(pid)?;
     let wall_start = Instant::now();
     thread::sleep(CPU_SAMPLE_INTERVAL);
-    let second = macos_cpu_seconds(pid)?;
+    let second = macos_task_snapshot(pid)?;
     let wall = wall_start.elapsed();
 
     Ok(ProcessInfoResult {
         pid,
         name,
-        memory_bytes: rss_kb.saturating_mul(1024),
-        cpu_percent: cpu_percent_from_deltas(second - first, wall),
+        memory_bytes: second.resident_size,
+        cpu_percent: cpu_percent_from_deltas(second.cpu_seconds - first.cpu_seconds, wall),
     })
 }
 

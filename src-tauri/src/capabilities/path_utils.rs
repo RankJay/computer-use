@@ -45,10 +45,7 @@ pub fn path_lexists(path: &Path) -> bool {
 
 /// If `path` is a symlink, require its resolved target to stay under the workspace root.
 /// Use before read/write/patch that follow links.
-pub fn ensure_io_target_within_root(
-    workspace_root: &str,
-    path: &Path,
-) -> Result<(), CommandError> {
+pub fn ensure_io_target_within_root(workspace_root: &str, path: &Path) -> Result<(), CommandError> {
     let root = resolve_root(workspace_root)?;
     let metadata = match fs::symlink_metadata(path) {
         Ok(metadata) => metadata,
@@ -191,12 +188,10 @@ mod tests {
             return;
         }
 
-        let resolved = resolve_workspace_path(root.to_str().expect("utf8"), "link.txt")
-            .expect("resolve link");
+        let resolved =
+            resolve_workspace_path(root.to_str().expect("utf8"), "link.txt").expect("resolve link");
         assert_eq!(resolved, root.join("link.txt"));
-        assert!(fs::symlink_metadata(&resolved)
-            .expect("lstat")
-            .is_symlink());
+        assert!(fs::symlink_metadata(&resolved).expect("lstat").is_symlink());
 
         let _ = fs::remove_dir_all(cleanup);
     }

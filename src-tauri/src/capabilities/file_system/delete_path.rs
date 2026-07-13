@@ -21,19 +21,20 @@ pub fn delete_path(path: String, workspace_root: String) -> Result<(), CommandEr
     // Symlinks are never directories in lstat metadata on Unix; remove_file unlinks the link.
     // On Windows, directory symlinks report is_dir() from symlink_metadata — remove_dir.
     if metadata.is_symlink() {
-        fs::remove_file(&resolved).or_else(|error| {
-            if metadata.is_dir() {
-                fs::remove_dir(&resolved)
-            } else {
-                Err(error)
-            }
-        })
-        .map_err(|error| {
-            CommandError::new(
-                ErrorCode::DeleteFailed,
-                format!("Failed to delete symlink: {error}"),
-            )
-        })?;
+        fs::remove_file(&resolved)
+            .or_else(|error| {
+                if metadata.is_dir() {
+                    fs::remove_dir(&resolved)
+                } else {
+                    Err(error)
+                }
+            })
+            .map_err(|error| {
+                CommandError::new(
+                    ErrorCode::DeleteFailed,
+                    format!("Failed to delete symlink: {error}"),
+                )
+            })?;
     } else if metadata.is_dir() {
         fs::remove_dir_all(&resolved).map_err(|error| {
             CommandError::new(

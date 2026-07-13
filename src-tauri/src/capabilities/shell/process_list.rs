@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use serde::Serialize;
 
 use crate::capabilities::error::{CommandError, ErrorCode};
@@ -9,6 +11,33 @@ const MAX_PROCESSES: usize = 200;
 pub struct ProcessListResult {
     pub text: String,
     pub count: usize,
+}
+
+/// Parse a `"{pid}  {name}"` line where `name` may contain spaces.
+pub(crate) fn parse_process_list_line(line: &str) -> Option<(u32, String)> {
+    let trimmed = line.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    let (pid_str, name) = trimmed.split_once(char::is_whitespace)?;
+    let pid = pid_str.trim().parse().ok()?;
+    let name = name.trim();
+    if name.is_empty() {
+        return None;
+    }
+    Some((pid, name.to_string()))
+}
+
+/// Match kill-by-name against a listed process (full path, basename, or `.ext` suffix).
+pub(crate) fn process_name_matches(process_name: &str, needle: &str) -> bool {
+    let lower = process_name.to_ascii_lowercase();
+    if lower == needle || lower.ends_with(&format!(".{needle}")) {
+        return true;
+    }
+    Path::new(process_name)
+        .file_name()
+        .and_then(|value| value.to_str())
+        .is_some_and(|base| base.to_ascii_lowercase() == needle)
 }
 
 #[tauri::command]
@@ -151,14 +180,10 @@ fn list_processes_macos() -> Result<ProcessListResult, CommandError> {
 
     let mut lines = Vec::new();
     for line in String::from_utf8_lossy(&output.stdout).lines() {
-        let trimmed = line.trim();
-        if trimmed.is_empty() {
-            continue;
-        }
-        let Some((pid, name)) = trimmed.split_once(char::is_whitespace) else {
+        let Some((pid, name)) = parse_process_list_line(line) else {
             continue;
         };
-        lines.push(format!("{}  {}", pid.trim(), name.trim()));
+        lines.push(format!("{pid}  {name}"));
         if lines.len() >= MAX_PROCESSES {
             break;
         }
@@ -169,4 +194,33 @@ fn list_processes_macos() -> Result<ProcessListResult, CommandError> {
         text: lines.join("\n"),
         count,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_keeps_spaced_process_name() {
+        let (pid, name) = parse_process_list_line(
+            "1234  /Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+        )
+        .expect("parse");
+        assert_eq!(pid, 1234);
+        assert_eq!(
+            name,
+            "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+        );
+    }
+
+    #[test]
+    fn name_match_uses_basename() {
+        let full = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+        assert!(process_name_matches(full, "google chrome"));
+        assert!(process_name_matches(
+            full,
+            full.to_ascii_lowercase().as_str()
+        ));
+        assert!(!process_name_matches(full, "chrome"));
+    }
 }

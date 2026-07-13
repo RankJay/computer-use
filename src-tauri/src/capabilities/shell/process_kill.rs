@@ -2,7 +2,7 @@ use serde::Serialize;
 
 use crate::capabilities::error::{CommandError, ErrorCode};
 
-use super::process_list::process_list;
+use super::process_list::{parse_process_list_line, process_list, process_name_matches};
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -71,14 +71,8 @@ fn resolve_pid_by_name(name: &str) -> Result<u32, CommandError> {
         .text
         .lines()
         .filter_map(|line| {
-            let mut parts = line.split_whitespace();
-            let pid = parts.next()?.parse::<u32>().ok()?;
-            let process_name = parts.next()?.to_string();
-            if process_name.to_ascii_lowercase() == needle
-                || process_name
-                    .to_ascii_lowercase()
-                    .ends_with(&format!(".{needle}"))
-            {
+            let (pid, process_name) = parse_process_list_line(line)?;
+            if process_name_matches(&process_name, &needle) {
                 Some((pid, process_name))
             } else {
                 None
