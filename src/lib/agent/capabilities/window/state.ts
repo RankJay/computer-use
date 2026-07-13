@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { windowAutomationEnabled } from "../shared/ui-automation";
 import { defineCapability } from "../types";
 
 export const windowStateInputSchema = z.object({
@@ -23,4 +24,5 @@ export const windowStateCapability = defineCapability({
     "Minimize, maximize, restore, or close a top-level window by id. maximize/restore are Windows-only; on macOS they return action_unavailable.",
   risk: "high",
   inputSchema: windowStateInputSchema,
+  enabledWhen: windowAutomationEnabled,
 });

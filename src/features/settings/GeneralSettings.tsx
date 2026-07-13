@@ -25,6 +25,7 @@ import {
   settingsInputGroupInputClassName,
   settingsSelectTriggerClassName,
 } from "@/features/settings/styles";
+import { hostSupportsUiAutomation } from "@/lib/agent/capabilities/shared/ui-automation";
 import { isTauriRuntime } from "@/lib/agent/is-tauri-runtime";
 import {
   getMacOsPermissionStatus,
@@ -38,10 +39,13 @@ import { parsePermissionMode, PERMISSION_MODE_OPTIONS } from "@/lib/settings/uti
 import { pickWorkspaceFolder } from "@/lib/settings/workspace-picker";
 
 const isMac = isMacOsClient();
+const uiAutomationSupported = hostSupportsUiAutomation();
 
-const UI_AUTOMATION_DESCRIPTION = isMac
-  ? "Allow pointer, click, and type tools. Grant macOS Accessibility below when prompted."
-  : "Allow pointer, click, and type tools.";
+const UI_AUTOMATION_DESCRIPTION = !uiAutomationSupported
+  ? "UI automation is not available on this OS."
+  : isMac
+    ? "Allow pointer, click, and type tools. Grant macOS Accessibility below when prompted."
+    : "Allow pointer, click, and type tools.";
 
 async function ensureMacOsAccessibilityOnEnable(): Promise<void> {
   if (!isMac || !isTauriRuntime()) {
@@ -162,6 +166,7 @@ export function GeneralSettings(): ReactElement {
           <Switch
             id="ui-automation"
             checked={settings.uiAutomation}
+            disabled={!uiAutomationSupported}
             onCheckedChange={(checked) => {
               updateSettings.mutate({ uiAutomation: checked });
               if (checked) {

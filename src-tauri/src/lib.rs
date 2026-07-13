@@ -172,6 +172,7 @@ pub fn run() {
             commands::macos_permissions::get_macos_permission_status,
             commands::macos_permissions::request_macos_permission,
             commands::macos_permissions::open_macos_privacy_settings,
+            commands::platform::get_platform_capabilities,
             commands::window::app_ready,
             commands::window::notify,
             read_file,

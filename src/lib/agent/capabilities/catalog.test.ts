@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
+import { hostSupportsUiAutomation } from "@/lib/agent/capabilities/shared/ui-automation";
 import { DEFAULT_SETTINGS } from "@/lib/settings/defaults";
 
 import { getCapabilities, getCapabilityNamesByRisk } from "./catalog";
@@ -77,9 +78,7 @@ describe("capability catalog", () => {
   test("filters accessibility tools when uiAutomation is off", () => {
     const off = getCapabilityNamesByRisk({ ...DEFAULT_SETTINGS, uiAutomation: false });
     const on = getCapabilityNamesByRisk({ ...DEFAULT_SETTINGS, uiAutomation: true });
-    const hostSupports =
-      typeof process !== "undefined" &&
-      (process.platform === "win32" || process.platform === "darwin");
+    const hostSupports = hostSupportsUiAutomation();
 
     expect(off.high).not.toContain("accessibility_snapshot");
     expect(off.high).not.toContain("accessibility_click");
@@ -113,6 +112,19 @@ describe("capability catalog", () => {
     expect(on.high).toContain("mouse_drag");
     expect(on.high).toContain("hotkey");
     expect(on.high).toContain("key_down");
+  });
+
+  test("gates window tools from platform capability cache", () => {
+    const byRisk = getCapabilityNamesByRisk(DEFAULT_SETTINGS);
+    const hostSupports = hostSupportsUiAutomation();
+    if (hostSupports) {
+      expect(byRisk.low).toContain("window_list");
+      expect(byRisk.low).toContain("get_active_window");
+      expect(byRisk.medium).toContain("window_focus");
+    } else {
+      expect(byRisk.low).not.toContain("window_list");
+      expect(byRisk.medium).not.toContain("window_focus");
+    }
   });
 
   test("workspace-root flag is set only on filesystem tools", () => {

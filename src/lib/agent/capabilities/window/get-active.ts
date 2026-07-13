@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { windowAutomationEnabled } from "../shared/ui-automation";
 import { defineCapability } from "../types";
 
 export const getActiveWindowInputSchema = z.object({});
@@ -15,4 +16,5 @@ export const getActiveWindowCapability = defineCapability({
   description: "Get the currently focused top-level window id, title, and process name.",
   risk: "low",
   inputSchema: getActiveWindowInputSchema,
+  enabledWhen: windowAutomationEnabled,
 });

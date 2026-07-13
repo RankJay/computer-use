@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { SCREEN_COORD_DESC } from "../shared/screen-coords";
+import { windowAutomationEnabled } from "../shared/ui-automation";
 import { defineCapability } from "../types";
 
 export const windowMoveInputSchema = z.object({
@@ -22,4 +23,5 @@ export const windowMoveCapability = defineCapability({
     "Move a top-level window to the given screen coordinates (same space as mouse_* / accessibility hit-test).",
   risk: "medium",
   inputSchema: windowMoveInputSchema,
+  enabledWhen: windowAutomationEnabled,
 });

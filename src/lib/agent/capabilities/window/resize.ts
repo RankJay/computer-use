@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { windowAutomationEnabled } from "../shared/ui-automation";
 import { defineCapability } from "../types";
 
 export const windowResizeInputSchema = z.object({
@@ -20,4 +21,5 @@ export const windowResizeCapability = defineCapability({
   description: "Resize a top-level window to the given width and height.",
   risk: "medium",
   inputSchema: windowResizeInputSchema,
+  enabledWhen: windowAutomationEnabled,
 });
