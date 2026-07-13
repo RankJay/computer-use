@@ -147,7 +147,7 @@ fn project_element_with_children(
     if should_skip_role_allow_text(&attrs.role) {
         return None;
     }
-    Some((project_from_attrs(attrs, parent, depth, ancestors, path)))
+    Some(project_from_attrs(attrs, parent, depth, ancestors, path))
 }
 
 fn project_from_attrs(

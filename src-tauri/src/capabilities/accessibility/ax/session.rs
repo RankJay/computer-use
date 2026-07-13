@@ -9,14 +9,15 @@ use objc2_core_foundation::{CFRetained, CFString, CFType};
 use crate::capabilities::error::{CommandError, ErrorCode};
 use crate::capabilities::shared::macos_ax::{
     activate_app, ax_copy_array, ax_copy_attributes, ax_copy_bool, ax_copy_element, ax_copy_point,
-    ax_copy_size, ax_copy_string, ax_perform, ax_uielement_get_window, ax_window_for_cg,
-    map_ax_error, require_accessibility, set_ax_bool, set_ax_value, slot_bool, slot_element,
-    slot_element_array, slot_point, slot_size, slot_string, AX_CHILDREN, AX_DESCRIPTION,
-    AX_ENABLED, AX_FOCUSED, AX_FOCUSED_UI_ELEMENT, AX_IDENTIFIER, AX_PARENT, AX_POSITION, AX_PRESS,
-    AX_RAISE, AX_ROLE, AX_SELECTED_CHILDREN, AX_SELECTED_TEXT, AX_SHOW_MENU, AX_SIZE, AX_TITLE,
-    AX_VALUE,
+    ax_copy_size, ax_copy_string, ax_uielement_get_window, ax_window_for_cg, map_ax_error,
+    require_accessibility, set_ax_bool, set_ax_value, slot_bool, slot_element, slot_element_array,
+    slot_point, slot_size, slot_string, AX_CHILDREN, AX_DESCRIPTION, AX_ENABLED, AX_FOCUSED,
+    AX_FOCUSED_UI_ELEMENT, AX_IDENTIFIER, AX_PARENT, AX_POSITION, AX_PRESS, AX_RAISE, AX_ROLE,
+    AX_SELECTED_CHILDREN, AX_SELECTED_TEXT, AX_SHOW_MENU, AX_SIZE, AX_TITLE, AX_VALUE,
 };
-pub(super) use crate::capabilities::shared::macos_ax::{lookup_cg_window, CgWindowInfo};
+pub(super) use crate::capabilities::shared::macos_ax::{
+    ax_perform, lookup_cg_window, CgWindowInfo,
+};
 use crate::capabilities::window::WindowId;
 
 use super::super::state::SnapshotStore;

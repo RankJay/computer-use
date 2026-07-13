@@ -22,8 +22,9 @@ use super::super::types::{ActionResult, GetValueResult};
 use super::resolve::resolve_stored_element;
 use super::roles::map_ax_role;
 use super::session::{
-    ax_press, ax_show_menu, element_parent, element_rect, element_role, element_value_text,
-    foreground_window, is_useful_value, lookup_cg_window, set_focused, set_value_string, AxSession,
+    ax_perform, ax_press, ax_show_menu, element_parent, element_rect, element_role,
+    element_value_text, foreground_window, is_useful_value, lookup_cg_window, set_focused,
+    set_value_string, AxSession,
 };
 
 pub(super) fn click_impl(
@@ -279,7 +280,7 @@ pub(super) fn scroll_element_impl(
         _ => "",
     };
     if amount == "large" && !action.is_empty() {
-        if super::session::ax_perform(&element, action).is_ok() {
+        if ax_perform(&element, action).is_ok() {
             return Ok(ActionResult {
                 ok: true,
                 method: "ax_scroll".to_string(),
@@ -382,7 +383,7 @@ pub(super) fn invoke_action_impl(
         }
     };
 
-    super::session::ax_perform(&element, ax_action).map_err(|error| {
+    ax_perform(&element, ax_action).map_err(|error| {
         if error.code == ErrorCode::AccessibilityPermissionDenied.as_str() {
             error
         } else {
@@ -457,8 +458,8 @@ fn type_unicode(text: &str) -> Result<(), CommandError> {
 
 #[cfg(test)]
 mod tests {
-    use super::super::send_keys_syntax::{parse_send_keys, Segment};
     use super::*;
+    use crate::capabilities::accessibility::send_keys_syntax::{parse_send_keys, Segment};
     use crate::capabilities::input::keys::Key;
 
     #[test]

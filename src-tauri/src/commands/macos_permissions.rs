@@ -3,8 +3,11 @@
 use serde::{Deserialize, Serialize};
 use tauri::AppHandle;
 
-use crate::capabilities::error::{CommandError, ErrorCode};
+use crate::capabilities::error::CommandError;
+#[cfg(not(target_os = "macos"))]
+use crate::capabilities::error::ErrorCode;
 
+#[cfg(not(target_os = "macos"))]
 const MACOS_ONLY: &str = "macOS permissions are only available on macOS";
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]

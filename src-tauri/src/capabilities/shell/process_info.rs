@@ -298,9 +298,9 @@ fn macos_task_snapshot(pid: u32) -> Result<MacosTaskSnapshot, CommandError> {
     // SAFETY: proc_pidinfo filled the struct when written > 0.
     let info = unsafe { info.assume_init() };
 
-    let mut timebase = libc::mach_timebase_info { numer: 1, denom: 1 };
+    let mut timebase = mach2::mach_time::mach_timebase_info { numer: 1, denom: 1 };
     // SAFETY: mach_timebase_info writes into the provided struct.
-    let _ = unsafe { libc::mach_timebase_info(&mut timebase) };
+    let _ = unsafe { mach2::mach_time::mach_timebase_info(&mut timebase) };
     let ticks = info.pti_total_user.saturating_add(info.pti_total_system);
     let nanos = ticks as f64 * f64::from(timebase.numer) / f64::from(timebase.denom.max(1));
 

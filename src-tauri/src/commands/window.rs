@@ -25,7 +25,9 @@ pub fn set_taskbar_visible(window: &tauri::WebviewWindow, visible: bool) {
     #[cfg(target_os = "windows")]
     let _ = window.set_skip_taskbar(!visible);
     #[cfg(not(target_os = "windows"))]
-    let _ = visible;
+    {
+        let _ = (window, visible);
+    }
 }
 
 #[cfg(desktop)]

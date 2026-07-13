@@ -558,7 +558,8 @@ mod tests {
 
     #[test]
     fn decode_slot_treats_cfnull_as_absent() {
-        let Some(null) = objc2_core_foundation::kCFNull else {
+        // SAFETY: kCFNull is a CoreFoundation constant; reading the extern static is required.
+        let Some(null) = (unsafe { objc2_core_foundation::kCFNull }) else {
             return;
         };
         let retained: CFRetained<CFType> = CFRetained::from(null);

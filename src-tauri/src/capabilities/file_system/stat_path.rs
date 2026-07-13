@@ -60,6 +60,7 @@ fn is_executable(path: &Path, metadata: &fs::Metadata) -> bool {
 
     #[cfg(unix)]
     {
+        let _ = path;
         use std::os::unix::fs::PermissionsExt;
         return metadata.permissions().mode() & 0o100 != 0;
     }
