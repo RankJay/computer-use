@@ -10,12 +10,13 @@ use crate::capabilities::error::{CommandError, ErrorCode};
 use crate::capabilities::shared::macos_ax::{
     activate_app, ax_copy_array, ax_copy_attributes, ax_copy_bool, ax_copy_element, ax_copy_point,
     ax_copy_size, ax_copy_string, ax_perform, ax_uielement_get_window, ax_window_for_cg,
-    lookup_cg_window, map_ax_error, require_accessibility, set_ax_bool, set_ax_value, slot_bool,
-    slot_element, slot_element_array, slot_point, slot_size, slot_string, CgWindowInfo,
-    AX_CHILDREN, AX_DESCRIPTION, AX_ENABLED, AX_FOCUSED, AX_FOCUSED_UI_ELEMENT, AX_IDENTIFIER,
-    AX_PARENT, AX_POSITION, AX_PRESS, AX_RAISE, AX_ROLE, AX_SELECTED_CHILDREN, AX_SELECTED_TEXT,
-    AX_SHOW_MENU, AX_SIZE, AX_TITLE, AX_VALUE,
+    map_ax_error, require_accessibility, set_ax_bool, set_ax_value, slot_bool, slot_element,
+    slot_element_array, slot_point, slot_size, slot_string, AX_CHILDREN, AX_DESCRIPTION,
+    AX_ENABLED, AX_FOCUSED, AX_FOCUSED_UI_ELEMENT, AX_IDENTIFIER, AX_PARENT, AX_POSITION, AX_PRESS,
+    AX_RAISE, AX_ROLE, AX_SELECTED_CHILDREN, AX_SELECTED_TEXT, AX_SHOW_MENU, AX_SIZE, AX_TITLE,
+    AX_VALUE,
 };
+pub(super) use crate::capabilities::shared::macos_ax::{lookup_cg_window, CgWindowInfo};
 use crate::capabilities::window::WindowId;
 
 use super::super::state::SnapshotStore;
@@ -70,10 +71,20 @@ pub fn snapshot_timeout_ms(store: &SnapshotStore, hwnd: WindowId) -> u64 {
     types::TIMEOUT_SNAPSHOT_MS
 }
 
+/// Id-based entry: lookup then AX resolve. Prefer [`ax_window_for_info`] when
+/// the caller already holds a `CgWindowInfo`.
+#[allow(dead_code)]
 pub(super) fn ax_window_for_hwnd(hwnd: WindowId) -> Result<CFRetained<AXUIElement>, CommandError> {
-    require_accessibility()?;
     let info = lookup_cg_window(hwnd)?;
-    ax_window_or_app_root(&info)
+    ax_window_for_info(&info)
+}
+
+/// Resolve AX window from a already-looked-up `CgWindowInfo`.
+pub(super) fn ax_window_for_info(
+    info: &CgWindowInfo,
+) -> Result<CFRetained<AXUIElement>, CommandError> {
+    require_accessibility()?;
+    ax_window_or_app_root(info)
 }
 
 /// Strict resolve, then app-root fallback when the CG window has no AX twin.
@@ -89,10 +100,9 @@ fn ax_window_or_app_root(info: &CgWindowInfo) -> Result<CFRetained<AXUIElement>,
     }
 }
 
-pub(super) fn foreground_window(hwnd: WindowId) -> Result<bool, CommandError> {
-    let info = lookup_cg_window(hwnd)?;
+pub(super) fn foreground_window(info: &CgWindowInfo) -> Result<bool, CommandError> {
     activate_app(info.pid)?;
-    if let Ok(window) = ax_window_or_app_root(&info) {
+    if let Ok(window) = ax_window_or_app_root(info) {
         let _ = ax_perform(&window, AX_RAISE);
     }
     Ok(true)

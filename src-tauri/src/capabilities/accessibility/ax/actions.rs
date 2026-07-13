@@ -23,7 +23,8 @@ use super::resolve::resolve_stored_element;
 use super::roles::map_ax_role;
 use super::session::{
     ax_press, ax_show_menu, element_parent, element_rect, element_role, element_value_text,
-    foreground_window, is_useful_value, set_focused, set_value_string, AxSession,
+    foreground_window, is_useful_value, lookup_cg_window, set_focused, set_value_string,
+    AxSession,
 };
 
 pub(super) fn click_impl(
@@ -33,8 +34,9 @@ pub(super) fn click_impl(
     deadline: Instant,
 ) -> Result<ActionResult, CommandError> {
     let stored = store.resolve_ref_or_stale(reference)?;
-    let element = resolve_stored_element(session, &stored, deadline)?;
-    let foregrounded = foreground_window(stored.hwnd)?;
+    let info = lookup_cg_window(stored.hwnd)?;
+    let element = resolve_stored_element(session, &stored, &info, deadline)?;
+    let foregrounded = foreground_window(&info)?;
     let target = resolve_click_target(&element);
     let _ = set_focused(&target);
 
@@ -109,8 +111,9 @@ pub(super) fn set_value_impl(
     deadline: Instant,
 ) -> Result<ActionResult, CommandError> {
     let stored = store.resolve_ref_or_stale(reference)?;
-    let element = resolve_stored_element(session, &stored, deadline)?;
-    let foregrounded = foreground_window(stored.hwnd)?;
+    let info = lookup_cg_window(stored.hwnd)?;
+    let element = resolve_stored_element(session, &stored, &info, deadline)?;
+    let foregrounded = foreground_window(&info)?;
 
     if set_value_string(&element, text).is_ok() {
         return Ok(ActionResult {
@@ -144,7 +147,8 @@ pub(super) fn send_keys_impl(
         ));
     }
 
-    let foregrounded = foreground_window(hwnd)?;
+    let info = lookup_cg_window(hwnd)?;
+    let foregrounded = foreground_window(&info)?;
     if let Some(ref_str) = reference {
         let stored = store.resolve_ref_or_stale(ref_str)?;
         if stored.hwnd != hwnd {
@@ -153,7 +157,7 @@ pub(super) fn send_keys_impl(
                 "reference does not belong to the provided hwnd",
             ));
         }
-        let element = resolve_stored_element(session, &stored, deadline)?;
+        let element = resolve_stored_element(session, &stored, &info, deadline)?;
         let _ = set_focused(&element);
     }
 
@@ -206,8 +210,9 @@ pub(super) fn focus_impl(
     deadline: Instant,
 ) -> Result<ActionResult, CommandError> {
     let stored = store.resolve_ref_or_stale(reference)?;
-    let element = resolve_stored_element(session, &stored, deadline)?;
-    let foregrounded = foreground_window(stored.hwnd)?;
+    let info = lookup_cg_window(stored.hwnd)?;
+    let element = resolve_stored_element(session, &stored, &info, deadline)?;
+    let foregrounded = foreground_window(&info)?;
     set_focused(&element).map_err(|error| {
         if error.code == ErrorCode::AccessibilityPermissionDenied.as_str() {
             error
@@ -229,7 +234,8 @@ pub(super) fn get_value_impl(
     deadline: Instant,
 ) -> Result<GetValueResult, CommandError> {
     let stored = store.resolve_ref_or_stale(reference)?;
-    let element = resolve_stored_element(session, &stored, deadline)?;
+    let info = lookup_cg_window(stored.hwnd)?;
+    let element = resolve_stored_element(session, &stored, &info, deadline)?;
 
     if let Some(value) = element_value_text(&element) {
         if is_useful_value(&value) {
@@ -261,8 +267,9 @@ pub(super) fn scroll_element_impl(
     deadline: Instant,
 ) -> Result<ActionResult, CommandError> {
     let stored = store.resolve_ref_or_stale(reference)?;
-    let element = resolve_stored_element(session, &stored, deadline)?;
-    let foregrounded = foreground_window(stored.hwnd)?;
+    let info = lookup_cg_window(stored.hwnd)?;
+    let element = resolve_stored_element(session, &stored, &info, deadline)?;
+    let foregrounded = foreground_window(&info)?;
 
     let (dx, dy) = scroll_deltas(direction, amount)?;
     let action = match direction {
@@ -329,8 +336,9 @@ pub(super) fn right_click_element_impl(
     deadline: Instant,
 ) -> Result<ActionResult, CommandError> {
     let stored = store.resolve_ref_or_stale(reference)?;
-    let element = resolve_stored_element(session, &stored, deadline)?;
-    let foregrounded = foreground_window(stored.hwnd)?;
+    let info = lookup_cg_window(stored.hwnd)?;
+    let element = resolve_stored_element(session, &stored, &info, deadline)?;
+    let foregrounded = foreground_window(&info)?;
     let _ = set_focused(&element);
 
     if ax_show_menu(&element).is_ok() {
@@ -356,8 +364,9 @@ pub(super) fn invoke_action_impl(
     deadline: Instant,
 ) -> Result<ActionResult, CommandError> {
     let stored = store.resolve_ref_or_stale(reference)?;
-    let element = resolve_stored_element(session, &stored, deadline)?;
-    let foregrounded = foreground_window(stored.hwnd)?;
+    let info = lookup_cg_window(stored.hwnd)?;
+    let element = resolve_stored_element(session, &stored, &info, deadline)?;
+    let foregrounded = foreground_window(&info)?;
     let method = parse_invoke_action(action)?;
 
     let ax_action = match method {

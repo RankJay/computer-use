@@ -42,7 +42,7 @@ use query::{find_element_impl, query_impl, wait_impl};
 use resolve::{mint_projected_element, resolve_element_hwnd, resolve_stored_element};
 use session::{
     ax_selected_children, ax_selected_text, element_at_point, element_name, element_pid,
-    element_role, element_value_text, focused_element, process_id_for_hwnd,
+    element_role, element_value_text, focused_element, lookup_cg_window, process_id_for_hwnd,
     AxSession as SessionInner,
 };
 use tree_extract::{fetch_tree, fetch_tree_from_element, project_element_allow_text};
@@ -106,12 +106,13 @@ fn snapshot_from_hwnd(
     max_elements: u32,
     deadline: Instant,
 ) -> Result<(TextResult, session::SnapshotStats), CommandError> {
-    let process_id = process_id_for_hwnd(hwnd).ok_or_else(|| {
+    let info = lookup_cg_window(hwnd).map_err(|_| {
         CommandError::new(
             ErrorCode::SnapshotFailed,
             "Could not resolve process id for hwnd",
         )
     })?;
+    let process_id = info.pid;
 
     if store.is_process_degraded(process_id) {
         return Err(CommandError::new(
@@ -122,7 +123,7 @@ fn snapshot_from_hwnd(
 
     let _ = store.is_first_process_touch(process_id);
 
-    let extracted = fetch_tree(session, hwnd, max_depth, deadline)?;
+    let extracted = fetch_tree(session, &info, max_depth, deadline)?;
     let generation = store.begin_generation(hwnd);
     let outline = emit_outline_from_arena(
         store,
@@ -205,7 +206,8 @@ fn snapshot_from_reference(
         }
     }
 
-    let element = resolve_stored_element(session, &stored, deadline)?;
+    let info = lookup_cg_window(stored.hwnd)?;
+    let element = resolve_stored_element(session, &stored, &info, deadline)?;
     let extracted = fetch_tree_from_element(&element, max_depth, deadline)?;
     let generation = store.begin_generation(stored.hwnd);
     let outline = emit_outline_from_arena(
@@ -259,7 +261,8 @@ fn get_text_impl(
         }
     }
 
-    let element = resolve_stored_element(session, &stored, deadline)?;
+    let info = lookup_cg_window(stored.hwnd)?;
+    let element = resolve_stored_element(session, &stored, &info, deadline)?;
     if let Some(value) = element_value_text(&element) {
         if !value.trim().is_empty() {
             return Ok(GetTextResult {
@@ -290,7 +293,8 @@ fn inspect_impl(
     deadline: Instant,
 ) -> Result<InspectResult, CommandError> {
     let stored = store.resolve_ref_or_stale(reference)?;
-    let element = resolve_stored_element(session, &stored, deadline)?;
+    let info = lookup_cg_window(stored.hwnd)?;
+    let element = resolve_stored_element(session, &stored, &info, deadline)?;
     let record = project_element_allow_text(&element, None, 0, &[], &stored.runtime_id)
         .ok_or_else(|| {
             CommandError::new(
@@ -363,7 +367,8 @@ fn get_selection_impl(
     deadline: Instant,
 ) -> Result<TextResult, CommandError> {
     let stored = store.resolve_ref_or_stale(reference)?;
-    let element = resolve_stored_element(session, &stored, deadline)?;
+    let info = lookup_cg_window(stored.hwnd)?;
+    let element = resolve_stored_element(session, &stored, &info, deadline)?;
 
     if let Some(text) = ax_selected_text(&element) {
         if !text.is_empty() {

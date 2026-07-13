@@ -15,27 +15,30 @@ use super::super::state::{make_reference, SnapshotStore, StoredElement};
 use super::super::types::TextResult;
 use super::roles::map_ax_role;
 use super::session::{
-    ax_window_for_hwnd, element_ancestor_hop, element_cg_window_id, element_node_attrs,
-    element_parent, element_pid, is_transient_command_error, process_id_for_hwnd, AxSession,
-    NodeAttrs, RESOLVE_RETRY_ATTEMPTS, TRANSIENT_AX_RETRY_MS,
+    ax_window_for_info, element_ancestor_hop, element_cg_window_id, element_node_attrs,
+    element_parent, element_pid, is_transient_command_error, lookup_cg_window,
+    process_id_for_hwnd, AxSession, CgWindowInfo, NodeAttrs, RESOLVE_RETRY_ATTEMPTS,
+    TRANSIENT_AX_RETRY_MS,
 };
 use super::tree_extract::{project_element_allow_text, walk_path};
 
 pub(super) fn resolve_stored_element(
     _session: &AxSession,
     stored: &StoredElement,
+    info: &CgWindowInfo,
     deadline: Instant,
 ) -> Result<CFRetained<AXUIElement>, CommandError> {
-    Ok(resolve_stored_element_with_stats(stored, deadline)?.0)
+    Ok(resolve_stored_element_with_stats(stored, info, deadline)?.0)
 }
 
 fn resolve_stored_element_with_stats(
     stored: &StoredElement,
+    info: &CgWindowInfo,
     deadline: Instant,
 ) -> Result<(CFRetained<AXUIElement>, ResolveStats), CommandError> {
     let mut last_error: Option<CommandError> = None;
     for attempt in 0..RESOLVE_RETRY_ATTEMPTS {
-        match resolve_stored_element_once(stored, deadline) {
+        match resolve_stored_element_once(stored, info, deadline) {
             Ok(result) => return Ok(result),
             Err(error)
                 if is_transient_command_error(&error) && attempt + 1 < RESOLVE_RETRY_ATTEMPTS =>
@@ -66,9 +69,10 @@ fn backoff_fits_before_deadline(now: Instant, deadline: Instant, backoff: Durati
 
 fn resolve_stored_element_once(
     stored: &StoredElement,
+    info: &CgWindowInfo,
     deadline: Instant,
 ) -> Result<(CFRetained<AXUIElement>, ResolveStats), CommandError> {
-    let root = ax_window_for_hwnd(stored.hwnd).map_err(|error| {
+    let root = ax_window_for_info(info).map_err(|error| {
         if error.code == ErrorCode::AccessibilityPermissionDenied.as_str()
             || error.code == ErrorCode::InvalidHwnd.as_str()
         {
@@ -357,7 +361,8 @@ pub fn resolve_reference_with_stats(
     deadline: Instant,
 ) -> Result<ResolveStats, CommandError> {
     let stored = store.resolve_ref_or_stale(reference)?;
-    Ok(resolve_stored_element_with_stats(&stored, deadline)?.1)
+    let info = lookup_cg_window(stored.hwnd)?;
+    Ok(resolve_stored_element_with_stats(&stored, &info, deadline)?.1)
 }
 
 #[cfg(test)]

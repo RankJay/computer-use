@@ -23,8 +23,8 @@ use objc2_core_foundation::{
     CGSize,
 };
 use objc2_core_graphics::{
-    kCGNullWindowID, kCGWindowLayer, kCGWindowName, kCGWindowNumber, kCGWindowOwnerName,
-    kCGWindowOwnerPID, CGWindowListCopyWindowInfo, CGWindowListOption,
+    kCGNullWindowID, kCGWindowIsOnscreen, kCGWindowLayer, kCGWindowName, kCGWindowNumber,
+    kCGWindowOwnerName, kCGWindowOwnerPID, CGWindowListCopyWindowInfo, CGWindowListOption,
 };
 
 use crate::capabilities::error::{CommandError, ErrorCode};
@@ -95,39 +95,16 @@ pub(crate) fn collect_cg_windows() -> Vec<CgWindowInfo> {
 
     let mut entries = Vec::new();
     for dict in list.iter() {
-        let Some(window_id) = dict_number(&dict, unsafe { kCGWindowNumber }) else {
-            continue;
-        };
-        if window_id == 0 {
-            continue;
+        if let Some(info) = parse_cg_window_dict(&dict) {
+            entries.push(info);
         }
-        let layer = dict_number(&dict, unsafe { kCGWindowLayer }).unwrap_or(0);
-        if layer != 0 {
-            continue;
-        }
-        let Some(pid) = dict_number(&dict, unsafe { kCGWindowOwnerPID }) else {
-            continue;
-        };
-        let owner = dict_string(&dict, unsafe { kCGWindowOwnerName }).unwrap_or_default();
-        let name = dict_string(&dict, unsafe { kCGWindowName }).unwrap_or_default();
-        let title = if !name.is_empty() {
-            name
-        } else if !owner.is_empty() {
-            owner.clone()
-        } else {
-            continue;
-        };
-
-        entries.push(CgWindowInfo {
-            window_id: window_id as u32,
-            pid: pid as u32,
-            title,
-            process_name: owner,
-        });
     }
     entries
 }
 
+/// Point query via `OptionIncludingWindow` (one WindowServer IPC) instead of
+/// full on-screen enumeration. Re-applies the filters `OptionOnScreenOnly`
+/// gave `collect_cg_windows` for free — notably `kCGWindowIsOnscreen`.
 pub(crate) fn lookup_cg_window(id: WindowId) -> Result<CgWindowInfo, CommandError> {
     if id.0 <= 0 {
         return Err(CommandError::new(
@@ -136,10 +113,67 @@ pub(crate) fn lookup_cg_window(id: WindowId) -> Result<CgWindowInfo, CommandErro
         ));
     }
     let target = id.0 as u32;
-    collect_cg_windows()
-        .into_iter()
-        .find(|entry| entry.window_id == target)
-        .ok_or_else(|| CommandError::new(ErrorCode::InvalidHwnd, "Window handle is not valid"))
+    let Some(raw_list) =
+        CGWindowListCopyWindowInfo(CGWindowListOption::OptionIncludingWindow, target)
+    else {
+        return Err(CommandError::new(
+            ErrorCode::InvalidHwnd,
+            "Window handle is not valid",
+        ));
+    };
+
+    let list: CFRetained<CFArray<CFDictionary<CFString, CFType>>> =
+        unsafe { CFRetained::cast_unchecked(raw_list) };
+
+    // Expect 0 or 1 dicts; still filter by id in case a release returns more.
+    for dict in list.iter() {
+        let Some(window_id) = dict_number(&dict, unsafe { kCGWindowNumber }) else {
+            continue;
+        };
+        if window_id as u32 != target {
+            continue;
+        }
+        // IncludingWindow has no on-screen filter; absent key ⇒ off-screen.
+        if !dict_bool(&dict, unsafe { kCGWindowIsOnscreen }).unwrap_or(false) {
+            continue;
+        }
+        if let Some(info) = parse_cg_window_dict(&dict) {
+            return Ok(info);
+        }
+    }
+
+    Err(CommandError::new(
+        ErrorCode::InvalidHwnd,
+        "Window handle is not valid",
+    ))
+}
+
+fn parse_cg_window_dict(dict: &CFDictionary<CFString, CFType>) -> Option<CgWindowInfo> {
+    let window_id = dict_number(dict, unsafe { kCGWindowNumber })?;
+    if window_id == 0 {
+        return None;
+    }
+    let layer = dict_number(dict, unsafe { kCGWindowLayer }).unwrap_or(0);
+    if layer != 0 {
+        return None;
+    }
+    let pid = dict_number(dict, unsafe { kCGWindowOwnerPID })?;
+    let owner = dict_string(dict, unsafe { kCGWindowOwnerName }).unwrap_or_default();
+    let name = dict_string(dict, unsafe { kCGWindowName }).unwrap_or_default();
+    let title = if !name.is_empty() {
+        name
+    } else if !owner.is_empty() {
+        owner.clone()
+    } else {
+        return None;
+    };
+
+    Some(CgWindowInfo {
+        window_id: window_id as u32,
+        pid: pid as u32,
+        title,
+        process_name: owner,
+    })
 }
 
 pub(crate) fn dict_number(dict: &CFDictionary<CFString, CFType>, key: &CFString) -> Option<i64> {
@@ -150,6 +184,11 @@ pub(crate) fn dict_number(dict: &CFDictionary<CFString, CFType>, key: &CFString)
 pub(crate) fn dict_string(dict: &CFDictionary<CFString, CFType>, key: &CFString) -> Option<String> {
     let value = dict.get(key)?;
     Some(value.downcast::<CFString>().ok()?.to_string())
+}
+
+pub(crate) fn dict_bool(dict: &CFDictionary<CFString, CFType>, key: &CFString) -> Option<bool> {
+    let value = dict.get(key)?;
+    Some(value.downcast::<CFBoolean>().ok()?.as_bool())
 }
 
 pub(crate) fn require_accessibility() -> Result<(), CommandError> {

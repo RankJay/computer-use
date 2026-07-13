@@ -16,7 +16,7 @@ use super::super::types::{
     FindElementInput, QueryInput, TextResult, MAX_FIND_CANDIDATES, WAIT_POLL_MS,
 };
 use super::resolve::resolve_stored_element;
-use super::session::{ax_window_for_hwnd, process_id_for_hwnd, AxSession};
+use super::session::{ax_window_for_info, lookup_cg_window, AxSession};
 use super::tree_extract::collect_descendants;
 
 pub(super) fn find_element_impl(
@@ -92,12 +92,13 @@ fn query_once(
     input: &QueryInput,
     deadline: Instant,
 ) -> Result<TextResult, CommandError> {
-    let process_id = process_id_for_hwnd(input.hwnd).ok_or_else(|| {
+    let info = lookup_cg_window(input.hwnd).map_err(|_| {
         CommandError::new(
             ErrorCode::FindFailed,
             "Could not resolve process id for hwnd",
         )
     })?;
+    let process_id = info.pid;
 
     if store.is_process_degraded(process_id) {
         return Err(CommandError::new(
@@ -149,9 +150,9 @@ fn query_once(
                 "scopeReference does not belong to the provided hwnd",
             ));
         }
-        resolve_stored_element(session, &stored, deadline)?
+        resolve_stored_element(session, &stored, &info, deadline)?
     } else {
-        ax_window_for_hwnd(input.hwnd).map_err(|error| {
+        ax_window_for_info(&info).map_err(|error| {
             if error.code == ErrorCode::AccessibilityPermissionDenied.as_str()
                 || error.code == ErrorCode::InvalidHwnd.as_str()
             {

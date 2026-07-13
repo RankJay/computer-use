@@ -7,13 +7,12 @@ use objc2_application_services::AXUIElement;
 use objc2_core_foundation::CFRetained;
 
 use crate::capabilities::error::{CommandError, ErrorCode};
-use crate::capabilities::window::WindowId;
 
 use super::super::arena::NodeRecord;
 use super::super::budget::{SearchBudget, SNAPSHOT_MAX_NODES};
 use super::roles::{map_ax_role, should_skip_role_allow_text};
 use super::session::{
-    ax_window_for_hwnd, element_children, element_node_attrs, AxSession, NodeAttrs,
+    ax_window_for_info, element_children, element_node_attrs, AxSession, CgWindowInfo, NodeAttrs,
 };
 
 pub(super) struct ExtractedTree {
@@ -23,11 +22,11 @@ pub(super) struct ExtractedTree {
 
 pub(super) fn fetch_tree(
     _session: &AxSession,
-    hwnd: WindowId,
+    info: &CgWindowInfo,
     max_depth: u32,
     deadline: Instant,
 ) -> Result<ExtractedTree, CommandError> {
-    let root = ax_window_for_hwnd(hwnd).map_err(|error| {
+    let root = ax_window_for_info(info).map_err(|error| {
         if error.code == ErrorCode::AccessibilityPermissionDenied.as_str()
             || error.code == ErrorCode::InvalidHwnd.as_str()
         {
