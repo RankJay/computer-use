@@ -7,7 +7,10 @@ use crate::capabilities::error::CommandError;
 #[cfg(windows)]
 use super::win_resolver::WinResolver;
 
-#[cfg(not(windows))]
+#[cfg(target_os = "macos")]
+use super::mac_resolver::MacResolver;
+
+#[cfg(not(any(windows, target_os = "macos")))]
 use super::unsupported_resolver::UnsupportedResolver;
 
 /// Resolved path or PATH name ready for `std::process::Command`.
@@ -42,7 +45,12 @@ pub fn resolver() -> &'static dyn ExecutableResolver {
         static RESOLVER: WinResolver = WinResolver;
         &RESOLVER
     }
-    #[cfg(not(windows))]
+    #[cfg(target_os = "macos")]
+    {
+        static RESOLVER: MacResolver = MacResolver;
+        &RESOLVER
+    }
+    #[cfg(not(any(windows, target_os = "macos")))]
     {
         static RESOLVER: UnsupportedResolver = UnsupportedResolver;
         &RESOLVER

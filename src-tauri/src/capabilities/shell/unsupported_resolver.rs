@@ -1,4 +1,4 @@
-//! Non-Windows resolver until a macOS adapter exists: PATH lookup only, no `.exe` suffixing.
+//! Non-Windows / non-macOS resolver: PATH lookup only, no `.exe` suffixing.
 
 use crate::capabilities::error::CommandError;
 
