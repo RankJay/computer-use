@@ -121,12 +121,20 @@ export function createRunController(deps: RunControllerDeps): RunController {
       if (!resolve) return;
       permissionResolvers.delete(callId);
 
-      if (decision === "approved" && persist && lastConfig?.persistApproval) {
+      if (decision === "approved" && persist && lastConfig) {
         const pending = deps
           .getProjection()
           .pendingPermissions.find((entry) => entry.callId === callId);
         if (pending) {
-          await lastConfig.persistApproval(pending.capability);
+          // Mutate the live run settings object so later tools in this run
+          // see the approval (runnerDeps holds the same reference).
+          if (!lastConfig.settings.persistedApprovals.includes(pending.capability)) {
+            lastConfig.settings.persistedApprovals = [
+              ...lastConfig.settings.persistedApprovals,
+              pending.capability,
+            ];
+          }
+          await lastConfig.persistApproval?.(pending.capability);
         }
       }
 

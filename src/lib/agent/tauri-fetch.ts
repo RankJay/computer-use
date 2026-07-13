@@ -10,8 +10,14 @@ const STRIP_HEADERS = [
   "sec-fetch-user",
 ];
 
-function buildProviderHeaders(init?: RequestInit): Headers {
-  const headers = new Headers(init?.headers);
+function buildProviderHeaders(input: RequestInfo | URL, init?: RequestInit): Headers {
+  // Prefer init headers, then fall back to Request headers (AI SDK / fetch(Request) path).
+  const headers = new Headers(input instanceof Request ? input.headers : undefined);
+  if (init?.headers) {
+    new Headers(init.headers).forEach((value, key) => {
+      headers.set(key, value);
+    });
+  }
 
   // Tauri plugin-http removes Origin when set to "" (requires unsafe-headers).
   headers.set("Origin", "");
@@ -24,15 +30,16 @@ function buildProviderHeaders(init?: RequestInit): Headers {
 }
 
 function toTauriRequestInit(input: RequestInfo | URL, init?: RequestInit): RequestInit {
-  const headers = buildProviderHeaders(init);
+  const headers = buildProviderHeaders(input, init);
 
   if (input instanceof Request) {
+    const { headers: _ignored, ...restInit } = init ?? {};
     return {
       method: init?.method ?? input.method,
-      headers,
       body: init?.body ?? input.body,
       signal: init?.signal ?? input.signal,
-      ...init,
+      ...restInit,
+      headers,
     };
   }
 

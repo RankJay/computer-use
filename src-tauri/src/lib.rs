@@ -33,8 +33,31 @@ fn apply_frameless_window(window: &tauri::WebviewWindow) {
     let _ = window.set_decorations(false);
 }
 
+/// macOS routes Cmd+C/V/X/A through the app Edit menu. Removing the default menu
+/// without restoring those PredefinedMenuItems breaks paste in inputs.
+#[cfg(all(desktop, target_os = "macos"))]
+fn install_edit_menu(app: &tauri::App) -> tauri::Result<()> {
+    use tauri::menu::{MenuBuilder, SubmenuBuilder};
+
+    let edit = SubmenuBuilder::new(app, "Edit")
+        .undo()
+        .redo()
+        .separator()
+        .cut()
+        .copy()
+        .paste()
+        .select_all()
+        .build()?;
+    let menu = MenuBuilder::new(app).item(&edit).build()?;
+    let _ = app.set_menu(menu);
+    Ok(())
+}
+
 #[cfg(desktop)]
 fn setup_desktop(app: &mut tauri::App) -> tauri::Result<()> {
+    #[cfg(target_os = "macos")]
+    install_edit_menu(app)?;
+    #[cfg(not(target_os = "macos"))]
     let _ = app.remove_menu();
 
     use tauri::{

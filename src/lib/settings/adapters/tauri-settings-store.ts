@@ -20,4 +20,6 @@ export async function readAppSettings(): Promise<AppSettings> {
 export async function writeAppSettings(settings: AppSettings): Promise<void> {
   await settingsStore.init();
   await settingsStore.set(SETTINGS_KEY, settings);
+  // autoSave can lag; flush so "Always allow this tool" survives restarts.
+  await settingsStore.save();
 }

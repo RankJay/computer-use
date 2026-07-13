@@ -1,6 +1,7 @@
 import { appDataDir } from "@tauri-apps/api/path";
 import { type Client, Stronghold } from "@tauri-apps/plugin-stronghold";
 
+import { sanitizeApiKey } from "@/lib/settings/api-key";
 import { DEFAULT_SECRETS } from "@/lib/settings/defaults";
 import type { AppSecrets } from "@/lib/settings/types";
 
@@ -61,12 +62,16 @@ export async function readAppSecrets(): Promise<AppSecrets> {
     }),
   );
 
-  return { ...DEFAULT_SECRETS, ...Object.fromEntries(entries) };
+  const secrets = { ...DEFAULT_SECRETS, ...Object.fromEntries(entries) };
+  return {
+    anthropicApiKey: sanitizeApiKey(secrets.anthropicApiKey),
+    openaiApiKey: sanitizeApiKey(secrets.openaiApiKey),
+  };
 }
 
 export async function writeAppSecret(key: keyof AppSecrets, value: string): Promise<void> {
   const { stronghold, client } = await getStrongholdSession();
   const store = client.getStore();
-  await store.insert(key, encodeSecret(value));
+  await store.insert(key, encodeSecret(sanitizeApiKey(value)));
   await stronghold.save();
 }

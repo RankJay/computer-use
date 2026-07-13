@@ -25,7 +25,7 @@ export type RunShellOutput = {
 export const runShellCapability = defineCapability({
   name: "run_shell",
   description:
-    "Run a shell command or executable anywhere on the system. Returns stdout, stderr, and exit code.",
+    "Run a shell command or executable anywhere on the system. Returns stdout, stderr, and exit code. Not for UI: do not drive apps via osascript/System Events, AppleScript, or keystroke injection — use accessibility_* / mouse_* / keyboard_* instead.",
   risk: "high",
   inputSchema: runShellInputSchema,
 });
