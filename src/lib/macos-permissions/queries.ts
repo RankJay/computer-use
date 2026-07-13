@@ -1,5 +1,4 @@
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
 import { toast } from "sonner";
 
 import { mapInvokeError } from "@/lib/agent/capabilities/native-invoke";
@@ -38,19 +37,7 @@ export function macosPermissionStatusQueryOptions() {
 
 /** Lazy status probe — only fetches once the settings section mounts. */
 export function useMacOsPermissionStatus() {
-  const query = useQuery(macosPermissionStatusQueryOptions());
-
-  useEffect(() => {
-    if (!isTauriRuntime()) return;
-
-    const onFocus = () => {
-      void query.refetch();
-    };
-    window.addEventListener("focus", onFocus);
-    return () => window.removeEventListener("focus", onFocus);
-  }, [query.refetch]);
-
-  return query;
+  return useQuery(macosPermissionStatusQueryOptions());
 }
 
 export function useRequestMacOsPermission() {
