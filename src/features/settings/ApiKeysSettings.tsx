@@ -53,7 +53,7 @@ function ApiKeyRow({
 
   return (
     <SettingsRow label={label} description={description}>
-      <InputGroup className={`w-56 ${settingsInputGroupClassName}`}>
+      <InputGroup className={`w-36 ${settingsInputGroupClassName}`}>
         <InputGroupInput
           id={inputId}
           type="password"

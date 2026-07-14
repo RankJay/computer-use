@@ -1,7 +1,7 @@
 import type { ReactElement } from "react";
 
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
+import { ContentSkeleton } from "@/components/ui/content-skeleton";
 import { SettingsRow } from "@/features/settings/SettingsRow";
 import { SettingsSection } from "@/features/settings/SettingsSection";
 import { settingsGhostButtonClassName } from "@/features/settings/styles";
@@ -14,18 +14,24 @@ import { missingMacOsPermissions } from "@/lib/macos-permissions/types";
 
 function MacOsPermissionsSkeleton(): ReactElement {
   return (
-    <section className="flex flex-col gap-3">
-      <Skeleton className="mx-4 h-4 w-36 bg-[#252525]" />
-      <div className="divide-y divide-[#252525] overflow-hidden rounded-xl bg-[#141414] shadow-layered">
-        <div className="flex items-center justify-between gap-6 px-4 py-3.5">
-          <div className="flex min-w-0 flex-1 flex-col gap-2">
-            <Skeleton className="h-4 w-28 bg-[#252525]" />
-            <Skeleton className="h-3 w-52 max-w-full bg-[#252525]" />
-          </div>
-          <Skeleton className="h-8 w-20 shrink-0 bg-[#252525]" />
-        </div>
-      </div>
-    </section>
+    <ContentSkeleton loading>
+      <SettingsSection title="macOS permissions">
+        <SettingsRow
+          label="Accessibility"
+          description="Required for pointer and UI automation tools."
+        >
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled
+            className={settingsGhostButtonClassName}
+          >
+            Grant
+          </Button>
+        </SettingsRow>
+      </SettingsSection>
+    </ContentSkeleton>
   );
 }
 
