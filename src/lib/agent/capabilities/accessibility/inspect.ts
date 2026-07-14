@@ -23,7 +23,7 @@ export type AccessibilityInspectOutput = {
 export const accessibilityInspectCapability = defineCapability({
   name: "accessibility_inspect",
   description:
-    "Dump properties and available UIA patterns for one ref (debugging / disambiguation). Not a full snapshot.",
+    "Dump properties and available actions/patterns for one ref (debugging / disambiguation). Not a full snapshot.",
   risk: "high",
   inputSchema: accessibilityInspectInputSchema,
   enabledWhen: uiAutomationEnabled,

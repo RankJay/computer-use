@@ -16,9 +16,10 @@ pub struct ReadFileResult {
 #[tauri::command]
 pub fn read_file(path: String, workspace_root: String) -> Result<ReadFileResult, CommandError> {
     let resolved = path_utils::resolve_workspace_path(&workspace_root, &path)?;
+    path_utils::ensure_io_target_within_root(&workspace_root, &resolved)?;
 
     let metadata = fs::metadata(&resolved).map_err(|error| {
-        CommandError::new(ErrorCode::NotFound, format!("File not found: {error}"))
+        path_utils::map_fs_io_error(error, ErrorCode::NotFound, "File not found")
     })?;
 
     if !metadata.is_file() {
@@ -33,10 +34,7 @@ pub fn read_file(path: String, workspace_root: String) -> Result<ReadFileResult,
     }
 
     let content = fs::read_to_string(&resolved).map_err(|error| {
-        CommandError::new(
-            ErrorCode::ReadFailed,
-            format!("Failed to read file: {error}"),
-        )
+        path_utils::map_fs_io_error(error, ErrorCode::ReadFailed, "Failed to read file")
     })?;
 
     Ok(ReadFileResult {

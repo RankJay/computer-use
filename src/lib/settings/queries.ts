@@ -2,6 +2,7 @@ import { queryOptions, useMutation, useQueryClient, useSuspenseQuery } from "@ta
 import { useCallback } from "react";
 import { toast } from "sonner";
 
+import { sanitizeApiKey } from "@/lib/settings/api-key";
 import { loadedSettingsOrDefault, mergeSettingsPatch } from "@/lib/settings/defaults";
 import { createSettingsPersistence } from "@/lib/settings/persistence";
 import type { AppSecrets, AppSettings, LoadedSettings } from "@/lib/settings/types";
@@ -79,10 +80,11 @@ export function useUpdateSecret() {
       value: string;
     }): Promise<LoadedSettings> => {
       const current = await queryClient.ensureQueryData(settingsQueryOptions());
-      await persistence.saveSecret(key, value);
+      const sanitized = sanitizeApiKey(value);
+      await persistence.saveSecret(key, sanitized);
       return {
         ...stripSecrets(current),
-        secrets: { ...current.secrets, [key]: value },
+        secrets: { ...current.secrets, [key]: sanitized },
       };
     },
     onSuccess: (next) => {

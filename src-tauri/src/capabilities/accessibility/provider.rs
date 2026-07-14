@@ -51,6 +51,7 @@ pub trait AccessibilitySession: Send {
         &mut self,
         store: &SnapshotStore,
         reference: &str,
+        deadline: Instant,
     ) -> Result<GetTextResult, CommandError>;
 
     fn get_focused(
@@ -71,18 +72,21 @@ pub trait AccessibilitySession: Send {
         &mut self,
         store: &SnapshotStore,
         reference: &str,
+        deadline: Instant,
     ) -> Result<InspectResult, CommandError>;
 
     fn get_selection(
         &mut self,
         store: &SnapshotStore,
         reference: &str,
+        deadline: Instant,
     ) -> Result<TextResult, CommandError>;
 
     fn click(
         &mut self,
         store: &SnapshotStore,
         reference: &str,
+        deadline: Instant,
     ) -> Result<ActionResult, CommandError>;
 
     fn set_value(
@@ -90,6 +94,7 @@ pub trait AccessibilitySession: Send {
         store: &SnapshotStore,
         reference: &str,
         text: &str,
+        deadline: Instant,
     ) -> Result<ActionResult, CommandError>;
 
     fn send_keys(
@@ -98,18 +103,21 @@ pub trait AccessibilitySession: Send {
         hwnd: WindowId,
         text: &str,
         reference: Option<&str>,
+        deadline: Instant,
     ) -> Result<ActionResult, CommandError>;
 
     fn focus(
         &mut self,
         store: &SnapshotStore,
         reference: &str,
+        deadline: Instant,
     ) -> Result<ActionResult, CommandError>;
 
     fn get_value(
         &mut self,
         store: &SnapshotStore,
         reference: &str,
+        deadline: Instant,
     ) -> Result<GetValueResult, CommandError>;
 
     fn scroll_element(
@@ -118,12 +126,14 @@ pub trait AccessibilitySession: Send {
         reference: &str,
         direction: &str,
         amount: &str,
+        deadline: Instant,
     ) -> Result<ActionResult, CommandError>;
 
     fn right_click_element(
         &mut self,
         store: &SnapshotStore,
         reference: &str,
+        deadline: Instant,
     ) -> Result<ActionResult, CommandError>;
 
     fn invoke_action(
@@ -131,6 +141,7 @@ pub trait AccessibilitySession: Send {
         store: &SnapshotStore,
         reference: &str,
         action: &str,
+        deadline: Instant,
     ) -> Result<ActionResult, CommandError>;
 }
 

@@ -11,7 +11,13 @@ mod system_info;
 #[cfg(windows)]
 mod win_resolver;
 
-#[cfg(not(windows))]
+#[cfg(target_os = "macos")]
+mod mac_launch;
+
+#[cfg(target_os = "macos")]
+mod mac_resolver;
+
+#[cfg(not(any(windows, target_os = "macos")))]
 mod unsupported_resolver;
 
 pub use env::{get_env, set_env};

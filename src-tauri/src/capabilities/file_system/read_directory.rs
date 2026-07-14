@@ -23,10 +23,10 @@ pub struct ReadDirectoryResult {
 }
 
 fn entry_kind(metadata: &fs::Metadata) -> &'static str {
-    if metadata.is_dir() {
-        "directory"
-    } else if metadata.is_symlink() {
+    if metadata.is_symlink() {
         "symlink"
+    } else if metadata.is_dir() {
+        "directory"
     } else {
         "file"
     }
@@ -39,10 +39,16 @@ pub fn read_directory(
 ) -> Result<ReadDirectoryResult, CommandError> {
     let resolved = path_utils::resolve_workspace_path(&workspace_root, &path)?;
 
-    if !resolved.exists() {
+    let metadata = fs::symlink_metadata(&resolved).map_err(|error| {
+        path_utils::map_fs_io_error(error, ErrorCode::IoError, "Failed to read path metadata")
+    })?;
+
+    if metadata.is_symlink() {
+        path_utils::ensure_io_target_within_root(&workspace_root, &resolved)?;
+    } else if !metadata.is_dir() {
         return Err(CommandError::new(
-            ErrorCode::NotFound,
-            "Directory does not exist",
+            ErrorCode::NotADirectory,
+            "Path is not a directory",
         ));
     }
 
@@ -55,21 +61,16 @@ pub fn read_directory(
 
     let mut entries = Vec::new();
     for entry in fs::read_dir(&resolved).map_err(|error| {
-        CommandError::new(
-            ErrorCode::ReadFailed,
-            format!("Failed to read directory: {error}"),
-        )
+        path_utils::map_fs_io_error(error, ErrorCode::ReadFailed, "Failed to read directory")
     })? {
         let entry = entry.map_err(|error| {
-            CommandError::new(
-                ErrorCode::ReadFailed,
-                format!("Failed to read entry: {error}"),
-            )
+            path_utils::map_fs_io_error(error, ErrorCode::ReadFailed, "Failed to read entry")
         })?;
-        let metadata = entry.metadata().map_err(|error| {
-            CommandError::new(
+        let metadata = fs::symlink_metadata(entry.path()).map_err(|error| {
+            path_utils::map_fs_io_error(
+                error,
                 ErrorCode::ReadFailed,
-                format!("Failed to read entry metadata: {error}"),
+                "Failed to read entry metadata",
             )
         })?;
 
@@ -121,6 +122,40 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec!["a.txt", "b.txt", "dir"]
         );
+        cleanup_workspace(&cleanup);
+    }
+
+    #[test]
+    fn lists_symlink_entries_as_symlink() {
+        let (root, cleanup) = temp_workspace();
+        fs::write(root.join("target.txt"), "data").expect("write target");
+
+        #[cfg(unix)]
+        std::os::unix::fs::symlink("target.txt", root.join("link.txt")).expect("symlink");
+
+        #[cfg(windows)]
+        {
+            if std::os::windows::fs::symlink_file("target.txt", root.join("link.txt")).is_err() {
+                cleanup_workspace(&cleanup);
+                return;
+            }
+        }
+
+        #[cfg(not(any(unix, windows)))]
+        {
+            cleanup_workspace(&cleanup);
+            return;
+        }
+
+        let result =
+            read_directory(".".to_string(), root.to_string_lossy().to_string()).expect("read dir");
+        let link = result
+            .entries
+            .iter()
+            .find(|entry| entry.name == "link.txt")
+            .expect("link entry");
+        assert_eq!(link.kind, "symlink");
+        assert!(link.size_bytes.is_none());
         cleanup_workspace(&cleanup);
     }
 

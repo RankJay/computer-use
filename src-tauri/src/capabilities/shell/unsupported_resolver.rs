@@ -1,4 +1,4 @@
-//! Non-Windows resolver until a macOS adapter exists: PATH lookup only, no `.exe` suffixing.
+//! Non-Windows / non-macOS resolver: PATH lookup only, no `.exe` suffixing.
 
 use crate::capabilities::error::CommandError;
 
@@ -9,11 +9,9 @@ pub struct UnsupportedResolver;
 impl ExecutableResolver for UnsupportedResolver {
     fn resolve(&self, name: &str) -> Result<ResolvedExecutable, CommandError> {
         if let Some(path) = as_path_literal(name) {
-            return Ok(ResolvedExecutable { path });
+            return Ok(ResolvedExecutable::cli(path));
         }
-        Ok(ResolvedExecutable {
-            path: name.trim().to_string(),
-        })
+        Ok(ResolvedExecutable::cli(name.trim().to_string()))
     }
 }
 

@@ -43,8 +43,9 @@ pub fn patch_file(
     workspace_root: String,
 ) -> Result<PatchFileResult, CommandError> {
     let resolved = path_utils::resolve_workspace_path(&workspace_root, &path)?;
+    path_utils::ensure_io_target_within_root(&workspace_root, &resolved)?;
 
-    if !resolved.exists() {
+    if !path_utils::path_lexists(&resolved) {
         return Err(CommandError::new(
             ErrorCode::NotFound,
             "File does not exist",
@@ -56,10 +57,7 @@ pub fn patch_file(
     }
 
     let original = fs::read_to_string(&resolved).map_err(|error| {
-        CommandError::new(
-            ErrorCode::ReadFailed,
-            format!("Failed to read file: {error}"),
-        )
+        path_utils::map_fs_io_error(error, ErrorCode::ReadFailed, "Failed to read file")
     })?;
 
     let (patched, hunks_applied) =
@@ -74,9 +72,10 @@ pub fn patch_file(
     }
 
     fs::write(&resolved, patched).map_err(|error| {
-        CommandError::new(
+        path_utils::map_fs_io_error(
+            error,
             ErrorCode::WriteFailed,
-            format!("Failed to write patched file: {error}"),
+            "Failed to write patched file",
         )
     })?;
 

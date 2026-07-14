@@ -20,7 +20,7 @@ pub fn create_directory(
 ) -> Result<CreateDirectoryResult, CommandError> {
     let resolved = path_utils::resolve_workspace_path(&workspace_root, &path)?;
 
-    if resolved.exists() {
+    if path_utils::path_lexists(&resolved) {
         return Err(CommandError::new(
             ErrorCode::AlreadyExists,
             "Directory already exists",
@@ -29,16 +29,18 @@ pub fn create_directory(
 
     if recursive.unwrap_or(false) {
         fs::create_dir_all(&resolved).map_err(|error| {
-            CommandError::new(
+            path_utils::map_fs_io_error(
+                error,
                 ErrorCode::CreateFailed,
-                format!("Failed to create directories: {error}"),
+                "Failed to create directories",
             )
         })?;
     } else {
         fs::create_dir(&resolved).map_err(|error| {
-            CommandError::new(
+            path_utils::map_fs_io_error(
+                error,
                 ErrorCode::CreateFailed,
-                format!("Failed to create directory: {error}"),
+                "Failed to create directory",
             )
         })?;
     }

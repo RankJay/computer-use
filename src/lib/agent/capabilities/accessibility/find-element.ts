@@ -4,7 +4,7 @@ import { defineCapability } from "../types";
 import { uiAutomationEnabled } from "./shared";
 
 export const accessibilityFindElementInputSchema = z.object({
-  hwnd: z.number().int().describe("Native window handle to search within"),
+  windowId: z.number().int().describe("Native window id to search within"),
   nameContains: z.string().min(1).describe("Case-insensitive substring of the element name"),
   role: z
     .string()

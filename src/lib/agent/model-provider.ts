@@ -3,6 +3,7 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { APICallError, LoadAPIKeyError, type LanguageModel } from "ai";
 
 import { requireProviderFetch } from "@/lib/agent/tauri-fetch";
+import { sanitizeApiKey } from "@/lib/settings/api-key";
 import type { AppSecrets } from "@/lib/settings/types";
 
 export class ModelProviderError extends Error {
@@ -35,10 +36,12 @@ function parseModelId(modelId: string): { provider: string; model: string } {
 
 export function resolveLanguageModel(modelId: string, secrets: AppSecrets): LanguageModel {
   const { provider, model } = parseModelId(modelId);
+  const openaiApiKey = sanitizeApiKey(secrets.openaiApiKey);
+  const anthropicApiKey = sanitizeApiKey(secrets.anthropicApiKey);
 
   switch (provider) {
     case "openai": {
-      if (!secrets.openaiApiKey) {
+      if (!openaiApiKey) {
         throw new ModelProviderError(
           "auth",
           "OpenAI API key is missing. Add it in Settings.",
@@ -48,10 +51,17 @@ export function resolveLanguageModel(modelId: string, secrets: AppSecrets): Lang
       break;
     }
     case "anthropic": {
-      if (!secrets.anthropicApiKey) {
+      if (!anthropicApiKey) {
         throw new ModelProviderError(
           "auth",
           "Anthropic API key is missing. Add it in Settings.",
+          true,
+        );
+      }
+      if (!anthropicApiKey.startsWith("sk-ant-")) {
+        throw new ModelProviderError(
+          "auth",
+          "Anthropic API key looks invalid. Re-paste a key starting with sk-ant- in Settings.",
           true,
         );
       }
@@ -75,11 +85,11 @@ export function resolveLanguageModel(modelId: string, secrets: AppSecrets): Lang
   }
 
   if (provider === "openai") {
-    return createOpenAI({ apiKey: secrets.openaiApiKey, fetch })(model);
+    return createOpenAI({ apiKey: openaiApiKey, fetch })(model);
   }
 
   return createAnthropic({
-    apiKey: secrets.anthropicApiKey,
+    apiKey: anthropicApiKey,
     fetch,
     headers: {
       "anthropic-dangerous-direct-browser-access": "true",

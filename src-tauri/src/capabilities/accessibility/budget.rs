@@ -3,8 +3,8 @@ use std::time::{Duration, Instant};
 pub const FIND_MAX_NODES: u32 = 20_000;
 /// Local walk after bulk BuildCache is memory-bound; cap protects monster trees.
 pub const SNAPSHOT_MAX_NODES: u32 = 20_000;
-/// Retained for resolve budgets if a DFS fallback is reintroduced.
-#[allow(dead_code)]
+/// Cap for fingerprint DFS resolve (wired on macOS AX; UIA follow-up).
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 pub const RESOLVE_MAX_NODES: u32 = 2_500;
 
 #[derive(Debug, Clone, Copy)]
@@ -41,7 +41,7 @@ impl SearchBudget {
         !self.exhausted()
     }
 
-    #[allow(dead_code)]
+    #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
     pub fn nodes_visited(&self) -> u32 {
         self.nodes_visited
     }

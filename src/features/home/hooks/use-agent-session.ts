@@ -1,3 +1,4 @@
+import { useQueryClient } from "@tanstack/react-query";
 import type { LanguageModelUsage } from "ai";
 import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from "react";
 import { toast } from "sonner";
@@ -18,6 +19,7 @@ import {
   type SessionProjection,
 } from "@/lib/session";
 import {
+  settingsQueryOptions,
   useLoadedSettings,
   usePersistToolApproval,
   useUpdateSettings,
@@ -174,6 +176,7 @@ export function useAgentTranscript(store: BatchedEngine): AgentTranscriptSlice {
 /** Warm path: control flags, usage, submit/cancel/retry, model binding. */
 export function useAgentSessionControls(store: BatchedEngine): AgentSessionControls {
   const { data: settings } = useLoadedSettings();
+  const queryClient = useQueryClient();
   const updateSettings = useUpdateSettings();
   const persistToolApproval = usePersistToolApproval();
 
@@ -211,7 +214,8 @@ export function useAgentSessionControls(store: BatchedEngine): AgentSessionContr
 
   const start = useCallback(
     async (prompt: string) => {
-      const { secrets, ...appSettings } = settings;
+      const latest = await queryClient.ensureQueryData(settingsQueryOptions());
+      const { secrets, ...appSettings } = latest;
       if (!isLiveWorkspaceReady(appSettings)) {
         toast.error("Set a workspace root in Settings before running live.");
         return;
@@ -226,7 +230,7 @@ export function useAgentSessionControls(store: BatchedEngine): AgentSessionContr
         persistApproval: persistToolApproval,
       });
     },
-    [store, settings, persistToolApproval],
+    [store, queryClient, persistToolApproval],
   );
 
   const cancel = useCallback(() => store.engine.cancel(), [store]);

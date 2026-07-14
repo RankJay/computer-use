@@ -1,4 +1,4 @@
-#![cfg(windows)]
+#![cfg(any(windows, target_os = "macos"))]
 
 //! Live desktop smoke: launch by name and full path.
 //!
@@ -16,6 +16,7 @@ impl Drop for KillOnDrop {
     }
 }
 
+#[cfg(windows)]
 #[test]
 #[ignore = "requires interactive Windows desktop; run with --ignored"]
 fn launch_notepad_by_name_and_path() {
@@ -37,6 +38,52 @@ fn launch_notepad_by_name_and_path() {
             actuate_lib::launch(r"C:\Windows\System32\notepad.exe".into(), None, None, None)
                 .expect("launch path");
         assert!(launched.pid > 0);
+        let _guard = KillOnDrop(Some(launched.pid));
+        std::thread::sleep(std::time::Duration::from_millis(400));
+    }
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+#[ignore = "requires interactive macOS desktop; run with --ignored"]
+fn launch_textedit_by_name_and_path() {
+    // Launch itself does not need Accessibility; keep the assert for dogfood host setup.
+    actuate_lib::smoke_support::require_macos_automation(false);
+
+    {
+        let launched =
+            actuate_lib::launch("TextEdit".into(), None, None, None).expect("launch name");
+        assert!(launched.pid > 0);
+        assert!(
+            launched.exe.contains("TextEdit"),
+            "resolved exe: {}",
+            launched.exe
+        );
+        let _guard = KillOnDrop(Some(launched.pid));
+        std::thread::sleep(std::time::Duration::from_millis(400));
+    }
+
+    {
+        let launched =
+            actuate_lib::launch("/bin/ls".into(), None, None, None).expect("launch path");
+        assert!(launched.pid > 0);
+        let _guard = KillOnDrop(Some(launched.pid));
+        std::thread::sleep(std::time::Duration::from_millis(200));
+    }
+
+    {
+        let app = if std::path::Path::new("/System/Applications/TextEdit.app").exists() {
+            "/System/Applications/TextEdit.app"
+        } else {
+            "/Applications/TextEdit.app"
+        };
+        let launched = actuate_lib::launch(app.into(), None, None, None).expect("launch .app");
+        assert!(launched.pid > 0);
+        assert!(
+            launched.exe.contains("TextEdit"),
+            "resolved exe: {}",
+            launched.exe
+        );
         let _guard = KillOnDrop(Some(launched.pid));
         std::thread::sleep(std::time::Duration::from_millis(400));
     }

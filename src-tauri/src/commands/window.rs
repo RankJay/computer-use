@@ -1,6 +1,8 @@
 use tauri::{AppHandle, Manager};
 use tauri_plugin_notification::NotificationExt;
 
+use crate::capabilities::error::{CommandError, ErrorCode};
+
 #[cfg(desktop)]
 use std::sync::Once;
 
@@ -23,7 +25,9 @@ pub fn set_taskbar_visible(window: &tauri::WebviewWindow, visible: bool) {
     #[cfg(target_os = "windows")]
     let _ = window.set_skip_taskbar(!visible);
     #[cfg(not(target_os = "windows"))]
-    let _ = visible;
+    {
+        let _ = (window, visible);
+    }
 }
 
 #[cfg(desktop)]
@@ -125,7 +129,7 @@ pub fn notify(
     title: String,
     body: String,
     only_if_unfocused: bool,
-) -> Result<NotifyResult, String> {
+) -> Result<NotifyResult, CommandError> {
     if only_if_unfocused {
         let Some(window) = app.get_webview_window("main") else {
             return Ok(NotifyResult { notified: false });
@@ -140,7 +144,10 @@ pub fn notify(
         .title(title)
         .body(body)
         .show()
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| {
+            CommandError::new(ErrorCode::NotifyFailed, "Failed to show notification")
+                .with_details(e.to_string())
+        })?;
 
     Ok(NotifyResult { notified: true })
 }

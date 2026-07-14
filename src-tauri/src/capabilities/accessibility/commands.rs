@@ -32,26 +32,26 @@ where
 #[tauri::command]
 pub async fn accessibility_snapshot(
     store: State<'_, SnapshotStore>,
-    hwnd: Option<WindowId>,
+    window_id: Option<WindowId>,
     reference: Option<String>,
     max_depth: Option<u32>,
     max_elements: Option<u32>,
 ) -> Result<TextResult, CommandError> {
-    if hwnd.is_none() && reference.is_none() {
+    if window_id.is_none() && reference.is_none() {
         return Err(CommandError::new(
             ErrorCode::InvalidInput,
-            "accessibility_snapshot requires hwnd or reference",
+            "accessibility_snapshot requires windowId or reference",
         ));
     }
 
     let input = SnapshotInput {
-        hwnd,
+        hwnd: window_id,
         reference,
         max_depth: max_depth.unwrap_or(10),
         max_elements: max_elements.unwrap_or(150),
     };
     let store = store.inner().clone();
-    let timeout_hwnd = hwnd.or_else(|| {
+    let timeout_hwnd = window_id.or_else(|| {
         input
             .reference
             .as_deref()
@@ -93,14 +93,14 @@ pub async fn accessibility_snapshot(
 #[tauri::command]
 pub async fn accessibility_find_element(
     store: State<'_, SnapshotStore>,
-    hwnd: WindowId,
+    window_id: WindowId,
     name_contains: String,
     role: Option<String>,
     wait_ms: Option<u64>,
 ) -> Result<TextResult, CommandError> {
     let wait_ms = wait_ms.unwrap_or(0).min(MAX_WAIT_MS);
     let store = store.inner().clone();
-    let process_id = super::provider().process_id_for_window(hwnd);
+    let process_id = super::provider().process_id_for_window(window_id);
     let timeout_budget = TIMEOUT_FIND_MS.saturating_add(wait_ms);
     let store_for_worker = store.clone();
 
@@ -110,7 +110,7 @@ pub async fn accessibility_find_element(
         session.find_element(
             &store_for_worker,
             FindElementInput {
-                hwnd,
+                hwnd: window_id,
                 name_contains,
                 role,
                 wait_ms,
@@ -144,7 +144,7 @@ pub async fn accessibility_find_element(
 #[allow(clippy::too_many_arguments)] // wire-stable Tauri command arity
 pub async fn accessibility_query(
     store: State<'_, SnapshotStore>,
-    hwnd: WindowId,
+    window_id: WindowId,
     name: Option<String>,
     name_contains: Option<String>,
     automation_id: Option<String>,
@@ -157,7 +157,7 @@ pub async fn accessibility_query(
 ) -> Result<TextResult, CommandError> {
     let wait_ms = wait_ms.unwrap_or(0).min(MAX_WAIT_MS);
     let input = QueryInput {
-        hwnd,
+        hwnd: window_id,
         name,
         name_contains,
         automation_id,
@@ -170,7 +170,7 @@ pub async fn accessibility_query(
     }
     .clamped();
     let store = store.inner().clone();
-    let process_id = super::provider().process_id_for_window(hwnd);
+    let process_id = super::provider().process_id_for_window(window_id);
     let timeout_budget = TIMEOUT_FIND_MS.saturating_add(wait_ms);
     let store_for_worker = store.clone();
 
@@ -205,7 +205,7 @@ pub async fn accessibility_query(
 #[allow(clippy::too_many_arguments)] // wire-stable Tauri command arity
 pub async fn accessibility_wait(
     store: State<'_, SnapshotStore>,
-    hwnd: WindowId,
+    window_id: WindowId,
     name: Option<String>,
     name_contains: Option<String>,
     automation_id: Option<String>,
@@ -218,7 +218,7 @@ pub async fn accessibility_wait(
 ) -> Result<TextResult, CommandError> {
     let timeout_ms = timeout_ms.unwrap_or(5_000).clamp(1, MAX_WAIT_MS);
     let input = QueryInput {
-        hwnd,
+        hwnd: window_id,
         name,
         name_contains,
         automation_id,
@@ -231,7 +231,7 @@ pub async fn accessibility_wait(
     }
     .clamped();
     let store = store.inner().clone();
-    let process_id = super::provider().process_id_for_window(hwnd);
+    let process_id = super::provider().process_id_for_window(window_id);
     let store_for_worker = store.clone();
 
     let outcome = run(Duration::from_millis(timeout_ms), move |ctx| {
@@ -272,8 +272,9 @@ pub async fn accessibility_get_text(
         ErrorCode::GetTextTimeout,
         "Reading accessibility text timed out",
         move |ctx| {
+            let deadline = ctx.deadline;
             let session = ctx.session_mut()?;
-            session.get_text(&store, &reference)
+            session.get_text(&store, &reference, deadline)
         },
     )
     .await
@@ -282,7 +283,7 @@ pub async fn accessibility_get_text(
 #[tauri::command]
 pub async fn accessibility_get_focused(
     store: State<'_, SnapshotStore>,
-    hwnd: Option<WindowId>,
+    window_id: Option<WindowId>,
 ) -> Result<TextResult, CommandError> {
     let store = store.inner().clone();
     run_action(
@@ -291,7 +292,7 @@ pub async fn accessibility_get_focused(
         "Getting focused accessibility element timed out",
         move |ctx| {
             let session = ctx.session_mut()?;
-            session.get_focused(&store, hwnd)
+            session.get_focused(&store, window_id)
         },
     )
     .await
@@ -302,7 +303,7 @@ pub async fn accessibility_element_at_point(
     store: State<'_, SnapshotStore>,
     x: i32,
     y: i32,
-    hwnd: Option<WindowId>,
+    window_id: Option<WindowId>,
 ) -> Result<TextResult, CommandError> {
     let store = store.inner().clone();
     run_action(
@@ -311,7 +312,7 @@ pub async fn accessibility_element_at_point(
         "Element-at-point lookup timed out",
         move |ctx| {
             let session = ctx.session_mut()?;
-            session.element_at_point(&store, x, y, hwnd)
+            session.element_at_point(&store, x, y, window_id)
         },
     )
     .await
@@ -328,8 +329,9 @@ pub async fn accessibility_inspect(
         ErrorCode::InspectTimeout,
         "Accessibility inspect timed out",
         move |ctx| {
+            let deadline = ctx.deadline;
             let session = ctx.session_mut()?;
-            session.inspect(&store, &reference)
+            session.inspect(&store, &reference, deadline)
         },
     )
     .await
@@ -346,8 +348,9 @@ pub async fn accessibility_get_selection(
         ErrorCode::GetSelectionTimeout,
         "Reading accessibility selection timed out",
         move |ctx| {
+            let deadline = ctx.deadline;
             let session = ctx.session_mut()?;
-            session.get_selection(&store, &reference)
+            session.get_selection(&store, &reference, deadline)
         },
     )
     .await
@@ -364,8 +367,9 @@ pub async fn accessibility_click(
         ErrorCode::ClickTimeout,
         "Accessibility click timed out",
         move |ctx| {
+            let deadline = ctx.deadline;
             let session = ctx.session_mut()?;
-            session.click(&store, &reference)
+            session.click(&store, &reference, deadline)
         },
     )
     .await
@@ -383,8 +387,9 @@ pub async fn accessibility_set_value(
         ErrorCode::SetValueTimeout,
         "Setting accessibility value timed out",
         move |ctx| {
+            let deadline = ctx.deadline;
             let session = ctx.session_mut()?;
-            session.set_value(&store, &reference, &text)
+            session.set_value(&store, &reference, &text, deadline)
         },
     )
     .await
@@ -393,7 +398,7 @@ pub async fn accessibility_set_value(
 #[tauri::command]
 pub async fn accessibility_send_keys(
     store: State<'_, SnapshotStore>,
-    hwnd: WindowId,
+    window_id: WindowId,
     text: String,
     reference: Option<String>,
 ) -> Result<ActionResult, CommandError> {
@@ -403,8 +408,9 @@ pub async fn accessibility_send_keys(
         ErrorCode::SendKeysTimeout,
         "Accessibility send_keys timed out",
         move |ctx| {
+            let deadline = ctx.deadline;
             let session = ctx.session_mut()?;
-            session.send_keys(&store, hwnd, &text, reference.as_deref())
+            session.send_keys(&store, window_id, &text, reference.as_deref(), deadline)
         },
     )
     .await
@@ -421,8 +427,9 @@ pub async fn accessibility_focus(
         ErrorCode::FocusTimeout,
         "Accessibility focus timed out",
         move |ctx| {
+            let deadline = ctx.deadline;
             let session = ctx.session_mut()?;
-            session.focus(&store, &reference)
+            session.focus(&store, &reference, deadline)
         },
     )
     .await
@@ -439,8 +446,9 @@ pub async fn accessibility_get_value(
         ErrorCode::GetValueTimeout,
         "Reading accessibility value timed out",
         move |ctx| {
+            let deadline = ctx.deadline;
             let session = ctx.session_mut()?;
-            session.get_value(&store, &reference)
+            session.get_value(&store, &reference, deadline)
         },
     )
     .await
@@ -460,8 +468,9 @@ pub async fn accessibility_scroll_element(
         ErrorCode::ScrollElementTimeout,
         "Accessibility scroll timed out",
         move |ctx| {
+            let deadline = ctx.deadline;
             let session = ctx.session_mut()?;
-            session.scroll_element(&store, &reference, &direction, &amount)
+            session.scroll_element(&store, &reference, &direction, &amount, deadline)
         },
     )
     .await
@@ -478,8 +487,9 @@ pub async fn accessibility_right_click_element(
         ErrorCode::RightClickTimeout,
         "Accessibility right-click timed out",
         move |ctx| {
+            let deadline = ctx.deadline;
             let session = ctx.session_mut()?;
-            session.right_click_element(&store, &reference)
+            session.right_click_element(&store, &reference, deadline)
         },
     )
     .await
@@ -497,8 +507,9 @@ pub async fn accessibility_invoke_action(
         ErrorCode::InvokeActionTimeout,
         "Accessibility invoke_action timed out",
         move |ctx| {
+            let deadline = ctx.deadline;
             let session = ctx.session_mut()?;
-            session.invoke_action(&store, &reference, &action)
+            session.invoke_action(&store, &reference, &action, deadline)
         },
     )
     .await

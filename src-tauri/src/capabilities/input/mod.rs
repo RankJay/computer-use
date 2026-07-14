@@ -1,14 +1,17 @@
 //! Mouse and keyboard input synthesis behind [`InputSynthesizer`].
 
 mod commands;
-mod keys;
+pub(crate) mod keys;
 mod synthesizer;
 mod types;
 
 #[cfg(windows)]
 mod win32;
 
-#[cfg(not(windows))]
+#[cfg(target_os = "macos")]
+mod macos;
+
+#[cfg(not(any(windows, target_os = "macos")))]
 mod unsupported;
 
 #[cfg(test)]
@@ -28,7 +31,12 @@ pub fn synthesizer() -> &'static dyn InputSynthesizer {
         static SYNTH: win32::Win32InputSynthesizer = win32::Win32InputSynthesizer;
         &SYNTH
     }
-    #[cfg(not(windows))]
+    #[cfg(target_os = "macos")]
+    {
+        static SYNTH: macos::MacosInputSynthesizer = macos::MacosInputSynthesizer::new();
+        &SYNTH
+    }
+    #[cfg(not(any(windows, target_os = "macos")))]
     {
         static SYNTH: unsupported::UnsupportedInputSynthesizer =
             unsupported::UnsupportedInputSynthesizer;

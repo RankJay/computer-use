@@ -6,6 +6,7 @@ use serde::Serialize;
 #[serde(rename_all = "snake_case")]
 pub enum ErrorCode {
     A11yBusy,
+    AccessibilityPermissionDenied,
     ActionUnavailable,
     AlreadyExists,
     AmbiguousProcessName,
@@ -74,6 +75,9 @@ pub enum ErrorCode {
     NotADirectory,
     NotAFile,
     NotFound,
+    NotifyFailed,
+    OpenFailed,
+    OsPermissionDenied,
     ParentMissing,
     PatchApplyFailed,
     PatchInvalidDiff,
@@ -121,6 +125,7 @@ impl ErrorCode {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::A11yBusy => "a11y_busy",
+            Self::AccessibilityPermissionDenied => "accessibility_permission_denied",
             Self::ActionUnavailable => "action_unavailable",
             Self::AlreadyExists => "already_exists",
             Self::AmbiguousProcessName => "ambiguous_process_name",
@@ -189,6 +194,9 @@ impl ErrorCode {
             Self::NotADirectory => "not_a_directory",
             Self::NotAFile => "not_a_file",
             Self::NotFound => "not_found",
+            Self::NotifyFailed => "notify_failed",
+            Self::OpenFailed => "open_failed",
+            Self::OsPermissionDenied => "os_permission_denied",
             Self::ParentMissing => "parent_missing",
             Self::PatchApplyFailed => "patch_apply_failed",
             Self::PatchInvalidDiff => "patch_invalid_diff",
@@ -267,7 +275,7 @@ pub struct OkResult {
 pub fn unsupported_platform(capability: &str) -> CommandError {
     CommandError::new(
         ErrorCode::UnsupportedPlatform,
-        format!("{capability} is only supported on Windows"),
+        format!("{capability} is only supported on Windows and macOS"),
     )
 }
 
@@ -279,6 +287,10 @@ mod tests {
     #[test]
     fn error_code_as_str_matches_legacy_wire_strings() {
         assert_eq!(ErrorCode::A11yBusy.as_str(), "a11y_busy");
+        assert_eq!(
+            ErrorCode::AccessibilityPermissionDenied.as_str(),
+            "accessibility_permission_denied"
+        );
         assert_eq!(ErrorCode::ActionUnavailable.as_str(), "action_unavailable");
         assert_eq!(ErrorCode::AlreadyExists.as_str(), "already_exists");
         assert_eq!(
@@ -398,6 +410,12 @@ mod tests {
         assert_eq!(ErrorCode::NotADirectory.as_str(), "not_a_directory");
         assert_eq!(ErrorCode::NotAFile.as_str(), "not_a_file");
         assert_eq!(ErrorCode::NotFound.as_str(), "not_found");
+        assert_eq!(ErrorCode::NotifyFailed.as_str(), "notify_failed");
+        assert_eq!(ErrorCode::OpenFailed.as_str(), "open_failed");
+        assert_eq!(
+            ErrorCode::OsPermissionDenied.as_str(),
+            "os_permission_denied"
+        );
         assert_eq!(ErrorCode::ParentMissing.as_str(), "parent_missing");
         assert_eq!(ErrorCode::PatchApplyFailed.as_str(), "patch_apply_failed");
         assert_eq!(ErrorCode::PatchInvalidDiff.as_str(), "patch_invalid_diff");
@@ -456,6 +474,10 @@ mod tests {
         assert_eq!(
             serde_json::to_value(ErrorCode::A11yBusy).unwrap(),
             json!("a11y_busy")
+        );
+        assert_eq!(
+            serde_json::to_value(ErrorCode::AccessibilityPermissionDenied).unwrap(),
+            json!("accessibility_permission_denied")
         );
         assert_eq!(
             serde_json::to_value(ErrorCode::ActionUnavailable).unwrap(),
@@ -730,6 +752,18 @@ mod tests {
             json!("not_found")
         );
         assert_eq!(
+            serde_json::to_value(ErrorCode::NotifyFailed).unwrap(),
+            json!("notify_failed")
+        );
+        assert_eq!(
+            serde_json::to_value(ErrorCode::OpenFailed).unwrap(),
+            json!("open_failed")
+        );
+        assert_eq!(
+            serde_json::to_value(ErrorCode::OsPermissionDenied).unwrap(),
+            json!("os_permission_denied")
+        );
+        assert_eq!(
             serde_json::to_value(ErrorCode::ParentMissing).unwrap(),
             json!("parent_missing")
         );
@@ -893,7 +927,7 @@ mod tests {
         assert_eq!(err.code, "unsupported_platform");
         assert_eq!(
             err.message,
-            "Accessibility automation is only supported on Windows"
+            "Accessibility automation is only supported on Windows and macOS"
         );
     }
 }

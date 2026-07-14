@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { SCREEN_COORD_DESC } from "../shared/screen-coords";
 import { uiAutomationEnabled } from "../shared/ui-automation";
 import { defineCapability } from "../types";
 
@@ -8,8 +9,16 @@ export const mouseButtonSchema = z.enum(["left", "right", "middle"]);
 export const mouseClickInputSchema = z.object({
   button: mouseButtonSchema.describe("Mouse button to click"),
   count: z.number().int().min(1).optional().describe("Number of clicks (default 1)"),
-  x: z.number().int().optional().describe("Optional screen x before clicking"),
-  y: z.number().int().optional().describe("Optional screen y before clicking"),
+  x: z
+    .number()
+    .int()
+    .optional()
+    .describe(`Optional screen x before clicking. ${SCREEN_COORD_DESC}`),
+  y: z
+    .number()
+    .int()
+    .optional()
+    .describe(`Optional screen y before clicking. ${SCREEN_COORD_DESC}`),
 });
 
 export type MouseOkOutput = {

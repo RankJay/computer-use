@@ -11,23 +11,21 @@ pub struct WinResolver;
 impl ExecutableResolver for WinResolver {
     fn resolve(&self, name: &str) -> Result<ResolvedExecutable, CommandError> {
         if let Some(path) = as_path_literal(name) {
-            return Ok(ResolvedExecutable { path });
+            return Ok(ResolvedExecutable::cli(path));
         }
 
         let trimmed = name.trim();
         let normalized = normalize_exe_name(trimmed);
 
         if let Some(from_app_paths) = lookup_app_paths(&normalized) {
-            return Ok(ResolvedExecutable {
-                path: from_app_paths,
-            });
+            return Ok(ResolvedExecutable::cli(from_app_paths));
         }
 
         for candidate in well_known_paths(&normalized) {
             if candidate.exists() {
-                return Ok(ResolvedExecutable {
-                    path: candidate.to_string_lossy().into_owned(),
-                });
+                return Ok(ResolvedExecutable::cli(
+                    candidate.to_string_lossy().into_owned(),
+                ));
             }
         }
 
@@ -37,7 +35,7 @@ impl ExecutableResolver for WinResolver {
         } else {
             trimmed.to_string()
         };
-        Ok(ResolvedExecutable { path })
+        Ok(ResolvedExecutable::cli(path))
     }
 }
 

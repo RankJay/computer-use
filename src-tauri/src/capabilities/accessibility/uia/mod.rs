@@ -237,6 +237,7 @@ pub fn get_text_impl(
     arenas: &HashMap<WindowId, ElementArena>,
     store: &SnapshotStore,
     reference: &str,
+    _deadline: Instant,
 ) -> Result<GetTextResult, CommandError> {
     let stored = store.resolve_ref_or_stale(reference)?;
 
@@ -304,6 +305,7 @@ pub fn inspect_impl(
     session: &UiaSession,
     store: &SnapshotStore,
     reference: &str,
+    _deadline: Instant,
 ) -> Result<InspectResult, CommandError> {
     let stored = store.resolve_ref_or_stale(reference)?;
     let element = resolve_stored_element(session, &stored)?;
@@ -387,6 +389,7 @@ pub fn get_selection_impl(
     session: &UiaSession,
     store: &SnapshotStore,
     reference: &str,
+    _deadline: Instant,
 ) -> Result<TextResult, CommandError> {
     let stored = store.resolve_ref_or_stale(reference)?;
     let element = resolve_stored_element(session, &stored)?;
@@ -621,8 +624,9 @@ impl AccessibilitySession for UiaAccessibilitySession {
         &mut self,
         store: &SnapshotStore,
         reference: &str,
+        deadline: Instant,
     ) -> Result<GetTextResult, CommandError> {
-        get_text_impl(&self.inner, &self.arenas, store, reference)
+        get_text_impl(&self.inner, &self.arenas, store, reference, deadline)
     }
 
     fn get_focused(
@@ -647,24 +651,27 @@ impl AccessibilitySession for UiaAccessibilitySession {
         &mut self,
         store: &SnapshotStore,
         reference: &str,
+        deadline: Instant,
     ) -> Result<InspectResult, CommandError> {
-        inspect_impl(&self.inner, store, reference)
+        inspect_impl(&self.inner, store, reference, deadline)
     }
 
     fn get_selection(
         &mut self,
         store: &SnapshotStore,
         reference: &str,
+        deadline: Instant,
     ) -> Result<TextResult, CommandError> {
-        get_selection_impl(&self.inner, store, reference)
+        get_selection_impl(&self.inner, store, reference, deadline)
     }
 
     fn click(
         &mut self,
         store: &SnapshotStore,
         reference: &str,
+        deadline: Instant,
     ) -> Result<ActionResult, CommandError> {
-        click_impl(&self.inner, store, reference)
+        click_impl(&self.inner, store, reference, deadline)
     }
 
     fn set_value(
@@ -672,8 +679,9 @@ impl AccessibilitySession for UiaAccessibilitySession {
         store: &SnapshotStore,
         reference: &str,
         text: &str,
+        deadline: Instant,
     ) -> Result<ActionResult, CommandError> {
-        set_value_impl(&self.inner, store, reference, text)
+        set_value_impl(&self.inner, store, reference, text, deadline)
     }
 
     fn send_keys(
@@ -682,24 +690,27 @@ impl AccessibilitySession for UiaAccessibilitySession {
         hwnd: WindowId,
         text: &str,
         reference: Option<&str>,
+        deadline: Instant,
     ) -> Result<ActionResult, CommandError> {
-        send_keys_impl(&self.inner, store, hwnd, text, reference)
+        send_keys_impl(&self.inner, store, hwnd, text, reference, deadline)
     }
 
     fn focus(
         &mut self,
         store: &SnapshotStore,
         reference: &str,
+        deadline: Instant,
     ) -> Result<ActionResult, CommandError> {
-        focus_impl(&self.inner, store, reference)
+        focus_impl(&self.inner, store, reference, deadline)
     }
 
     fn get_value(
         &mut self,
         store: &SnapshotStore,
         reference: &str,
+        deadline: Instant,
     ) -> Result<GetValueResult, CommandError> {
-        get_value_impl(&self.inner, store, reference)
+        get_value_impl(&self.inner, store, reference, deadline)
     }
 
     fn scroll_element(
@@ -708,16 +719,18 @@ impl AccessibilitySession for UiaAccessibilitySession {
         reference: &str,
         direction: &str,
         amount: &str,
+        deadline: Instant,
     ) -> Result<ActionResult, CommandError> {
-        scroll_element_impl(&self.inner, store, reference, direction, amount)
+        scroll_element_impl(&self.inner, store, reference, direction, amount, deadline)
     }
 
     fn right_click_element(
         &mut self,
         store: &SnapshotStore,
         reference: &str,
+        deadline: Instant,
     ) -> Result<ActionResult, CommandError> {
-        right_click_element_impl(&self.inner, store, reference)
+        right_click_element_impl(&self.inner, store, reference, deadline)
     }
 
     fn invoke_action(
@@ -725,8 +738,9 @@ impl AccessibilitySession for UiaAccessibilitySession {
         store: &SnapshotStore,
         reference: &str,
         action: &str,
+        deadline: Instant,
     ) -> Result<ActionResult, CommandError> {
-        invoke_action_impl(&self.inner, store, reference, action)
+        invoke_action_impl(&self.inner, store, reference, action, deadline)
     }
 }
 

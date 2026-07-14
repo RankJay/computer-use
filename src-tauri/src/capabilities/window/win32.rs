@@ -297,6 +297,11 @@ unsafe extern "system" fn enum_visible_window(hwnd: HWND, lparam: LPARAM) -> BOO
     ENUM_CONTINUE
 }
 
+/// Run `work` on a helper thread; abandon it on timeout.
+///
+/// `EnumWindows` is not cancellable. On timeout the receiver is dropped and the
+/// worker is abandoned; the thread still exits once the call returns because
+/// the buffered `sync_channel(1)` send never blocks.
 fn run_with_list_timeout<F, T>(timeout_ms: u64, work: F) -> Result<T, CommandError>
 where
     F: FnOnce() -> Result<T, CommandError> + Send + 'static,

@@ -4,7 +4,9 @@ import { queryClient } from "@/app/query-client";
 import { SectionErrorBoundary } from "@/components/boundaries/ErrorBoundary";
 import { GeneralSettings } from "@/features/settings/GeneralSettings";
 import { SettingsPageHeader } from "@/features/settings/header";
+import { MacOsPermissionsSettings } from "@/features/settings/MacOsPermissionsSettings";
 import { SettingsPageSkeleton } from "@/features/settings/SettingsPageSkeleton";
+import { isMacOsClient } from "@/lib/platform";
 import { settingsKeys } from "@/lib/settings/queries";
 
 import { ApiKeysSettings } from "./ApiKeysSettings";
@@ -15,6 +17,7 @@ function SettingsSections() {
   return (
     <div className="flex flex-col gap-8">
       <GeneralSettings />
+      {isMacOsClient() ? <MacOsPermissionsSettings /> : null}
       <ApiKeysSettings />
       <ModelProviderSettings />
       <MaintenanceSettings />

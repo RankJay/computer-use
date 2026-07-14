@@ -4,11 +4,13 @@ import { defineCapability } from "../types";
 import { uiAutomationEnabled } from "./shared";
 
 export const accessibilitySendKeysInputSchema = z.object({
-  hwnd: z.number().int().describe("Native window handle from window_list"),
+  windowId: z.number().int().describe("Native window id from window_list"),
   text: z
     .string()
     .min(1)
-    .describe("Keys to send. Use {ENTER}, {TAB}, ^v for Ctrl+V, / for YouTube search focus"),
+    .describe(
+      "Keys to send. Use {ENTER}, {TAB}, ^v for paste (Ctrl+V on Windows, Cmd+V on macOS), / for YouTube search focus",
+    ),
   reference: z
     .string()
     .min(1)
@@ -25,7 +27,7 @@ export type AccessibilityActionOutput = {
 export const accessibilitySendKeysCapability = defineCapability({
   name: "accessibility_send_keys",
   description:
-    "Send keyboard input to a window (or element ref). Foregrounds the window first. Prefer this over run_shell SendKeys.",
+    "Send keyboard input to a window (or element ref). Foregrounds the window first. Prefer this over shell-based key sending.",
   risk: "high",
   inputSchema: accessibilitySendKeysInputSchema,
   enabledWhen: uiAutomationEnabled,

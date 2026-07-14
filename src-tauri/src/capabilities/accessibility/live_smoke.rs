@@ -68,8 +68,9 @@ pub async fn click(store: &SnapshotStore, reference: &str) -> Result<ActionResul
     let reference = reference.to_string();
     map_worker_outcome(
         run(Duration::from_millis(TIMEOUT_ACTION_MS), move |ctx| {
+            let deadline = ctx.deadline;
             let session = ctx.session_mut()?;
-            session.click(&store, &reference)
+            session.click(&store, &reference, deadline)
         })
         .await,
         ErrorCode::ClickTimeout,

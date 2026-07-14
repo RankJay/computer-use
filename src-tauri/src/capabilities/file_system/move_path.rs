@@ -21,14 +21,14 @@ pub fn move_path(
     let source = path_utils::resolve_workspace_path(&workspace_root, &from)?;
     let destination = path_utils::resolve_workspace_path(&workspace_root, &to)?;
 
-    if !source.exists() {
+    if !path_utils::path_lexists(&source) {
         return Err(CommandError::new(
             ErrorCode::NotFound,
             "Source path does not exist",
         ));
     }
 
-    if destination.exists() {
+    if path_utils::path_lexists(&destination) {
         return Err(CommandError::new(
             ErrorCode::DestExists,
             "Destination path already exists",
@@ -45,10 +45,7 @@ pub fn move_path(
     }
 
     fs::rename(&source, &destination).map_err(|error| {
-        CommandError::new(
-            ErrorCode::MoveFailed,
-            format!("Failed to move path: {error}"),
-        )
+        path_utils::map_fs_io_error(error, ErrorCode::MoveFailed, "Failed to move path")
     })?;
 
     Ok(MovePathResult { from, to })

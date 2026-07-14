@@ -1,4 +1,4 @@
-//! Manual UIA timing harness. Not CI-safe; requires a real Windows desktop session.
+//! Manual a11y timing harness. Not CI-safe; requires a real desktop session.
 //!
 //! ```text
 //! cargo test -p actuate --features a11y-bench --test a11y_bench -- --ignored --nocapture
@@ -8,19 +8,29 @@ use std::process::Command;
 use std::thread;
 use std::time::{Duration, Instant};
 
-use windows::core::BOOL;
-use windows::Win32::Foundation::{HWND, LPARAM};
-use windows::Win32::UI::WindowsAndMessaging::{EnumWindows, GetWindowTextW, IsWindowVisible};
-
 use crate::capabilities::error::{CommandError, ErrorCode};
 use crate::capabilities::window::WindowId;
 
 use super::state::SnapshotStore;
 use super::types::SnapshotInput;
+use super::worker::{run, WorkerOutcome};
+
+#[cfg(target_os = "macos")]
+use super::ax::{
+    resolve_reference_with_stats, snapshot_with_stats, take_ax_ipc_calls, AxAccessibilitySession,
+    SnapshotStats,
+};
+#[cfg(windows)]
 use super::uia::{
     resolve_reference_with_stats, snapshot_with_stats, SnapshotStats, UiaAccessibilitySession,
 };
-use super::worker::{run, WorkerOutcome};
+
+#[cfg(windows)]
+use windows::core::BOOL;
+#[cfg(windows)]
+use windows::Win32::Foundation::{HWND, LPARAM};
+#[cfg(windows)]
+use windows::Win32::UI::WindowsAndMessaging::{EnumWindows, GetWindowTextW, IsWindowVisible};
 
 const RUNS: usize = 5;
 
@@ -31,6 +41,7 @@ pub struct BenchSample {
     pub duration_ms: u64,
     pub nodes_visited: u32,
     pub emitted: u32,
+    pub ipc_calls: Option<u64>,
     pub ok: bool,
     pub error: Option<String>,
 }
@@ -47,25 +58,54 @@ pub struct BenchSummary {
 pub fn run_all() -> Vec<BenchSummary> {
     let mut summaries = Vec::new();
 
-    if let Some(hwnd) = ensure_notepad_hwnd() {
-        summaries.push(bench_snapshot("notepad", hwnd));
-        summaries.push(bench_resolve("notepad", hwnd));
-    } else {
-        eprintln!("a11y-bench: could not open Notepad; skipping required fixture");
+    #[cfg(windows)]
+    {
+        if let Some(hwnd) = ensure_notepad_hwnd() {
+            summaries.push(bench_snapshot("notepad", hwnd));
+            summaries.push(bench_resolve("notepad", hwnd));
+        } else {
+            eprintln!("a11y-bench: could not open Notepad; skipping required fixture");
+        }
+
+        if let Some(hwnd) = ensure_explorer_hwnd() {
+            summaries.push(bench_snapshot("explorer", hwnd));
+            summaries.push(bench_resolve("explorer", hwnd));
+        } else {
+            eprintln!("a11y-bench: could not open Explorer; skipping optional fixture");
+        }
+
+        if let Some(hwnd) = find_window_title_contains(&["Chrome", "Edge", "Firefox", "Brave"]) {
+            summaries.push(bench_snapshot("browser", hwnd));
+            summaries.push(bench_resolve("browser", hwnd));
+        } else {
+            eprintln!("a11y-bench: no browser window found; skipping optional fixture");
+        }
     }
 
-    if let Some(hwnd) = ensure_explorer_hwnd() {
-        summaries.push(bench_snapshot("explorer", hwnd));
-        summaries.push(bench_resolve("explorer", hwnd));
-    } else {
-        eprintln!("a11y-bench: could not open Explorer; skipping optional fixture");
-    }
+    #[cfg(target_os = "macos")]
+    {
+        if let Some(hwnd) = ensure_textedit_hwnd() {
+            summaries.push(bench_snapshot("textedit", hwnd));
+            summaries.push(bench_resolve("textedit", hwnd));
+        } else {
+            eprintln!("a11y-bench: could not open TextEdit; skipping required fixture");
+        }
 
-    if let Some(hwnd) = find_window_title_contains(&["Chrome", "Edge", "Firefox", "Brave"]) {
-        summaries.push(bench_snapshot("browser", hwnd));
-        summaries.push(bench_resolve("browser", hwnd));
-    } else {
-        eprintln!("a11y-bench: no browser window found; skipping optional fixture");
+        if let Some(hwnd) = find_hwnd_containing("finder") {
+            summaries.push(bench_snapshot("finder", hwnd));
+            summaries.push(bench_resolve("finder", hwnd));
+        } else {
+            eprintln!("a11y-bench: no Finder window found; skipping optional fixture");
+        }
+
+        if let Some(hwnd) =
+            find_hwnd_containing_any(&["chrome", "safari", "firefox", "brave", "edge"])
+        {
+            summaries.push(bench_snapshot("browser", hwnd));
+            summaries.push(bench_resolve("browser", hwnd));
+        } else {
+            eprintln!("a11y-bench: no browser window found; skipping optional fixture");
+        }
     }
 
     summaries.push(bench_timeout_recovery());
@@ -101,66 +141,150 @@ fn bench_snapshot(fixture: &str, hwnd: WindowId) -> BenchSummary {
         let store_for_worker = store.clone();
         let started = Instant::now();
         let outcome = block_on_worker(Duration::from_secs(30), move |ctx| {
+            #[cfg(target_os = "macos")]
+            let _ = take_ax_ipc_calls();
             let deadline = ctx.deadline;
             let session = ctx.session_mut()?;
-            let uia = session
-                .as_any_mut()
-                .downcast_mut::<UiaAccessibilitySession>()
-                .ok_or_else(|| {
-                    CommandError::new(ErrorCode::WorkerFailed, "expected UiaAccessibilitySession")
-                })?;
-            snapshot_with_stats(
-                &uia.inner,
-                &mut uia.arenas,
-                &store_for_worker,
-                input,
-                deadline,
-            )
+            #[cfg(windows)]
+            {
+                let uia = session
+                    .as_any_mut()
+                    .downcast_mut::<UiaAccessibilitySession>()
+                    .ok_or_else(|| {
+                        CommandError::new(
+                            ErrorCode::WorkerFailed,
+                            "expected UiaAccessibilitySession",
+                        )
+                    })?;
+                snapshot_with_stats(
+                    &uia.inner,
+                    &mut uia.arenas,
+                    &store_for_worker,
+                    input,
+                    deadline,
+                )
+            }
+            #[cfg(target_os = "macos")]
+            {
+                let ax = session
+                    .as_any_mut()
+                    .downcast_mut::<AxAccessibilitySession>()
+                    .ok_or_else(|| {
+                        CommandError::new(
+                            ErrorCode::WorkerFailed,
+                            "expected AxAccessibilitySession",
+                        )
+                    })?;
+                let result = snapshot_with_stats(
+                    &ax.inner,
+                    &mut ax.arenas,
+                    &store_for_worker,
+                    input,
+                    deadline,
+                )?;
+                let ipc = take_ax_ipc_calls();
+                Ok((result, ipc))
+            }
         });
         let duration_ms = started.elapsed().as_millis() as u64;
-        match outcome {
-            WorkerOutcome::Ok((
+        samples.push(sample_from_snapshot_outcome(fixture, duration_ms, outcome));
+    }
+    summarize("snapshot", fixture, samples)
+}
+
+#[cfg(windows)]
+fn sample_from_snapshot_outcome(
+    fixture: &str,
+    duration_ms: u64,
+    outcome: WorkerOutcome<(super::types::TextResult, SnapshotStats)>,
+) -> BenchSample {
+    match outcome {
+        WorkerOutcome::Ok((
+            _text,
+            SnapshotStats {
+                nodes_visited,
+                emitted,
+            },
+        )) => BenchSample {
+            tool: "snapshot",
+            fixture: fixture.to_string(),
+            duration_ms,
+            nodes_visited,
+            emitted,
+            ipc_calls: None,
+            ok: true,
+            error: None,
+        },
+        WorkerOutcome::Err(error) => BenchSample {
+            tool: "snapshot",
+            fixture: fixture.to_string(),
+            duration_ms,
+            nodes_visited: 0,
+            emitted: 0,
+            ipc_calls: None,
+            ok: false,
+            error: Some(format!("{}: {}", error.code, error.message)),
+        },
+        WorkerOutcome::TimedOut => BenchSample {
+            tool: "snapshot",
+            fixture: fixture.to_string(),
+            duration_ms,
+            nodes_visited: 0,
+            emitted: 0,
+            ipc_calls: None,
+            ok: false,
+            error: Some("timed out".to_string()),
+        },
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn sample_from_snapshot_outcome(
+    fixture: &str,
+    duration_ms: u64,
+    outcome: WorkerOutcome<((super::types::TextResult, SnapshotStats), u64)>,
+) -> BenchSample {
+    match outcome {
+        WorkerOutcome::Ok((
+            (
                 _text,
                 SnapshotStats {
                     nodes_visited,
                     emitted,
                 },
-            )) => {
-                samples.push(BenchSample {
-                    tool: "snapshot",
-                    fixture: fixture.to_string(),
-                    duration_ms,
-                    nodes_visited,
-                    emitted,
-                    ok: true,
-                    error: None,
-                });
-            }
-            WorkerOutcome::Err(error) => {
-                samples.push(BenchSample {
-                    tool: "snapshot",
-                    fixture: fixture.to_string(),
-                    duration_ms,
-                    nodes_visited: 0,
-                    emitted: 0,
-                    ok: false,
-                    error: Some(format!("{}: {}", error.code, error.message)),
-                });
-            }
-            WorkerOutcome::TimedOut => {
-                samples.push(BenchSample {
-                    tool: "snapshot",
-                    fixture: fixture.to_string(),
-                    duration_ms,
-                    nodes_visited: 0,
-                    emitted: 0,
-                    ok: false,
-                    error: Some("timed out".to_string()),
-                });
-            }
-        }
+            ),
+            ipc_calls,
+        )) => BenchSample {
+            tool: "snapshot",
+            fixture: fixture.to_string(),
+            duration_ms,
+            nodes_visited,
+            emitted,
+            ipc_calls: Some(ipc_calls),
+            ok: true,
+            error: None,
+        },
+        WorkerOutcome::Err(error) => BenchSample {
+            tool: "snapshot",
+            fixture: fixture.to_string(),
+            duration_ms,
+            nodes_visited: 0,
+            emitted: 0,
+            ipc_calls: None,
+            ok: false,
+            error: Some(format!("{}: {}", error.code, error.message)),
+        },
+        WorkerOutcome::TimedOut => BenchSample {
+            tool: "snapshot",
+            fixture: fixture.to_string(),
+            duration_ms,
+            nodes_visited: 0,
+            emitted: 0,
+            ipc_calls: None,
+            ok: false,
+            error: Some("timed out".to_string()),
+        },
     }
-    summarize("snapshot", fixture, samples)
 }
 
 fn bench_resolve(fixture: &str, hwnd: WindowId) -> BenchSummary {
@@ -175,19 +299,38 @@ fn bench_resolve(fixture: &str, hwnd: WindowId) -> BenchSummary {
     let snapshot_outcome = block_on_worker(Duration::from_secs(30), move |ctx| {
         let deadline = ctx.deadline;
         let session = ctx.session_mut()?;
-        let uia = session
-            .as_any_mut()
-            .downcast_mut::<UiaAccessibilitySession>()
-            .ok_or_else(|| {
-                CommandError::new(ErrorCode::WorkerFailed, "expected UiaAccessibilitySession")
-            })?;
-        snapshot_with_stats(
-            &uia.inner,
-            &mut uia.arenas,
-            &store_for_snapshot,
-            input,
-            deadline,
-        )
+        #[cfg(windows)]
+        {
+            let uia = session
+                .as_any_mut()
+                .downcast_mut::<UiaAccessibilitySession>()
+                .ok_or_else(|| {
+                    CommandError::new(ErrorCode::WorkerFailed, "expected UiaAccessibilitySession")
+                })?;
+            snapshot_with_stats(
+                &uia.inner,
+                &mut uia.arenas,
+                &store_for_snapshot,
+                input,
+                deadline,
+            )
+        }
+        #[cfg(target_os = "macos")]
+        {
+            let ax = session
+                .as_any_mut()
+                .downcast_mut::<AxAccessibilitySession>()
+                .ok_or_else(|| {
+                    CommandError::new(ErrorCode::WorkerFailed, "expected AxAccessibilitySession")
+                })?;
+            snapshot_with_stats(
+                &ax.inner,
+                &mut ax.arenas,
+                &store_for_snapshot,
+                input,
+                deadline,
+            )
+        }
     });
     let Ok((text, _)) = (match snapshot_outcome {
         WorkerOutcome::Ok(value) => Ok(value),
@@ -206,6 +349,7 @@ fn bench_resolve(fixture: &str, hwnd: WindowId) -> BenchSummary {
                 duration_ms: 0,
                 nodes_visited: 0,
                 emitted: 0,
+                ipc_calls: None,
                 ok: false,
                 error: Some("snapshot failed before resolve".to_string()),
             }],
@@ -222,6 +366,7 @@ fn bench_resolve(fixture: &str, hwnd: WindowId) -> BenchSummary {
                 duration_ms: 0,
                 nodes_visited: 0,
                 emitted: 0,
+                ipc_calls: None,
                 ok: false,
                 error: Some("no reference in snapshot outline".to_string()),
             }],
@@ -234,24 +379,54 @@ fn bench_resolve(fixture: &str, hwnd: WindowId) -> BenchSummary {
         let reference_for_worker = reference.clone();
         let started = Instant::now();
         let outcome = block_on_worker(Duration::from_secs(10), move |ctx| {
+            #[cfg(target_os = "macos")]
+            let _ = take_ax_ipc_calls();
             let session = ctx.session_mut()?;
-            let uia = session
-                .as_any_mut()
-                .downcast_mut::<UiaAccessibilitySession>()
-                .ok_or_else(|| {
-                    CommandError::new(ErrorCode::WorkerFailed, "expected UiaAccessibilitySession")
-                })?;
-            resolve_reference_with_stats(&uia.inner, &store_for_worker, &reference_for_worker)
+            #[cfg(windows)]
+            {
+                let uia = session
+                    .as_any_mut()
+                    .downcast_mut::<UiaAccessibilitySession>()
+                    .ok_or_else(|| {
+                        CommandError::new(
+                            ErrorCode::WorkerFailed,
+                            "expected UiaAccessibilitySession",
+                        )
+                    })?;
+                resolve_reference_with_stats(&uia.inner, &store_for_worker, &reference_for_worker)
+                    .map(|stats| (stats, None::<u64>))
+            }
+            #[cfg(target_os = "macos")]
+            {
+                let deadline = ctx.deadline;
+                let ax = session
+                    .as_any_mut()
+                    .downcast_mut::<AxAccessibilitySession>()
+                    .ok_or_else(|| {
+                        CommandError::new(
+                            ErrorCode::WorkerFailed,
+                            "expected AxAccessibilitySession",
+                        )
+                    })?;
+                let stats = resolve_reference_with_stats(
+                    &ax.inner,
+                    &store_for_worker,
+                    &reference_for_worker,
+                    deadline,
+                )?;
+                Ok((stats, Some(take_ax_ipc_calls())))
+            }
         });
         let duration_ms = started.elapsed().as_millis() as u64;
         match outcome {
-            WorkerOutcome::Ok(stats) => {
+            WorkerOutcome::Ok((stats, ipc_calls)) => {
                 samples.push(BenchSample {
                     tool: "resolve",
                     fixture: fixture.to_string(),
                     duration_ms,
                     nodes_visited: stats.nodes_visited,
                     emitted: 0,
+                    ipc_calls,
                     ok: true,
                     error: None,
                 });
@@ -263,6 +438,7 @@ fn bench_resolve(fixture: &str, hwnd: WindowId) -> BenchSummary {
                     duration_ms,
                     nodes_visited: 0,
                     emitted: 0,
+                    ipc_calls: None,
                     ok: false,
                     error: Some(format!("{}: {}", error.code, error.message)),
                 });
@@ -274,6 +450,7 @@ fn bench_resolve(fixture: &str, hwnd: WindowId) -> BenchSummary {
                     duration_ms,
                     nodes_visited: 0,
                     emitted: 0,
+                    ipc_calls: None,
                     ok: false,
                     error: Some("timed out".to_string()),
                 });
@@ -309,13 +486,18 @@ fn print_summary(summary: &BenchSummary) {
     for sample in &summary.samples {
         let status = if sample.ok { "ok" } else { "err" };
         let err = sample.error.as_deref().unwrap_or("");
+        let ipc = sample
+            .ipc_calls
+            .map(|n| format!(" ipc_calls={n}"))
+            .unwrap_or_default();
         println!(
-            "tool={} fixture={} duration_ms={} nodes_visited={} emitted={} status={} {}",
+            "tool={} fixture={} duration_ms={} nodes_visited={} emitted={}{} status={} {}",
             sample.tool,
             sample.fixture,
             sample.duration_ms,
             sample.nodes_visited,
             sample.emitted,
+            ipc,
             status,
             err
         );
@@ -334,38 +516,6 @@ fn first_reference(outline: &str) -> Option<String> {
     for token in outline.split_whitespace() {
         if token.starts_with('e') && token.contains('@') {
             return Some(token.to_string());
-        }
-    }
-    None
-}
-
-fn ensure_notepad_hwnd() -> Option<WindowId> {
-    if let Some(hwnd) = find_window_title_contains(&["Notepad", "Untitled - Notepad"]) {
-        return Some(hwnd);
-    }
-    let _ = Command::new("notepad.exe").spawn().ok()?;
-    for _ in 0..20 {
-        thread::sleep(Duration::from_millis(100));
-        if let Some(hwnd) = find_window_title_contains(&["Notepad", "Untitled - Notepad"]) {
-            return Some(hwnd);
-        }
-    }
-    None
-}
-
-fn ensure_explorer_hwnd() -> Option<WindowId> {
-    if let Some(hwnd) =
-        find_window_title_contains(&["File Explorer", "Exploring", "This PC", "Quick access"])
-    {
-        return Some(hwnd);
-    }
-    let _ = Command::new("explorer.exe").spawn().ok()?;
-    for _ in 0..30 {
-        thread::sleep(Duration::from_millis(150));
-        if let Some(hwnd) =
-            find_window_title_contains(&["File Explorer", "Exploring", "This PC", "Quick access"])
-        {
-            return Some(hwnd);
         }
     }
     None
@@ -395,6 +545,7 @@ fn bench_timeout_recovery() -> BenchSummary {
             duration_ms: slow_ms,
             nodes_visited: 0,
             emitted: 0,
+            ipc_calls: None,
             ok: slow_ok,
             error: if slow_ok {
                 None
@@ -408,6 +559,7 @@ fn bench_timeout_recovery() -> BenchSummary {
             duration_ms: next_ms,
             nodes_visited: 0,
             emitted: 0,
+            ipc_calls: None,
             ok: next_ok,
             error: if next_ok {
                 None
@@ -425,6 +577,41 @@ fn bench_timeout_recovery() -> BenchSummary {
     summarize("timeout_recovery", "induced_slow", samples)
 }
 
+#[cfg(windows)]
+fn ensure_notepad_hwnd() -> Option<WindowId> {
+    if let Some(hwnd) = find_window_title_contains(&["Notepad", "Untitled - Notepad"]) {
+        return Some(hwnd);
+    }
+    let _ = Command::new("notepad.exe").spawn().ok()?;
+    for _ in 0..20 {
+        thread::sleep(Duration::from_millis(100));
+        if let Some(hwnd) = find_window_title_contains(&["Notepad", "Untitled - Notepad"]) {
+            return Some(hwnd);
+        }
+    }
+    None
+}
+
+#[cfg(windows)]
+fn ensure_explorer_hwnd() -> Option<WindowId> {
+    if let Some(hwnd) =
+        find_window_title_contains(&["File Explorer", "Exploring", "This PC", "Quick access"])
+    {
+        return Some(hwnd);
+    }
+    let _ = Command::new("explorer.exe").spawn().ok()?;
+    for _ in 0..30 {
+        thread::sleep(Duration::from_millis(150));
+        if let Some(hwnd) =
+            find_window_title_contains(&["File Explorer", "Exploring", "This PC", "Quick access"])
+        {
+            return Some(hwnd);
+        }
+    }
+    None
+}
+
+#[cfg(windows)]
 fn find_window_title_contains(needles: &[&str]) -> Option<WindowId> {
     let mut state = EnumState {
         needles: needles.iter().map(|s| (*s).to_string()).collect(),
@@ -439,11 +626,13 @@ fn find_window_title_contains(needles: &[&str]) -> Option<WindowId> {
     state.found
 }
 
+#[cfg(windows)]
 struct EnumState {
     needles: Vec<String>,
     found: Option<WindowId>,
 }
 
+#[cfg(windows)]
 unsafe extern "system" fn enum_windows_callback(hwnd: HWND, lparam: LPARAM) -> BOOL {
     let state = &mut *(lparam.0 as *mut EnumState);
     if state.found.is_some() {
@@ -463,4 +652,43 @@ unsafe extern "system" fn enum_windows_callback(hwnd: HWND, lparam: LPARAM) -> B
         return BOOL(0);
     }
     BOOL(1)
+}
+
+#[cfg(target_os = "macos")]
+fn ensure_textedit_hwnd() -> Option<WindowId> {
+    if let Some(hwnd) = find_hwnd_containing("textedit") {
+        return Some(hwnd);
+    }
+    let _ = Command::new("open").args(["-a", "TextEdit"]).spawn().ok()?;
+    for _ in 0..40 {
+        thread::sleep(Duration::from_millis(100));
+        if let Some(hwnd) = find_hwnd_containing("textedit") {
+            return Some(hwnd);
+        }
+    }
+    None
+}
+
+#[cfg(target_os = "macos")]
+fn find_hwnd_containing(needle: &str) -> Option<WindowId> {
+    find_hwnd_containing_any(&[needle])
+}
+
+#[cfg(target_os = "macos")]
+fn find_hwnd_containing_any(needles: &[&str]) -> Option<WindowId> {
+    let list = crate::capabilities::window::window_list().ok()?;
+    for line in list.text.lines() {
+        let lower = line.to_ascii_lowercase();
+        if !needles.iter().any(|n| lower.contains(n)) {
+            continue;
+        }
+        for token in line.split_whitespace() {
+            if let Ok(id) = token.parse::<i64>() {
+                if id > 0 {
+                    return Some(WindowId(id));
+                }
+            }
+        }
+    }
+    None
 }

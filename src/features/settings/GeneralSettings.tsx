@@ -25,10 +25,45 @@ import {
   settingsInputGroupInputClassName,
   settingsSelectTriggerClassName,
 } from "@/features/settings/styles";
+import { hostSupportsUiAutomation } from "@/lib/agent/capabilities/shared/ui-automation";
+import { isTauriRuntime } from "@/lib/agent/is-tauri-runtime";
+import {
+  getMacOsPermissionStatus,
+  openMacOsPrivacySettings,
+  requestMacOsPermission,
+} from "@/lib/macos-permissions/commands";
+import { isMacOsClient } from "@/lib/platform";
 import { useSettingsSelector, useUpdateSettings } from "@/lib/settings/queries";
 import { selectGeneralSettings } from "@/lib/settings/selectors";
 import { parsePermissionMode, PERMISSION_MODE_OPTIONS } from "@/lib/settings/utils";
 import { pickWorkspaceFolder } from "@/lib/settings/workspace-picker";
+
+const isMac = isMacOsClient();
+const uiAutomationSupported = hostSupportsUiAutomation();
+
+const UI_AUTOMATION_DESCRIPTION = !uiAutomationSupported
+  ? "UI automation is not available on this OS."
+  : isMac
+    ? "Allow pointer, click, and type tools. Grant macOS Accessibility below when prompted."
+    : "Allow pointer, click, and type tools.";
+
+async function ensureMacOsAccessibilityOnEnable(): Promise<void> {
+  if (!isMac || !isTauriRuntime()) {
+    return;
+  }
+
+  try {
+    const status = await getMacOsPermissionStatus();
+    if (status.accessibility) {
+      return;
+    }
+    toast.message("Grant Accessibility for Actuate in System Settings → Privacy & Security.");
+    await openMacOsPrivacySettings("accessibility");
+    await requestMacOsPermission("accessibility");
+  } catch {
+    toast.error("Could not open macOS Accessibility settings.");
+  }
+}
 
 export function GeneralSettings(): ReactElement {
   const settings = useSettingsSelector(selectGeneralSettings);
@@ -56,7 +91,7 @@ export function GeneralSettings(): ReactElement {
             <InputGroupInput
               id="workspace-root"
               type="text"
-              placeholder="C:\Users\...\Projects"
+              placeholder={isMac ? "/Users/.../Projects" : "C:\\Users\\...\\Projects"}
               key={settings.workspaceRoot}
               defaultValue={settings.workspaceRoot}
               onBlur={(event) => {
@@ -127,15 +162,16 @@ export function GeneralSettings(): ReactElement {
           </Select>
         </SettingsRow>
 
-        <SettingsRow
-          label="Pointer / UI automation"
-          description="Allow pointer, click, and type tools."
-        >
+        <SettingsRow label="Pointer / UI automation" description={UI_AUTOMATION_DESCRIPTION}>
           <Switch
             id="ui-automation"
             checked={settings.uiAutomation}
+            disabled={!uiAutomationSupported}
             onCheckedChange={(checked) => {
               updateSettings.mutate({ uiAutomation: checked });
+              if (checked) {
+                void ensureMacOsAccessibilityOnEnable();
+              }
             }}
           />
         </SettingsRow>

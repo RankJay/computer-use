@@ -6,33 +6,39 @@ use std::fs;
 pub fn delete_path(path: String, workspace_root: String) -> Result<(), CommandError> {
     let resolved = path_utils::resolve_workspace_path(&workspace_root, &path)?;
 
-    if !resolved.exists() {
-        return Err(CommandError::new(
-            ErrorCode::NotFound,
-            "Path does not exist",
-        ));
-    }
-
     let metadata = fs::symlink_metadata(&resolved).map_err(|error| {
-        CommandError::new(
-            ErrorCode::IoError,
-            format!("Failed to read path metadata: {error}"),
-        )
+        path_utils::map_fs_io_error(error, ErrorCode::IoError, "Failed to read path metadata")
     })?;
 
-    if metadata.is_dir() {
+    // Symlinks are never directories in lstat metadata on Unix; remove_file unlinks the link.
+    // On Windows, directory symlinks report is_dir() from symlink_metadata — remove_dir.
+    if metadata.is_symlink() {
+        fs::remove_file(&resolved)
+            .or_else(|error| {
+                if metadata.is_dir() {
+                    fs::remove_dir(&resolved)
+                } else {
+                    Err(error)
+                }
+            })
+            .map_err(|error| {
+                path_utils::map_fs_io_error(
+                    error,
+                    ErrorCode::DeleteFailed,
+                    "Failed to delete symlink",
+                )
+            })?;
+    } else if metadata.is_dir() {
         fs::remove_dir_all(&resolved).map_err(|error| {
-            CommandError::new(
+            path_utils::map_fs_io_error(
+                error,
                 ErrorCode::DeleteFailed,
-                format!("Failed to delete directory: {error}"),
+                "Failed to delete directory",
             )
         })?;
     } else {
         fs::remove_file(&resolved).map_err(|error| {
-            CommandError::new(
-                ErrorCode::DeleteFailed,
-                format!("Failed to delete file: {error}"),
-            )
+            path_utils::map_fs_io_error(error, ErrorCode::DeleteFailed, "Failed to delete file")
         })?;
     }
 
@@ -68,6 +74,39 @@ mod tests {
             .expect("delete directory");
 
         assert!(!root.join("nested").exists());
+        cleanup_workspace(&cleanup);
+    }
+
+    #[test]
+    fn deletes_symlink_not_target() {
+        let (root, cleanup) = temp_workspace();
+        fs::write(root.join("target.txt"), "keep me").expect("write target");
+
+        #[cfg(unix)]
+        std::os::unix::fs::symlink("target.txt", root.join("link.txt")).expect("symlink");
+
+        #[cfg(windows)]
+        {
+            if std::os::windows::fs::symlink_file("target.txt", root.join("link.txt")).is_err() {
+                cleanup_workspace(&cleanup);
+                return;
+            }
+        }
+
+        #[cfg(not(any(unix, windows)))]
+        {
+            cleanup_workspace(&cleanup);
+            return;
+        }
+
+        delete_path("link.txt".to_string(), root.to_string_lossy().to_string())
+            .expect("delete symlink");
+
+        assert!(!path_utils::path_lexists(&root.join("link.txt")));
+        assert_eq!(
+            fs::read_to_string(root.join("target.txt")).expect("target intact"),
+            "keep me"
+        );
         cleanup_workspace(&cleanup);
     }
 

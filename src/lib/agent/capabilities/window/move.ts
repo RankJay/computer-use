@@ -1,23 +1,27 @@
 import { z } from "zod";
 
+import { SCREEN_COORD_DESC } from "../shared/screen-coords";
+import { windowAutomationEnabled } from "../shared/ui-automation";
 import { defineCapability } from "../types";
 
 export const windowMoveInputSchema = z.object({
-  hwnd: z.number().int().describe("Native window handle from window_list"),
-  x: z.number().int().describe("Target x position in screen coordinates"),
-  y: z.number().int().describe("Target y position in screen coordinates"),
+  windowId: z.number().int().describe("Native window id from window_list"),
+  x: z.number().int().describe(`Target x. ${SCREEN_COORD_DESC}`),
+  y: z.number().int().describe(`Target y. ${SCREEN_COORD_DESC}`),
 });
 
 export type WindowMoveOutput = {
   ok: boolean;
-  hwnd: number;
+  windowId: number;
   x: number;
   y: number;
 };
 
 export const windowMoveCapability = defineCapability({
   name: "window_move",
-  description: "Move a top-level window to the given screen coordinates.",
+  description:
+    "Move a top-level window to the given screen coordinates (same space as mouse_* / accessibility hit-test).",
   risk: "medium",
   inputSchema: windowMoveInputSchema,
+  enabledWhen: windowAutomationEnabled,
 });

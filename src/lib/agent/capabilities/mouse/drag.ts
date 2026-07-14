@@ -1,14 +1,15 @@
 import { z } from "zod";
 
+import { SCREEN_COORD_DESC } from "../shared/screen-coords";
 import { uiAutomationEnabled } from "../shared/ui-automation";
 import { defineCapability } from "../types";
 import { mouseButtonSchema } from "./click";
 
 export const mouseDragInputSchema = z.object({
-  x0: z.number().int().describe("Start screen x"),
-  y0: z.number().int().describe("Start screen y"),
-  x1: z.number().int().describe("End screen x"),
-  y1: z.number().int().describe("End screen y"),
+  x0: z.number().int().describe(`Start screen x. ${SCREEN_COORD_DESC}`),
+  y0: z.number().int().describe(`Start screen y. ${SCREEN_COORD_DESC}`),
+  x1: z.number().int().describe(`End screen x. ${SCREEN_COORD_DESC}`),
+  y1: z.number().int().describe(`End screen y. ${SCREEN_COORD_DESC}`),
   button: mouseButtonSchema.optional().describe("Button held during drag (default left)"),
   steps: z
     .number()

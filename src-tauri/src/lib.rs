@@ -17,13 +17,15 @@ pub use capabilities::{
     read_clipboard_html, read_clipboard_image, read_directory, read_file, run_shell, search_files,
     set_env, stat_path, wait, window_focus, window_list, window_move, window_resize, window_state,
     write_clipboard, write_clipboard_html, write_clipboard_image, write_file, SnapshotStore,
-    WindowId,
+    WindowId, WindowStateOp,
 };
 
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "macos"))]
 pub use capabilities::a11y_live_smoke;
+#[cfg(any(windows, target_os = "macos"))]
+pub use capabilities::smoke_support;
 
-#[cfg(all(windows, feature = "a11y-bench"))]
+#[cfg(all(any(windows, target_os = "macos"), feature = "a11y-bench"))]
 pub use capabilities::bench as a11y_bench;
 
 #[cfg(desktop)]
@@ -31,8 +33,52 @@ fn apply_frameless_window(window: &tauri::WebviewWindow) {
     let _ = window.set_decorations(false);
 }
 
+/// macOS menu bar: App menu (About/Hide/Quit) + Edit (clipboard shortcuts for WKWebView).
+#[cfg(all(desktop, target_os = "macos"))]
+fn install_macos_menu(app: &tauri::App) -> tauri::Result<()> {
+    use tauri::menu::{MenuBuilder, SubmenuBuilder};
+
+    let app_menu = SubmenuBuilder::new(app, "Actuate")
+        .about(None)
+        .separator()
+        .services()
+        .separator()
+        .hide()
+        .hide_others()
+        .show_all()
+        .separator()
+        .quit()
+        .build()?;
+
+    let edit = SubmenuBuilder::new(app, "Edit")
+        .undo()
+        .redo()
+        .separator()
+        .cut()
+        .copy()
+        .paste()
+        .select_all()
+        .build()?;
+
+    let menu = MenuBuilder::new(app).item(&app_menu).item(&edit).build()?;
+    let _ = app.set_menu(menu);
+    Ok(())
+}
+
+/// Dock-visible regular app (not LSUIElement accessory). Close still hides to tray.
+#[cfg(all(desktop, target_os = "macos"))]
+fn configure_macos_dock_app(app: &tauri::App, window: &tauri::WebviewWindow) {
+    let _ = app
+        .handle()
+        .set_activation_policy(tauri::ActivationPolicy::Regular);
+    let _ = window.set_skip_taskbar(false);
+}
+
 #[cfg(desktop)]
 fn setup_desktop(app: &mut tauri::App) -> tauri::Result<()> {
+    #[cfg(target_os = "macos")]
+    install_macos_menu(app)?;
+    #[cfg(not(target_os = "macos"))]
     let _ = app.remove_menu();
 
     use tauri::{
@@ -85,6 +131,9 @@ fn setup_desktop(app: &mut tauri::App) -> tauri::Result<()> {
         })
         .build(app)?;
 
+    #[cfg(target_os = "macos")]
+    let toggle_shortcut = Shortcut::new(Some(Modifiers::SUPER | Modifiers::SHIFT), Code::KeyA);
+    #[cfg(not(target_os = "macos"))]
     let toggle_shortcut = Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::KeyA);
     app.handle().plugin(
         tauri_plugin_global_shortcut::Builder::new()
@@ -104,6 +153,8 @@ fn setup_desktop(app: &mut tauri::App) -> tauri::Result<()> {
         .expect("main window not found");
 
     apply_frameless_window(&window);
+    #[cfg(target_os = "macos")]
+    configure_macos_dock_app(app, &window);
 
     let window_for_close = window.clone();
     window.on_window_event(move |event| {
@@ -141,6 +192,10 @@ pub fn run() {
             commands::maintenance::open_logs_folder,
             commands::maintenance::clear_logs,
             commands::maintenance::reset_session,
+            commands::macos_permissions::get_macos_permission_status,
+            commands::macos_permissions::request_macos_permission,
+            commands::macos_permissions::open_macos_privacy_settings,
+            commands::platform::get_platform_capabilities,
             commands::window::app_ready,
             commands::window::notify,
             read_file,
@@ -234,6 +289,16 @@ pub fn run() {
                 .app_local_data_dir()
                 .expect("could not resolve app local data path")
                 .join("salt.txt");
+            // Stronghold writes salt.txt without creating the parent dir.
+            if let Some(parent) = salt_path.parent() {
+                std::fs::create_dir_all(parent)?;
+            }
+            // Vault lives under app data dir (`appDataDir()` on the frontend).
+            let app_data_dir = app
+                .path()
+                .app_data_dir()
+                .expect("could not resolve app data path");
+            std::fs::create_dir_all(&app_data_dir)?;
             app.handle()
                 .plugin(tauri_plugin_stronghold::Builder::with_argon2(&salt_path).build())?;
 
