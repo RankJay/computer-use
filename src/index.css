@@ -124,15 +124,19 @@
     @apply border-border outline-ring/50;
   }
   html,
-  body,
-  #root {
-    @apply h-full overflow-hidden;
+  body {
+    @apply h-full overflow-hidden bg-transparent;
   }
   body {
-    @apply bg-background text-foreground;
+    /* Inset so the CSS drop shadow has room outside the rounded chrome. */
+    @apply box-border text-foreground;
   }
   html {
     @apply font-sans;
+  }
+  /* Real window chrome: 24px radius + soft OS drop shadow (shadow disabled in Tauri). */
+  #root {
+    @apply h-full overflow-hidden rounded-[24px] bg-background;
   }
 
   .shadow-layered {

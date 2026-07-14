@@ -10,6 +10,7 @@
     "frontendDist": "../dist"
   },
   "app": {
+    "macOSPrivateApi": true,
     "windows": [
       {
         "title": "actuate",
@@ -19,7 +20,10 @@
         "skipTaskbar": true,
         "maximizable": false,
         "minimizable": true,
-        "decorations": false
+        "decorations": false,
+        "transparent": true,
+        "shadow": false,
+        "backgroundColor": [0, 0, 0, 0]
       }
     ],
     "security": {

@@ -15,9 +15,12 @@ fn window_state_flags() -> tauri_plugin_window_state::StateFlags {
     StateFlags::all().difference(StateFlags::DECORATIONS)
 }
 
+/// Frameless + no OS shadow so CSS can own the 24px chrome radius.
+/// Win11 `shadow: true` forces system corner radius and fights custom rounding.
 #[cfg(desktop)]
 fn apply_frameless_window(window: &tauri::WebviewWindow) {
     let _ = window.set_decorations(false);
+    let _ = window.set_shadow(false);
 }
 
 #[cfg(desktop)]

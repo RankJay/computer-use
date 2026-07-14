@@ -28,9 +28,12 @@ pub use capabilities::smoke_support;
 #[cfg(all(any(windows, target_os = "macos"), feature = "a11y-bench"))]
 pub use capabilities::bench as a11y_bench;
 
+/// Frameless + no OS shadow so CSS can own the 24px chrome radius.
+/// Win11 `shadow: true` forces system corner radius and fights custom rounding.
 #[cfg(desktop)]
 fn apply_frameless_window(window: &tauri::WebviewWindow) {
     let _ = window.set_decorations(false);
+    let _ = window.set_shadow(false);
 }
 
 /// macOS menu bar: App menu (About/Hide/Quit) + Edit (clipboard shortcuts for WKWebView).

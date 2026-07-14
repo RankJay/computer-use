@@ -131,7 +131,10 @@ export function useChatPersistence(store: SessionStore, chatId: string | undefin
   useEffect(() => {
     let prevStatus = engine.getProjection().status;
 
-    async function persistChat(chat: StoredChat, options: { navigateToChat: boolean }): Promise<void> {
+    async function persistChat(
+      chat: StoredChat,
+      options: { navigateToChat: boolean },
+    ): Promise<void> {
       try {
         await persistence.save(chat);
         void queryClient.invalidateQueries({ queryKey: chatsKeys.list() });
