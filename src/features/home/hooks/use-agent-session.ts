@@ -64,7 +64,7 @@ function toContextUsage(
 
 type Listener = () => void;
 
-type BatchedEngine = {
+export type BatchedEngine = {
   engine: SessionEngine;
   getSnapshot: () => SessionProjection;
   subscribe: (listener: Listener) => () => void;
@@ -153,6 +153,16 @@ export function useAgentSessionStore(): BatchedEngine {
   }, []);
 
   return storeRef.current;
+}
+
+/** Header chrome only — no settings Suspense; safe outside SuspenseQueryBoundary. */
+export function useAgentInputDisabled(store: BatchedEngine): boolean {
+  const status = useSyncExternalStore(
+    store.subscribe,
+    () => store.getSnapshot().status,
+    () => store.getSnapshot().status,
+  );
+  return status === "running" || status === "streaming" || status === "waiting_permission";
 }
 
 /** Hot path: display rows (presentation derive) + streaming / pending permission slices. */

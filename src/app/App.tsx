@@ -1,41 +1,42 @@
-import { lazy, Suspense } from "react";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { lazy, Suspense, type ReactElement, type ReactNode } from "react";
+import { BrowserRouter, Route, Routes, useParams } from "react-router-dom";
 
 import { RouteErrorBoundary } from "@/components/boundaries/ErrorBoundary";
 
 import HomePage from "./pages/home";
 import { AppQueryProvider } from "./providers/QueryProvider";
+import { RouteChunkFallback } from "./route-chunk-fallback";
 
 const HistoryPage = lazy(() => import("./pages/history"));
 const SettingsPage = lazy(() => import("./pages/settings"));
+
+function HomeRoute(): ReactElement {
+  const { chatId } = useParams<{ chatId?: string }>();
+
+  return (
+    <RouteErrorBoundary resetKeys={[chatId ?? "new"]}>
+      <HomePage />
+    </RouteErrorBoundary>
+  );
+}
+
+function LazyRoute(props: { readonly page: ReactNode }): ReactElement {
+  return (
+    <RouteErrorBoundary>
+      <Suspense fallback={<RouteChunkFallback />}>{props.page}</Suspense>
+    </RouteErrorBoundary>
+  );
+}
 
 function App() {
   return (
     <AppQueryProvider>
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/chat/:chatId" element={<HomePage />} />
-          <Route
-            path="/settings"
-            element={
-              <RouteErrorBoundary>
-                <Suspense>
-                  <SettingsPage />
-                </Suspense>
-              </RouteErrorBoundary>
-            }
-          />
-          <Route
-            path="/history"
-            element={
-              <RouteErrorBoundary>
-                <Suspense>
-                  <HistoryPage />
-                </Suspense>
-              </RouteErrorBoundary>
-            }
-          />
+          <Route path="/" element={<HomeRoute />} />
+          <Route path="/chat/:chatId" element={<HomeRoute />} />
+          <Route path="/settings" element={<LazyRoute page={<SettingsPage />} />} />
+          <Route path="/history" element={<LazyRoute page={<HistoryPage />} />} />
         </Routes>
       </BrowserRouter>
     </AppQueryProvider>

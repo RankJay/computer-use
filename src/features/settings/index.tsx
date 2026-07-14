@@ -1,7 +1,4 @@
-import { Suspense } from "react";
-
-import { queryClient } from "@/app/query-client";
-import { SectionErrorBoundary } from "@/components/boundaries/ErrorBoundary";
+import { SuspenseQueryBoundary } from "@/components/boundaries/ErrorBoundary";
 import { GeneralSettings } from "@/features/settings/GeneralSettings";
 import { SettingsPageHeader } from "@/features/settings/header";
 import { MacOsPermissionsSettings } from "@/features/settings/MacOsPermissionsSettings";
@@ -25,10 +22,6 @@ function SettingsSections() {
   );
 }
 
-function handleSettingsRetry(): void {
-  void queryClient.invalidateQueries({ queryKey: settingsKeys.loaded() });
-}
-
 export default function SettingsPageContent() {
   return (
     <div className="flex flex-col h-full w-full gap-0 overflow-hidden box-border overscroll-contain">
@@ -36,11 +29,14 @@ export default function SettingsPageContent() {
         <SettingsPageHeader />
       </div>
       <div className="flex min-h-0 flex-1 w-full md:max-w-3xl mx-auto flex-col gap-8 px-4 pb-4 overflow-y-auto scrollbar-none">
-        <SectionErrorBoundary onRetry={handleSettingsRetry}>
-          <Suspense fallback={<SettingsPageSkeleton />}>
-            <SettingsSections />
-          </Suspense>
-        </SectionErrorBoundary>
+        <SuspenseQueryBoundary
+          queryKey={settingsKeys.loaded()}
+          fallback={<SettingsPageSkeleton />}
+          fallbackTitle="Could not load settings"
+          fallbackDescription="Settings failed to load from this device."
+        >
+          <SettingsSections />
+        </SuspenseQueryBoundary>
       </div>
     </div>
   );

@@ -1,17 +1,22 @@
-﻿import { Suspense, memo, useCallback, useEffect, type ReactElement } from "react";
+﻿import { memo, useCallback, useEffect, type ReactElement } from "react";
 
+import { SuspenseQueryBoundary } from "@/components/boundaries/ErrorBoundary";
 import { Container, Item } from "@/components/motion/stagger";
 import { signalAppReady } from "@/lib/app-ready";
 import type { PermissionDecision } from "@/lib/session";
+import { settingsKeys } from "@/lib/settings/queries";
 
 import { AgentTranscript } from "./chat/AgentTranscript";
 import { TaskPromptComposer } from "./Composer";
 import { HomePageHeader } from "./header";
+import { HomePageSkeleton } from "./HomePageSkeleton";
 import {
+  useAgentInputDisabled,
   useAgentSessionControls,
   useAgentSessionStore,
   useAgentTranscript,
   type AgentSessionControls,
+  type BatchedEngine,
 } from "./hooks/use-agent-session";
 import { useChatPersistence } from "./hooks/use-chat-persistence";
 import { SessionStatusBar } from "./SessionStatusBar";
@@ -63,8 +68,13 @@ const HomeChatComposer = memo(function HomeChatComposer({
   );
 });
 
-function HomePageInner({ chatId }: { readonly chatId: string | undefined }): ReactElement {
-  const store = useAgentSessionStore();
+function HomePageBody({
+  store,
+  chatId,
+}: {
+  readonly store: BatchedEngine;
+  readonly chatId: string | undefined;
+}): ReactElement {
   useChatPersistence(store, chatId);
   const { rows, streamingMessageId, pendingPermissions } = useAgentTranscript(store);
   const controls = useAgentSessionControls(store);
@@ -82,10 +92,7 @@ function HomePageInner({ chatId }: { readonly chatId: string | undefined }): Rea
   }, []);
 
   return (
-    <div className="flex flex-col h-full w-full gap-0 overflow-hidden box-border overscroll-contain">
-      <div>
-        <HomePageHeader navDisabled={controls.inputDisabled} />
-      </div>
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       {rows.length === 0 ? (
         <Container className="flex min-h-0 flex-1 flex-col justify-center px-4">
           <Item className="text-[22px] font-[445] text-foreground">Welcome to Actuate</Item>
@@ -106,9 +113,26 @@ function HomePageInner({ chatId }: { readonly chatId: string | undefined }): Rea
 }
 
 export function HomePageContent({ chatId }: { readonly chatId?: string }): ReactElement {
+  const routeKey = chatId ?? "new";
+  const store = useAgentSessionStore();
+  const navDisabled = useAgentInputDisabled(store);
+
   return (
-    <Suspense fallback={null}>
-      <HomePageInner chatId={chatId} />
-    </Suspense>
+    <div className="flex flex-col h-full w-full gap-0 overflow-hidden box-border overscroll-contain">
+      <div>
+        <HomePageHeader navDisabled={navDisabled} />
+      </div>
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <SuspenseQueryBoundary
+          queryKey={settingsKeys.loaded()}
+          fallback={<HomePageSkeleton />}
+          fallbackTitle="Could not load workspace"
+          fallbackDescription="Settings failed to load from this device."
+          resetKeys={[routeKey]}
+        >
+          <HomePageBody store={store} chatId={chatId} />
+        </SuspenseQueryBoundary>
+      </div>
+    </div>
   );
 }

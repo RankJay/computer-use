@@ -1,7 +1,9 @@
-import { Component, type ErrorInfo, type ReactNode } from "react";
+import { QueryErrorResetBoundary } from "@tanstack/react-query";
+import { Component, Suspense, type ErrorInfo, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 
+import { queryClient } from "@/app/query-client";
 import { Button } from "@/components/ui/button";
 
 type ErrorBoundaryProps = {
@@ -122,12 +124,16 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   }
 }
 
-export function RouteErrorBoundary(props: { children: ReactNode }): ReactNode {
+export function RouteErrorBoundary(props: {
+  children: ReactNode;
+  resetKeys?: readonly unknown[];
+}): ReactNode {
   return (
     <ErrorBoundary
       variant="route"
       fallbackTitle="This page failed to load"
       fallbackDescription="Something went wrong while loading this page."
+      resetKeys={props.resetKeys}
     >
       {props.children}
     </ErrorBoundary>
@@ -136,16 +142,51 @@ export function RouteErrorBoundary(props: { children: ReactNode }): ReactNode {
 
 export function SectionErrorBoundary(props: {
   children: ReactNode;
+  fallbackTitle: string;
+  fallbackDescription?: string;
   onRetry?: () => void;
+  resetKeys?: readonly unknown[];
 }): ReactNode {
   return (
     <ErrorBoundary
       variant="section"
-      fallbackTitle="Could not load settings"
-      fallbackDescription="Settings failed to load from this device."
+      fallbackTitle={props.fallbackTitle}
+      fallbackDescription={props.fallbackDescription}
       onRetry={props.onRetry}
+      resetKeys={props.resetKeys}
     >
       {props.children}
     </ErrorBoundary>
+  );
+}
+
+/**
+ * Suspense + section ErrorBoundary + TanStack Query error reset.
+ * Retry clears the query error so useSuspenseQuery can re-suspend.
+ */
+export function SuspenseQueryBoundary(props: {
+  children: ReactNode;
+  fallback: ReactNode;
+  fallbackTitle: string;
+  fallbackDescription?: string;
+  queryKey: readonly unknown[];
+  resetKeys?: readonly unknown[];
+}): ReactNode {
+  return (
+    <QueryErrorResetBoundary>
+      {({ reset }) => (
+        <SectionErrorBoundary
+          fallbackTitle={props.fallbackTitle}
+          fallbackDescription={props.fallbackDescription}
+          resetKeys={props.resetKeys}
+          onRetry={() => {
+            reset();
+            void queryClient.resetQueries({ queryKey: props.queryKey });
+          }}
+        >
+          <Suspense fallback={props.fallback}>{props.children}</Suspense>
+        </SectionErrorBoundary>
+      )}
+    </QueryErrorResetBoundary>
   );
 }

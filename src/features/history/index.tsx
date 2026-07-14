@@ -1,7 +1,6 @@
-import { Suspense, type ReactElement } from "react";
+import { type ReactElement } from "react";
 
-import { queryClient } from "@/app/query-client";
-import { ErrorBoundary } from "@/components/boundaries/ErrorBoundary";
+import { SuspenseQueryBoundary } from "@/components/boundaries/ErrorBoundary";
 import { ChatRow } from "@/features/history/ChatRow";
 import { HistoryPageHeader } from "@/features/history/header";
 import { HistoryPageSkeleton } from "@/features/history/HistoryPageSkeleton";
@@ -56,10 +55,6 @@ function HistoryChatList(): ReactElement {
   );
 }
 
-function handleHistoryRetry(): void {
-  void queryClient.invalidateQueries({ queryKey: chatsKeys.list() });
-}
-
 export default function HistoryPageContent(): ReactElement {
   return (
     <div className="flex h-full w-full flex-col gap-0 overflow-hidden box-border overscroll-contain">
@@ -67,16 +62,14 @@ export default function HistoryPageContent(): ReactElement {
         <HistoryPageHeader />
       </div>
       <div className="mx-auto flex min-h-0 w-full flex-1 flex-col gap-8 overflow-y-auto px-4 pb-4 scrollbar-none md:max-w-3xl">
-        <ErrorBoundary
-          variant="section"
+        <SuspenseQueryBoundary
+          queryKey={chatsKeys.list()}
+          fallback={<HistoryPageSkeleton />}
           fallbackTitle="Could not load history"
           fallbackDescription="Chat history failed to load from this device."
-          onRetry={handleHistoryRetry}
         >
-          <Suspense fallback={<HistoryPageSkeleton />}>
-            <HistoryChatList />
-          </Suspense>
-        </ErrorBoundary>
+          <HistoryChatList />
+        </SuspenseQueryBoundary>
       </div>
     </div>
   );
