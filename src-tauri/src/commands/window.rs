@@ -99,35 +99,37 @@ fn position_bottom_right(window: &tauri::WebviewWindow) -> tauri::Result<()> {
     window.set_position(PhysicalPosition::new(x, y))
 }
 
-/// True when the frame mid-point is near the work-area center (Tao macOS default).
-#[cfg(all(desktop, target_os = "macos"))]
-fn is_approximately_centered(window: &tauri::WebviewWindow) -> bool {
-    use objc2::MainThreadMarker;
-    use objc2_app_kit::{NSScreen, NSWindow};
+#[cfg(desktop)]
+fn reveal_main_window_on_thread(window: &tauri::WebviewWindow, has_state: bool) {
+    use tauri_plugin_window_state::WindowExt;
 
-    let Some(mtm) = MainThreadMarker::new() else {
-        return false;
-    };
-    let Ok(ptr) = window.ns_window() else {
-        return false;
-    };
-    let ns_window: &NSWindow = unsafe { &*ptr.cast() };
-    let Some(screen) = ns_window.screen().or_else(|| NSScreen::mainScreen(mtm)) else {
-        return false;
-    };
+    if has_state {
+        let _ = window.restore_state(window_state_flags());
+    }
 
-    let visible = screen.visibleFrame();
-    let frame = ns_window.frame();
-    let mid_x = frame.origin.x + frame.size.width / 2.0;
-    let mid_y = frame.origin.y + frame.size.height / 2.0;
-    let target_x = visible.origin.x + visible.size.width / 2.0;
-    let target_y = visible.origin.y + visible.size.height / 2.0;
-    (mid_x - target_x).abs() < 120.0 && (mid_y - target_y).abs() < 120.0
+    // Always dock on first reveal. `app_ready` / the setup timeout run off the
+    // main thread, so older Cocoa placement never applied and Tao's centered
+    // default (plus Retina state saves) kept winning.
+    let _ = position_bottom_right(window);
+
+    apply_frameless_window(window);
+
+    if !window.is_visible().unwrap_or(false) {
+        let _ = window.show();
+    }
+
+    // Re-apply after show in case orderFront left a centered frame.
+    let _ = position_bottom_right(window);
+
+    set_taskbar_visible(window, true);
+    let _ = window.set_focus();
 }
 
+/// `app_ready` and the setup timeout run off the main thread. Cocoa `NSWindow`
+/// placement needs the main thread (`MainThreadMarker`), so schedule reveal there.
 #[cfg(desktop)]
 fn show_main_window(app: &AppHandle) {
-    use tauri_plugin_window_state::{WindowExt, DEFAULT_FILENAME};
+    use tauri_plugin_window_state::DEFAULT_FILENAME;
 
     let Some(window) = app.get_webview_window("main") else {
         return;
@@ -138,38 +140,16 @@ fn show_main_window(app: &AppHandle) {
         .app_config_dir()
         .is_ok_and(|dir| dir.join(DEFAULT_FILENAME).exists());
 
-    let place_bottom_right = if has_state {
-        let _ = window.restore_state(window_state_flags());
-        // Prior Retina runs often persisted Tao's centered default; re-dock those.
-        #[cfg(target_os = "macos")]
-        {
-            is_approximately_centered(&window)
-        }
-        #[cfg(not(target_os = "macos"))]
-        {
-            false
-        }
-    } else {
-        true
-    };
-
-    if place_bottom_right {
-        let _ = position_bottom_right(&window);
+    let window_for_main = window.clone();
+    if window
+        .run_on_main_thread(move || {
+            reveal_main_window_on_thread(&window_for_main, has_state);
+        })
+        .is_err()
+    {
+        // Fallback if the runtime cannot schedule (should be rare).
+        reveal_main_window_on_thread(&window, has_state);
     }
-
-    apply_frameless_window(&window);
-
-    if !window.is_visible().unwrap_or(false) {
-        let _ = window.show();
-    }
-
-    // Re-apply after show in case orderFront left a centered frame.
-    if place_bottom_right {
-        let _ = position_bottom_right(&window);
-    }
-
-    set_taskbar_visible(&window, true);
-    let _ = window.set_focus();
 }
 
 /// Show, focus, or hide the main window.
