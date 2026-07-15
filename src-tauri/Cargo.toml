@@ -52,6 +52,8 @@ mach2 = "0.6.0"
 objc2 = "0.6.4"
 objc2-app-kit = { version = "0.3.2", default-features = false, features = [
     "NSRunningApplication",
+    "NSScreen",
+    "NSWindow",
     "NSWorkspace",
     "block2",
     "libc",
