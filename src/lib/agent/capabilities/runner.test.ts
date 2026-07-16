@@ -1,12 +1,23 @@
-import { describe, expect, test } from "bun:test";
+import { beforeEach, describe, expect, mock, test } from "bun:test";
 
 import type { RuntimeEventPayload } from "@/lib/session/events";
 import { DEFAULT_SETTINGS } from "@/lib/settings/defaults";
 
-import { createMockCapabilityInvoker } from "./native-invoke";
-import { runCapability } from "./runner";
+const notifyIfUnfocusedMock = mock((_notification: { title: string; body: string }) => {});
+
+mock.module("@/lib/native/notification", () => ({
+  notify: mock(() => {}),
+  notifyIfUnfocused: notifyIfUnfocusedMock,
+}));
+
+const { createMockCapabilityInvoker } = await import("./native-invoke");
+const { runCapability } = await import("./runner");
 
 describe("runCapability", () => {
+  beforeEach(() => {
+    notifyIfUnfocusedMock.mockClear();
+  });
+
   test("executes low-risk capability and emits lifecycle payloads", async () => {
     const payloads: RuntimeEventPayload[] = [];
     const result = await runCapability(
@@ -93,6 +104,11 @@ describe("runCapability", () => {
           p.part.state === "approval-requested",
       ),
     ).toBe(true);
+    expect(notifyIfUnfocusedMock).toHaveBeenCalledTimes(1);
+    expect(notifyIfUnfocusedMock).toHaveBeenCalledWith({
+      title: "Approval needed",
+      body: "Removing a path is waiting. Hop back in to approve or reject.",
+    });
 
     resolveDecision?.("approved");
     const result = await resultPromise;

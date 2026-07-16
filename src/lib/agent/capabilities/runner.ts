@@ -1,5 +1,6 @@
 import type { DynamicToolUIPart } from "ai";
 
+import { notifyIfUnfocused } from "@/lib/native/notification";
 import type { RuntimeEventPayload } from "@/lib/session/events";
 
 import { getCapabilityDefinition } from "./catalog";
@@ -11,6 +12,7 @@ import type {
   InvokeCapabilityResult,
   ToolPartLocation,
 } from "./types";
+import { uiToolLabel } from "./ui-labels";
 
 function parseInputError(error: unknown): CapabilityError {
   if (error instanceof Error) {
@@ -123,6 +125,10 @@ export async function runCapability(
       risk: definition.risk,
     });
     emitApprovalPart(deps, resolveLocation(), name, callId, parsedInput, "approval-requested");
+    notifyIfUnfocused({
+      title: "Approval needed",
+      body: `${uiToolLabel(name)} is waiting. Hop back in to approve or reject.`,
+    });
 
     const waiter = deps.createPermissionWaiter(callId);
     const decision = await waiter.waitForDecision();
