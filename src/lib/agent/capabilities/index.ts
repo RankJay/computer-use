@@ -26,3 +26,4 @@ export {
   isCapabilityName,
 } from "./registry";
 export type { AgentTools, CapabilityName } from "./registry";
+export { uiToolLabel } from "./ui-labels";

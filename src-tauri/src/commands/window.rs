@@ -34,7 +34,7 @@ pub fn set_taskbar_visible(window: &tauri::WebviewWindow, visible: bool) {
 }
 
 /// Cocoa top-left for bottom-right docking inside `visibleFrame` (points, bottom-left origin).
-#[cfg(desktop)]
+#[cfg(any(all(desktop, target_os = "macos"), all(test, desktop)))]
 fn cocoa_bottom_right_top_left(
     visible_x: f64,
     visible_y: f64,

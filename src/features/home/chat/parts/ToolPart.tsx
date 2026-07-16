@@ -18,6 +18,7 @@ import {
   ToolInput,
   ToolOutput,
 } from "@/components/ai-elements/tool";
+import { uiToolLabel } from "@/lib/agent/capabilities";
 import { isMacOsClient } from "@/lib/platform";
 import type { PendingPermission } from "@/lib/session";
 import type { PermissionMode } from "@/lib/settings/types";
@@ -85,9 +86,10 @@ export const ToolPart = memo(function ToolPart({
   const showAlwaysAllow = canAct && permissionMode === "once-per-class";
   const toolName = toolNameFromPart(part);
 
+  const title = uiToolLabel(toolName);
   const headerProps = isDynamicToolUIPart(part)
-    ? { type: part.type, state: part.state, toolName: part.toolName }
-    : { type: part.type, state: part.state };
+    ? { type: part.type, state: part.state, toolName: part.toolName, title }
+    : { type: part.type, state: part.state, title };
 
   return (
     <div className="space-y-2">

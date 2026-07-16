@@ -1,5 +1,6 @@
 import type { ReactElement } from "react";
 
+import { uiToolLabel } from "@/lib/agent/capabilities";
 import type { PendingPermission, SessionFailure } from "@/lib/session";
 
 export type SessionStatusBarProps = {
@@ -21,7 +22,9 @@ export function SessionStatusBar({
     return null;
   }
 
-  const capabilityNames = [...new Set(pendingPermissions.map((entry) => entry.capability))];
+  const capabilityNames = [
+    ...new Set(pendingPermissions.map((entry) => uiToolLabel(entry.capability))),
+  ];
 
   return (
     <div className="flex flex-col gap-1.5 pb-0 pt-1">

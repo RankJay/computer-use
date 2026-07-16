@@ -35,8 +35,22 @@ describe("SessionStatusBar", () => {
     );
     expect(html).toContain('data-testid="multi-pending-banner"');
     expect(html).toContain("2 tools waiting for approval");
-    expect(html).toContain("write_file");
-    expect(html).toContain("run_shell");
+    expect(html).toContain("Writing a file");
+    expect(html).toContain("Running a command");
+  });
+
+  test("shows friendly labels for mouse and accessibility tools", () => {
+    const html = renderToStaticMarkup(
+      <SessionStatusBar
+        pendingPermissions={[pending("c1", "mouse_move"), pending("c2", "accessibility_click")]}
+        canResolvePermission
+        failure={null}
+      />,
+    );
+    expect(html).toContain("Surfing through your screen");
+    expect(html).toContain("Touching an element");
+    expect(html).not.toContain("mouse_move");
+    expect(html).not.toContain("accessibility_click");
   });
 
   test("hides banner when canResolvePermission is false", () => {
