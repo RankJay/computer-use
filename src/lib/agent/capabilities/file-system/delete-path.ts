@@ -12,6 +12,7 @@ export const deletePathCapability = defineCapability({
   name: "delete_path",
   description: "Delete a file or directory from the workspace",
   risk: "high",
+  destructive: true,
   needsWorkspaceRoot: true,
   inputSchema: deletePathInputSchema,
 });

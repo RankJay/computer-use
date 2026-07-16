@@ -22,5 +22,6 @@ export const processKillCapability = defineCapability({
   name: "process_kill",
   description: "Terminate a running process by pid or executable name.",
   risk: "high",
+  destructive: true,
   inputSchema: processKillInputSchema,
 });

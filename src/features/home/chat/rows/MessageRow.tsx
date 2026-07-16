@@ -34,7 +34,8 @@ export const MessageRow = memo(function MessageRow({
   onRetryMessage,
 }: MessageRowProps): ReactElement {
   const align = row.message.role === "user" ? "end" : "start";
-  const showActions = row.message.role === "assistant" && !isStreaming;
+  // canRetryMessage is session-idle; keeps copy from flashing between tool steps.
+  const showActions = row.message.role === "assistant" && !isStreaming && canRetryMessage;
 
   const handleRetry = useCallback(() => {
     onRetryMessage?.(row.id);

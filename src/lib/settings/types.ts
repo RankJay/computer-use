@@ -1,4 +1,4 @@
-export type PermissionMode = "risky" | "every-meaningful" | "once-per-class";
+export type PermissionMode = "risky" | "every-meaningful" | "destructive-only" | "once-per-class";
 
 export type AgentMode = "live" | "demo";
 

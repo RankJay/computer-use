@@ -114,7 +114,7 @@ function isActiveState(state: ToolUIPart["state"] | DynamicToolUIPart["state"]):
 export const ToolPart = memo(function ToolPart({
   part,
   pendingPermissions = EMPTY_PENDING_PERMISSIONS,
-  permissionMode = "risky",
+  permissionMode = "destructive-only",
   onResolvePermission,
 }: ToolPartProps): ReactElement {
   const [persistAlways, setPersistAlways] = useState(false);

@@ -6,8 +6,9 @@ export const AGENT_MODE_OPTIONS: SettingsSelectOption<AgentMode>[] = [
 ];
 
 export const PERMISSION_MODE_OPTIONS: SettingsSelectOption<PermissionMode>[] = [
-  { value: "risky", label: "Ask before risky actions" },
   { value: "every-meaningful", label: "Ask before every action" },
+  { value: "risky", label: "Ask before risky actions" },
+  { value: "destructive-only", label: "Ask only before destructive" },
   { value: "once-per-class", label: "Ask once per class" },
 ];
 
@@ -41,6 +42,7 @@ export function parsePermissionMode(value: string): PermissionMode {
   switch (value) {
     case "risky":
     case "every-meaningful":
+    case "destructive-only":
     case "once-per-class":
       return value;
     default:

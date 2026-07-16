@@ -20,7 +20,7 @@ describe("needsPermission", () => {
   test("high-risk prompts in risky mode", () => {
     expect(
       needsPermission(
-        { name: "delete_path", risk: "high" },
+        { name: "delete_path", risk: "high", destructive: true },
         {
           ...DEFAULT_SETTINGS,
           permissionMode: "risky",
@@ -56,7 +56,7 @@ describe("needsPermission", () => {
   test("run_shell prompts in risky mode", () => {
     expect(
       needsPermission(
-        { name: "run_shell", risk: "high" },
+        { name: "run_shell", risk: "high", destructive: true },
         {
           ...DEFAULT_SETTINGS,
           permissionMode: "risky",
@@ -65,10 +65,46 @@ describe("needsPermission", () => {
     ).toBe(true);
   });
 
+  test("destructive-only prompts for destructive high-risk tools", () => {
+    expect(
+      needsPermission(
+        { name: "delete_path", risk: "high", destructive: true },
+        {
+          ...DEFAULT_SETTINGS,
+          permissionMode: "destructive-only",
+        },
+      ),
+    ).toBe(true);
+  });
+
+  test("destructive-only skips non-destructive high-risk tools", () => {
+    expect(
+      needsPermission(
+        { name: "mouse_click", risk: "high" },
+        {
+          ...DEFAULT_SETTINGS,
+          permissionMode: "destructive-only",
+        },
+      ),
+    ).toBe(false);
+  });
+
+  test("destructive-only skips medium-risk tools", () => {
+    expect(
+      needsPermission(
+        { name: "read_clipboard", risk: "medium" },
+        {
+          ...DEFAULT_SETTINGS,
+          permissionMode: "destructive-only",
+        },
+      ),
+    ).toBe(false);
+  });
+
   test("persisted approvals bypass prompts", () => {
     expect(
       needsPermission(
-        { name: "delete_path", risk: "high" },
+        { name: "delete_path", risk: "high", destructive: true },
         {
           ...DEFAULT_SETTINGS,
           permissionMode: "every-meaningful",

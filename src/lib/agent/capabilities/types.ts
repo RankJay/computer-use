@@ -22,6 +22,11 @@ export type CapabilityDefinition<Name extends string = string> = {
   name: Name;
   description: string;
   risk: CapabilityRisk;
+  /**
+   * Hard-to-undo side effects (delete, kill, arbitrary shell/launch).
+   * Used by permission mode `destructive-only`.
+   */
+  destructive?: boolean;
   inputSchema: z.ZodType;
   parseInput: (input: unknown) => unknown;
   /** When true, native invoke injects workspaceRoot into the Tauri payload. */
@@ -33,6 +38,7 @@ export function defineCapability<S extends z.ZodType, Name extends string>(confi
   name: Name;
   description: string;
   risk: CapabilityRisk;
+  destructive?: boolean;
   inputSchema: S;
   needsWorkspaceRoot?: boolean;
   enabledWhen?: (settings: AppSettings) => boolean;
@@ -41,6 +47,7 @@ export function defineCapability<S extends z.ZodType, Name extends string>(confi
     name: config.name,
     description: config.description,
     risk: config.risk,
+    destructive: config.destructive,
     inputSchema: config.inputSchema,
     parseInput: (input) => config.inputSchema.parse(input),
     needsWorkspaceRoot: config.needsWorkspaceRoot,

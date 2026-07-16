@@ -17,8 +17,8 @@ export function normalizeMaxWallClockMs(ms: number): number {
 export const DEFAULT_SETTINGS: AppSettings = {
   workspaceRoot: "",
   logRetentionDays: 30,
-  permissionMode: "risky",
-  uiAutomation: false,
+  permissionMode: "destructive-only",
+  uiAutomation: true,
   agentMode: "live",
   selectedModelId: getDefaultAgentModelId(),
   maxSteps: 50,
