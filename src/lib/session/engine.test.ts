@@ -409,6 +409,85 @@ describe("RunController via SessionEngine", () => {
     expect(userRowsAfter).toBe(1);
   });
 
+  test("retryFromMessage keeps prior turns and user prompt, drops answer and after", async () => {
+    let lastPrompt: string | undefined;
+    let lastIsRetry: boolean | undefined;
+    let lastChatIds: string[] = [];
+
+    const producer: ProduceRun = async ({ append, config, taskId }) => {
+      lastPrompt = config.prompt;
+      lastIsRetry = config.isRetry === true;
+      lastChatIds = (config.chatMessages ?? []).map((message) => message.id);
+      append({
+        type: "task.started",
+        prompt: config.prompt,
+        modelId: config.modelId,
+        agentMode: "demo",
+        userMessageId: config.isRetry ? undefined : `user-${taskId}`,
+        omitUserMessage: config.isRetry === true,
+      });
+      const assistantId = `assistant-${taskId}`;
+      append({ type: "assistant.message_started", messageId: assistantId, role: "assistant" });
+      append({
+        type: "assistant.part_updated",
+        messageId: assistantId,
+        partIndex: 0,
+        part: { type: "text", text: `answer for ${config.prompt}` },
+      });
+      append({ type: "assistant.message_finished", messageId: assistantId });
+      append({ type: "task.completed", finishReason: "stop" });
+    };
+
+    const engine = createSessionEngine({ produceRun: producer });
+    await engine.start({
+      prompt: "first",
+      modelId: "openai/gpt-5.4",
+      settings: DEFAULT_SETTINGS,
+      secrets: DEFAULT_SECRETS,
+    });
+    await engine.start({
+      prompt: "second",
+      modelId: "openai/gpt-5.4",
+      settings: DEFAULT_SETTINGS,
+      secrets: DEFAULT_SECRETS,
+      chatMessages: engine.getProjection().chatMessages,
+    });
+    await engine.start({
+      prompt: "third",
+      modelId: "openai/gpt-5.4",
+      settings: DEFAULT_SETTINGS,
+      secrets: DEFAULT_SECRETS,
+      chatMessages: engine.getProjection().chatMessages,
+    });
+
+    const before = engine.getProjection().chatMessages;
+    expect(before).toHaveLength(6);
+    const middleAssistant = before[3];
+    expect(middleAssistant?.role).toBe("assistant");
+
+    await engine.retryFromMessage(middleAssistant!.id, {
+      modelId: "openai/gpt-5.4",
+      settings: DEFAULT_SETTINGS,
+      secrets: DEFAULT_SECRETS,
+    });
+
+    expect(lastPrompt).toBe("second");
+    expect(lastIsRetry).toBe(true);
+    expect(lastChatIds).toEqual([before[0]!.id, before[1]!.id, before[2]!.id]);
+
+    const after = engine.getProjection().chatMessages;
+    expect(after.map((message) => message.role)).toEqual([
+      "user",
+      "assistant",
+      "user",
+      "assistant",
+    ]);
+    expect(after[0]?.id).toBe(before[0]!.id);
+    expect(after[1]?.id).toBe(before[1]!.id);
+    expect(after[2]?.id).toBe(before[2]!.id);
+    expect(after[3]?.id).not.toBe(middleAssistant!.id);
+  });
+
   test("cancel-before-start replaces prior run", async () => {
     let runs = 0;
     const producer: ProduceRun = async ({ append, config, taskId, signal }) => {

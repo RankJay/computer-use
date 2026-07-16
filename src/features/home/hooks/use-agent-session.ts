@@ -123,6 +123,7 @@ export type AgentSessionControls = SessionControls & {
   start: (prompt: string) => Promise<void>;
   cancel: () => Promise<void>;
   retry: () => Promise<void>;
+  retryFromMessage: (assistantMessageId: string) => Promise<void>;
   resolvePermission: (
     callId: string,
     decision: PermissionDecision,
@@ -245,6 +246,23 @@ export function useAgentSessionControls(store: BatchedEngine): AgentSessionContr
 
   const cancel = useCallback(() => store.engine.cancel(), [store]);
   const retry = useCallback(() => store.engine.retry(), [store]);
+  const retryFromMessage = useCallback(
+    async (assistantMessageId: string) => {
+      const latest = await queryClient.ensureQueryData(settingsQueryOptions());
+      const { secrets, ...appSettings } = latest;
+      if (!isLiveWorkspaceReady(appSettings)) {
+        toast.error("Set a workspace root in Settings before running live.");
+        return;
+      }
+      await store.engine.retryFromMessage(assistantMessageId, {
+        modelId: appSettings.selectedModelId,
+        settings: appSettings,
+        secrets,
+        persistApproval: persistToolApproval,
+      });
+    },
+    [store, queryClient, persistToolApproval],
+  );
   const resolvePermission = useCallback(
     (callId: string, decision: PermissionDecision, persist?: boolean) =>
       store.engine.resolvePermission(callId, decision, persist),
@@ -273,6 +291,7 @@ export function useAgentSessionControls(store: BatchedEngine): AgentSessionContr
       start,
       cancel,
       retry,
+      retryFromMessage,
       resolvePermission,
       modelId: settings.selectedModelId,
       onModelChange,
@@ -288,6 +307,7 @@ export function useAgentSessionControls(store: BatchedEngine): AgentSessionContr
       start,
       cancel,
       retry,
+      retryFromMessage,
       resolvePermission,
       settings.selectedModelId,
       settings.permissionMode,

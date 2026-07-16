@@ -39,7 +39,18 @@ export {
   type FoldState,
 } from "./project-session";
 
-export { createSessionEngine, type SessionEngine, type SessionEngineDeps } from "./engine";
+export {
+  createSessionEngine,
+  type SessionEngine,
+  type SessionEngineDeps,
+  type RetryFromMessageConfig,
+} from "./engine";
+
+export {
+  planRegenerateFromAssistant,
+  textPartsMarkdown,
+  type RegeneratePlan,
+} from "./control/regenerate-from-message";
 
 export {
   setActiveSessionEngine,

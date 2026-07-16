@@ -83,7 +83,14 @@ function HomePageBody({
     (callId: string, decision: PermissionDecision, persist?: boolean) => {
       void controls.resolvePermission(callId, decision, persist);
     },
-    [controls],
+    [controls.resolvePermission],
+  );
+
+  const onRetryMessage = useCallback(
+    (messageId: string) => {
+      void controls.retryFromMessage(messageId);
+    },
+    [controls.retryFromMessage],
   );
 
   // Settings (incl. model id) are loaded before this mounts; reveal window after paint.
@@ -105,6 +112,8 @@ function HomePageBody({
           pendingPermissions={pendingPermissions}
           permissionMode={controls.permissionMode}
           onResolvePermission={onResolvePermission}
+          canRetryMessage={controls.canSubmit}
+          onRetryMessage={onRetryMessage}
         />
       )}
       <HomeChatComposer controls={controls} />

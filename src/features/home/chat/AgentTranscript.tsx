@@ -26,6 +26,8 @@ export type AgentTranscriptProps = {
     decision: "approved" | "denied",
     persist?: boolean,
   ) => void;
+  readonly canRetryMessage?: boolean;
+  readonly onRetryMessage?: (messageId: string) => void;
 };
 
 const TranscriptRowView = memo(function TranscriptRowView({
@@ -34,6 +36,8 @@ const TranscriptRowView = memo(function TranscriptRowView({
   pendingPermissions,
   permissionMode,
   onResolvePermission,
+  canRetryMessage,
+  onRetryMessage,
 }: {
   readonly row: AgentTranscriptRow;
   readonly isStreaming: boolean;
@@ -44,6 +48,8 @@ const TranscriptRowView = memo(function TranscriptRowView({
     decision: "approved" | "denied",
     persist?: boolean,
   ) => void;
+  readonly canRetryMessage?: boolean;
+  readonly onRetryMessage?: (messageId: string) => void;
 }): ReactElement {
   switch (row.type) {
     case "marker":
@@ -56,6 +62,8 @@ const TranscriptRowView = memo(function TranscriptRowView({
           pendingPermissions={pendingPermissions}
           permissionMode={permissionMode}
           onResolvePermission={onResolvePermission}
+          canRetryMessage={canRetryMessage}
+          onRetryMessage={onRetryMessage}
         />
       );
     default:
@@ -70,6 +78,8 @@ const TranscriptItem = memo(function TranscriptItem({
   pendingPermissions,
   permissionMode,
   onResolvePermission,
+  canRetryMessage,
+  onRetryMessage,
 }: {
   readonly row: AgentTranscriptRow;
   readonly isStreaming: boolean;
@@ -80,6 +90,8 @@ const TranscriptItem = memo(function TranscriptItem({
     decision: "approved" | "denied",
     persist?: boolean,
   ) => void;
+  readonly canRetryMessage?: boolean;
+  readonly onRetryMessage?: (messageId: string) => void;
 }): ReactElement {
   return (
     <MessageScrollerItem
@@ -92,6 +104,8 @@ const TranscriptItem = memo(function TranscriptItem({
         pendingPermissions={pendingPermissions}
         permissionMode={permissionMode}
         onResolvePermission={onResolvePermission}
+        canRetryMessage={canRetryMessage}
+        onRetryMessage={onRetryMessage}
       />
     </MessageScrollerItem>
   );
@@ -103,6 +117,8 @@ export const AgentTranscript = memo(function AgentTranscript({
   pendingPermissions,
   permissionMode,
   onResolvePermission,
+  canRetryMessage = false,
+  onRetryMessage,
 }: AgentTranscriptProps): ReactElement {
   return (
     <MessageScrollerProvider autoScroll defaultScrollPosition="last-anchor">
@@ -117,6 +133,8 @@ export const AgentTranscript = memo(function AgentTranscript({
                 pendingPermissions={pendingPermissions}
                 permissionMode={permissionMode}
                 onResolvePermission={onResolvePermission}
+                canRetryMessage={canRetryMessage}
+                onRetryMessage={onRetryMessage}
               />
             ))}
           </MessageScrollerContent>

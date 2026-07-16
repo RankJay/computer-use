@@ -1,5 +1,6 @@
 import type { UIMessage } from "ai";
 
+import { planRegenerateFromAssistant } from "./control/regenerate-from-message";
 import {
   createRunController,
   type PermissionDecision,
@@ -11,6 +12,7 @@ import {
   RUNTIME_EVENT_SCHEMA_VERSION,
   type RuntimeEvent,
   type RuntimeEventPayload,
+  type RunStatus,
 } from "./events";
 import {
   createFoldState,
@@ -22,6 +24,8 @@ import {
 import { createEmptySessionProjection, type SessionProjection } from "./projection";
 
 export type SessionEngineListener = () => void;
+
+export type RetryFromMessageConfig = Omit<RunConfig, "prompt" | "chatMessages" | "isRetry">;
 
 export type SessionEngine = {
   append: (payload: RuntimeEventPayload) => RuntimeEvent | null;
@@ -40,9 +44,18 @@ export type SessionEngine = {
     persist?: boolean,
   ) => Promise<void>;
   retry: () => Promise<void>;
+  /**
+   * Regenerate the answer at `assistantMessageId`: keep prior turns + its user
+   * prompt, drop that answer and everything after, re-run with isRetry.
+   */
+  retryFromMessage: (assistantMessageId: string, config: RetryFromMessageConfig) => Promise<void>;
   beginTask: (taskId: string) => void;
   clearTask: () => void;
 };
+
+function isActiveStatus(status: RunStatus): boolean {
+  return status === "running" || status === "streaming" || status === "waiting_permission";
+}
 
 export type SessionEngineDeps = {
   produceRun: ProduceRun;
@@ -138,5 +151,30 @@ export function createSessionEngine(deps: SessionEngineDeps): SessionEngine {
     resolvePermission: (callId, decision, persist) =>
       controller.resolvePermission(callId, decision, persist),
     retry: () => controller.retry(),
+    async retryFromMessage(assistantMessageId, config) {
+      if (isActiveStatus(projection.status)) {
+        return;
+      }
+
+      const plan = planRegenerateFromAssistant(projection.chatMessages, assistantMessageId);
+      if (!plan) {
+        return;
+      }
+
+      await controller.cancel();
+      fold = foldStateFromMessages(plan.messages);
+      projection = toProjection(fold);
+      eventLog = [];
+      eventSeq = 0;
+      activeTaskId = null;
+      notify();
+
+      await controller.start({
+        ...config,
+        prompt: plan.prompt,
+        chatMessages: plan.messages,
+        isRetry: true,
+      });
+    },
   };
 }
