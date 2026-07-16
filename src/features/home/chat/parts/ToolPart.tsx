@@ -93,10 +93,7 @@ export const ToolPart = memo(function ToolPart({
 
   return (
     <div className="space-y-2">
-      <Tool
-        className="border-none ring-1 ring-border rounded-xl bg-[#161616]"
-        defaultOpen={part.state === "output-available" || part.state === "output-error"}
-      >
+      <Tool className="border-none ring-1 ring-border rounded-xl bg-[#161616]">
         <ToolHeader className="text-foreground font-[350]" {...headerProps} />
         <ToolContent>
           {"input" in part && part.input !== undefined ? <ToolInput input={part.input} /> : null}
