@@ -1,27 +1,66 @@
 import { isDynamicToolUIPart, type DynamicToolUIPart, type ToolUIPart } from "ai";
-import { CheckIcon, XIcon } from "lucide-react";
+import {
+  AppWindowIcon,
+  ChevronDownIcon,
+  ClipboardIcon,
+  EyeIcon,
+  FileCode2Icon,
+  KeyboardIcon,
+  type LucideIcon,
+  MousePointer2Icon,
+  TerminalIcon,
+  TimerIcon,
+} from "lucide-react";
 import { memo, useState, type ReactElement } from "react";
 
-import {
-  Confirmation,
-  ConfirmationAccepted,
-  ConfirmationAction,
-  ConfirmationActions,
-  ConfirmationRejected,
-  ConfirmationRequest,
-  ConfirmationTitle,
-} from "@/components/ai-elements/confirmation";
-import {
-  Tool,
-  ToolContent,
-  ToolHeader,
-  ToolInput,
-  ToolOutput,
-} from "@/components/ai-elements/tool";
-import { uiToolLabel } from "@/lib/agent/capabilities";
+import { Shimmer } from "@/components/ai-elements/shimmer";
+import { Button } from "@/components/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { toolActivityDetail, uiToolLabel } from "@/lib/agent/capabilities";
 import { isMacOsClient } from "@/lib/platform";
 import type { PendingPermission } from "@/lib/session";
 import type { PermissionMode } from "@/lib/settings/types";
+import { cn } from "@/lib/utils";
+
+/** Category glyph for activity rows — same role as Reasoning's brain icon. */
+function toolActivityIcon(toolName: string): LucideIcon {
+  if (toolName.startsWith("accessibility_")) {
+    return EyeIcon;
+  }
+  if (toolName.startsWith("mouse_")) {
+    return MousePointer2Icon;
+  }
+  if (toolName.startsWith("key_") || toolName === "hotkey") {
+    return KeyboardIcon;
+  }
+  if (toolName.startsWith("window_") || toolName === "get_active_window" || toolName === "launch") {
+    return AppWindowIcon;
+  }
+  if (toolName.includes("clipboard")) {
+    return ClipboardIcon;
+  }
+  if (
+    toolName === "run_shell" ||
+    toolName.startsWith("process_") ||
+    toolName === "get_env" ||
+    toolName === "set_env" ||
+    toolName === "get_system_info"
+  ) {
+    return TerminalIcon;
+  }
+  if (
+    toolName.includes("file") ||
+    toolName.includes("directory") ||
+    toolName.includes("path") ||
+    toolName === "search_files"
+  ) {
+    return FileCode2Icon;
+  }
+  if (toolName === "wait") {
+    return TimerIcon;
+  }
+  return TerminalIcon;
+}
 
 export type ToolPartProps = {
   readonly part: ToolUIPart | DynamicToolUIPart;
@@ -60,10 +99,16 @@ function needsOsPrivacyNotice(toolName: string): boolean {
 function approvalRequestCopy(toolName: string): string {
   if (needsOsPrivacyNotice(toolName)) {
     return isMacOsClient()
-      ? "This tool can observe or control other apps (macOS Accessibility / input). Approve execution?"
-      : "This tool can observe or control other apps. Approve execution?";
+      ? "Can observe or control other apps (macOS Accessibility / input)."
+      : "Can observe or control other apps.";
   }
-  return "This tool wants to run. Approve execution?";
+  return "Needs your approval to run.";
+}
+
+function isActiveState(state: ToolUIPart["state"] | DynamicToolUIPart["state"]): boolean {
+  return (
+    state === "input-streaming" || state === "input-available" || state === "approval-responded"
+  );
 }
 
 export const ToolPart = memo(function ToolPart({
@@ -74,54 +119,79 @@ export const ToolPart = memo(function ToolPart({
 }: ToolPartProps): ReactElement {
   const [persistAlways, setPersistAlways] = useState(false);
 
-  const showApproval =
-    part.state === "approval-requested" ||
-    part.state === "approval-responded" ||
-    part.state === "output-denied";
-
   const toolCallId = part.toolCallId;
   const isPending = pendingPermissions.some((entry) => entry.callId === toolCallId);
   const canAct =
     part.state === "approval-requested" && isPending && typeof onResolvePermission === "function";
   const showAlwaysAllow = canAct && permissionMode === "once-per-class";
-  const toolName = toolNameFromPart(part);
+  const showApprovalActions = part.state === "approval-requested";
 
+  const toolName = toolNameFromPart(part);
   const title = uiToolLabel(toolName);
-  const headerProps = isDynamicToolUIPart(part)
-    ? { type: part.type, state: part.state, toolName: part.toolName, title }
-    : { type: part.type, state: part.state, title };
+  const detail =
+    "input" in part && part.input !== undefined ? toolActivityDetail(toolName, part.input) : null;
+  const errorText =
+    "errorText" in part && typeof part.errorText === "string" ? part.errorText : null;
+  const isFailed = part.state === "output-error" || Boolean(errorText);
+  const isDenied = part.state === "output-denied";
+  const isActive = isActiveState(part.state);
+  const canExpand = Boolean(errorText);
+
+  const labelPrefix = isDenied ? "Skipped" : isFailed ? "Failed" : null;
+  const ActivityIcon = toolActivityIcon(toolName);
+
+  const labelNode = isActive ? (
+    <Shimmer as="span" duration={1}>
+      {title}
+    </Shimmer>
+  ) : (
+    <span>{title}</span>
+  );
+
+  const activityLine = (
+    <>
+      <ActivityIcon className="size-4 shrink-0" aria-hidden />
+      <span
+        className={cn(
+          "min-w-0 truncate",
+          isFailed && !isActive ? "text-destructive/80" : undefined,
+        )}
+      >
+        {labelPrefix ? <span>{labelPrefix} · </span> : null}
+        {labelNode}
+        {detail ? <span className="text-muted-foreground/80"> · {detail}</span> : null}
+      </span>
+    </>
+  );
 
   return (
-    <div className="space-y-2">
-      <Tool className="border-none ring-1 ring-border rounded-xl bg-[#161616]">
-        <ToolHeader className="text-foreground font-[350]" {...headerProps} />
-        <ToolContent>
-          {"input" in part && part.input !== undefined ? <ToolInput input={part.input} /> : null}
-          <ToolOutput
-            output={"output" in part ? part.output : undefined}
-            errorText={"errorText" in part ? part.errorText : undefined}
-          />
-        </ToolContent>
-      </Tool>
-      {showApproval && "approval" in part ? (
-        <Confirmation
-          className="border-none ring-1 ring-border rounded-xl bg-[#161616]"
-          approval={part.approval}
-          state={part.state}
-        >
-          <ConfirmationTitle>
-            <ConfirmationRequest>{approvalRequestCopy(toolName)}</ConfirmationRequest>
-            <ConfirmationAccepted>
-              <CheckIcon className="size-4" />
-              <span>You approved this tool execution</span>
-            </ConfirmationAccepted>
-            <ConfirmationRejected>
-              <XIcon className="size-4" />
-              <span>You rejected this tool execution</span>
-            </ConfirmationRejected>
-          </ConfirmationTitle>
+    <div className="space-y-2 px-1">
+      {canExpand ? (
+        <Collapsible className="group">
+          <CollapsibleTrigger
+            className={cn(
+              "flex w-full items-center gap-2 text-muted-foreground text-sm transition-colors hover:text-foreground",
+              isFailed && "text-destructive/80 hover:text-destructive",
+            )}
+          >
+            {activityLine}
+            <ChevronDownIcon className="size-4 shrink-0 transition-transform group-data-open:rotate-180" />
+          </CollapsibleTrigger>
+          <CollapsibleContent className="mt-2 text-sm outline-none">
+            <p className="whitespace-pre-wrap wrap-break-word text-destructive/90">{errorText}</p>
+          </CollapsibleContent>
+        </Collapsible>
+      ) : (
+        <div className="flex w-full items-center gap-2 text-muted-foreground text-sm">
+          {activityLine}
+        </div>
+      )}
+
+      {showApprovalActions ? (
+        <div className="space-y-2 pl-0.5">
+          <p className="text-xs text-muted-foreground">{approvalRequestCopy(toolName)}</p>
           {showAlwaysAllow ? (
-            <label className="flex items-center gap-2 px-3 pb-1 text-xs text-muted-foreground">
+            <label className="flex items-center gap-2 text-xs text-muted-foreground">
               <input
                 type="checkbox"
                 checked={persistAlways}
@@ -130,22 +200,26 @@ export const ToolPart = memo(function ToolPart({
               Always allow this tool
             </label>
           ) : null}
-          <ConfirmationActions>
-            <ConfirmationAction
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
               variant="outline"
+              size="sm"
               disabled={!canAct}
               onClick={() => onResolvePermission?.(toolCallId, "denied")}
             >
               Reject
-            </ConfirmationAction>
-            <ConfirmationAction
+            </Button>
+            <Button
+              type="button"
+              size="sm"
               disabled={!canAct}
               onClick={() => onResolvePermission?.(toolCallId, "approved", persistAlways)}
             >
               Approve
-            </ConfirmationAction>
-          </ConfirmationActions>
-        </Confirmation>
+            </Button>
+          </div>
+        </div>
       ) : null}
     </div>
   );
