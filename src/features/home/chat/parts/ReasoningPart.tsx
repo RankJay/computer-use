@@ -1,6 +1,23 @@
-import { memo, type ReactElement } from "react";
+import { lazy, memo, Suspense, type ReactElement } from "react";
 
-import { Reasoning, ReasoningContent, ReasoningTrigger } from "@/components/ai-elements/reasoning";
+const ReasoningBundle = lazy(() =>
+  import("@/components/ai-elements/reasoning").then((mod) => ({
+    default: function ReasoningBundleInner({
+      text,
+      isStreaming,
+    }: {
+      text: string;
+      isStreaming: boolean;
+    }) {
+      return (
+        <mod.Reasoning isStreaming={isStreaming}>
+          <mod.ReasoningTrigger />
+          <mod.ReasoningContent>{text}</mod.ReasoningContent>
+        </mod.Reasoning>
+      );
+    },
+  })),
+);
 
 export type ReasoningPartProps = {
   readonly text: string;
@@ -12,9 +29,10 @@ export const ReasoningPart = memo(function ReasoningPart({
   isStreaming = false,
 }: ReasoningPartProps): ReactElement {
   return (
-    <Reasoning isStreaming={isStreaming}>
-      <ReasoningTrigger />
-      <ReasoningContent>{text}</ReasoningContent>
-    </Reasoning>
+    <Suspense
+      fallback={<p className="text-muted-foreground text-sm whitespace-pre-wrap">{text}</p>}
+    >
+      <ReasoningBundle text={text} isStreaming={isStreaming} />
+    </Suspense>
   );
 });

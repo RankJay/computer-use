@@ -1,4 +1,4 @@
-import { memo, type ReactElement } from "react";
+import { lazy, memo, Suspense, type ReactElement } from "react";
 
 import {
   MessageScroller,
@@ -12,9 +12,15 @@ import type { PendingPermission } from "@/lib/session";
 import type { PermissionMode } from "@/lib/settings/types";
 
 import { MarkerRow } from "./rows/MarkerRow";
-import { MessageRow } from "./rows/MessageRow";
-import { SpecialRow } from "./rows/SpecialRow";
 import type { AgentTranscriptRow } from "./types";
+
+/** Heavy rows (markdown / CoT / ai type-guards) — kept off empty-home cold path. */
+const MessageRow = lazy(() =>
+  import("./rows/MessageRow").then((mod) => ({ default: mod.MessageRow })),
+);
+const SpecialRow = lazy(() =>
+  import("./rows/SpecialRow").then((mod) => ({ default: mod.SpecialRow })),
+);
 
 export type AgentTranscriptProps = {
   readonly rows: readonly AgentTranscriptRow[];
@@ -56,18 +62,24 @@ const TranscriptRowView = memo(function TranscriptRowView({
       return <MarkerRow row={row} />;
     case "message":
       return (
-        <MessageRow
-          row={row}
-          isStreaming={isStreaming}
-          pendingPermissions={pendingPermissions}
-          permissionMode={permissionMode}
-          onResolvePermission={onResolvePermission}
-          canRetryMessage={canRetryMessage}
-          onRetryMessage={onRetryMessage}
-        />
+        <Suspense fallback={null}>
+          <MessageRow
+            row={row}
+            isStreaming={isStreaming}
+            pendingPermissions={pendingPermissions}
+            permissionMode={permissionMode}
+            onResolvePermission={onResolvePermission}
+            canRetryMessage={canRetryMessage}
+            onRetryMessage={onRetryMessage}
+          />
+        </Suspense>
       );
     default:
-      return <SpecialRow row={row} />;
+      return (
+        <Suspense fallback={null}>
+          <SpecialRow row={row} />
+        </Suspense>
+      );
   }
 });
 

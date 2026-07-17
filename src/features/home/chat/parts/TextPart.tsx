@@ -1,8 +1,11 @@
 import type { TextUIPart } from "ai";
-import { memo, type ReactElement } from "react";
+import { lazy, memo, Suspense, type ReactElement } from "react";
 
-import { MessageResponse } from "@/components/ai-elements/message";
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
+
+const MessageResponse = lazy(() =>
+  import("@/components/ai-elements/message").then((mod) => ({ default: mod.MessageResponse })),
+);
 
 export type TextPartProps = {
   readonly part: TextUIPart;
@@ -28,7 +31,9 @@ export const TextPart = memo(function TextPart({
   return (
     <Bubble variant={bubbleVariant} align="start" className="text-foreground px-1 font-[350]">
       <BubbleContent>
-        <MessageResponse isAnimating={isAnimating}>{part.text}</MessageResponse>
+        <Suspense fallback={<span className="whitespace-pre-wrap">{part.text}</span>}>
+          <MessageResponse isAnimating={isAnimating}>{part.text}</MessageResponse>
+        </Suspense>
       </BubbleContent>
     </Bubble>
   );

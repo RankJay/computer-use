@@ -19,6 +19,7 @@ import {
   type SessionProjection,
 } from "@/lib/session";
 import {
+  ensureSecretsReady,
   settingsQueryOptions,
   useLoadedSettings,
   usePersistToolApproval,
@@ -260,11 +261,12 @@ export function useAgentSessionControls(store: BatchedEngine): AgentSessionContr
   const start = useCallback(
     async (prompt: string) => {
       const latest = await queryClient.ensureQueryData(settingsQueryOptions());
-      const { secrets, ...appSettings } = latest;
+      const { secrets: _placeholder, ...appSettings } = latest;
       if (!isLiveWorkspaceReady(appSettings)) {
         toast.error("Set a workspace root in Settings before running live.");
         return;
       }
+      const secrets = await ensureSecretsReady();
       const projection = store.engine.getProjection();
       await store.engine.start({
         prompt,
@@ -283,11 +285,12 @@ export function useAgentSessionControls(store: BatchedEngine): AgentSessionContr
   const retryFromMessage = useCallback(
     async (assistantMessageId: string) => {
       const latest = await queryClient.ensureQueryData(settingsQueryOptions());
-      const { secrets, ...appSettings } = latest;
+      const { secrets: _placeholder, ...appSettings } = latest;
       if (!isLiveWorkspaceReady(appSettings)) {
         toast.error("Set a workspace root in Settings before running live.");
         return;
       }
+      const secrets = await ensureSecretsReady();
       await store.engine.retryFromMessage(assistantMessageId, {
         modelId: appSettings.selectedModelId,
         settings: appSettings,
