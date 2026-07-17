@@ -9,7 +9,8 @@ import { chatsKeys } from "@/lib/chats/queries";
 import { deriveChatTitle } from "@/lib/chats/title";
 import type { StoredChat } from "@/lib/chats/types";
 import type { RunStatus, SessionEngine, SessionProjection } from "@/lib/session";
-import { useLoadedSettings } from "@/lib/settings/queries";
+import { useSettingsSelector } from "@/lib/settings/queries";
+import { selectSelectedModelId } from "@/lib/settings/selectors";
 
 const persistence = createChatsPersistence();
 
@@ -77,14 +78,14 @@ export function useChatPersistence(store: SessionStore, chatId: string | undefin
   const { engine } = store;
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { data: settings } = useLoadedSettings();
+  const selectedModelId = useSettingsSelector(selectSelectedModelId);
 
   const chatIdRef = useRef(chatId);
   chatIdRef.current = chatId;
 
   const metaRef = useRef<ChatMeta | null>(null);
-  const modelIdRef = useRef(settings.selectedModelId);
-  modelIdRef.current = settings.selectedModelId;
+  const modelIdRef = useRef(selectedModelId);
+  modelIdRef.current = selectedModelId;
 
   const createInFlightRef = useRef(false);
   const createIdRef = useRef<string | null>(null);

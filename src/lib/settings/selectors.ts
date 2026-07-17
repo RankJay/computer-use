@@ -20,6 +20,10 @@ export function selectAgentMode(settings: LoadedSettings): LoadedSettings["agent
   return settings.agentMode;
 }
 
+export function selectSelectedModelId(settings: LoadedSettings): string {
+  return settings.selectedModelId;
+}
+
 export function selectMaxSteps(settings: LoadedSettings): number {
   return settings.maxSteps;
 }

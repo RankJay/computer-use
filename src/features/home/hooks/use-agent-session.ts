@@ -21,10 +21,11 @@ import {
 import {
   ensureSecretsReady,
   settingsQueryOptions,
-  useLoadedSettings,
   usePersistToolApproval,
+  useSettingsSelector,
   useUpdateSettings,
 } from "@/lib/settings/queries";
+import { selectPermissionMode, selectSelectedModelId } from "@/lib/settings/selectors";
 import type { PermissionMode } from "@/lib/settings/types";
 
 export type ComposerContextUsage = {
@@ -211,21 +212,21 @@ export function useAgentTranscript(store: BatchedEngine): AgentTranscriptSlice {
 
 /** Context meter only — silent on text chunks when usage identity is shared. */
 export function useAgentContextUsage(store: BatchedEngine): ComposerContextUsage {
-  const { data: settings } = useLoadedSettings();
+  // Field selector — secrets hydration must not wake this island.
+  const selectedModelId = useSettingsSelector(selectSelectedModelId);
   const usage = useSyncExternalStore(
     store.subscribe,
     () => store.getSnapshot().usage,
     () => store.getSnapshot().usage,
   );
-  return useMemo(
-    () => toContextUsage(usage, settings.selectedModelId),
-    [usage, settings.selectedModelId],
-  );
+  return useMemo(() => toContextUsage(usage, selectedModelId), [usage, selectedModelId]);
 }
 
 /** Warm path: control flags + actions — no usage (keeps composer chrome cold on chunks). */
 export function useAgentSessionControls(store: BatchedEngine): AgentSessionControls {
-  const { data: settings } = useLoadedSettings();
+  // Field selectors — secrets hydration must not rebuild composer controls.
+  const selectedModelId = useSettingsSelector(selectSelectedModelId);
+  const permissionMode = useSettingsSelector(selectPermissionMode);
   const queryClient = useQueryClient();
   // mutate is referentially stable; the full mutation result object is not.
   const { mutate: mutateSettings } = useUpdateSettings();
@@ -323,9 +324,9 @@ export function useAgentSessionControls(store: BatchedEngine): AgentSessionContr
       retry,
       retryFromMessage,
       resolvePermission,
-      modelId: settings.selectedModelId,
+      modelId: selectedModelId,
       onModelChange,
-      permissionMode: settings.permissionMode,
+      permissionMode,
       pendingPermissions,
     }),
     [
@@ -337,8 +338,8 @@ export function useAgentSessionControls(store: BatchedEngine): AgentSessionContr
       retry,
       retryFromMessage,
       resolvePermission,
-      settings.selectedModelId,
-      settings.permissionMode,
+      selectedModelId,
+      permissionMode,
       onModelChange,
       pendingPermissions,
     ],
