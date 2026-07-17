@@ -96,7 +96,8 @@ export function useUpdateSecret() {
 
 export function usePersistToolApproval() {
   const queryClient = useQueryClient();
-  const updateSettings = useUpdateSettings();
+  // Depend on mutateAsync only — the full mutation result object changes every render.
+  const { mutateAsync } = useUpdateSettings();
 
   return useCallback(
     async (tool: string) => {
@@ -108,10 +109,10 @@ export function usePersistToolApproval() {
         return;
       }
 
-      await updateSettings.mutateAsync({
+      await mutateAsync({
         persistedApprovals: [...current.persistedApprovals, tool],
       });
     },
-    [queryClient, updateSettings],
+    [queryClient, mutateAsync],
   );
 }

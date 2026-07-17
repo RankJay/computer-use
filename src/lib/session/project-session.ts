@@ -3,10 +3,16 @@ import type { UIMessage } from "ai";
 import type { RuntimeEvent, UIMessagePartSnapshot } from "./events";
 import {
   createEmptySessionProjection,
+  EMPTY_PENDING_PERMISSIONS,
   type PendingPermission,
   type SessionProjection,
 } from "./projection";
 import type { AgentMessageRowData, AgentTranscriptRow } from "./rows";
+
+/** Clear pending permissions without inventing a new empty-array identity. */
+function clearedPendingPermissions(pending: PendingPermission[]): PendingPermission[] {
+  return pending.length === 0 ? pending : EMPTY_PENDING_PERMISSIONS;
+}
 
 export type FoldState = {
   taskId: string | null;
@@ -220,7 +226,7 @@ export function reduceSession(state: FoldState, event: RuntimeEvent): FoldState 
         taskId: event.taskId,
         status: "running",
         failure: null,
-        pendingPermissions: [],
+        pendingPermissions: clearedPendingPermissions(base.pendingPermissions),
         streamingMessageId: null,
         usage: { ...base.usage, modelId: event.modelId },
       };
@@ -260,7 +266,7 @@ export function reduceSession(state: FoldState, event: RuntimeEvent): FoldState 
       return {
         ...base,
         status,
-        pendingPermissions: [],
+        pendingPermissions: clearedPendingPermissions(base.pendingPermissions),
         streamingMessageId: null,
       };
     }
@@ -274,7 +280,7 @@ export function reduceSession(state: FoldState, event: RuntimeEvent): FoldState 
           message: event.message,
           recoverable: event.recoverable,
         },
-        pendingPermissions: [],
+        pendingPermissions: clearedPendingPermissions(base.pendingPermissions),
         streamingMessageId: null,
       };
       return appendFailureMessage(withFailure, event.taskId, event.message);
@@ -340,7 +346,9 @@ export function reduceSession(state: FoldState, event: RuntimeEvent): FoldState 
     }
 
     case "permission.resolved": {
-      const pendingPermissions = base.pendingPermissions.filter((p) => p.callId !== event.callId);
+      const remaining = base.pendingPermissions.filter((p) => p.callId !== event.callId);
+      const pendingPermissions =
+        remaining.length === 0 ? EMPTY_PENDING_PERMISSIONS : remaining;
       return {
         ...base,
         pendingPermissions,
@@ -387,7 +395,7 @@ export function reduceSession(state: FoldState, event: RuntimeEvent): FoldState 
           message,
           recoverable: true,
         },
-        pendingPermissions: [],
+        pendingPermissions: clearedPendingPermissions(base.pendingPermissions),
         streamingMessageId: null,
       };
       if (base.taskId) {
@@ -408,16 +416,27 @@ export function reduceSession(state: FoldState, event: RuntimeEvent): FoldState 
   }
 }
 
-export function toProjection(state: FoldState): SessionProjection {
+/**
+ * Emit Projection with structural sharing.
+ * Pass `previous` from the engine so unchanged slices keep identity across events
+ * (usage/budget stay silent on part_updated; chatMessages rebuild only when rows change).
+ */
+export function toProjection(
+  state: FoldState,
+  previous: SessionProjection | null = null,
+): SessionProjection {
+  const rowsUnchanged = previous !== null && Object.is(previous.rows, state.rows);
   return {
     taskId: state.taskId,
     status: state.status,
     failure: state.failure,
     rows: state.rows,
-    chatMessages: chatMessagesFromRows(state.rows),
+    chatMessages: rowsUnchanged
+      ? previous.chatMessages
+      : chatMessagesFromRows(state.rows),
     pendingPermissions: state.pendingPermissions,
-    usage: { ...state.usage },
-    budget: { ...state.budget },
+    usage: state.usage,
+    budget: state.budget,
     streamingMessageId: state.streamingMessageId,
   };
 }

@@ -238,6 +238,97 @@ describe("project-session", () => {
     expect(state.rows[0]).toBe(markerRef);
   });
 
+  test("clearing pendingPermissions reuses empty-array identity", () => {
+    let state = createFoldState();
+    const emptyRef = state.pendingPermissions;
+
+    state = reduceSession(
+      state,
+      evt(1, {
+        type: "task.started",
+        prompt: "hi",
+        modelId: "openai/gpt-5.4",
+        agentMode: "demo",
+      }),
+    );
+    expect(state.pendingPermissions).toBe(emptyRef);
+
+    state = reduceSession(
+      state,
+      evt(2, {
+        type: "task.completed",
+        finishReason: "stop",
+      }),
+    );
+    expect(state.pendingPermissions).toBe(emptyRef);
+
+    const before = toProjection(state);
+    state = reduceSession(
+      state,
+      evt(3, {
+        type: "task.started",
+        prompt: "again",
+        modelId: "openai/gpt-5.4",
+        agentMode: "demo",
+      }),
+    );
+    const after = toProjection(state, before);
+    expect(after.pendingPermissions).toBe(before.pendingPermissions);
+  });
+
+  test("toProjection reuses usage/budget/chatMessages when unchanged", () => {
+    let state = createFoldState();
+    state = reduceSession(
+      state,
+      evt(1, {
+        type: "task.started",
+        prompt: "hi",
+        modelId: "openai/gpt-5.4",
+        agentMode: "demo",
+      }),
+    );
+    state = reduceSession(
+      state,
+      evt(2, {
+        type: "assistant.message_started",
+        messageId: "asst-1",
+        role: "assistant",
+      }),
+    );
+    const before = toProjection(state);
+
+    state = reduceSession(
+      state,
+      evt(3, {
+        type: "assistant.part_updated",
+        messageId: "asst-1",
+        partIndex: 0,
+        part: { type: "text", text: "hello" },
+      }),
+    );
+    const afterPart = toProjection(state, before);
+
+    expect(afterPart.usage).toBe(before.usage);
+    expect(afterPart.budget).toBe(before.budget);
+    expect(afterPart.chatMessages).not.toBe(before.chatMessages);
+
+    state = reduceSession(
+      state,
+      evt(4, {
+        type: "usage.updated",
+        modelId: "openai/gpt-5.4",
+        usedTokens: 12,
+        maxTokens: 200_000,
+      }),
+    );
+    const afterUsage = toProjection(state, afterPart);
+
+    expect(afterUsage.usage).not.toBe(afterPart.usage);
+    expect(afterUsage.budget).toBe(afterPart.budget);
+    expect(afterUsage.rows).toBe(afterPart.rows);
+    expect(afterUsage.chatMessages).toBe(afterPart.chatMessages);
+  });
+
   test("activity and assistant events build transcript rows", () => {
     const projection = projectSession([
       evt(1, {

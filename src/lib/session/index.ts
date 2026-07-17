@@ -26,6 +26,7 @@ export type {
 } from "./projection";
 export {
   createEmptySessionProjection,
+  EMPTY_PENDING_PERMISSIONS,
   EMPTY_SESSION_BUDGET,
   EMPTY_SESSION_USAGE,
 } from "./projection";

@@ -94,7 +94,7 @@ export function createSessionEngine(deps: SessionEngineDeps): SessionEngine {
     }
 
     fold = reduceSession(fold, event);
-    projection = toProjection(fold);
+    projection = toProjection(fold, projection);
     eventLog = [...eventLog, event];
     notify();
     return event;
@@ -135,7 +135,7 @@ export function createSessionEngine(deps: SessionEngineDeps): SessionEngine {
     },
     hydrate(messages) {
       fold = foldStateFromMessages(messages);
-      projection = toProjection(fold);
+      projection = toProjection(fold, null);
       notify();
     },
     beginTask(taskId) {
@@ -163,7 +163,7 @@ export function createSessionEngine(deps: SessionEngineDeps): SessionEngine {
 
       await controller.cancel();
       fold = foldStateFromMessages(plan.messages);
-      projection = toProjection(fold);
+      projection = toProjection(fold, null);
       eventLog = [];
       eventSeq = 0;
       activeTaskId = null;

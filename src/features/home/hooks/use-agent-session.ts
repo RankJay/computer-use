@@ -115,11 +115,10 @@ export type AgentTranscriptSlice = {
   pendingPermissions: readonly PendingPermission[];
 };
 
+/** Composer / status-bar actions — deliberately excludes usage (own island). */
 export type AgentSessionControls = SessionControls & {
   status: SessionProjection["status"];
   failure: SessionFailure | null;
-  usage: SessionProjection["usage"];
-  contextUsage: ComposerContextUsage;
   start: (prompt: string) => Promise<void>;
   cancel: () => Promise<void>;
   retry: () => Promise<void>;
@@ -166,29 +165,69 @@ export function useAgentInputDisabled(store: BatchedEngine): boolean {
   return status === "running" || status === "streaming" || status === "waiting_permission";
 }
 
-/** Hot path: display rows (presentation derive) + streaming / pending permission slices. */
+/** Hot path: only fields that affect the transcript list / Thinking marker. */
 export function useAgentTranscript(store: BatchedEngine): AgentTranscriptSlice {
-  const projection = useSyncExternalStore(
+  const rows = useSyncExternalStore(
     store.subscribe,
-    () => store.getSnapshot(),
-    () => store.getSnapshot(),
+    () => store.getSnapshot().rows,
+    () => store.getSnapshot().rows,
   );
-  const rows = useMemo(() => deriveDisplayRows(projection), [projection]);
+  const streamingMessageId = useSyncExternalStore(
+    store.subscribe,
+    () => store.getSnapshot().streamingMessageId,
+    () => store.getSnapshot().streamingMessageId,
+  );
+  const pendingPermissions = useSyncExternalStore(
+    store.subscribe,
+    () => store.getSnapshot().pendingPermissions,
+    () => store.getSnapshot().pendingPermissions,
+  );
+  const status = useSyncExternalStore(
+    store.subscribe,
+    () => store.getSnapshot().status,
+    () => store.getSnapshot().status,
+  );
+  const taskId = useSyncExternalStore(
+    store.subscribe,
+    () => store.getSnapshot().taskId,
+    () => store.getSnapshot().taskId,
+  );
+
+  const displayRows = useMemo(
+    () => deriveDisplayRows({ rows, status, taskId, streamingMessageId }),
+    [rows, status, taskId, streamingMessageId],
+  );
+
   return useMemo(
     () => ({
-      rows,
-      streamingMessageId: projection.streamingMessageId,
-      pendingPermissions: projection.pendingPermissions,
+      rows: displayRows,
+      streamingMessageId,
+      pendingPermissions,
     }),
-    [rows, projection.streamingMessageId, projection.pendingPermissions],
+    [displayRows, streamingMessageId, pendingPermissions],
   );
 }
 
-/** Warm path: control flags, usage, submit/cancel/retry, model binding. */
+/** Context meter only — silent on text chunks when usage identity is shared. */
+export function useAgentContextUsage(store: BatchedEngine): ComposerContextUsage {
+  const { data: settings } = useLoadedSettings();
+  const usage = useSyncExternalStore(
+    store.subscribe,
+    () => store.getSnapshot().usage,
+    () => store.getSnapshot().usage,
+  );
+  return useMemo(
+    () => toContextUsage(usage, settings.selectedModelId),
+    [usage, settings.selectedModelId],
+  );
+}
+
+/** Warm path: control flags + actions — no usage (keeps composer chrome cold on chunks). */
 export function useAgentSessionControls(store: BatchedEngine): AgentSessionControls {
   const { data: settings } = useLoadedSettings();
   const queryClient = useQueryClient();
-  const updateSettings = useUpdateSettings();
+  // mutate is referentially stable; the full mutation result object is not.
+  const { mutate: mutateSettings } = useUpdateSettings();
   const persistToolApproval = usePersistToolApproval();
 
   const status = useSyncExternalStore(
@@ -205,11 +244,6 @@ export function useAgentSessionControls(store: BatchedEngine): AgentSessionContr
     store.subscribe,
     () => store.getSnapshot().pendingPermissions,
     () => store.getSnapshot().pendingPermissions,
-  );
-  const usage = useSyncExternalStore(
-    store.subscribe,
-    () => store.getSnapshot().usage,
-    () => store.getSnapshot().usage,
   );
 
   const controls = useMemo(
@@ -271,14 +305,9 @@ export function useAgentSessionControls(store: BatchedEngine): AgentSessionContr
 
   const onModelChange = useCallback(
     (modelId: string) => {
-      updateSettings.mutate({ selectedModelId: modelId });
+      mutateSettings({ selectedModelId: modelId });
     },
-    [updateSettings],
-  );
-
-  const contextUsage = useMemo(
-    () => toContextUsage(usage, settings.selectedModelId),
-    [usage, settings.selectedModelId],
+    [mutateSettings],
   );
 
   return useMemo(
@@ -286,8 +315,6 @@ export function useAgentSessionControls(store: BatchedEngine): AgentSessionContr
       ...controls,
       status,
       failure,
-      usage,
-      contextUsage,
       start,
       cancel,
       retry,
@@ -302,8 +329,6 @@ export function useAgentSessionControls(store: BatchedEngine): AgentSessionContr
       controls,
       status,
       failure,
-      usage,
-      contextUsage,
       start,
       cancel,
       retry,

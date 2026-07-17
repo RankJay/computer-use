@@ -188,4 +188,16 @@ describe("deriveDisplayRows", () => {
       expect(display).toBe(rows);
     }
   });
+
+  test("Thinking marker identity is stable across identical derives", () => {
+    const taskId = "task-stable";
+    const rows: AgentTranscriptRow[] = [userRow("user-1", "hi")];
+    const input = projection({ taskId, status: "running", rows });
+
+    const first = deriveDisplayRows(input);
+    const second = deriveDisplayRows(input);
+
+    expect(second).toBe(first);
+    expect(second[1]).toBe(first[1]);
+  });
 });

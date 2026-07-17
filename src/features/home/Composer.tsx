@@ -1,7 +1,8 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import type { LanguageModelUsage } from "ai";
 import { ArrowUp, RotateCcw, Square } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
-import type { ChangeEvent, KeyboardEvent, ReactElement, SubmitEvent } from "react";
+import { memo, useEffect, useRef, useState } from "react";
+import type { ChangeEvent, KeyboardEvent, ReactElement, ReactNode, SubmitEvent } from "react";
 
 import {
   Context,
@@ -30,21 +31,52 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { getAvailableAgentModels } from "@/lib/agent-models";
 
-import type { ComposerContextUsage } from "./hooks/use-agent-session";
+export type ComposerContextMeterProps = {
+  readonly usedTokens: number;
+  readonly maxTokens: number;
+  readonly modelId: string;
+  readonly usage: LanguageModelUsage;
+};
+
+export const ComposerContextMeter = memo(function ComposerContextMeter({
+  usedTokens,
+  maxTokens,
+  modelId,
+  usage,
+}: ComposerContextMeterProps): ReactElement {
+  return (
+    <Context maxTokens={maxTokens} modelId={modelId} usage={usage} usedTokens={usedTokens}>
+      <ContextTrigger className="h-7 px-1.5 text-xs text-[#767676] hover:bg-[#252525] hover:text-[#CDCDCD]" />
+      <ContextContent align="end" className="border-[#252525] bg-[#161616] text-[#CDCDCD]">
+        <ContextContentHeader />
+        <ContextContentBody className="space-y-2">
+          <ContextInputUsage />
+          <ContextOutputUsage />
+          <ContextReasoningUsage />
+          <ContextCacheUsage />
+        </ContextContentBody>
+        <ContextContentFooter />
+      </ContextContent>
+    </Context>
+  );
+});
 
 export type TaskPromptComposerProps = {
-  readonly onSubmit: (prompt: string) => void;
-  readonly onCancel: () => void;
-  readonly onRetry?: () => void;
+  readonly onSubmit: (prompt: string) => void | Promise<void>;
+  readonly onCancel: () => void | Promise<void>;
+  readonly onRetry?: () => void | Promise<void>;
   readonly inputDisabled: boolean;
   readonly cancelVisible: boolean;
   readonly canRetry?: boolean;
   readonly modelId: string;
   readonly onModelChange: (modelId: string) => void;
-  readonly contextUsage: ComposerContextUsage;
+  /** Own subscription island — keeps Select/textarea cold when usage ticks. */
+  readonly contextSlot: ReactNode;
 };
 
-export function TaskPromptComposer(props: TaskPromptComposerProps): ReactElement {
+export const TaskPromptComposer = memo(function TaskPromptComposer(
+  props: TaskPromptComposerProps,
+): ReactElement {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [canSubmit, setCanSubmit] = useState(false);
   const models = getAvailableAgentModels();
@@ -162,25 +194,7 @@ export function TaskPromptComposer(props: TaskPromptComposerProps): ReactElement
         </Select>
 
         <div className="flex shrink-0 items-center gap-0.5">
-          <Context
-            maxTokens={props.contextUsage.maxTokens}
-            modelId={props.contextUsage.modelId}
-            usage={props.contextUsage.usage}
-            usedTokens={props.contextUsage.usedTokens}
-          >
-            <ContextTrigger className="h-7 px-1.5 text-xs text-[#767676] hover:bg-[#252525] hover:text-[#CDCDCD]" />
-            <ContextContent align="end" className="border-[#252525] bg-[#161616] text-[#CDCDCD]">
-              <ContextContentHeader />
-              <ContextContentBody className="space-y-2">
-                <ContextInputUsage />
-                <ContextOutputUsage />
-                <ContextReasoningUsage />
-                <ContextCacheUsage />
-              </ContextContentBody>
-              <ContextContentFooter />
-            </ContextContent>
-          </Context>
-
+          {props.contextSlot}
           {props.canRetry && props.onRetry ? (
             <Button
               type="button"
@@ -214,4 +228,4 @@ export function TaskPromptComposer(props: TaskPromptComposerProps): ReactElement
       </div>
     </form>
   );
-}
+});
