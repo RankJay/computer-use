@@ -347,8 +347,7 @@ export function reduceSession(state: FoldState, event: RuntimeEvent): FoldState 
 
     case "permission.resolved": {
       const remaining = base.pendingPermissions.filter((p) => p.callId !== event.callId);
-      const pendingPermissions =
-        remaining.length === 0 ? EMPTY_PENDING_PERMISSIONS : remaining;
+      const pendingPermissions = remaining.length === 0 ? EMPTY_PENDING_PERMISSIONS : remaining;
       return {
         ...base,
         pendingPermissions,
@@ -431,9 +430,7 @@ export function toProjection(
     status: state.status,
     failure: state.failure,
     rows: state.rows,
-    chatMessages: rowsUnchanged
-      ? previous.chatMessages
-      : chatMessagesFromRows(state.rows),
+    chatMessages: rowsUnchanged ? previous.chatMessages : chatMessagesFromRows(state.rows),
     pendingPermissions: state.pendingPermissions,
     usage: state.usage,
     budget: state.budget,

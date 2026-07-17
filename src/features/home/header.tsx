@@ -4,6 +4,7 @@ import { useCallback, type ReactElement } from "react";
 import { Link } from "react-router-dom";
 
 import { queryClient } from "@/app/query-client";
+import { chatsListQueryOptions } from "@/lib/chats/queries";
 import { settingsQueryOptions } from "@/lib/settings/queries";
 
 const headerIconClassName =
@@ -23,6 +24,10 @@ export function HomePageHeader({ navDisabled }: HomePageHeaderProps): ReactEleme
 
   const prefetchSettings = useCallback((): void => {
     void queryClient.prefetchQuery(settingsQueryOptions());
+  }, []);
+
+  const prefetchHistory = useCallback((): void => {
+    void queryClient.prefetchQuery(chatsListQueryOptions());
   }, []);
 
   return (
@@ -49,6 +54,8 @@ export function HomePageHeader({ navDisabled }: HomePageHeaderProps): ReactEleme
           aria-label="History"
           aria-disabled={navDisabled}
           tabIndex={navDisabled ? -1 : undefined}
+          onMouseEnter={navDisabled ? undefined : prefetchHistory}
+          onFocus={navDisabled ? undefined : prefetchHistory}
           onClick={(event) => {
             if (navDisabled) event.preventDefault();
           }}
