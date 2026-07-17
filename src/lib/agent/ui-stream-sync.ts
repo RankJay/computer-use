@@ -7,11 +7,31 @@ import type { RuntimeEventPayload, UIMessagePartSnapshot } from "@/lib/session/e
 
 export type MessageSyncState = {
   messageId: string;
+  /** Cheap dirty keys — text/reasoning avoid full JSON.stringify on every token. */
   partSnapshots: string[];
 };
 
-function serializePart(part: UIMessagePartSnapshot): string {
-  return JSON.stringify(part);
+/**
+ * Fingerprint a part for change detection.
+ * Hot path (text / reasoning): concatenate fields. Cold path (tools, etc.): JSON.
+ */
+export function partDirtyKey(part: UIMessagePartSnapshot): string {
+  switch (part.type) {
+    case "text":
+      return `t\0${part.state ?? ""}\0${part.text}`;
+    case "reasoning":
+      return `r\0${part.state ?? ""}\0${typeof part.text === "string" ? part.text : ""}`;
+    case "file":
+      return `f\0${part.url}\0${part.filename ?? ""}\0${part.mediaType}`;
+    case "source-url":
+      return `su\0${part.sourceId}\0${part.url}\0${part.title ?? ""}`;
+    case "source-document":
+      return `sd\0${part.sourceId}\0${part.title}\0${part.mediaType}\0${part.filename ?? ""}`;
+    case "step-start":
+      return "ss";
+    default:
+      return JSON.stringify(part);
+  }
 }
 
 export function syncAssistantMessage(
@@ -35,24 +55,38 @@ export function syncAssistantMessage(
     currentState = { messageId: message.id, partSnapshots: [] };
   }
 
-  const partSnapshots = [...currentState.partSnapshots];
+  const prevSnapshots = currentState.partSnapshots;
+  let nextSnapshots = prevSnapshots;
+  let cloned = false;
+
   for (let index = 0; index < message.parts.length; index += 1) {
     const part = message.parts[index];
     if (!part) continue;
 
-    const snapshot = serializePart(part);
-    if (partSnapshots[index] !== snapshot) {
-      emit({
-        type: "assistant.part_updated",
-        messageId: message.id,
-        partIndex: index,
-        part,
-      });
-      partSnapshots[index] = snapshot;
+    const key = partDirtyKey(part);
+    if (prevSnapshots[index] === key) {
+      continue;
     }
+
+    emit({
+      type: "assistant.part_updated",
+      messageId: message.id,
+      partIndex: index,
+      part,
+    });
+
+    if (!cloned) {
+      nextSnapshots = prevSnapshots.slice();
+      cloned = true;
+    }
+    nextSnapshots[index] = key;
   }
 
-  return { messageId: message.id, partSnapshots };
+  if (!cloned) {
+    return currentState;
+  }
+
+  return { messageId: message.id, partSnapshots: nextSnapshots };
 }
 
 export function finishAssistantMessage(

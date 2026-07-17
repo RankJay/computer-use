@@ -1,31 +1,35 @@
 import type { AppSecrets, LoadedSettings } from "@/lib/settings/types";
 
-export type GeneralSettingsSlice = Pick<
-  LoadedSettings,
-  "workspaceRoot" | "logRetentionDays" | "permissionMode" | "uiAutomation"
->;
-
-export type GuardrailSettingsSlice = Pick<
-  LoadedSettings,
-  "agentMode" | "maxSteps" | "maxCostUsd" | "maxWallClockMs"
->;
-
-export function selectGeneralSettings(settings: LoadedSettings): GeneralSettingsSlice {
-  return {
-    workspaceRoot: settings.workspaceRoot,
-    logRetentionDays: settings.logRetentionDays,
-    permissionMode: settings.permissionMode,
-    uiAutomation: settings.uiAutomation,
-  };
+export function selectWorkspaceRoot(settings: LoadedSettings): string {
+  return settings.workspaceRoot;
 }
 
-export function selectGuardrailSettings(settings: LoadedSettings): GuardrailSettingsSlice {
-  return {
-    agentMode: settings.agentMode,
-    maxSteps: settings.maxSteps,
-    maxCostUsd: settings.maxCostUsd,
-    maxWallClockMs: settings.maxWallClockMs,
-  };
+export function selectLogRetentionDays(settings: LoadedSettings): number {
+  return settings.logRetentionDays;
+}
+
+export function selectPermissionMode(settings: LoadedSettings): LoadedSettings["permissionMode"] {
+  return settings.permissionMode;
+}
+
+export function selectUiAutomation(settings: LoadedSettings): boolean {
+  return settings.uiAutomation;
+}
+
+export function selectAgentMode(settings: LoadedSettings): LoadedSettings["agentMode"] {
+  return settings.agentMode;
+}
+
+export function selectMaxSteps(settings: LoadedSettings): number {
+  return settings.maxSteps;
+}
+
+export function selectMaxCostUsd(settings: LoadedSettings): number {
+  return settings.maxCostUsd;
+}
+
+export function selectMaxWallClockMs(settings: LoadedSettings): number {
+  return settings.maxWallClockMs;
 }
 
 export function selectHasPersistedApprovals(settings: LoadedSettings): boolean {
