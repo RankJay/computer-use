@@ -9,6 +9,7 @@ import { SettingsPageSkeleton } from "@/features/settings/SettingsPageSkeleton";
 import { isMacOsClient } from "@/lib/platform";
 import { ensureSecretsReady, settingsKeys } from "@/lib/settings/queries";
 
+import { AccountSettingsNav } from "./AccountSettingsNav";
 import { ApiKeysSettings } from "./ApiKeysSettings";
 import { MaintenanceSettings } from "./MaintenanceSettings";
 import { ModelProviderSettings } from "./ModelProviderSettings";
@@ -22,6 +23,7 @@ function SettingsSections() {
 
   return (
     <div className="flex flex-col gap-8">
+      <AccountSettingsNav />
       <GeneralSettings />
       {isMacOsClient() ? <MacOsPermissionsSettings /> : null}
       <ApiKeysSettings />

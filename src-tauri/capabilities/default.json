@@ -5,8 +5,10 @@
   "windows": ["main"],
   "permissions": [
     "core:default",
+    "core:event:default",
     "core:window:allow-minimize",
     "opener:default",
+    "deep-link:default",
     "window-state:default",
     "store:default",
     "stronghold:default",
@@ -18,7 +20,8 @@
       "identifier": "http:default",
       "allow": [
         { "url": "https://api.anthropic.com/**" },
-        { "url": "https://api.openai.com/**" }
+        { "url": "https://api.openai.com/**" },
+        { "url": "http://localhost:8000/**" }
       ]
     }
   ]

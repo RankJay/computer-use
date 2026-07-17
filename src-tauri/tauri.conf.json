@@ -45,5 +45,12 @@
       "hardenedRuntime": true,
       "entitlements": "./Entitlements.plist"
     }
+  },
+  "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": ["actuate"]
+      }
+    }
   }
 }

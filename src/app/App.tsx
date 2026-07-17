@@ -3,12 +3,14 @@ import { BrowserRouter, Route, Routes, useParams } from "react-router-dom";
 
 import { RouteErrorBoundary } from "@/components/boundaries/ErrorBoundary";
 
+import { DeepLinkBootstrap } from "./DeepLinkBootstrap";
 import HomePage from "./pages/home";
 import { AppQueryProvider } from "./providers/QueryProvider";
 import { RouteChunkFallback } from "./route-chunk-fallback";
 
 const HistoryPage = lazy(() => import("./pages/history"));
 const SettingsPage = lazy(() => import("./pages/settings"));
+const AccountPage = lazy(() => import("./pages/account"));
 
 function HomeRoute(): ReactElement {
   const { chatId } = useParams<{ chatId?: string }>();
@@ -32,10 +34,12 @@ function App() {
   return (
     <AppQueryProvider>
       <BrowserRouter>
+        <DeepLinkBootstrap />
         <Routes>
           <Route path="/" element={<HomeRoute />} />
           <Route path="/chat/:chatId" element={<HomeRoute />} />
           <Route path="/settings" element={<LazyRoute page={<SettingsPage />} />} />
+          <Route path="/settings/account" element={<LazyRoute page={<AccountPage />} />} />
           <Route path="/history" element={<LazyRoute page={<HistoryPage />} />} />
         </Routes>
       </BrowserRouter>

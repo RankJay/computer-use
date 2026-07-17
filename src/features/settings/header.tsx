@@ -2,17 +2,31 @@ import { ArrowLeft } from "lucide-react";
 import { useCallback, type ReactElement } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
-export function SettingsPageHeader(): ReactElement {
+type SettingsPageHeaderProps = {
+  title?: string;
+  /** Parent route for nested settings pages (e.g. Account → Settings). */
+  backTo?: string;
+};
+
+export function SettingsPageHeader({
+  title = "Settings",
+  backTo,
+}: SettingsPageHeaderProps): ReactElement {
   const navigate = useNavigate();
   const location = useLocation();
 
   const goBack = useCallback((): void => {
+    if (backTo) {
+      // Replace Account with Settings so history stays […, settings] — one back exits.
+      navigate(backTo, { replace: true });
+      return;
+    }
     if (location.key === "default") {
       navigate("/");
       return;
     }
     navigate(-1);
-  }, [location.key, navigate]);
+  }, [backTo, location.key, navigate]);
 
   return (
     <header className="flex w-full relative shrink-0 select-none items-center justify-between p-4">
@@ -25,7 +39,7 @@ export function SettingsPageHeader(): ReactElement {
         >
           <ArrowLeft className="size-4 text-[#3F3F3F] transition-[color,transform] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] hover:text-[#9c9c9c] active:scale-[0.95] active:text-[#aeaeae] motion-reduce:transition-none" />
         </button>
-        <h1 className="text-base font-[450] shrink-0 tracking-tight text-foreground">Settings</h1>
+        <h1 className="text-base font-[450] shrink-0 tracking-tight text-foreground">{title}</h1>
       </div>
     </header>
   );

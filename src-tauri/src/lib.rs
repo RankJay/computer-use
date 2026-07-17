@@ -181,7 +181,24 @@ fn setup_desktop(app: &mut tauri::App) -> tauri::Result<()> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     #[allow(unused_mut)]
-    let mut builder = tauri::Builder::default()
+    let mut builder = tauri::Builder::default();
+
+    // Single-instance must register first so deep-link argv is forwarded to the running app.
+    #[cfg(desktop)]
+    {
+        builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            // With the `deep-link` feature, the deep-link plugin already emits onOpenUrl.
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.unminimize();
+                commands::window::set_taskbar_visible(&window, true);
+                let _ = window.set_focus();
+            }
+        }));
+    }
+
+    builder = builder
+        .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_dialog::init())
@@ -264,24 +281,15 @@ pub fn run() {
 
     #[cfg(desktop)]
     {
-        builder = builder
-            .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-                if let Some(window) = app.get_webview_window("main") {
-                    let _ = window.show();
-                    let _ = window.unminimize();
-                    commands::window::set_taskbar_visible(&window, true);
-                    let _ = window.set_focus();
-                }
-            }))
-            .plugin(
-                tauri_plugin_window_state::Builder::new()
-                    .skip_initial_state("main")
-                    .with_state_flags(
-                        tauri_plugin_window_state::StateFlags::all()
-                            .difference(tauri_plugin_window_state::StateFlags::DECORATIONS),
-                    )
-                    .build(),
-            );
+        builder = builder.plugin(
+            tauri_plugin_window_state::Builder::new()
+                .skip_initial_state("main")
+                .with_state_flags(
+                    tauri_plugin_window_state::StateFlags::all()
+                        .difference(tauri_plugin_window_state::StateFlags::DECORATIONS),
+                )
+                .build(),
+        );
     }
 
     builder
@@ -306,6 +314,13 @@ pub fn run() {
                 .plugin(tauri_plugin_stronghold::Builder::with_argon2(&salt_path).build())?;
 
             app.manage(SnapshotStore::default());
+
+            // Dev / unpackaged: associate schemes with this executable on Linux/Windows.
+            #[cfg(any(windows, target_os = "linux"))]
+            {
+                use tauri_plugin_deep_link::DeepLinkExt;
+                let _ = app.deep_link().register_all();
+            }
 
             #[cfg(desktop)]
             setup_desktop(app)?;
