@@ -7,8 +7,14 @@ import {
 } from "ai";
 
 import type { RunStatus } from "../events";
-import type { SessionProjection } from "../projection";
 import type { AgentMessageRowData, AgentTranscriptRow } from "../rows";
+
+export type DisplayRowsInput = {
+  readonly rows: readonly AgentTranscriptRow[];
+  readonly status: RunStatus;
+  readonly taskId: string | null;
+  readonly streamingMessageId: string | null;
+};
 
 function isActiveStatus(status: RunStatus): boolean {
   return status === "running" || status === "streaming" || status === "waiting_permission";
@@ -60,13 +66,61 @@ function findLastUserRowIndex(rows: readonly AgentTranscriptRow[]): number {
   return -1;
 }
 
+const thinkingMarkers = new Map<string, AgentTranscriptRow>();
+
+function thinkingMarkerFor(taskId: string): AgentTranscriptRow {
+  const cached = thinkingMarkers.get(taskId);
+  if (cached) return cached;
+  const marker: AgentTranscriptRow = {
+    type: "marker",
+    id: `live-thinking-${taskId}`,
+    text: "Thinking…",
+    live: true,
+    status: true,
+  };
+  thinkingMarkers.set(taskId, marker);
+  return marker;
+}
+
+type DeriveCache = {
+  rows: readonly AgentTranscriptRow[];
+  status: RunStatus;
+  taskId: string | null;
+  streamingMessageId: string | null;
+  result: readonly AgentTranscriptRow[];
+};
+
+let lastDerive: DeriveCache | null = null;
+
 /**
  * Presentation-plane row list for AgentTranscript.
  * Never mutates SessionProjection — live may insert a synthetic Thinking… marker.
+ * Result identity is stable when inputs are Object.is-equal.
  */
-export function deriveDisplayRows(projection: SessionProjection): readonly AgentTranscriptRow[] {
-  const { rows, status, taskId, streamingMessageId } = projection;
+export function deriveDisplayRows(input: DisplayRowsInput): readonly AgentTranscriptRow[] {
+  const { rows, status, taskId, streamingMessageId } = input;
 
+  if (
+    lastDerive &&
+    Object.is(lastDerive.rows, rows) &&
+    lastDerive.status === status &&
+    lastDerive.taskId === taskId &&
+    lastDerive.streamingMessageId === streamingMessageId
+  ) {
+    return lastDerive.result;
+  }
+
+  const result = computeDisplayRows(rows, status, taskId, streamingMessageId);
+  lastDerive = { rows, status, taskId, streamingMessageId, result };
+  return result;
+}
+
+function computeDisplayRows(
+  rows: readonly AgentTranscriptRow[],
+  status: RunStatus,
+  taskId: string | null,
+  streamingMessageId: string | null,
+): readonly AgentTranscriptRow[] {
   if (hasAuthoredActivityRows(rows)) {
     return rows;
   }
@@ -89,13 +143,7 @@ export function deriveDisplayRows(projection: SessionProjection): readonly Agent
     return rows;
   }
 
-  const marker: AgentTranscriptRow = {
-    type: "marker",
-    id: `live-thinking-${taskId}`,
-    text: "Thinking…",
-    live: true,
-    status: true,
-  };
+  const marker = thinkingMarkerFor(taskId);
 
   if (assistantRow) {
     const index = rows.findIndex((row) => row.id === assistantRow.id);

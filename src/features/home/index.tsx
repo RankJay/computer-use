@@ -1,4 +1,4 @@
-﻿import { memo, useCallback, useEffect, type ReactElement } from "react";
+﻿import { memo, useCallback, useEffect, useMemo, type ReactElement } from "react";
 
 import { SuspenseQueryBoundary } from "@/components/boundaries/ErrorBoundary";
 import { Container, Item } from "@/components/motion/stagger";
@@ -7,75 +7,41 @@ import type { PermissionDecision } from "@/lib/session";
 import { settingsKeys } from "@/lib/settings/queries";
 
 import { AgentTranscript } from "./chat/AgentTranscript";
-import { TaskPromptComposer } from "./Composer";
+import { ComposerContextMeter, TaskPromptComposer } from "./Composer";
 import { HomePageHeader } from "./header";
 import { HomePageSkeleton } from "./HomePageSkeleton";
 import {
+  useAgentContextUsage,
   useAgentInputDisabled,
   useAgentSessionControls,
   useAgentSessionStore,
   useAgentTranscript,
-  type AgentSessionControls,
   type BatchedEngine,
 } from "./hooks/use-agent-session";
 import { useChatPersistence } from "./hooks/use-chat-persistence";
 import { SessionStatusBar } from "./SessionStatusBar";
 
-const HomeComposer = memo(function HomeComposer({
-  controls,
+const ContextUsageIsland = memo(function ContextUsageIsland({
+  store,
 }: {
-  readonly controls: AgentSessionControls;
+  readonly store: BatchedEngine;
 }): ReactElement {
+  const contextUsage = useAgentContextUsage(store);
   return (
-    <TaskPromptComposer
-      onSubmit={(prompt) => {
-        void controls.start(prompt);
-      }}
-      onCancel={() => {
-        void controls.cancel();
-      }}
-      onRetry={
-        controls.canRetry
-          ? () => {
-              void controls.retry();
-            }
-          : undefined
-      }
-      inputDisabled={controls.inputDisabled}
-      cancelVisible={controls.cancelVisible}
-      canRetry={controls.canRetry}
-      modelId={controls.modelId}
-      onModelChange={controls.onModelChange}
-      contextUsage={controls.contextUsage}
+    <ComposerContextMeter
+      maxTokens={contextUsage.maxTokens}
+      modelId={contextUsage.modelId}
+      usage={contextUsage.usage}
+      usedTokens={contextUsage.usedTokens}
     />
   );
 });
 
-const HomeChatComposer = memo(function HomeChatComposer({
-  controls,
-}: {
-  readonly controls: AgentSessionControls;
-}): ReactElement {
-  return (
-    <div className="flex min-h-12 flex-col gap-2 p-2">
-      <SessionStatusBar
-        pendingPermissions={controls.pendingPermissions}
-        canResolvePermission={controls.canResolvePermission}
-        failure={controls.failure}
-      />
-      <HomeComposer controls={controls} />
-    </div>
-  );
-});
-
-function HomePageBody({
+const TranscriptIsland = memo(function TranscriptIsland({
   store,
-  chatId,
 }: {
   readonly store: BatchedEngine;
-  readonly chatId: string | undefined;
 }): ReactElement {
-  useChatPersistence(store, chatId);
   const { rows, streamingMessageId, pendingPermissions } = useAgentTranscript(store);
   const controls = useAgentSessionControls(store);
 
@@ -93,30 +59,76 @@ function HomePageBody({
     [controls.retryFromMessage],
   );
 
-  // Settings (incl. model id) are loaded before this mounts; reveal window after paint.
+  const empty = rows.length === 0;
+
+  return (
+    <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+      {empty ? (
+        <Container className="pointer-events-none absolute inset-0 z-10 flex min-h-0 flex-1 flex-col justify-center px-5">
+          <Item className="text-[22px] font-[445] text-foreground">Welcome to Actuate</Item>
+          <Item className="text-muted-foreground text-xl">Ready to run your errands?</Item>
+        </Container>
+      ) : null}
+      <AgentTranscript
+        rows={rows}
+        streamingMessageId={streamingMessageId}
+        pendingPermissions={pendingPermissions}
+        permissionMode={controls.permissionMode}
+        onResolvePermission={onResolvePermission}
+        canRetryMessage={controls.canSubmit}
+        onRetryMessage={onRetryMessage}
+      />
+    </div>
+  );
+});
+
+const ComposerIsland = memo(function ComposerIsland({
+  store,
+}: {
+  readonly store: BatchedEngine;
+}): ReactElement {
+  const controls = useAgentSessionControls(store);
+  const contextSlot = useMemo(() => <ContextUsageIsland store={store} />, [store]);
+
+  return (
+    <div className="flex min-h-12 flex-col gap-2 p-2">
+      <SessionStatusBar
+        pendingPermissions={controls.pendingPermissions}
+        canResolvePermission={controls.canResolvePermission}
+        failure={controls.failure}
+      />
+      <TaskPromptComposer
+        onSubmit={controls.start}
+        onCancel={controls.cancel}
+        onRetry={controls.canRetry ? controls.retry : undefined}
+        inputDisabled={controls.inputDisabled}
+        cancelVisible={controls.cancelVisible}
+        canRetry={controls.canRetry}
+        modelId={controls.modelId}
+        onModelChange={controls.onModelChange}
+        contextSlot={contextSlot}
+      />
+    </div>
+  );
+});
+
+function HomePageBody({
+  store,
+  chatId,
+}: {
+  readonly store: BatchedEngine;
+  readonly chatId: string | undefined;
+}): ReactElement {
+  useChatPersistence(store, chatId);
+
   useEffect(() => {
     signalAppReady();
   }, []);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      {rows.length === 0 ? (
-        <Container className="flex min-h-0 flex-1 flex-col justify-center px-5">
-          <Item className="text-[22px] font-[445] text-foreground">Welcome to Actuate</Item>
-          <Item className="text-muted-foreground text-xl">Ready to run your errands?</Item>
-        </Container>
-      ) : (
-        <AgentTranscript
-          rows={rows}
-          streamingMessageId={streamingMessageId}
-          pendingPermissions={pendingPermissions}
-          permissionMode={controls.permissionMode}
-          onResolvePermission={onResolvePermission}
-          canRetryMessage={controls.canSubmit}
-          onRetryMessage={onRetryMessage}
-        />
-      )}
-      <HomeChatComposer controls={controls} />
+      <TranscriptIsland store={store} />
+      <ComposerIsland store={store} />
     </div>
   );
 }

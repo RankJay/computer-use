@@ -1,4 +1,4 @@
-import { memo, type ReactElement } from "react";
+import { lazy, memo, Suspense, type ReactElement } from "react";
 
 import {
   MessageScroller,
@@ -10,11 +10,18 @@ import {
 } from "@/components/ui/message-scroller";
 import type { PendingPermission } from "@/lib/session";
 import type { PermissionMode } from "@/lib/settings/types";
+import { cn } from "@/lib/utils";
 
 import { MarkerRow } from "./rows/MarkerRow";
-import { MessageRow } from "./rows/MessageRow";
-import { SpecialRow } from "./rows/SpecialRow";
-import type { AgentTranscriptRow } from "./types";
+import type { AgentMessageRowData, AgentTranscriptRow } from "./types";
+
+/** Heavy rows (markdown / CoT / ai type-guards) — kept off empty-home cold path. */
+const MessageRow = lazy(() =>
+  import("./rows/MessageRow").then((mod) => ({ default: mod.MessageRow })),
+);
+const SpecialRow = lazy(() =>
+  import("./rows/SpecialRow").then((mod) => ({ default: mod.SpecialRow })),
+);
 
 export type AgentTranscriptProps = {
   readonly rows: readonly AgentTranscriptRow[];
@@ -29,6 +36,26 @@ export type AgentTranscriptProps = {
   readonly canRetryMessage?: boolean;
   readonly onRetryMessage?: (messageId: string) => void;
 };
+
+/** Plain-text stand-in while the MessageRow chunk loads — no Streamdown / ai imports. */
+function MessageRowChunkFallback({ row }: { readonly row: AgentMessageRowData }): ReactElement {
+  const text = row.message.parts
+    .flatMap((part) => (part.type === "text" && typeof part.text === "string" ? [part.text] : []))
+    .join("\n\n");
+  const isUser = row.message.role === "user";
+
+  return (
+    <div className={cn(isUser ? "flex justify-end" : "px-2")}>
+      {isUser ? (
+        <div className="text-sm bg-[#161616] px-3 py-2.5 rounded-xl whitespace-pre-wrap text-foreground max-w-[85%]">
+          {text}
+        </div>
+      ) : (
+        <p className="text-sm whitespace-pre-wrap text-foreground font-[350] px-1">{text}</p>
+      )}
+    </div>
+  );
+}
 
 const TranscriptRowView = memo(function TranscriptRowView({
   row,
@@ -56,18 +83,26 @@ const TranscriptRowView = memo(function TranscriptRowView({
       return <MarkerRow row={row} />;
     case "message":
       return (
-        <MessageRow
-          row={row}
-          isStreaming={isStreaming}
-          pendingPermissions={pendingPermissions}
-          permissionMode={permissionMode}
-          onResolvePermission={onResolvePermission}
-          canRetryMessage={canRetryMessage}
-          onRetryMessage={onRetryMessage}
-        />
+        <Suspense fallback={<MessageRowChunkFallback row={row} />}>
+          <MessageRow
+            row={row}
+            isStreaming={isStreaming}
+            pendingPermissions={pendingPermissions}
+            permissionMode={permissionMode}
+            onResolvePermission={onResolvePermission}
+            canRetryMessage={canRetryMessage}
+            onRetryMessage={onRetryMessage}
+          />
+        </Suspense>
       );
     default:
-      return <SpecialRow row={row} />;
+      return (
+        <Suspense
+          fallback={<div aria-hidden className="h-8 animate-pulse rounded-lg bg-[#252525]" />}
+        >
+          <SpecialRow row={row} />
+        </Suspense>
+      );
   }
 });
 

@@ -29,10 +29,10 @@ export function useDeleteChat() {
   return useMutation({
     mutationFn: (id: string) => persistence.remove(id),
     onSuccess: (_void, id) => {
+      // Optimistic cache update only — skip invalidate to avoid isFetching list thrash.
       queryClient.setQueryData<ChatSummary[]>(chatsKeys.list(), (current) =>
         current?.filter((chat) => chat.id !== id),
       );
-      void queryClient.invalidateQueries({ queryKey: chatsKeys.list() });
     },
     onError: () => {
       toast.error("Could not delete chat. Try again.");

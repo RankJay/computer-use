@@ -1,11 +1,11 @@
-import { type ReactElement } from "react";
+import { useCallback, type ReactElement } from "react";
 
 import { SuspenseQueryBoundary } from "@/components/boundaries/ErrorBoundary";
 import { ChatRow } from "@/features/history/ChatRow";
 import { HistoryPageHeader } from "@/features/history/header";
 import { HistoryPageSkeleton } from "@/features/history/HistoryPageSkeleton";
 import { groupChatsByRecency, type ChatsByRecency } from "@/lib/chats/grouping";
-import { chatsKeys, useChatsList } from "@/lib/chats/queries";
+import { chatsKeys, useChatsList, useDeleteChat } from "@/lib/chats/queries";
 import type { ChatSummary } from "@/lib/chats/types";
 
 const RECENCY_SECTIONS: readonly { key: keyof ChatsByRecency; label: string }[] = [
@@ -18,6 +18,13 @@ const RECENCY_SECTIONS: readonly { key: keyof ChatsByRecency; label: string }[] 
 
 function HistoryChatList(): ReactElement {
   const { data: chats } = useChatsList();
+  const { mutate: deleteChat, isPending, variables: deletingId } = useDeleteChat();
+  const onDelete = useCallback(
+    (id: string) => {
+      deleteChat(id);
+    },
+    [deleteChat],
+  );
 
   if (chats.length === 0) {
     return (
@@ -45,7 +52,14 @@ function HistoryChatList(): ReactElement {
             <h2 className="px-4 text-sm text-foreground">{label}</h2>
             <div className="divide-y divide-[#252525] overflow-hidden rounded-xl bg-[#141414] text-foreground shadow-layered">
               {sectionChats.map((chat) => (
-                <ChatRow key={chat.id} chat={chat} />
+                <ChatRow
+                  key={chat.id}
+                  id={chat.id}
+                  title={chat.title}
+                  updatedAt={chat.updatedAt}
+                  deleting={isPending && deletingId === chat.id}
+                  onDelete={onDelete}
+                />
               ))}
             </div>
           </section>

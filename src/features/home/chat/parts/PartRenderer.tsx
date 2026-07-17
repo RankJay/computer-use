@@ -50,6 +50,16 @@ export const PartRenderer = memo(function PartRenderer({
   );
 });
 
+function lastStreamingTextPartIndex(parts: UIMessage["parts"]): number {
+  for (let i = parts.length - 1; i >= 0; i -= 1) {
+    const part = parts[i];
+    if (part && isTextUIPart(part)) {
+      return i;
+    }
+  }
+  return -1;
+}
+
 function renderMessageParts(
   message: UIMessage,
   isStreaming: boolean,
@@ -65,6 +75,7 @@ function renderMessageParts(
 ): ReactNode[] {
   const elements: ReactNode[] = [];
   let index = 0;
+  const activeTextIndex = isStreaming ? lastStreamingTextPartIndex(message.parts) : -1;
 
   while (index < message.parts.length) {
     const part = message.parts[index];
@@ -114,7 +125,7 @@ function renderMessageParts(
           key={`text-${index}`}
           part={part}
           messageRole={message.role}
-          isAnimating={isStreaming}
+          isAnimating={isStreaming && index === activeTextIndex}
         />,
       );
       index += 1;

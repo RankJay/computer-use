@@ -1,63 +1,38 @@
 import type { ReactElement } from "react";
 
-import { ContentSkeleton } from "@/components/ui/content-skeleton";
-import { ChatRow } from "@/features/history/ChatRow";
-import type { ChatSummary } from "@/lib/chats/types";
+const SECTION_ROW_COUNTS = [3, 2] as const;
+const SECTION_LABELS = ["Today", "Yesterday"] as const;
 
-const HISTORY_SKELETON_SECTIONS: readonly {
-  label: string;
-  chats: readonly ChatSummary[];
-}[] = [
-  {
-    label: "Today",
-    chats: [
-      {
-        id: "skeleton-today-1",
-        title: "Scaffold project structure and agents",
-        updatedAt: Date.now() - 1000 * 60 * 12,
-      },
-      {
-        id: "skeleton-today-2",
-        title: "Wire session timeline and permissions",
-        updatedAt: Date.now() - 1000 * 60 * 45,
-      },
-      {
-        id: "skeleton-today-3",
-        title: "Polish history and settings loading",
-        updatedAt: Date.now() - 1000 * 60 * 90,
-      },
-    ],
-  },
-  {
-    label: "Yesterday",
-    chats: [
-      {
-        id: "skeleton-yesterday-1",
-        title: "Explore capability catalog layout",
-        updatedAt: Date.now() - 1000 * 60 * 60 * 26,
-      },
-      {
-        id: "skeleton-yesterday-2",
-        title: "Debug native invoke error mapping",
-        updatedAt: Date.now() - 1000 * 60 * 60 * 30,
-      },
-    ],
-  },
-];
+function SkeletonBar({ className }: { readonly className: string }): ReactElement {
+  return <div className={`animate-pulse rounded bg-[#252525] ${className}`} />;
+}
 
+function SkeletonChatRow(): ReactElement {
+  return (
+    <div className="flex items-center gap-3 px-4 py-3.5">
+      <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+        <SkeletonBar className="h-3.5 w-3/5" />
+        <SkeletonBar className="h-3 w-1/4" />
+      </div>
+      <SkeletonBar className="size-6 shrink-0 rounded-md" />
+    </div>
+  );
+}
+
+/** Static placeholders only — no ChatRow, mutations, or ContentSkeleton measure. */
 export function HistoryPageSkeleton(): ReactElement {
   return (
-    <ContentSkeleton loading className="flex flex-col gap-8 pt-1">
-      {HISTORY_SKELETON_SECTIONS.map((section) => (
-        <section key={section.label} className="flex flex-col gap-3">
-          <h2 className="px-4 text-sm text-foreground">{section.label}</h2>
-          <div className="divide-y divide-[#252525] overflow-hidden rounded-xl bg-[#141414] text-foreground shadow-layered">
-            {section.chats.map((chat) => (
-              <ChatRow key={chat.id} chat={chat} />
+    <div className="flex flex-col gap-8 pt-1" aria-hidden>
+      {SECTION_LABELS.map((label, sectionIndex) => (
+        <section key={label} className="flex flex-col gap-3">
+          <SkeletonBar className="mx-4 h-3.5 w-16" />
+          <div className="divide-y divide-[#252525] overflow-hidden rounded-xl bg-[#141414] shadow-layered">
+            {Array.from({ length: SECTION_ROW_COUNTS[sectionIndex] ?? 2 }, (_, i) => (
+              <SkeletonChatRow key={i} />
             ))}
           </div>
         </section>
       ))}
-    </ContentSkeleton>
+    </div>
   );
 }

@@ -1,17 +1,18 @@
 import type { ProduceRun } from "../control/run-controller";
-import { createDemoReplayProducer } from "./demo-replay";
-import { createLiveRunProducer } from "./live-run";
 
-/** Select demo vs live producer from config.settings.agentMode — not inside RunController. */
+/**
+ * Select demo vs live producer from config.settings.agentMode.
+ * Dynamic import keeps the AI SDK / demo fixtures off the cold-start graph.
+ */
 export function createProduceRun(): ProduceRun {
-  const demo = createDemoReplayProducer();
-  const live = createLiveRunProducer();
-
   return async (ctx) => {
     if (ctx.config.settings.agentMode === "demo") {
-      await demo(ctx);
+      const { createDemoReplayProducer } = await import("./demo-replay");
+      await createDemoReplayProducer()(ctx);
       return;
     }
-    await live(ctx);
+
+    const { createLiveRunProducer } = await import("./live-run");
+    await createLiveRunProducer()(ctx);
   };
 }

@@ -3,6 +3,10 @@ import { useEffect, type ReactNode } from "react";
 
 import { queryClient } from "@/app/query-client";
 import { platformCapabilitiesQueryOptions } from "@/lib/native/platform-queries";
+import { settingsQueryOptions } from "@/lib/settings/queries";
+
+// Overlap settings store I/O with React mount / remaining module eval.
+void queryClient.prefetchQuery(settingsQueryOptions());
 
 function PlatformCapabilitiesBootstrap(): null {
   useEffect(() => {

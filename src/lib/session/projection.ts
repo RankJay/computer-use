@@ -63,6 +63,9 @@ export const EMPTY_SESSION_USAGE: SessionUsage = {
   maxTokens: getDefaultAgentModel().contextWindowTokens,
 };
 
+/** Shared empty pending list — fold clears must reuse this, never `[]`. */
+export const EMPTY_PENDING_PERMISSIONS: PendingPermission[] = [];
+
 export function createEmptySessionProjection(): SessionProjection {
   return {
     taskId: null,
@@ -70,7 +73,7 @@ export function createEmptySessionProjection(): SessionProjection {
     failure: null,
     rows: [],
     chatMessages: [],
-    pendingPermissions: [],
+    pendingPermissions: EMPTY_PENDING_PERMISSIONS,
     usage: { ...EMPTY_SESSION_USAGE },
     budget: { ...EMPTY_SESSION_BUDGET },
     streamingMessageId: null,

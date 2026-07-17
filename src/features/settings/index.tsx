@@ -1,16 +1,25 @@
+import { useEffect } from "react";
+import { toast } from "sonner";
+
 import { SuspenseQueryBoundary } from "@/components/boundaries/ErrorBoundary";
 import { GeneralSettings } from "@/features/settings/GeneralSettings";
 import { SettingsPageHeader } from "@/features/settings/header";
 import { MacOsPermissionsSettings } from "@/features/settings/MacOsPermissionsSettings";
 import { SettingsPageSkeleton } from "@/features/settings/SettingsPageSkeleton";
 import { isMacOsClient } from "@/lib/platform";
-import { settingsKeys } from "@/lib/settings/queries";
+import { ensureSecretsReady, settingsKeys } from "@/lib/settings/queries";
 
 import { ApiKeysSettings } from "./ApiKeysSettings";
 import { MaintenanceSettings } from "./MaintenanceSettings";
 import { ModelProviderSettings } from "./ModelProviderSettings";
 
 function SettingsSections() {
+  useEffect(() => {
+    void ensureSecretsReady().catch(() => {
+      toast.error("Could not load API keys from the vault.");
+    });
+  }, []);
+
   return (
     <div className="flex flex-col gap-8">
       <GeneralSettings />
