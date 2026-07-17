@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from "r
 import { toast } from "sonner";
 
 import {
-  createProduceRun,
   createSessionEngine,
   deriveDisplayRows,
   deriveSessionControls,
@@ -18,6 +17,8 @@ import {
   type SessionFailure,
   type SessionProjection,
 } from "@/lib/session";
+import { createProduceRun } from "@/lib/session/producers/select-producer";
+import { DEFAULT_SECRETS } from "@/lib/settings/defaults";
 import {
   ensureSecretsReady,
   settingsQueryOptions,
@@ -267,7 +268,9 @@ export function useAgentSessionControls(store: BatchedEngine): AgentSessionContr
         toast.error("Set a workspace root in Settings before running live.");
         return;
       }
-      const secrets = await ensureSecretsReady();
+      // Demo never needs the vault — don't stall first send on Stronghold.
+      const secrets =
+        appSettings.agentMode === "live" ? await ensureSecretsReady() : { ...DEFAULT_SECRETS };
       const projection = store.engine.getProjection();
       await store.engine.start({
         prompt,
@@ -291,7 +294,8 @@ export function useAgentSessionControls(store: BatchedEngine): AgentSessionContr
         toast.error("Set a workspace root in Settings before running live.");
         return;
       }
-      const secrets = await ensureSecretsReady();
+      const secrets =
+        appSettings.agentMode === "live" ? await ensureSecretsReady() : { ...DEFAULT_SECRETS };
       await store.engine.retryFromMessage(assistantMessageId, {
         modelId: appSettings.selectedModelId,
         settings: appSettings,

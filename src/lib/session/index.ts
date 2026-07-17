@@ -87,6 +87,6 @@ export { isLiveWorkspaceReady } from "./live-workspace";
 
 export { createDemoPayloads, createTestDemoProducer } from "./fixtures/demo-payloads";
 
-export { createDemoReplayProducer } from "./producers/demo-replay";
-export { createLiveRunProducer } from "./producers/live-run";
+// Demo/live producers are loaded via dynamic import inside createProduceRun —
+// do not statically re-export them from this barrel (defeats cold-start splitting).
 export { createProduceRun } from "./producers/select-producer";

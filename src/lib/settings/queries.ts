@@ -93,9 +93,11 @@ export function useUpdateSettings() {
   return useMutation({
     mutationFn: async (patch: Partial<AppSettings>): Promise<LoadedSettings> => {
       const current = await client.ensureQueryData(settingsQueryOptions());
+      // Never write placeholder DEFAULT_SECRETS into cache from a pre-hydration patch.
+      const secrets = await ensureSecretsReady();
       const nextSettings = mergeSettingsPatch(stripSecrets(current), patch);
       await persistence.saveSettings(nextSettings);
-      return { ...nextSettings, secrets: current.secrets };
+      return { ...nextSettings, secrets };
     },
     onSuccess: (next) => {
       client.setQueryData(settingsKeys.loaded(), next);
