@@ -4,6 +4,7 @@ import { useCallback, type ReactElement } from "react";
 import { Link } from "react-router-dom";
 
 import { queryClient } from "@/app/query-client";
+import { useAppVersion } from "@/lib/app-version";
 import { chatsListQueryOptions } from "@/lib/chats/queries";
 import { settingsQueryOptions } from "@/lib/settings/queries";
 
@@ -18,6 +19,8 @@ type HomePageHeaderProps = {
 };
 
 export function HomePageHeader({ navDisabled }: HomePageHeaderProps): ReactElement {
+  const version = useAppVersion();
+
   const minimize = useCallback(async (): Promise<void> => {
     await getCurrentWindow().minimize();
   }, []);
@@ -34,7 +37,7 @@ export function HomePageHeader({ navDisabled }: HomePageHeaderProps): ReactEleme
     <header className="flex w-full relative shrink-0 select-none items-center justify-between p-4 px-5">
       <div className="flex items-baseline gap-2.5">
         <h1 className="text-base font-[450] shrink-0 tracking-tight text-foreground">Actuate</h1>
-        <span className="text-[13px] text-foreground/50">0.1.0</span>
+        {version ? <span className="text-[13px] text-foreground/50">{version}</span> : null}
       </div>
       <div className="flex items-center gap-4">
         <Link

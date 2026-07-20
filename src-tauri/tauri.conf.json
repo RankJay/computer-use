@@ -33,6 +33,7 @@
   "bundle": {
     "active": true,
     "targets": ["app", "dmg", "nsis"],
+    "createUpdaterArtifacts": true,
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -50,6 +51,13 @@
     "deep-link": {
       "desktop": {
         "schemes": ["actuate"]
+      }
+    },
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEVCQTkzQjMzRTY0QjVCNTIKUldSU1cwdm1NenVwNnpXYXkwZHFEYTJvWGNTZHhNYTc0MEFidVcvOVUrckJxdWxjRWRmRXpERDUK",
+      "endpoints": ["https://updates.actuate.app/desktop/latest.json"],
+      "windows": {
+        "installMode": "passive"
       }
     }
   }

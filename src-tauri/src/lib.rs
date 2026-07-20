@@ -36,11 +36,19 @@ fn apply_frameless_window(window: &tauri::WebviewWindow) {
     let _ = window.set_shadow(false);
 }
 
+/// Ask the frontend to quit so an armed update can install first.
+#[cfg(desktop)]
+fn request_app_quit(app: &tauri::AppHandle) {
+    use tauri::Emitter;
+    let _ = app.emit("quit-requested", ());
+}
+
 /// macOS menu bar: App menu (About/Hide/Quit) + Edit (clipboard shortcuts for WKWebView).
 #[cfg(all(desktop, target_os = "macos"))]
 fn install_macos_menu(app: &tauri::App) -> tauri::Result<()> {
-    use tauri::menu::{MenuBuilder, SubmenuBuilder};
+    use tauri::menu::{MenuBuilder, MenuItem, SubmenuBuilder};
 
+    let quit = MenuItem::with_id(app, "quit", "Quit Actuate", true, Some("cmd+q"))?;
     let app_menu = SubmenuBuilder::new(app, "Actuate")
         .about(None)
         .separator()
@@ -50,7 +58,7 @@ fn install_macos_menu(app: &tauri::App) -> tauri::Result<()> {
         .hide_others()
         .show_all()
         .separator()
-        .quit()
+        .item(&quit)
         .build()?;
 
     let edit = SubmenuBuilder::new(app, "Edit")
@@ -65,6 +73,12 @@ fn install_macos_menu(app: &tauri::App) -> tauri::Result<()> {
 
     let menu = MenuBuilder::new(app).item(&app_menu).item(&edit).build()?;
     let _ = app.set_menu(menu);
+
+    app.on_menu_event(|app, event| {
+        if event.id().as_ref() == "quit" {
+            request_app_quit(app);
+        }
+    });
     Ok(())
 }
 
@@ -118,7 +132,7 @@ fn setup_desktop(app: &mut tauri::App) -> tauri::Result<()> {
                     let _ = window.hide();
                     set_taskbar_visible(&window, false);
                 }
-                "quit" => app.exit(0),
+                "quit" => request_app_quit(app),
                 _ => {}
             }
         })
@@ -181,20 +195,22 @@ fn setup_desktop(app: &mut tauri::App) -> tauri::Result<()> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     #[allow(unused_mut)]
-    let mut builder = tauri::Builder::default();
+    let mut builder = tauri::Builder::default().plugin(tauri_plugin_process::init());
 
     // Single-instance must register first so deep-link argv is forwarded to the running app.
     #[cfg(desktop)]
     {
-        builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-            // With the `deep-link` feature, the deep-link plugin already emits onOpenUrl.
-            if let Some(window) = app.get_webview_window("main") {
-                let _ = window.show();
-                let _ = window.unminimize();
-                commands::window::set_taskbar_visible(&window, true);
-                let _ = window.set_focus();
-            }
-        }));
+        builder = builder
+            .plugin(tauri_plugin_updater::Builder::new().build())
+            .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+                // With the `deep-link` feature, the deep-link plugin already emits onOpenUrl.
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.show();
+                    let _ = window.unminimize();
+                    commands::window::set_taskbar_visible(&window, true);
+                    let _ = window.set_focus();
+                }
+            }));
     }
 
     builder = builder

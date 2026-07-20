@@ -25,6 +25,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   maxCostUsd: 5,
   maxWallClockMs: 900_000,
   persistedApprovals: [],
+  installUpdateOnClose: false,
 };
 
 export const DEFAULT_SECRETS: AppSecrets = {

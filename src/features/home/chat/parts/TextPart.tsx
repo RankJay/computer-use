@@ -23,11 +23,17 @@ export const TextPart = memo(function TextPart({
     );
   }
 
-  const bubbleVariant = part.text.startsWith("Error") ? "destructive" : "ghost";
+  const isError = part.text.startsWith("Error");
 
   return (
-    <Bubble variant={bubbleVariant} align="start" className="text-foreground px-1 font-[350]">
-      <BubbleContent>
+    <Bubble
+      variant={isError ? "destructive" : "ghost"}
+      align="start"
+      className={
+        isError ? "w-full max-w-full text-foreground font-[350]" : "text-foreground px-1 font-[350]"
+      }
+    >
+      <BubbleContent className={isError ? "w-full" : undefined}>
         <MessageResponse isAnimating={isAnimating}>{part.text}</MessageResponse>
       </BubbleContent>
     </Bubble>

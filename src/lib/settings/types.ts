@@ -19,6 +19,8 @@ export type AppSettings = {
   maxCostUsd: number;
   maxWallClockMs: number;
   persistedApprovals: string[];
+  /** When true, verified updates apply on quit with no ready dialog. */
+  installUpdateOnClose: boolean;
 };
 
 export type AppSecrets = {

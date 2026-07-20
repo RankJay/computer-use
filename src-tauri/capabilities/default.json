@@ -14,6 +14,7 @@
     "stronghold:default",
     "dialog:default",
     "notification:default",
+    "process:default",
     "sql:default",
     "sql:allow-execute",
     {

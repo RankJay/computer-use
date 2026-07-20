@@ -40,6 +40,10 @@ export function selectHasPersistedApprovals(settings: LoadedSettings): boolean {
   return settings.persistedApprovals.length > 0;
 }
 
+export function selectInstallUpdateOnClose(settings: LoadedSettings): boolean {
+  return settings.installUpdateOnClose;
+}
+
 export const selectSecretIsSaved = {
   anthropicApiKey: (settings: LoadedSettings) => settings.secrets.anthropicApiKey.length > 0,
   openaiApiKey: (settings: LoadedSettings) => settings.secrets.openaiApiKey.length > 0,

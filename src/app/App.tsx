@@ -7,6 +7,7 @@ import { DeepLinkBootstrap } from "./DeepLinkBootstrap";
 import HomePage from "./pages/home";
 import { AppQueryProvider } from "./providers/QueryProvider";
 import { RouteChunkFallback } from "./route-chunk-fallback";
+import { UpdaterBootstrap } from "./UpdaterBootstrap";
 
 const HistoryPage = lazy(() => import("./pages/history"));
 const SettingsPage = lazy(() => import("./pages/settings"));
@@ -35,6 +36,7 @@ function App() {
     <AppQueryProvider>
       <BrowserRouter>
         <DeepLinkBootstrap />
+        <UpdaterBootstrap />
         <Routes>
           <Route path="/" element={<HomeRoute />} />
           <Route path="/chat/:chatId" element={<HomeRoute />} />

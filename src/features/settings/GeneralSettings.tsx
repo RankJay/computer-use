@@ -35,6 +35,7 @@ import {
 import { isMacOsClient } from "@/lib/platform";
 import { useSettingsSelector, useUpdateSettings } from "@/lib/settings/queries";
 import {
+  selectInstallUpdateOnClose,
   selectLogRetentionDays,
   selectPermissionMode,
   selectUiAutomation,
@@ -200,12 +201,33 @@ function UiAutomationRow(): ReactElement {
   );
 }
 
+function InstallUpdateOnCloseRow(): ReactElement {
+  const installUpdateOnClose = useSettingsSelector(selectInstallUpdateOnClose);
+  const { mutate } = useUpdateSettings();
+
+  return (
+    <SettingsRow
+      label="Install updates on close"
+      description="Skip the update dialog and apply verified updates when you quit."
+    >
+      <Switch
+        id="install-update-on-close"
+        checked={installUpdateOnClose}
+        onCheckedChange={(checked) => {
+          mutate({ installUpdateOnClose: checked });
+        }}
+      />
+    </SettingsRow>
+  );
+}
+
 export function GeneralSettings(): ReactElement {
   return (
     <>
       <SettingsSection title="General">
         <WorkspaceRootRow />
         <LogRetentionRow />
+        <InstallUpdateOnCloseRow />
       </SettingsSection>
 
       <SettingsSection title="Permissions">
