@@ -1,6 +1,7 @@
 import type { UIMessage } from "ai";
 
 import type { EntitlementPolicy } from "@/lib/entitlements";
+import type { StandingPolicyDocument } from "@/lib/mandates/types";
 import type { AppSecrets, AppSettings } from "@/lib/settings/types";
 
 import type { RuntimeEventPayload } from "../events";
@@ -30,6 +31,8 @@ export type RunConfig = {
   isRetry?: boolean;
   /** Persist capability approval into settings (once-per-class). */
   persistApproval?: (capability: string) => Promise<void>;
+  /** Mandate standing policy for Capability PermissionPolicy overlay. */
+  standingPolicy?: StandingPolicyDocument | null;
 };
 
 export type ProduceRunContext = {
@@ -43,6 +46,8 @@ export type ProduceRunContext = {
   entitlements?: EntitlementPolicy;
   /** Injected by AttemptHost — desktop lock for UI-automation Capabilities. */
   osLease?: OsLease;
+  /** Mandate standing policy (from AttemptControl packing). */
+  standingPolicy?: StandingPolicyDocument | null;
 };
 
 export type ProduceRun = (ctx: ProduceRunContext) => Promise<void>;
@@ -117,6 +122,7 @@ export function createRunController(deps: RunControllerDeps): RunController {
         append: deps.append,
         escalationPort,
         osLease: deps.osLease,
+        standingPolicy: config.standingPolicy,
       });
     } finally {
       clearActiveRun();

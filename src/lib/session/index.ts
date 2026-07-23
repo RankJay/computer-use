@@ -97,6 +97,15 @@ export {
 } from "./control/attempt-registry";
 
 export {
+  cancelPreviousConcurrencyPolicy,
+  rejectIfBusyConcurrencyPolicy,
+  queueIfBusyConcurrencyPolicy,
+  type ConcurrencyPolicy,
+  type ConcurrencyConflictContext,
+  type ConcurrencyConflictDecision,
+} from "./control/concurrency-policy";
+
+export {
   createOsLease,
   type OsLease,
   type OsLeaseAcquireResult,

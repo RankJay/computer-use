@@ -1,8 +1,10 @@
 /**
  * In-process index of the live Attempt + UI focus pointers.
- * Phase 1 concurrency (cancel-previous) still lives in RunController;
- * this registry records identity so Clients can reattach without owning the loop.
+ * ConcurrencyPolicy is swappable here; Phase 1 RunController still cancel-previous
+ * for interactive starts. Triggers use evaluateTriggerWake + this policy.
  */
+
+import { cancelPreviousConcurrencyPolicy, type ConcurrencyPolicy } from "./concurrency-policy";
 
 export type LiveAttempt = {
   mandateId: string;
@@ -17,14 +19,19 @@ export type AttemptRegistry = {
   setLiveChatId: (chatId: string | null) => void;
   getFocusedMandateId: () => string | null;
   setFocusedMandateId: (mandateId: string | null) => void;
+  getConcurrencyPolicy: () => ConcurrencyPolicy;
+  setConcurrencyPolicy: (policy: ConcurrencyPolicy) => void;
   /** Maintenance: clear live + focus pointers (engine reset is separate). */
   resetPointers: () => void;
 };
 
-export function createAttemptRegistry(): AttemptRegistry {
+export function createAttemptRegistry(
+  initialConcurrency: ConcurrencyPolicy = cancelPreviousConcurrencyPolicy,
+): AttemptRegistry {
   let live: LiveAttempt | null = null;
   let liveChatId: string | null = null;
   let focusedMandateId: string | null = null;
+  let concurrencyPolicy = initialConcurrency;
 
   return {
     getLive: () => live,
@@ -42,6 +49,10 @@ export function createAttemptRegistry(): AttemptRegistry {
     getFocusedMandateId: () => focusedMandateId,
     setFocusedMandateId: (mandateId) => {
       focusedMandateId = mandateId;
+    },
+    getConcurrencyPolicy: () => concurrencyPolicy,
+    setConcurrencyPolicy: (policy) => {
+      concurrencyPolicy = policy;
     },
     resetPointers: () => {
       live = null;

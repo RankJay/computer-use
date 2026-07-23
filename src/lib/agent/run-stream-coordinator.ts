@@ -22,6 +22,7 @@ import {
   type MessageSyncState,
 } from "@/lib/agent/ui-stream-sync";
 import type { EntitlementPolicy } from "@/lib/entitlements";
+import type { StandingPolicyDocument } from "@/lib/mandates/types";
 import { notifyIfUnfocused } from "@/lib/native/notification";
 import { createBudgetGuard, createBudgetTracker } from "@/lib/session/control/budget";
 import type { EscalationPort } from "@/lib/session/control/escalation-port";
@@ -49,6 +50,7 @@ export type RunStreamCoordinatorDeps = {
   escalationPort: EscalationPort;
   entitlements?: EntitlementPolicy;
   osLease?: OsLease;
+  standingPolicy?: StandingPolicyDocument | null;
   budgetStartedAt?: number;
 };
 
@@ -101,6 +103,7 @@ export async function runStreamCoordinator(
     resolveToolPart,
     entitlements: deps.entitlements,
     osLease: deps.osLease,
+    standingPolicy: deps.standingPolicy,
   };
 
   const tools = buildAgentTools(runnerDeps);

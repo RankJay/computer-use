@@ -1,6 +1,7 @@
 import type { z } from "zod";
 
 import type { EntitlementPolicy } from "@/lib/entitlements";
+import type { StandingPolicyDocument } from "@/lib/mandates/types";
 import type { EscalationPort } from "@/lib/session/control/escalation-port";
 import type { OsLease } from "@/lib/session/control/os-lease";
 import type { RuntimeEventPayload } from "@/lib/session/events";
@@ -79,6 +80,8 @@ export type CapabilityRunnerDeps = {
   escalationPort?: EscalationPort;
   /** Defaults to settings-backed policy. */
   permissionPolicy?: PermissionPolicy;
+  /** Mandate standing policy for PermissionPolicy overlay. */
+  standingPolicy?: StandingPolicyDocument | null;
   invokeNative?: CapabilityNativeInvoker;
   resolveToolPart?: (callId: string) => ToolPartLocation | null;
   /** Commercial gate before PermissionPolicy. Optional for tests. */

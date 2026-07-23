@@ -1,8 +1,36 @@
 export type MandateKind = "interactive";
 
-/** Durable intent the runtime may pursue. v0: id + createdAt + kind only. */
+/**
+ * Mandate lifecycle (store). Distinct from Attempt RunStatus.
+ * v0 interactive starts as `armed`; AttemptControl sets `running` on start.
+ */
+export type MandateLifecycleStatus =
+  | "armed"
+  | "running"
+  | "paused"
+  | "waiting_permission"
+  | "done"
+  | "failed";
+
+/**
+ * Versioned standing grants/ceilings on a Mandate (Phase 2 product fills this in).
+ * Empty / absent ≡ settings-only PermissionPolicy (today).
+ */
+export type StandingPolicyDocument = {
+  readonly version: 1;
+  /** Pre-approved capability names → allow (no escalate). */
+  readonly allowCapabilities?: readonly string[];
+  /** Standing deny for capability names. */
+  readonly denyCapabilities?: readonly string[];
+};
+
+/** Durable intent the runtime may pursue. */
 export type Mandate = {
   id: string;
   createdAt: number;
   kind: MandateKind;
+  status: MandateLifecycleStatus;
+  /** Reserved for sub-agent trees (ops-contract §6). */
+  parentMandateId: string | null;
+  standingPolicy: StandingPolicyDocument | null;
 };

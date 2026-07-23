@@ -2,6 +2,7 @@ import type { LanguageModelV4 } from "@ai-sdk/provider";
 import type { LanguageModel, UIMessage } from "ai";
 
 import type { EntitlementPolicy } from "@/lib/entitlements";
+import type { StandingPolicyDocument } from "@/lib/mandates/types";
 import type { EscalationPort } from "@/lib/session/control/escalation-port";
 import type { OsLease } from "@/lib/session/control/os-lease";
 import type { RuntimeEventPayload } from "@/lib/session/events";
@@ -19,6 +20,7 @@ export type RunAgentDeps = {
   escalationPort: EscalationPort;
   entitlements?: EntitlementPolicy;
   osLease?: OsLease;
+  standingPolicy?: StandingPolicyDocument | null;
   /** Test hook — bypasses provider resolution when set. */
   modelOverride?: LanguageModel | LanguageModelV4;
   /** Test hook — simulates an already-elapsed run for budget enforcement. */

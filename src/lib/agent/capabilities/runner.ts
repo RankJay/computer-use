@@ -164,6 +164,7 @@ export async function runCapability(
     risk: definition.risk,
     destructive: definition.destructive,
     settings: deps.settings,
+    standingPolicy: deps.standingPolicy,
   });
 
   if (policyDecision === "deny") {

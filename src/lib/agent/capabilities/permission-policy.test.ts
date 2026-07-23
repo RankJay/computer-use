@@ -42,4 +42,28 @@ describe("PermissionPolicy", () => {
       }),
     ).toBe("allow");
   });
+
+  test("empty standing policy ≡ settings-only", () => {
+    expect(
+      policy.resolve({
+        name: "delete_path",
+        risk: "high",
+        destructive: true,
+        settings: { ...DEFAULT_SETTINGS, permissionMode: "risky" },
+        standingPolicy: null,
+      }),
+    ).toBe("escalate");
+  });
+
+  test("standing allowCapabilities → allow without escalate", () => {
+    expect(
+      policy.resolve({
+        name: "delete_path",
+        risk: "high",
+        destructive: true,
+        settings: { ...DEFAULT_SETTINGS, permissionMode: "every-meaningful" },
+        standingPolicy: { version: 1, allowCapabilities: ["delete_path"] },
+      }),
+    ).toBe("allow");
+  });
 });

@@ -1,3 +1,5 @@
+import { applyStandingPolicyOverlay } from "@/lib/mandates/standing-policy";
+import type { StandingPolicyDocument } from "@/lib/mandates/types";
 import type { AppSettings } from "@/lib/settings/types";
 
 import { needsPermission } from "./permission";
@@ -11,6 +13,8 @@ export type PermissionPolicyInput = {
   readonly risk: CapabilityRisk;
   readonly destructive?: boolean;
   readonly settings: AppSettings;
+  /** Mandate standing policy overlay (empty ≡ settings-only). */
+  readonly standingPolicy?: StandingPolicyDocument | null;
 };
 
 export type PermissionPolicy = {
@@ -18,25 +22,24 @@ export type PermissionPolicy = {
 };
 
 /**
- * Phase 1 settings grants/mode → allow | escalate.
- * `deny` reserved for standing deny / Phase 2 overlay.
+ * Phase 1 settings grants/mode → allow | escalate, then standing overlay.
+ * Overlay deny is the first real use of `deny` at this seam.
  */
 export function createSettingsPermissionPolicy(): PermissionPolicy {
   return {
     resolve(input) {
-      if (
-        needsPermission(
-          {
-            name: input.name,
-            risk: input.risk,
-            destructive: input.destructive,
-          },
-          input.settings,
-        )
-      ) {
-        return "escalate";
-      }
-      return "allow";
+      const base: PermissionPolicyDecision = needsPermission(
+        {
+          name: input.name,
+          risk: input.risk,
+          destructive: input.destructive,
+        },
+        input.settings,
+      )
+        ? "escalate"
+        : "allow";
+
+      return applyStandingPolicyOverlay(base, input.name, input.standingPolicy);
     },
   };
 }

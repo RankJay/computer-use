@@ -178,6 +178,8 @@ export function createAttemptControl(deps: AttemptControlDeps): AttemptControl {
       }
 
       const mandateId = await resolveMandateId(input.mandateId);
+      const mandate = await deps.mandates.get(mandateId);
+      await deps.mandates.update(mandateId, { status: "running" });
       const execution = foldExecutionContext(deps.engine.getProjection());
       const config: RunConfig = {
         prompt: input.prompt,
@@ -186,6 +188,7 @@ export function createAttemptControl(deps: AttemptControlDeps): AttemptControl {
         settings: ctx.settings,
         secrets: ctx.secrets,
         persistApproval: ctx.persistApproval,
+        standingPolicy: mandate?.standingPolicy ?? null,
       };
       return beginRun(mandateId, () => deps.engine.start(config));
     },
@@ -203,6 +206,7 @@ export function createAttemptControl(deps: AttemptControlDeps): AttemptControl {
         deps.registry.getLive()?.mandateId ??
         deps.registry.getFocusedMandateId() ??
         (await resolveMandateId(undefined));
+      await deps.mandates.update(mandateId, { status: "running" });
       return beginRun(mandateId, () => deps.engine.retry());
     },
 
@@ -216,11 +220,14 @@ export function createAttemptControl(deps: AttemptControlDeps): AttemptControl {
         return blocked;
       }
       const mandateId = deps.registry.getFocusedMandateId() ?? (await resolveMandateId(undefined));
+      const mandate = await deps.mandates.get(mandateId);
+      await deps.mandates.update(mandateId, { status: "running" });
       const pack: RetryFromMessageConfig = {
         modelId: ctx.settings.selectedModelId,
         settings: ctx.settings,
         secrets: ctx.secrets,
         persistApproval: ctx.persistApproval,
+        standingPolicy: mandate?.standingPolicy ?? null,
       };
       return beginRun(mandateId, () => deps.engine.retryFromMessage(assistantMessageId, pack));
     },

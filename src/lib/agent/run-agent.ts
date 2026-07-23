@@ -38,6 +38,7 @@ export async function runAgentLoop(deps: RunAgentDeps): Promise<RunAgentResult> 
       escalationPort: deps.escalationPort,
       entitlements: deps.entitlements,
       osLease: deps.osLease,
+      standingPolicy: deps.standingPolicy,
       budgetStartedAt: deps.budgetStartedAt,
     });
   } catch (error) {

@@ -61,5 +61,14 @@ pub fn migrations() -> Vec<Migration> {
         );",
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 5,
+            description: "mandate lifecycle standing policy parent",
+            sql: "ALTER TABLE mandates ADD COLUMN status TEXT;
+        ALTER TABLE mandates ADD COLUMN parent_mandate_id TEXT;
+        ALTER TABLE mandates ADD COLUMN standing_policy_json TEXT;
+        UPDATE mandates SET status = 'armed' WHERE status IS NULL;",
+            kind: MigrationKind::Up,
+        },
     ]
 }
