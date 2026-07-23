@@ -3,7 +3,7 @@ import {
   projectionToFoldSnapshot,
   type AttemptEventStore,
 } from "@/lib/attempts";
-import type { StoredChat } from "@/lib/chats/types";
+import type { StoredChat } from "@/lib/chats";
 import type { EntitlementPolicy } from "@/lib/entitlements";
 import {
   createMandatesPersistence,

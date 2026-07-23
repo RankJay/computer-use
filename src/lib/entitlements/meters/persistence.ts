@@ -1,4 +1,6 @@
+import { MemoryMeterStore } from "@/lib/entitlements/meters/adapters/memory-store";
 import { TauriSqlMeterStore } from "@/lib/entitlements/meters/adapters/tauri-sql-store";
+import { isTauriRuntime } from "@/lib/runtime/is-tauri-runtime";
 
 export type MeterStore = {
   get(subjectId: string, meterKey: string, periodKey: string): Promise<number>;
@@ -12,5 +14,8 @@ export type MeterStore = {
 };
 
 export function createMeterStore(): MeterStore {
+  if (!isTauriRuntime()) {
+    return new MemoryMeterStore();
+  }
   return new TauriSqlMeterStore();
 }

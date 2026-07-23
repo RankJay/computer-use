@@ -18,6 +18,7 @@ export {
   type EntitlementPolicyDeps,
 } from "./policy";
 export { resolveEntitlementSubjectId } from "./subject";
+/** Meters is a nested store sub-module (own persistence + adapters). */
 export type { MeterStore } from "./meters/persistence";
 export { createMeterStore } from "./meters/persistence";
 export { MemoryMeterStore } from "./meters/adapters/memory-store";

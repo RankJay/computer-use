@@ -4,13 +4,9 @@ import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
-import { createChatsPersistence } from "@/lib/chats/persistence";
-import { chatsKeys } from "@/lib/chats/queries";
-import { deriveChatTitle } from "@/lib/chats/title";
-import type { StoredChat } from "@/lib/chats/types";
+import { chatsKeys, createChatsPersistence, deriveChatTitle, type StoredChat } from "@/lib/chats";
 import type { BatchedAttemptStore, MandateProjection, RunStatus } from "@/lib/session";
-import { useSettingsSelector } from "@/lib/settings/queries";
-import { selectSelectedModelId } from "@/lib/settings/selectors";
+import { selectSelectedModelId, useSettingsSelector } from "@/lib/settings";
 
 const persistence = createChatsPersistence();
 
