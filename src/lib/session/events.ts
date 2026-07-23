@@ -141,6 +141,25 @@ export type BudgetExceededPayload = {
   dimension: "steps" | "cost" | "wall_clock";
 };
 
+export type EntitlementDeniedPayload = {
+  type: "entitlement.denied";
+  checkKind: "attempt_start" | "model" | "capability";
+  outcome: "deny" | "require_upgrade";
+  reason: string;
+  feature?: string;
+  capability?: string;
+  modelId?: string;
+};
+
+export type EntitlementMeteredPayload = {
+  type: "entitlement.metered";
+  meterKey: string;
+  amount: number;
+  newValue: number;
+  checkKind: "attempt_start" | "model" | "capability";
+  capability?: string;
+};
+
 export type ActivityMarkerPayload = {
   type: "activity.marker";
   markerId: string;
@@ -184,6 +203,8 @@ export type RuntimeEventPayload =
   | UsageUpdatedPayload
   | BudgetUpdatedPayload
   | BudgetExceededPayload
+  | EntitlementDeniedPayload
+  | EntitlementMeteredPayload
   | ActivityMarkerPayload
   | ActivityChainUpdatedPayload
   | ActivityTaskUpdatedPayload;

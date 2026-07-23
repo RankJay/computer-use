@@ -1,5 +1,6 @@
 import type { z } from "zod";
 
+import type { EntitlementPolicy } from "@/lib/entitlements";
 import type { PermissionWaiter } from "@/lib/session/control/run-controller";
 import type { RuntimeEventPayload } from "@/lib/session/events";
 import type { AppSettings } from "@/lib/settings/types";
@@ -74,4 +75,6 @@ export type CapabilityRunnerDeps = {
   createPermissionWaiter: (callId: string) => PermissionWaiter;
   invokeNative?: CapabilityNativeInvoker;
   resolveToolPart?: (callId: string) => ToolPartLocation | null;
+  /** Commercial gate before PermissionPolicy. Optional for tests. */
+  entitlements?: EntitlementPolicy;
 };

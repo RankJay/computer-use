@@ -1,5 +1,6 @@
 import type { DynamicToolUIPart } from "ai";
 
+import { capabilityClassOf } from "@/lib/entitlements";
 import { notifyIfUnfocused } from "@/lib/native/notification";
 import type { RuntimeEventPayload } from "@/lib/session/events";
 
@@ -79,8 +80,8 @@ function emitApprovalPart(
 }
 
 /**
- * CapabilityRunner: validate → permission gate → native invoke → audit events.
- * Emits assistant.part_updated for approval UI (deepening #2).
+ * CapabilityRunner: validate → entitlement → permission gate → native invoke.
+ * EntitlementPolicy is commercial; PermissionPolicy / waiter is OS safety — never conflated.
  */
 export async function runCapability(
   name: string,
@@ -112,6 +113,48 @@ export async function runCapability(
       error: capabilityError,
     });
     return { ok: false, error: capabilityError };
+  }
+
+  if (deps.entitlements) {
+    const entitlement = await deps.entitlements.authorize({
+      kind: "capability",
+      capability: name,
+      capabilityClass: capabilityClassOf(name),
+    });
+
+    if (entitlement.outcome === "deny" || entitlement.outcome === "require_upgrade") {
+      append({
+        type: "entitlement.denied",
+        checkKind: "capability",
+        outcome: entitlement.outcome,
+        reason: entitlement.reason,
+        feature: entitlement.outcome === "require_upgrade" ? entitlement.feature : undefined,
+        capability: name,
+      });
+      const capabilityError: CapabilityError = {
+        code:
+          entitlement.outcome === "require_upgrade" ? "entitlement_upgrade" : "entitlement_denied",
+        message: entitlement.reason,
+      };
+      append({
+        type: "capability.failed",
+        callId,
+        capability: name,
+        error: capabilityError,
+      });
+      return { ok: false, error: capabilityError };
+    }
+
+    if (entitlement.outcome === "allow_and_meter") {
+      append({
+        type: "entitlement.metered",
+        meterKey: entitlement.meterKey,
+        amount: entitlement.amount,
+        newValue: entitlement.newValue,
+        checkKind: "capability",
+        capability: name,
+      });
+    }
   }
 
   const resolveLocation = () => deps.resolveToolPart?.(callId) ?? null;

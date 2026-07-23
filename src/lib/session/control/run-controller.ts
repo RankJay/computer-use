@@ -1,5 +1,6 @@
 import type { UIMessage } from "ai";
 
+import type { EntitlementPolicy } from "@/lib/entitlements";
 import type { AppSecrets, AppSettings } from "@/lib/settings/types";
 
 import type { RuntimeEventPayload } from "../events";
@@ -30,6 +31,8 @@ export type ProduceRunContext = {
   signal: AbortSignal;
   append: (payload: RuntimeEventPayload) => unknown;
   createPermissionWaiter: (callId: string) => PermissionWaiter;
+  /** Injected by AttemptHost — commercial gate for Capability invoke. */
+  entitlements?: EntitlementPolicy;
 };
 
 export type ProduceRun = (ctx: ProduceRunContext) => Promise<void>;

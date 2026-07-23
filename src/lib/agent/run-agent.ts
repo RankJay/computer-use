@@ -36,6 +36,7 @@ export async function runAgentLoop(deps: RunAgentDeps): Promise<RunAgentResult> 
       append: deps.append,
       workspaceRoot: deps.workspaceRoot,
       createPermissionWaiter: deps.createPermissionWaiter,
+      entitlements: deps.entitlements,
       budgetStartedAt: deps.budgetStartedAt,
     });
   } catch (error) {

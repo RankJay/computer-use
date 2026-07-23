@@ -1,3 +1,4 @@
+import type { EntitlementPolicy } from "@/lib/entitlements";
 import type { MandatesPersistence } from "@/lib/mandates";
 import type { AppSecrets, AppSettings } from "@/lib/settings/types";
 
@@ -19,7 +20,9 @@ export type AttemptIds = {
 
 export type AttemptStartError = {
   ok: false;
-  reason: "workspace_not_ready" | "noop";
+  reason: "workspace_not_ready" | "noop" | "entitlement_denied" | "require_upgrade";
+  message?: string;
+  feature?: string;
 };
 
 export type AttemptStartOk = {
@@ -59,7 +62,29 @@ export type AttemptControlDeps = {
   waitForAttemptStarted: () => Promise<string>;
   /** Cancel a pending waitForAttemptStarted waiter (no-op start / early settle). */
   cancelAttemptStartedWait: () => void;
+  /** Commercial gate; optional so unit tests can omit. */
+  entitlements?: EntitlementPolicy;
 };
+
+function entitlementStartError(decision: {
+  outcome: "deny" | "require_upgrade";
+  reason: string;
+  feature?: string;
+}): AttemptStartError {
+  if (decision.outcome === "require_upgrade") {
+    return {
+      ok: false,
+      reason: "require_upgrade",
+      message: decision.reason,
+      feature: decision.feature,
+    };
+  }
+  return {
+    ok: false,
+    reason: "entitlement_denied",
+    message: decision.reason,
+  };
+}
 
 export function createAttemptControl(deps: AttemptControlDeps): AttemptControl {
   async function resolveMandateId(mandateId: string | undefined): Promise<string> {
@@ -78,6 +103,26 @@ export function createAttemptControl(deps: AttemptControlDeps): AttemptControl {
     }
     const created = await deps.mandates.create({ kind: "interactive" });
     return created.id;
+  }
+
+  async function authorizeStart(modelId: string): Promise<AttemptStartError | null> {
+    const policy = deps.entitlements;
+    if (!policy) {
+      return null;
+    }
+
+    // Model first (no meter) so a blocked model does not consume attempt quota.
+    const modelDecision = await policy.authorize({ kind: "model", modelId });
+    if (modelDecision.outcome === "deny" || modelDecision.outcome === "require_upgrade") {
+      return entitlementStartError(modelDecision);
+    }
+
+    const attemptDecision = await policy.authorize({ kind: "attempt_start" });
+    if (attemptDecision.outcome === "deny" || attemptDecision.outcome === "require_upgrade") {
+      return entitlementStartError(attemptDecision);
+    }
+
+    return null;
   }
 
   async function beginRun(
@@ -127,6 +172,11 @@ export function createAttemptControl(deps: AttemptControlDeps): AttemptControl {
         return { ok: false, reason: "workspace_not_ready" };
       }
 
+      const blocked = await authorizeStart(ctx.settings.selectedModelId);
+      if (blocked) {
+        return blocked;
+      }
+
       const mandateId = await resolveMandateId(input.mandateId);
       const execution = foldExecutionContext(deps.engine.getProjection());
       const config: RunConfig = {
@@ -145,6 +195,10 @@ export function createAttemptControl(deps: AttemptControlDeps): AttemptControl {
       if (!ctx) {
         return { ok: false, reason: "workspace_not_ready" };
       }
+      const blocked = await authorizeStart(ctx.settings.selectedModelId);
+      if (blocked) {
+        return blocked;
+      }
       const mandateId =
         deps.registry.getLive()?.mandateId ??
         deps.registry.getFocusedMandateId() ??
@@ -156,6 +210,10 @@ export function createAttemptControl(deps: AttemptControlDeps): AttemptControl {
       const ctx = await deps.loadRunContext();
       if (!ctx) {
         return { ok: false, reason: "workspace_not_ready" };
+      }
+      const blocked = await authorizeStart(ctx.settings.selectedModelId);
+      if (blocked) {
+        return blocked;
       }
       const mandateId = deps.registry.getFocusedMandateId() ?? (await resolveMandateId(undefined));
       const pack: RetryFromMessageConfig = {

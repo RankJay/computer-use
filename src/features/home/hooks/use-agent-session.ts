@@ -77,7 +77,7 @@ export type AgentSessionControls = SessionControls & {
     persist?: boolean,
   ) => Promise<void>;
   modelId: string;
-  onModelChange: (modelId: string) => void;
+  onModelChange: (modelId: string) => void | Promise<void>;
   permissionMode: PermissionMode;
   pendingPermissions: readonly PendingPermission[];
 };
@@ -184,34 +184,48 @@ export function useAgentSessionControls(store: BatchedAttemptStore): AgentSessio
     [store, status, failure, pendingPermissions],
   );
 
+  const toastStartError = useCallback((result: { ok: false; reason: string; message?: string }) => {
+    if (result.reason === "workspace_not_ready") {
+      toast.error("Set a workspace root in Settings before running live.");
+      return;
+    }
+    if (result.reason === "require_upgrade") {
+      toast.error(result.message ?? "Upgrade required for this action.");
+      return;
+    }
+    if (result.reason === "entitlement_denied") {
+      toast.error(result.message ?? "This action is not available on your plan.");
+    }
+  }, []);
+
   const start = useCallback(
     async (prompt: string) => {
       const result = await store.control.start({
         prompt,
         mandateId: store.control.getFocusedMandateId() ?? undefined,
       });
-      if (!result.ok && result.reason === "workspace_not_ready") {
-        toast.error("Set a workspace root in Settings before running live.");
+      if (!result.ok) {
+        toastStartError(result);
       }
     },
-    [store],
+    [store, toastStartError],
   );
 
   const cancel = useCallback(() => store.control.cancel(), [store]);
   const retry = useCallback(async () => {
     const result = await store.control.retry();
-    if (!result.ok && result.reason === "workspace_not_ready") {
-      toast.error("Set a workspace root in Settings before running live.");
+    if (!result.ok) {
+      toastStartError(result);
     }
-  }, [store]);
+  }, [store, toastStartError]);
   const retryFromMessage = useCallback(
     async (assistantMessageId: string) => {
       const result = await store.control.retryFromMessage(assistantMessageId);
-      if (!result.ok && result.reason === "workspace_not_ready") {
-        toast.error("Set a workspace root in Settings before running live.");
+      if (!result.ok) {
+        toastStartError(result);
       }
     },
-    [store],
+    [store, toastStartError],
   );
   const resolvePermission = useCallback(
     (callId: string, decision: PermissionDecision, persist?: boolean) =>
@@ -220,10 +234,15 @@ export function useAgentSessionControls(store: BatchedAttemptStore): AgentSessio
   );
 
   const onModelChange = useCallback(
-    (modelId: string) => {
+    async (modelId: string) => {
+      const decision = await store.entitlements?.authorize({ kind: "model", modelId });
+      if (decision?.outcome === "require_upgrade" || decision?.outcome === "deny") {
+        toast.error(decision.reason);
+        return;
+      }
       mutateSettings({ selectedModelId: modelId });
     },
-    [mutateSettings],
+    [mutateSettings, store],
   );
 
   return useMemo(

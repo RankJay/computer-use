@@ -199,6 +199,8 @@ const KNOWN_EVENT_TYPES = new Set<RuntimeEvent["type"]>([
   "usage.updated",
   "budget.updated",
   "budget.exceeded",
+  "entitlement.denied",
+  "entitlement.metered",
   "activity.marker",
   "activity.chain_updated",
   "activity.task_updated",
@@ -406,6 +408,8 @@ export function reduceSession(state: FoldState, event: RuntimeEvent): FoldState 
     case "capability.requested":
     case "capability.completed":
     case "capability.failed":
+    case "entitlement.denied":
+    case "entitlement.metered":
       return base;
 
     default: {

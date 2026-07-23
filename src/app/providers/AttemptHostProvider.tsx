@@ -9,6 +9,11 @@ import {
 } from "react";
 
 import {
+  createEntitlementPolicy,
+  createMeterStore,
+  resolveEntitlementSubjectId,
+} from "@/lib/entitlements";
+import {
   createAttemptHost,
   createProduceRun,
   isLiveWorkspaceReady,
@@ -49,8 +54,14 @@ export function AttemptHostProvider(props: { readonly children: ReactNode }): Re
 
   const hostRef = useRef<BatchedAttemptStore | null>(null);
   if (hostRef.current === null) {
+    const entitlements = createEntitlementPolicy({
+      getSubjectId: () => resolveEntitlementSubjectId(depsRef.current.queryClient),
+      meters: createMeterStore(),
+    });
+
     hostRef.current = createAttemptHost({
       produceRun: createProduceRun(),
+      entitlements,
       loadRunContext: async () => {
         const { queryClient: client, persistToolApproval: persistApproval } = depsRef.current;
         const latest = await client.ensureQueryData(settingsQueryOptions());

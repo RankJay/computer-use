@@ -1,6 +1,6 @@
 import Database from "@tauri-apps/plugin-sql";
 
-/** Single local-first SQLite file for chats, mandates, and Attempt ledger. */
+/** Single local-first SQLite file for chats, mandates, Attempt ledger, and meters. */
 export const LOCAL_DB_URL = "sqlite:chats.db";
 
 let dbPromise: Promise<Database> | null = null;

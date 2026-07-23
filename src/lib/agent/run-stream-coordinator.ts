@@ -21,6 +21,7 @@ import {
   syncAssistantMessage,
   type MessageSyncState,
 } from "@/lib/agent/ui-stream-sync";
+import type { EntitlementPolicy } from "@/lib/entitlements";
 import { notifyIfUnfocused } from "@/lib/native/notification";
 import { createBudgetGuard, createBudgetTracker } from "@/lib/session/control/budget";
 import type { PermissionWaiter } from "@/lib/session/control/run-controller";
@@ -45,6 +46,7 @@ export type RunStreamCoordinatorDeps = {
   append: (payload: RuntimeEventPayload) => unknown;
   workspaceRoot: string;
   createPermissionWaiter: (callId: string) => PermissionWaiter;
+  entitlements?: EntitlementPolicy;
   budgetStartedAt?: number;
 };
 
@@ -95,6 +97,7 @@ export async function runStreamCoordinator(
     workspaceRoot: deps.workspaceRoot,
     createPermissionWaiter: deps.createPermissionWaiter,
     resolveToolPart,
+    entitlements: deps.entitlements,
   };
 
   const tools = buildAgentTools(runnerDeps);

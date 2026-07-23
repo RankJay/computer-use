@@ -49,5 +49,17 @@ pub fn migrations() -> Vec<Migration> {
         CREATE INDEX attempt_events_mandate ON attempt_events (mandate_id, attempt_id);",
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 4,
+            description: "entitlement meters",
+            sql: "CREATE TABLE meters (
+            subject_id TEXT NOT NULL,
+            meter_key TEXT NOT NULL,
+            period_key TEXT NOT NULL,
+            value INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (subject_id, meter_key, period_key)
+        );",
+            kind: MigrationKind::Up,
+        },
     ]
 }

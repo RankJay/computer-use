@@ -6,6 +6,7 @@ import {
   type AttemptEventStore,
 } from "@/lib/attempts";
 import type { StoredChat } from "@/lib/chats/types";
+import type { EntitlementPolicy } from "@/lib/entitlements";
 import { createMandatesPersistence, type MandatesPersistence } from "@/lib/mandates";
 
 import {
@@ -27,6 +28,8 @@ export type BatchedAttemptStore = {
   control: AttemptControl;
   registry: AttemptRegistry;
   eventStore: AttemptEventStore;
+  /** Commercial policy (undefined in tests that omit it). */
+  entitlements: EntitlementPolicy | undefined;
   /** MandateProjection (audit/UI). Alias of getSnapshot. */
   getMandateProjection: () => SessionProjection;
   getSnapshot: () => SessionProjection;
@@ -57,6 +60,8 @@ export type AttemptHostDeps = {
   loadRunContext: () => Promise<LoadedRunContext | null>;
   mandates?: MandatesPersistence;
   eventStore?: AttemptEventStore;
+  /** Commercial gate — Attempt start/model + Capability invoke. */
+  entitlements?: EntitlementPolicy;
 };
 
 function isActiveStatus(status: RunStatus): boolean {
@@ -78,8 +83,14 @@ export function createAttemptHost(deps: AttemptHostDeps): BatchedAttemptStore {
 
   let attemptStartedWaiter: ((attemptId: string) => void) | null = null;
 
+  const produceRun: ProduceRun = async (ctx) =>
+    deps.produceRun({
+      ...ctx,
+      entitlements: deps.entitlements,
+    });
+
   const engine = createSessionEngine({
-    produceRun: deps.produceRun,
+    produceRun,
     onAttemptStarted: (attemptId) => {
       const waiter = attemptStartedWaiter;
       attemptStartedWaiter = null;
@@ -100,6 +111,7 @@ export function createAttemptHost(deps: AttemptHostDeps): BatchedAttemptStore {
     registry,
     mandates,
     loadRunContext: deps.loadRunContext,
+    entitlements: deps.entitlements,
     waitForAttemptStarted: () =>
       new Promise<string>((resolve, reject) => {
         const timer = setTimeout(() => {
@@ -322,6 +334,7 @@ export function createAttemptHost(deps: AttemptHostDeps): BatchedAttemptStore {
     control,
     registry,
     eventStore,
+    entitlements: deps.entitlements,
     getMandateProjection: () => snapshot,
     getSnapshot: () => snapshot,
     subscribe: (listener) => {

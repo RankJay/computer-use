@@ -1,6 +1,7 @@
 import type { LanguageModelV4 } from "@ai-sdk/provider";
 import type { LanguageModel, UIMessage } from "ai";
 
+import type { EntitlementPolicy } from "@/lib/entitlements";
 import type { PermissionWaiter } from "@/lib/session/control/run-controller";
 import type { RuntimeEventPayload } from "@/lib/session/events";
 import type { AppSecrets, AppSettings } from "@/lib/settings/types";
@@ -15,6 +16,7 @@ export type RunAgentDeps = {
   append: (payload: RuntimeEventPayload) => unknown;
   workspaceRoot: string;
   createPermissionWaiter: (callId: string) => PermissionWaiter;
+  entitlements?: EntitlementPolicy;
   /** Test hook — bypasses provider resolution when set. */
   modelOverride?: LanguageModel | LanguageModelV4;
   /** Test hook — simulates an already-elapsed run for budget enforcement. */
