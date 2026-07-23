@@ -1,5 +1,5 @@
 import { coalesceDurableEvents } from "@/lib/attempts/coalesce";
-import { isAttemptFoldSnapshot } from "@/lib/attempts/fold-snapshot";
+import { parseAttemptFoldSnapshot } from "@/lib/attempts/fold-snapshot";
 import type {
   AppendEventsInput,
   AttemptEventStore,
@@ -31,7 +31,7 @@ function parseSnapshot(json: string | null): AttemptFoldSnapshot | null {
     return null;
   }
   const parsed: unknown = JSON.parse(json);
-  return isAttemptFoldSnapshot(parsed) ? parsed : null;
+  return parseAttemptFoldSnapshot(parsed);
 }
 
 function parseEvent(json: string): RuntimeEvent {

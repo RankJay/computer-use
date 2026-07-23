@@ -1,6 +1,7 @@
 import type { AppSettings } from "@/lib/settings/types";
 
 import type { BudgetExceededPayload } from "../events";
+import type { AttemptBudget } from "../projection";
 
 export type BudgetDimension = BudgetExceededPayload["dimension"];
 
@@ -8,14 +9,7 @@ export type BudgetTracker = {
   incrementStep: () => void;
   addCostUsd: (amount: number) => void;
   checkBudget: () => { ok: true } | { ok: false; dimension: BudgetDimension };
-  snapshot: () => {
-    stepsUsed: number;
-    maxSteps: number;
-    costUsd: number;
-    maxCostUsd: number;
-    elapsedMs: number;
-    maxWallClockMs: number;
-  };
+  snapshot: () => AttemptBudget;
 };
 
 function isOverSteps(stepsUsed: number, maxSteps: number): boolean {

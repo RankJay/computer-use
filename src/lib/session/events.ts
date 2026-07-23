@@ -1,15 +1,26 @@
 import type { UIMessage } from "ai";
+import { z } from "zod";
+
+import type { CapabilityRisk } from "@/lib/agent/capabilities/risk";
+import type { EntitlementCheckKind } from "@/lib/entitlements/types";
+import type { AgentMode } from "@/lib/settings/types";
 
 export const RUNTIME_EVENT_SCHEMA_VERSION = 1;
 
-export type RunStatus =
-  | "idle"
-  | "running"
-  | "streaming"
-  | "waiting_permission"
-  | "completed"
-  | "failed"
-  | "cancelled";
+export const runStatusSchema = z.enum([
+  "idle",
+  "running",
+  "streaming",
+  "waiting_permission",
+  "completed",
+  "failed",
+  "cancelled",
+]);
+
+export type RunStatus = z.infer<typeof runStatusSchema>;
+
+/** UI / events / RunController vocabulary (not EscalationOutcome). */
+export type PermissionDecision = "approved" | "denied";
 
 export type RuntimeEventEnvelope = {
   eventId: string;
@@ -40,7 +51,7 @@ export type TaskStartedPayload = {
   type: "task.started";
   prompt: string;
   modelId: string;
-  agentMode: "live" | "demo";
+  agentMode: AgentMode;
   userMessageId?: string;
   /** When true (e.g. retry), do not append a new user message row. */
   omitUserMessage?: boolean;
@@ -108,13 +119,13 @@ export type PermissionRequestedPayload = {
   callId: string;
   capability: string;
   input: unknown;
-  risk: "low" | "medium" | "high";
+  risk: CapabilityRisk;
 };
 
 export type PermissionResolvedPayload = {
   type: "permission.resolved";
   callId: string;
-  decision: "approved" | "denied";
+  decision: PermissionDecision;
   persisted?: boolean;
 };
 
@@ -143,7 +154,7 @@ export type BudgetExceededPayload = {
 
 export type EntitlementDeniedPayload = {
   type: "entitlement.denied";
-  checkKind: "attempt_start" | "model" | "capability";
+  checkKind: EntitlementCheckKind;
   outcome: "deny" | "require_upgrade";
   reason: string;
   feature?: string;
@@ -156,7 +167,7 @@ export type EntitlementMeteredPayload = {
   meterKey: string;
   amount: number;
   newValue: number;
-  checkKind: "attempt_start" | "model" | "capability";
+  checkKind: EntitlementCheckKind;
   capability?: string;
 };
 

@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import { DEFAULT_SECRETS, DEFAULT_SETTINGS } from "@/lib/settings/defaults";
 
+import { escalationToPermissionDecision } from "./control/escalation-port";
 import type { ProduceRun, PermissionDecision } from "./control/run-controller";
 import { createSessionEngine } from "./engine";
 import { createDemoPayloads, createTestDemoProducer } from "./fixtures/demo-payloads";
@@ -282,7 +283,7 @@ describe("RunController via SessionEngine", () => {
         input: {},
         risk: "high",
       });
-      sawDecision = outcome === "allow" ? "approved" : "denied";
+      sawDecision = escalationToPermissionDecision(outcome);
       append({
         type: "permission.resolved",
         callId: "c1",
@@ -338,7 +339,7 @@ describe("RunController via SessionEngine", () => {
         input: {},
         risk: "high",
       });
-      sawDecision = outcome === "allow" ? "approved" : "denied";
+      sawDecision = escalationToPermissionDecision(outcome);
       if (!signal.aborted) {
         append({ type: "task.completed", finishReason: "stop" });
       }

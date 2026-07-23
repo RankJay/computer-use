@@ -1,4 +1,10 @@
-import type { AgentMode, SettingsSelectOption, PermissionMode } from "@/lib/settings/types";
+import {
+  agentModeSchema,
+  permissionModeSchema,
+  type AgentMode,
+  type SettingsSelectOption,
+  type PermissionMode,
+} from "@/lib/settings/types";
 
 export const AGENT_MODE_OPTIONS: SettingsSelectOption<AgentMode>[] = [
   { value: "live", label: "Live" },
@@ -13,13 +19,8 @@ export const PERMISSION_MODE_OPTIONS: SettingsSelectOption<PermissionMode>[] = [
 ];
 
 export function parseAgentMode(value: string): AgentMode {
-  switch (value) {
-    case "live":
-    case "demo":
-      return value;
-    default:
-      return "live";
-  }
+  const parsed = agentModeSchema.safeParse(value);
+  return parsed.success ? parsed.data : "live";
 }
 
 /** Stored as ms; settings UI edits in whole minutes. */
@@ -39,13 +40,6 @@ export function wallClockMsFromMinutes(minutes: number): number {
 }
 
 export function parsePermissionMode(value: string): PermissionMode {
-  switch (value) {
-    case "risky":
-    case "every-meaningful":
-    case "destructive-only":
-    case "once-per-class":
-      return value;
-    default:
-      return "risky";
-  }
+  const parsed = permissionModeSchema.safeParse(value);
+  return parsed.success ? parsed.data : "risky";
 }

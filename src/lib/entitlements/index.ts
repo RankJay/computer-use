@@ -1,6 +1,7 @@
 export type {
   EntitlementCapabilityClass,
   EntitlementCheck,
+  EntitlementCheckKind,
   EntitlementDecision,
   EntitlementSubject,
   ModelTier,

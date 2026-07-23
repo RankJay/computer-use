@@ -14,7 +14,9 @@ export { TauriSqlAttemptEventStore } from "./adapters/tauri-sql-store";
 
 export { coalesceDurableEvents } from "./coalesce";
 export {
+  attemptFoldSnapshotSchema,
   foldStateFromSnapshot,
   isAttemptFoldSnapshot,
+  parseAttemptFoldSnapshot,
   projectionToFoldSnapshot,
 } from "./fold-snapshot";

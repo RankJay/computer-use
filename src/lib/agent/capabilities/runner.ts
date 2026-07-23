@@ -1,6 +1,7 @@
 import type { DynamicToolUIPart } from "ai";
 
 import { capabilityClassOf } from "@/lib/entitlements";
+import { escalationToPermissionDecision } from "@/lib/session/control/escalation-port";
 import type { RuntimeEventPayload } from "@/lib/session/events";
 
 import { getCapabilityDefinition } from "./catalog";
@@ -219,7 +220,7 @@ export async function runCapability(
     append({
       type: "permission.resolved",
       callId,
-      decision: outcome === "allow" ? "approved" : "denied",
+      decision: escalationToPermissionDecision(outcome),
     });
 
     if (outcome === "deny") {

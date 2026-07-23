@@ -1,20 +1,21 @@
 import type { UIMessage } from "ai";
 
-import type { EntitlementPolicy } from "@/lib/entitlements";
 import type { StandingPolicyDocument } from "@/lib/mandates/types";
 import type { AppSecrets, AppSettings } from "@/lib/settings/types";
 
-import type { RuntimeEvent, RuntimeEventPayload } from "../events";
+import type { RuntimeEventPayload, PermissionDecision } from "../events";
 import { foldExecutionContext } from "../execution-context";
 import type { MandateProjection } from "../projection";
+import type { RunExecutionContext } from "../run-execution-context";
 import {
   createEscalationPort,
+  permissionDecisionToEscalation,
   type EscalationPort,
   type EscalationPortMode,
 } from "./escalation-port";
 import type { OsLease } from "./os-lease";
 
-export type PermissionDecision = "approved" | "denied";
+export type { PermissionDecision };
 
 export type RunConfig = {
   prompt: string;
@@ -30,21 +31,19 @@ export type RunConfig = {
   standingPolicy?: StandingPolicyDocument | null;
 };
 
-export type ProduceRunContext = {
+/** Producer seam: shared gates + packed RunConfig (settings/workspace via config). */
+export type ProduceRunContext = Pick<
+  RunExecutionContext,
+  | "taskId"
+  | "append"
+  | "escalationPort"
+  | "entitlements"
+  | "osLease"
+  | "standingPolicy"
+  | "getEventLog"
+> & {
   config: RunConfig;
-  taskId: string;
   signal: AbortSignal;
-  append: (payload: RuntimeEventPayload) => unknown;
-  /** EscalationPort for Capability gate (interactive or park). */
-  escalationPort: EscalationPort;
-  /** Injected by AttemptHost — commercial gate for Capability invoke. */
-  entitlements?: EntitlementPolicy;
-  /** Injected by AttemptHost — desktop lock for UI-automation Capabilities. */
-  osLease?: OsLease;
-  /** Mandate standing policy (from AttemptControl packing). */
-  standingPolicy?: StandingPolicyDocument | null;
-  /** Attempt event log for Capability resume-from-cursor. */
-  getEventLog?: () => readonly RuntimeEvent[];
 };
 
 export type ProduceRun = (ctx: ProduceRunContext) => Promise<void>;
@@ -159,7 +158,7 @@ export function createRunController(deps: RunControllerDeps): RunController {
         }
       }
 
-      escalationPort.resolve(callId, decision === "approved" ? "allow" : "deny");
+      escalationPort.resolve(callId, permissionDecisionToEscalation(decision));
     },
 
     async retry() {

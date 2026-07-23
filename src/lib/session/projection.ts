@@ -2,37 +2,35 @@ import type { UIMessage } from "ai";
 
 import { getDefaultAgentModel } from "@/lib/agent-models";
 
-import type { LanguageModelUsageSnapshot, RunStatus } from "./events";
+import type {
+  BudgetUpdatedPayload,
+  PermissionRequestedPayload,
+  RunStatus,
+  TaskFailedPayload,
+  UsageUpdatedPayload,
+} from "./events";
 import type { AgentTranscriptRow } from "./rows";
 
-export type AttemptFailure = {
-  code: string;
-  message: string;
-  recoverable: boolean;
-};
+export type AttemptFailure = Pick<TaskFailedPayload, "code" | "message" | "recoverable">;
 
-export type PendingPermission = {
-  callId: string;
-  capability: string;
-  input: unknown;
-  risk: "low" | "medium" | "high";
-};
+export type PendingPermission = Pick<
+  PermissionRequestedPayload,
+  "callId" | "capability" | "input" | "risk"
+>;
 
+/**
+ * Read-model usage: same fields as UsageUpdatedPayload, with nullability
+ * before the first usage.updated event (modelId/usage unset).
+ */
 export type AttemptUsage = {
-  modelId: string | null;
-  usage: LanguageModelUsageSnapshot | null;
-  usedTokens: number;
-  maxTokens: number;
+  modelId: UsageUpdatedPayload["modelId"] | null;
+  usage: NonNullable<UsageUpdatedPayload["usage"]> | null;
+  usedTokens: UsageUpdatedPayload["usedTokens"];
+  maxTokens: UsageUpdatedPayload["maxTokens"];
 };
 
-export type AttemptBudget = {
-  stepsUsed: number;
-  maxSteps: number;
-  costUsd: number;
-  maxCostUsd: number;
-  elapsedMs: number;
-  maxWallClockMs: number;
-};
+/** Historical run budget — not current AppSettings (Omit event type tag). */
+export type AttemptBudget = Omit<BudgetUpdatedPayload, "type">;
 
 /** Mandate-scoped audit/UI read model (fold of Attempt events + live tail). */
 export type MandateProjection = {

@@ -1,13 +1,16 @@
 import type { UIMessage } from "ai";
 
+import type {
+  ActivityChainUpdatedPayload,
+  ActivityMarkerPayload,
+  ActivityTaskUpdatedPayload,
+} from "./events";
+
+/** Presentation row: event markerId → row id; wire fields from ActivityMarkerPayload. */
 export type AgentMarkerRow = {
   type: "marker";
   id: string;
-  variant?: "default" | "separator" | "border";
-  text: string;
-  live?: boolean;
-  status?: boolean;
-};
+} & Pick<ActivityMarkerPayload, "variant" | "text" | "live" | "status">;
 
 export type AgentMessageRowData = {
   type: "message";
@@ -16,12 +19,7 @@ export type AgentMessageRowData = {
   scrollAnchor?: boolean;
 };
 
-export type AgentChainOfThoughtStep = {
-  label: string;
-  description?: string;
-  status?: "complete" | "active" | "pending";
-  searchResults?: string[];
-};
+export type AgentChainOfThoughtStep = ActivityChainUpdatedPayload["steps"][number];
 
 export type AgentChainOfThoughtRow = {
   type: "chain-of-thought";
@@ -29,7 +27,7 @@ export type AgentChainOfThoughtRow = {
   steps: AgentChainOfThoughtStep[];
 };
 
-export type AgentTaskItem = string | { text: string; file?: { name: string } };
+export type AgentTaskItem = ActivityTaskUpdatedPayload["items"][number];
 
 export type AgentTaskRow = {
   type: "task";

@@ -8,12 +8,10 @@ import {
   MessageScrollerProvider,
   MessageScrollerViewport,
 } from "@/components/ui/message-scroller";
-import type { PendingPermission } from "@/lib/session";
-import type { PermissionMode } from "@/lib/settings/types";
 import { cn } from "@/lib/utils";
 
 import { MarkerRow } from "./rows/MarkerRow";
-import type { AgentMessageRowData, AgentTranscriptRow } from "./types";
+import type { AgentMessageRowData, AgentTranscriptRow, PermissionResolveProps } from "./types";
 
 /** Heavy rows (markdown / CoT / ai type-guards) — kept off empty-home cold path. */
 const MessageRow = lazy(() =>
@@ -23,16 +21,9 @@ const SpecialRow = lazy(() =>
   import("./rows/SpecialRow").then((mod) => ({ default: mod.SpecialRow })),
 );
 
-export type AgentTranscriptProps = {
+export type AgentTranscriptProps = PermissionResolveProps & {
   readonly rows: readonly AgentTranscriptRow[];
   readonly streamingMessageId?: string | null;
-  readonly pendingPermissions?: readonly PendingPermission[];
-  readonly permissionMode?: PermissionMode;
-  readonly onResolvePermission?: (
-    callId: string,
-    decision: "approved" | "denied",
-    persist?: boolean,
-  ) => void;
   readonly canRetryMessage?: boolean;
   readonly onRetryMessage?: (messageId: string) => void;
 };
@@ -57,6 +48,13 @@ function MessageRowChunkFallback({ row }: { readonly row: AgentMessageRowData })
   );
 }
 
+type TranscriptRowViewProps = PermissionResolveProps & {
+  readonly row: AgentTranscriptRow;
+  readonly isStreaming: boolean;
+  readonly canRetryMessage?: boolean;
+  readonly onRetryMessage?: (messageId: string) => void;
+};
+
 const TranscriptRowView = memo(function TranscriptRowView({
   row,
   isStreaming,
@@ -65,19 +63,7 @@ const TranscriptRowView = memo(function TranscriptRowView({
   onResolvePermission,
   canRetryMessage,
   onRetryMessage,
-}: {
-  readonly row: AgentTranscriptRow;
-  readonly isStreaming: boolean;
-  readonly pendingPermissions?: readonly PendingPermission[];
-  readonly permissionMode?: PermissionMode;
-  readonly onResolvePermission?: (
-    callId: string,
-    decision: "approved" | "denied",
-    persist?: boolean,
-  ) => void;
-  readonly canRetryMessage?: boolean;
-  readonly onRetryMessage?: (messageId: string) => void;
-}): ReactElement {
+}: TranscriptRowViewProps): ReactElement {
   switch (row.type) {
     case "marker":
       return <MarkerRow row={row} />;
@@ -115,19 +101,7 @@ const TranscriptItem = memo(function TranscriptItem({
   onResolvePermission,
   canRetryMessage,
   onRetryMessage,
-}: {
-  readonly row: AgentTranscriptRow;
-  readonly isStreaming: boolean;
-  readonly pendingPermissions?: readonly PendingPermission[];
-  readonly permissionMode?: PermissionMode;
-  readonly onResolvePermission?: (
-    callId: string,
-    decision: "approved" | "denied",
-    persist?: boolean,
-  ) => void;
-  readonly canRetryMessage?: boolean;
-  readonly onRetryMessage?: (messageId: string) => void;
-}): ReactElement {
+}: TranscriptRowViewProps): ReactElement {
   return (
     <MessageScrollerItem
       messageId={row.id}

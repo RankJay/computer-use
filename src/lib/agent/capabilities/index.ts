@@ -8,6 +8,7 @@ export type {
   ToolPartLocation,
 } from "./types";
 
+export { capabilityRiskSchema } from "./risk";
 export { defineCapability } from "./types";
 
 export { needsPermission, permissionRiskForCapability } from "./permission";

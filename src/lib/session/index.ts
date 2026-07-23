@@ -4,8 +4,9 @@ export type {
   RunStatus,
   UIMessagePartSnapshot,
   LanguageModelUsageSnapshot,
+  PermissionDecision,
 } from "./events";
-export { RUNTIME_EVENT_SCHEMA_VERSION, isRuntimeEvent } from "./events";
+export { RUNTIME_EVENT_SCHEMA_VERSION, isRuntimeEvent, runStatusSchema } from "./events";
 
 export type {
   AgentTranscriptRow,
@@ -37,6 +38,8 @@ export {
   PASSTHROUGH_EXECUTION_CONTEXT_OPTIONS,
   foldExecutionContext,
 } from "./execution-context";
+
+export type { RunExecutionContext } from "./run-execution-context";
 
 export {
   createFoldState,
@@ -109,6 +112,8 @@ export {
   createEscalationPort,
   createAutoEscalationPort,
   DEFAULT_PARK_TIMEOUT_MS,
+  permissionDecisionToEscalation,
+  escalationToPermissionDecision,
   type EscalationPort,
   type EscalationPortMode,
   type EscalationOutcome,
@@ -131,7 +136,6 @@ export {
   type RunConfig,
   type ProduceRun,
   type ProduceRunContext,
-  type PermissionDecision,
   type RunControllerDeps,
 } from "./control/run-controller";
 

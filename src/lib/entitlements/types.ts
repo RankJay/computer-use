@@ -13,6 +13,9 @@ export type EntitlementCheck =
       readonly capabilityClass: EntitlementCapabilityClass;
     };
 
+/** Shared by EntitlementCheck discriminants and entitlement.* event payloads. */
+export type EntitlementCheckKind = EntitlementCheck["kind"];
+
 export type EntitlementDecision =
   | { readonly outcome: "allow" }
   | { readonly outcome: "deny"; readonly reason: string }

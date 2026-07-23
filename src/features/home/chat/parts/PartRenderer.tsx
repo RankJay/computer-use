@@ -12,24 +12,16 @@ import {
 import { memo, type ReactElement, type ReactNode } from "react";
 
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
-import type { PendingPermission } from "@/lib/session";
-import type { PermissionMode } from "@/lib/settings/types";
 
+import type { PermissionResolveProps } from "../types";
 import { ReasoningPart } from "./ReasoningPart";
 import { SourcesPart } from "./SourcesPart";
 import { TextPart } from "./TextPart";
 import { ToolPart } from "./ToolPart";
 
-export type PartRendererProps = {
+export type PartRendererProps = PermissionResolveProps & {
   readonly message: UIMessage;
   readonly isStreaming?: boolean;
-  readonly pendingPermissions?: readonly PendingPermission[];
-  readonly permissionMode?: PermissionMode;
-  readonly onResolvePermission?: (
-    callId: string,
-    decision: "approved" | "denied",
-    persist?: boolean,
-  ) => void;
 };
 
 export const PartRenderer = memo(function PartRenderer({
@@ -63,15 +55,7 @@ function lastStreamingTextPartIndex(parts: UIMessage["parts"]): number {
 function renderMessageParts(
   message: UIMessage,
   isStreaming: boolean,
-  permission: {
-    pendingPermissions?: readonly PendingPermission[];
-    permissionMode?: PermissionMode;
-    onResolvePermission?: (
-      callId: string,
-      decision: "approved" | "denied",
-      persist?: boolean,
-    ) => void;
-  },
+  permission: PermissionResolveProps,
 ): ReactNode[] {
   const elements: ReactNode[] = [];
   let index = 0;

@@ -1,9 +1,3 @@
-export type ChatSummary = {
-  id: string;
-  title: string;
-  updatedAt: number;
-};
-
 /**
  * Chat Client metadata row. Transcript truth is the Attempt ledger
  * (MandateProjection), never a messages blob.
@@ -17,3 +11,5 @@ export type StoredChat = {
   createdAt: number;
   updatedAt: number;
 };
+
+export type ChatSummary = Pick<StoredChat, "id" | "title" | "updatedAt">;

@@ -19,8 +19,9 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { toolActivityDetail, uiToolLabel } from "@/lib/agent/capabilities";
 import { isMacOsClient } from "@/lib/platform";
 import type { PendingPermission } from "@/lib/session";
-import type { PermissionMode } from "@/lib/settings/types";
 import { cn } from "@/lib/utils";
+
+import type { PermissionResolveProps } from "../types";
 
 /** Category glyph for activity rows — same role as Reasoning's brain icon. */
 function toolActivityIcon(toolName: string): LucideIcon {
@@ -62,15 +63,8 @@ function toolActivityIcon(toolName: string): LucideIcon {
   return TerminalIcon;
 }
 
-export type ToolPartProps = {
+export type ToolPartProps = PermissionResolveProps & {
   readonly part: ToolUIPart | DynamicToolUIPart;
-  readonly pendingPermissions?: readonly PendingPermission[];
-  readonly permissionMode?: PermissionMode;
-  readonly onResolvePermission?: (
-    callId: string,
-    decision: "approved" | "denied",
-    persist?: boolean,
-  ) => void;
 };
 
 const EMPTY_PENDING_PERMISSIONS: readonly PendingPermission[] = [];

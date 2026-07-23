@@ -21,14 +21,10 @@ import {
   syncAssistantMessage,
   type MessageSyncState,
 } from "@/lib/agent/ui-stream-sync";
-import type { EntitlementPolicy } from "@/lib/entitlements";
-import type { StandingPolicyDocument } from "@/lib/mandates/types";
 import { notifyIfUnfocused } from "@/lib/native/notification";
 import { createBudgetGuard, createBudgetTracker } from "@/lib/session/control/budget";
-import type { EscalationPort } from "@/lib/session/control/escalation-port";
-import type { OsLease } from "@/lib/session/control/os-lease";
-import type { RuntimeEvent, RuntimeEventPayload } from "@/lib/session/events";
-import type { AppSettings } from "@/lib/settings/types";
+import type { RuntimeEventPayload } from "@/lib/session/events";
+import type { RunExecutionContext } from "@/lib/session/run-execution-context";
 
 /** Reads toolCallId without AI SDK guards (empty TOOLS generics collapse ToolUIPart to never). */
 function getPartToolCallId(part: object): string | null {
@@ -37,21 +33,12 @@ function getPartToolCallId(part: object): string | null {
   return typeof id === "string" ? id : null;
 }
 
-export type RunStreamCoordinatorDeps = {
-  taskId: string;
+export type RunStreamCoordinatorDeps = RunExecutionContext & {
   model: LanguageModel | LanguageModelV4;
   modelId: string;
   system: string;
   messages: UIMessage[];
-  settings: AppSettings;
   signal: AbortSignal;
-  append: (payload: RuntimeEventPayload) => unknown;
-  workspaceRoot: string;
-  escalationPort: EscalationPort;
-  entitlements?: EntitlementPolicy;
-  osLease?: OsLease;
-  standingPolicy?: StandingPolicyDocument | null;
-  getEventLog?: () => readonly RuntimeEvent[];
   budgetStartedAt?: number;
 };
 

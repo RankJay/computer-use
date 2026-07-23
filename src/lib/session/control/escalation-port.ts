@@ -1,4 +1,6 @@
+import type { CapabilityRisk } from "@/lib/agent/capabilities/risk";
 import { notifyIfUnfocused as defaultNotifyIfUnfocused } from "@/lib/native/notification";
+import type { PermissionDecision } from "@/lib/session/events";
 
 import type { OsLease } from "./os-lease";
 
@@ -12,7 +14,7 @@ export type EscalationRequest = {
   /** Human-facing label for notify (optional). */
   readonly label?: string;
   readonly input: unknown;
-  readonly risk: "low" | "medium" | "high";
+  readonly risk: CapabilityRisk;
 };
 
 /**
@@ -39,6 +41,14 @@ export type CreateEscalationPortDeps = {
 
 /** Default park timeout when mode is park and timeoutMs omitted. */
 export const DEFAULT_PARK_TIMEOUT_MS = 15 * 60 * 1000;
+
+export function permissionDecisionToEscalation(decision: PermissionDecision): EscalationOutcome {
+  return decision === "approved" ? "allow" : "deny";
+}
+
+export function escalationToPermissionDecision(outcome: EscalationOutcome): PermissionDecision {
+  return outcome === "allow" ? "approved" : "denied";
+}
 
 /**
  * EscalationPort: what “needs a person” means.
