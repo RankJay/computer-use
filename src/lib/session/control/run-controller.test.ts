@@ -16,12 +16,15 @@ describe("createRunController persistApproval", () => {
     const persisted: string[] = [];
     const projection: MandateProjection = {
       ...createEmptyMandateProjection(),
-      pendingPermissions: [
+      pendingInteractions: [
         {
           callId: "c1",
-          capability: "accessibility_click",
-          risk: "high",
-          input: { reference: "e1" },
+          kind: "permission",
+          permission: {
+            capability: "accessibility_click",
+            risk: "high",
+            input: { reference: "e1" },
+          },
         },
       ],
     };
@@ -62,7 +65,12 @@ describe("createRunController persistApproval", () => {
       await Promise.resolve();
     }
 
-    await controller.resolvePermission("c1", "approved", true);
+    await controller.resolve({
+      callId: "c1",
+      kind: "permission",
+      decision: "approved",
+      persist: true,
+    });
     await startPromise;
 
     expect(persisted).toEqual(["accessibility_click"]);

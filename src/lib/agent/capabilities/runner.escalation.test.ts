@@ -45,9 +45,14 @@ describe("runCapability EscalationPort park", () => {
 
     expect(result).toEqual({ ok: false, denied: true });
     expect(lease.holder()).toBeNull();
-    expect(payloads.some((p) => p.type === "permission.requested")).toBe(true);
-    expect(payloads.some((p) => p.type === "permission.resolved" && p.decision === "denied")).toBe(
-      true,
-    );
+    expect(payloads.some((p) => p.type === "interaction.requested")).toBe(true);
+    expect(
+      payloads.some(
+        (p) =>
+          p.type === "interaction.resolved" &&
+          p.kind === "permission" &&
+          p.permission.decision === "denied",
+      ),
+    ).toBe(true);
   });
 });

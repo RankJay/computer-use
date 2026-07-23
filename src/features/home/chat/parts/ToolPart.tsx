@@ -18,7 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { toolActivityDetail, uiToolLabel } from "@/lib/agent/capabilities";
 import { isMacOsClient } from "@/lib/runtime/platform";
-import type { PendingPermission } from "@/lib/session";
+import type { PendingInteraction } from "@/lib/session";
 import { cn } from "@/lib/utils";
 
 import type { PermissionResolveProps } from "../types";
@@ -67,7 +67,7 @@ export type ToolPartProps = PermissionResolveProps & {
   readonly part: ToolUIPart | DynamicToolUIPart;
 };
 
-const EMPTY_PENDING_PERMISSIONS: readonly PendingPermission[] = [];
+const EMPTY_PENDING_INTERACTIONS: readonly PendingInteraction[] = [];
 
 function toolNameFromPart(part: ToolUIPart | DynamicToolUIPart): string {
   if (isDynamicToolUIPart(part)) {
@@ -107,14 +107,14 @@ function isActiveState(state: ToolUIPart["state"] | DynamicToolUIPart["state"]):
 
 export const ToolPart = memo(function ToolPart({
   part,
-  pendingPermissions = EMPTY_PENDING_PERMISSIONS,
+  pendingInteractions = EMPTY_PENDING_INTERACTIONS,
   permissionMode = "destructive-only",
   onResolvePermission,
 }: ToolPartProps): ReactElement {
   const [persistAlways, setPersistAlways] = useState(false);
 
   const toolCallId = part.toolCallId;
-  const isPending = pendingPermissions.some((entry) => entry.callId === toolCallId);
+  const isPending = pendingInteractions.some((entry) => entry.callId === toolCallId);
   const canAct =
     part.state === "approval-requested" && isPending && typeof onResolvePermission === "function";
   const showAlwaysAllow = canAct && permissionMode === "once-per-class";

@@ -30,13 +30,13 @@ describe("evaluateTriggerWake", () => {
     ).toEqual({ action: "suppress", reason: "mandate_running" });
   });
 
-  test("suppresses when waiting_permission", () => {
+  test("suppresses when waiting_interaction", () => {
     expect(
       evaluateTriggerWake({
-        mandate: mandate("waiting_permission"),
+        mandate: mandate("waiting_interaction"),
         live: null,
       }),
-    ).toEqual({ action: "suppress", reason: "waiting_permission" });
+    ).toEqual({ action: "suppress", reason: "waiting_interaction" });
   });
 
   test("armed + idle live → start", () => {

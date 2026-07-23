@@ -11,9 +11,9 @@ import {
   type AttemptFailure,
   type BatchedAttemptStore,
   type MandateProjection,
-  type PendingPermission,
-  type PermissionDecision,
+  type PendingInteraction,
 } from "@/lib/session";
+import type { ResolveInteraction } from "@/lib/session/control/run-controller";
 import { useSettingsSelector, useUpdateSettings } from "@/lib/settings/queries";
 import { selectPermissionMode, selectSelectedModelId } from "@/lib/settings/selectors";
 import type { PermissionMode } from "@/lib/settings/types";
@@ -57,7 +57,7 @@ function toContextUsage(
 export type AgentTranscriptSlice = {
   rows: readonly AgentTranscriptRow[];
   streamingMessageId: string | null;
-  pendingPermissions: readonly PendingPermission[];
+  pendingInteractions: readonly PendingInteraction[];
 };
 
 /** Composer / status-bar actions — deliberately excludes usage (own island). */
@@ -68,15 +68,11 @@ export type AgentSessionControls = AttemptControls & {
   cancel: () => Promise<void>;
   retry: () => Promise<void>;
   retryFromMessage: (assistantMessageId: string) => Promise<void>;
-  resolvePermission: (
-    callId: string,
-    decision: PermissionDecision,
-    persist?: boolean,
-  ) => Promise<void>;
+  resolve: (interaction: ResolveInteraction) => Promise<void>;
   modelId: string;
   onModelChange: (modelId: string) => void | Promise<void>;
   permissionMode: PermissionMode;
-  pendingPermissions: readonly PendingPermission[];
+  pendingInteractions: readonly PendingInteraction[];
 };
 
 /** App-runtime host store — survives Home unmount / route changes. */
@@ -91,7 +87,7 @@ export function useAgentInputDisabled(store: BatchedAttemptStore): boolean {
     () => store.getMandateProjection().status,
     () => store.getMandateProjection().status,
   );
-  return status === "running" || status === "streaming" || status === "waiting_permission";
+  return status === "running" || status === "streaming" || status === "waiting_interaction";
 }
 
 /** Hot path: only fields that affect the transcript list / Thinking marker. */
@@ -106,10 +102,10 @@ export function useAgentTranscript(store: BatchedAttemptStore): AgentTranscriptS
     () => store.getMandateProjection().streamingMessageId,
     () => store.getMandateProjection().streamingMessageId,
   );
-  const pendingPermissions = useSyncExternalStore(
+  const pendingInteractions = useSyncExternalStore(
     store.subscribe,
-    () => store.getMandateProjection().pendingPermissions,
-    () => store.getMandateProjection().pendingPermissions,
+    () => store.getMandateProjection().pendingInteractions,
+    () => store.getMandateProjection().pendingInteractions,
   );
   const status = useSyncExternalStore(
     store.subscribe,
@@ -131,9 +127,9 @@ export function useAgentTranscript(store: BatchedAttemptStore): AgentTranscriptS
     () => ({
       rows: displayRows,
       streamingMessageId,
-      pendingPermissions,
+      pendingInteractions,
     }),
-    [displayRows, streamingMessageId, pendingPermissions],
+    [displayRows, streamingMessageId, pendingInteractions],
   );
 }
 
@@ -164,10 +160,10 @@ export function useAgentSessionControls(store: BatchedAttemptStore): AgentSessio
     () => store.getMandateProjection().failure,
     () => store.getMandateProjection().failure,
   );
-  const pendingPermissions = useSyncExternalStore(
+  const pendingInteractions = useSyncExternalStore(
     store.subscribe,
-    () => store.getMandateProjection().pendingPermissions,
-    () => store.getMandateProjection().pendingPermissions,
+    () => store.getMandateProjection().pendingInteractions,
+    () => store.getMandateProjection().pendingInteractions,
   );
 
   const controls = useMemo(
@@ -176,9 +172,9 @@ export function useAgentSessionControls(store: BatchedAttemptStore): AgentSessio
         ...store.getMandateProjection(),
         status,
         failure,
-        pendingPermissions,
+        pendingInteractions,
       }),
-    [store, status, failure, pendingPermissions],
+    [store, status, failure, pendingInteractions],
   );
 
   const toastStartError = useCallback((result: { ok: false; reason: string; message?: string }) => {
@@ -224,9 +220,8 @@ export function useAgentSessionControls(store: BatchedAttemptStore): AgentSessio
     },
     [store, toastStartError],
   );
-  const resolvePermission = useCallback(
-    (callId: string, decision: PermissionDecision, persist?: boolean) =>
-      store.control.resolvePermission(callId, decision, persist),
+  const resolve = useCallback(
+    (interaction: ResolveInteraction) => store.control.resolve(interaction),
     [store],
   );
 
@@ -251,11 +246,11 @@ export function useAgentSessionControls(store: BatchedAttemptStore): AgentSessio
       cancel,
       retry,
       retryFromMessage,
-      resolvePermission,
+      resolve,
       modelId: selectedModelId,
       onModelChange,
       permissionMode,
-      pendingPermissions,
+      pendingInteractions,
     }),
     [
       controls,
@@ -265,11 +260,11 @@ export function useAgentSessionControls(store: BatchedAttemptStore): AgentSessio
       cancel,
       retry,
       retryFromMessage,
-      resolvePermission,
+      resolve,
       selectedModelId,
       permissionMode,
       onModelChange,
-      pendingPermissions,
+      pendingInteractions,
     ],
   );
 }

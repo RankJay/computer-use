@@ -58,7 +58,7 @@ type TranscriptRowViewProps = PermissionResolveProps & {
 const TranscriptRowView = memo(function TranscriptRowView({
   row,
   isStreaming,
-  pendingPermissions,
+  pendingInteractions,
   permissionMode,
   onResolvePermission,
   canRetryMessage,
@@ -73,7 +73,7 @@ const TranscriptRowView = memo(function TranscriptRowView({
           <MessageRow
             row={row}
             isStreaming={isStreaming}
-            pendingPermissions={pendingPermissions}
+            pendingInteractions={pendingInteractions}
             permissionMode={permissionMode}
             onResolvePermission={onResolvePermission}
             canRetryMessage={canRetryMessage}
@@ -96,7 +96,7 @@ const TranscriptRowView = memo(function TranscriptRowView({
 const TranscriptItem = memo(function TranscriptItem({
   row,
   isStreaming,
-  pendingPermissions,
+  pendingInteractions,
   permissionMode,
   onResolvePermission,
   canRetryMessage,
@@ -110,7 +110,7 @@ const TranscriptItem = memo(function TranscriptItem({
       <TranscriptRowView
         row={row}
         isStreaming={isStreaming}
-        pendingPermissions={pendingPermissions}
+        pendingInteractions={pendingInteractions}
         permissionMode={permissionMode}
         onResolvePermission={onResolvePermission}
         canRetryMessage={canRetryMessage}
@@ -123,7 +123,7 @@ const TranscriptItem = memo(function TranscriptItem({
 export const AgentTranscript = memo(function AgentTranscript({
   rows,
   streamingMessageId = null,
-  pendingPermissions,
+  pendingInteractions,
   permissionMode,
   onResolvePermission,
   canRetryMessage = false,
@@ -139,7 +139,7 @@ export const AgentTranscript = memo(function AgentTranscript({
                 key={row.id}
                 row={row}
                 isStreaming={row.type === "message" && row.id === streamingMessageId}
-                pendingPermissions={pendingPermissions}
+                pendingInteractions={pendingInteractions}
                 permissionMode={permissionMode}
                 onResolvePermission={onResolvePermission}
                 canRetryMessage={canRetryMessage}

@@ -63,7 +63,7 @@ function parseStatus(raw: string | null): MandateLifecycleStatus {
     case "armed":
     case "running":
     case "paused":
-    case "waiting_permission":
+    case "waiting_interaction":
     case "done":
     case "failed":
       return raw;

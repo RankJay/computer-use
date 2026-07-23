@@ -169,16 +169,22 @@ export async function runCapability(
 
   if (policyDecision === "deny") {
     append({
-      type: "permission.requested",
+      type: "interaction.requested",
       callId,
-      capability: name,
-      input: parsedInput,
-      risk: definition.risk,
+      kind: "permission",
+      permission: {
+        capability: name,
+        input: parsedInput,
+        risk: definition.risk,
+      },
     });
     append({
-      type: "permission.resolved",
+      type: "interaction.resolved",
       callId,
-      decision: "denied",
+      kind: "permission",
+      permission: {
+        decision: "denied",
+      },
     });
     emitApprovalPart(deps, resolveLocation(), name, callId, parsedInput, "output-denied", false);
     return { ok: false, denied: true };
@@ -200,11 +206,14 @@ export async function runCapability(
     }
 
     append({
-      type: "permission.requested",
+      type: "interaction.requested",
       callId,
-      capability: name,
-      input: parsedInput,
-      risk: definition.risk,
+      kind: "permission",
+      permission: {
+        capability: name,
+        input: parsedInput,
+        risk: definition.risk,
+      },
     });
     emitApprovalPart(deps, resolveLocation(), name, callId, parsedInput, "approval-requested");
 
@@ -218,9 +227,12 @@ export async function runCapability(
     });
 
     append({
-      type: "permission.resolved",
+      type: "interaction.resolved",
       callId,
-      decision: escalationToPermissionDecision(outcome),
+      kind: "permission",
+      permission: {
+        decision: escalationToPermissionDecision(outcome),
+      },
     });
 
     if (outcome === "deny") {

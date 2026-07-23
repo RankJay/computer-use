@@ -11,7 +11,7 @@ export const runStatusSchema = z.enum([
   "idle",
   "running",
   "streaming",
-  "waiting_permission",
+  "waiting_interaction",
   "completed",
   "failed",
   "cancelled",
@@ -21,6 +21,9 @@ export type RunStatus = z.infer<typeof runStatusSchema>;
 
 /** UI / events / RunController vocabulary (not EscalationOutcome). */
 export type PermissionDecision = "approved" | "denied";
+
+/** Human-visible interaction kinds (EscalationPort may later await non-human waits too). */
+export type InteractionKind = "permission";
 
 export type RuntimeEventEnvelope = {
   eventId: string;
@@ -114,19 +117,25 @@ export type CapabilityFailedPayload = {
   error: { code: string; message: string; details?: string; cause?: string };
 };
 
-export type PermissionRequestedPayload = {
-  type: "permission.requested";
+export type InteractionRequestedPayload = {
+  type: "interaction.requested";
   callId: string;
-  capability: string;
-  input: unknown;
-  risk: CapabilityRisk;
+  kind: "permission";
+  permission: {
+    capability: string;
+    input: unknown;
+    risk: CapabilityRisk;
+  };
 };
 
-export type PermissionResolvedPayload = {
-  type: "permission.resolved";
+export type InteractionResolvedPayload = {
+  type: "interaction.resolved";
   callId: string;
-  decision: PermissionDecision;
-  persisted?: boolean;
+  kind: "permission";
+  permission: {
+    decision: PermissionDecision;
+    persisted?: boolean;
+  };
 };
 
 export type UsageUpdatedPayload = {
@@ -209,8 +218,8 @@ export type RuntimeEventPayload =
   | CapabilityRequestedPayload
   | CapabilityCompletedPayload
   | CapabilityFailedPayload
-  | PermissionRequestedPayload
-  | PermissionResolvedPayload
+  | InteractionRequestedPayload
+  | InteractionResolvedPayload
   | UsageUpdatedPayload
   | BudgetUpdatedPayload
   | BudgetExceededPayload

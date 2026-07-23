@@ -29,9 +29,10 @@ export function lookupSettledCapability(
       };
     }
     if (
-      event.type === "permission.resolved" &&
+      event.type === "interaction.resolved" &&
       event.callId === callId &&
-      event.decision === "denied"
+      event.kind === "permission" &&
+      event.permission.decision === "denied"
     ) {
       return { ok: false, denied: true };
     }

@@ -41,12 +41,12 @@ const TranscriptIsland = memo(function TranscriptIsland({
 }: {
   readonly store: BatchedAttemptStore;
 }): ReactElement {
-  const { rows, streamingMessageId, pendingPermissions } = useAgentTranscript(store);
+  const { rows, streamingMessageId, pendingInteractions } = useAgentTranscript(store);
   const controls = useAgentSessionControls(store);
 
   const onResolvePermission = useCallback(
     (callId: string, decision: PermissionDecision, persist?: boolean) => {
-      void controls.resolvePermission(callId, decision, persist);
+      void controls.resolve({ callId, kind: "permission", decision, persist });
     },
     [controls],
   );
@@ -71,7 +71,7 @@ const TranscriptIsland = memo(function TranscriptIsland({
       <AgentTranscript
         rows={rows}
         streamingMessageId={streamingMessageId}
-        pendingPermissions={pendingPermissions}
+        pendingInteractions={pendingInteractions}
         permissionMode={controls.permissionMode}
         onResolvePermission={onResolvePermission}
         canRetryMessage={controls.canSubmit}
@@ -92,8 +92,8 @@ const ComposerIsland = memo(function ComposerIsland({
   return (
     <div className="flex min-h-12 flex-col gap-2 p-2">
       <AttemptStatusBar
-        pendingPermissions={controls.pendingPermissions}
-        canResolvePermission={controls.canResolvePermission}
+        pendingInteractions={controls.pendingInteractions}
+        canResolve={controls.canResolve}
         failure={controls.failure}
       />
       <TaskPromptComposer

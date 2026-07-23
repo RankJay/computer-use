@@ -1,4 +1,4 @@
-import type { PendingPermission, PermissionDecision } from "@/lib/session";
+import type { PendingInteraction, PermissionDecision } from "@/lib/session";
 import type { PermissionMode } from "@/lib/settings/types";
 
 export type {
@@ -13,7 +13,7 @@ export type {
 
 /** Shared chat UI props for permission escalation resolve. */
 export type PermissionResolveProps = {
-  readonly pendingPermissions?: readonly PendingPermission[];
+  readonly pendingInteractions?: readonly PendingInteraction[];
   readonly permissionMode?: PermissionMode;
   readonly onResolvePermission?: (
     callId: string,

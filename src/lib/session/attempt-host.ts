@@ -74,7 +74,7 @@ export type AttemptHostDeps = {
 };
 
 function isActiveStatus(status: RunStatus): boolean {
-  return status === "running" || status === "streaming" || status === "waiting_permission";
+  return status === "running" || status === "streaming" || status === "waiting_interaction";
 }
 
 function isSettleStatus(status: RunStatus): boolean {
@@ -181,8 +181,8 @@ export function createAttemptHost(deps: AttemptHostDeps): BatchedAttemptStore {
       return;
     }
     switch (status) {
-      case "waiting_permission":
-        await mandates.update(mandateId, { status: "waiting_permission" });
+      case "waiting_interaction":
+        await mandates.update(mandateId, { status: "waiting_interaction" });
         return;
       case "running":
       case "streaming":
@@ -370,7 +370,7 @@ export function createAttemptHost(deps: AttemptHostDeps): BatchedAttemptStore {
 
     if (status !== prev) {
       if (
-        status === "waiting_permission" ||
+        status === "waiting_interaction" ||
         status === "running" ||
         status === "streaming" ||
         isSettleStatus(status)
@@ -379,7 +379,7 @@ export function createAttemptHost(deps: AttemptHostDeps): BatchedAttemptStore {
       }
     }
 
-    if (status === "waiting_permission" && prev !== status) {
+    if (status === "waiting_interaction" && prev !== status) {
       scheduleLedgerFlush(true);
       return;
     }

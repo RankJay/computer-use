@@ -8,7 +8,7 @@ export type MandateLifecycleStatus =
   | "armed"
   | "running"
   | "paused"
-  | "waiting_permission"
+  | "waiting_interaction"
   | "done"
   | "failed";
 

@@ -4,7 +4,7 @@ import { getDefaultAgentModel } from "@/lib/agent/agent-models";
 
 import type {
   BudgetUpdatedPayload,
-  PermissionRequestedPayload,
+  InteractionRequestedPayload,
   RunStatus,
   TaskFailedPayload,
   UsageUpdatedPayload,
@@ -13,10 +13,7 @@ import type { AgentTranscriptRow } from "./rows";
 
 export type AttemptFailure = Pick<TaskFailedPayload, "code" | "message" | "recoverable">;
 
-export type PendingPermission = Pick<
-  PermissionRequestedPayload,
-  "callId" | "capability" | "input" | "risk"
->;
+export type PendingInteraction = Omit<InteractionRequestedPayload, "type">;
 
 /**
  * Read-model usage: same fields as UsageUpdatedPayload, with nullability
@@ -39,7 +36,7 @@ export type MandateProjection = {
   failure: AttemptFailure | null;
   rows: AgentTranscriptRow[];
   chatMessages: UIMessage[];
-  pendingPermissions: PendingPermission[];
+  pendingInteractions: PendingInteraction[];
   usage: AttemptUsage;
   budget: AttemptBudget;
   streamingMessageId: string | null;
@@ -62,7 +59,7 @@ export const EMPTY_ATTEMPT_USAGE: AttemptUsage = {
 };
 
 /** Shared empty pending list — fold clears must reuse this, never `[]`. */
-export const EMPTY_PENDING_PERMISSIONS: PendingPermission[] = [];
+export const EMPTY_PENDING_INTERACTIONS: PendingInteraction[] = [];
 
 export function createEmptyMandateProjection(): MandateProjection {
   return {
@@ -71,7 +68,7 @@ export function createEmptyMandateProjection(): MandateProjection {
     failure: null,
     rows: [],
     chatMessages: [],
-    pendingPermissions: EMPTY_PENDING_PERMISSIONS,
+    pendingInteractions: EMPTY_PENDING_INTERACTIONS,
     usage: { ...EMPTY_ATTEMPT_USAGE },
     budget: { ...EMPTY_ATTEMPT_BUDGET },
     streamingMessageId: null,

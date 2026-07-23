@@ -8,7 +8,7 @@ function projection(partial: Partial<MandateProjection>): MandateProjection {
   return { ...createEmptyMandateProjection(), ...partial };
 }
 
-const ACTIVE: RunStatus[] = ["running", "streaming", "waiting_permission"];
+const ACTIVE: RunStatus[] = ["running", "streaming", "waiting_interaction"];
 const INACTIVE: RunStatus[] = ["idle", "completed", "failed", "cancelled"];
 
 describe("deriveAttemptControls", () => {
@@ -54,25 +54,26 @@ describe("deriveAttemptControls", () => {
     expect(deriveAttemptControls(projection({ status: "completed" })).canRetry).toBe(false);
   });
 
-  test("canResolvePermission when pendingPermissions non-empty", () => {
-    expect(deriveAttemptControls(projection({ pendingPermissions: [] })).canResolvePermission).toBe(
-      false,
-    );
+  test("canResolve when pendingInteractions non-empty", () => {
+    expect(deriveAttemptControls(projection({ pendingInteractions: [] })).canResolve).toBe(false);
 
     expect(
       deriveAttemptControls(
         projection({
-          status: "waiting_permission",
-          pendingPermissions: [
+          status: "waiting_interaction",
+          pendingInteractions: [
             {
               callId: "c1",
-              capability: "write_file",
-              input: {},
-              risk: "high",
+              kind: "permission",
+              permission: {
+                capability: "write_file",
+                input: {},
+                risk: "high",
+              },
             },
           ],
         }),
-      ).canResolvePermission,
+      ).canResolve,
     ).toBe(true);
   });
 });

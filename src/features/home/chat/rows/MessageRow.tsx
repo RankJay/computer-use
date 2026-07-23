@@ -18,7 +18,7 @@ export type MessageRowProps = PermissionResolveProps & {
 export const MessageRow = memo(function MessageRow({
   row,
   isStreaming = false,
-  pendingPermissions,
+  pendingInteractions,
   permissionMode,
   onResolvePermission,
   canRetryMessage = false,
@@ -38,7 +38,7 @@ export const MessageRow = memo(function MessageRow({
         <PartRenderer
           message={row.message}
           isStreaming={isStreaming}
-          pendingPermissions={pendingPermissions}
+          pendingInteractions={pendingInteractions}
           permissionMode={permissionMode}
           onResolvePermission={onResolvePermission}
         />

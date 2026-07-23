@@ -258,7 +258,7 @@ describe("RunController via AttemptEngine", () => {
     expect(engine.getProjection().status).toBe("cancelled");
   });
 
-  test("resolvePermission unblocks EscalationPort", async () => {
+  test("resolve unblocks EscalationPort", async () => {
     let sawDecision: PermissionDecision | undefined;
 
     const producer: ProduceRun = async ({ append, escalationPort, config, taskId }) => {
@@ -270,11 +270,14 @@ describe("RunController via AttemptEngine", () => {
         userMessageId: `user-${taskId}`,
       });
       append({
-        type: "permission.requested",
+        type: "interaction.requested",
         callId: "c1",
-        capability: "run_shell",
-        input: {},
-        risk: "high",
+        kind: "permission",
+        permission: {
+          capability: "run_shell",
+          input: {},
+          risk: "high",
+        },
       });
       const outcome = await escalationPort.escalate({
         callId: "c1",
@@ -285,9 +288,12 @@ describe("RunController via AttemptEngine", () => {
       });
       sawDecision = escalationToPermissionDecision(outcome);
       append({
-        type: "permission.resolved",
+        type: "interaction.resolved",
         callId: "c1",
-        decision: sawDecision,
+        kind: "permission",
+        permission: {
+          decision: sawDecision,
+        },
       });
       append({ type: "task.completed", finishReason: "stop" });
     };
@@ -300,18 +306,18 @@ describe("RunController via AttemptEngine", () => {
       secrets: DEFAULT_SECRETS,
     });
 
-    // Wait until waiting_permission
+    // Wait until waiting_interaction
     for (let i = 0; i < 20; i += 1) {
-      if (engine.getProjection().status === "waiting_permission") break;
+      if (engine.getProjection().status === "waiting_interaction") break;
       await Promise.resolve();
     }
 
-    await engine.resolvePermission("c1", "approved");
+    await engine.resolve({ callId: "c1", kind: "permission", decision: "approved" });
     await startPromise;
 
     expect(sawDecision).toBe("approved");
     expect(engine.getProjection().status).toBe("completed");
-    expect(engine.getProjection().pendingPermissions).toEqual([]);
+    expect(engine.getProjection().pendingInteractions).toEqual([]);
   });
 
   test("cancel denies pending EscalationPort waits", async () => {
@@ -326,11 +332,14 @@ describe("RunController via AttemptEngine", () => {
         userMessageId: `user-${taskId}`,
       });
       append({
-        type: "permission.requested",
+        type: "interaction.requested",
         callId: "c1",
-        capability: "run_shell",
-        input: {},
-        risk: "high",
+        kind: "permission",
+        permission: {
+          capability: "run_shell",
+          input: {},
+          risk: "high",
+        },
       });
       const outcome = await escalationPort.escalate({
         callId: "c1",
@@ -354,7 +363,7 @@ describe("RunController via AttemptEngine", () => {
     });
 
     for (let i = 0; i < 20; i += 1) {
-      if (engine.getProjection().pendingPermissions.length > 0) break;
+      if (engine.getProjection().pendingInteractions.length > 0) break;
       await Promise.resolve();
     }
 

@@ -1,21 +1,22 @@
 import type { ReactElement } from "react";
 
 import { uiToolLabel } from "@/lib/agent/capabilities";
-import type { AttemptFailure, PendingPermission } from "@/lib/session";
+import type { AttemptFailure, PendingInteraction } from "@/lib/session";
 
 export type AttemptStatusBarProps = {
-  readonly pendingPermissions: readonly PendingPermission[];
-  readonly canResolvePermission: boolean;
+  readonly pendingInteractions: readonly PendingInteraction[];
+  readonly canResolve: boolean;
   readonly failure: AttemptFailure | null;
 };
 
 /** Compact multi-pending permission summary + failure line above the composer. */
 export function AttemptStatusBar({
-  pendingPermissions,
-  canResolvePermission,
+  pendingInteractions,
+  canResolve,
   failure,
 }: AttemptStatusBarProps): ReactElement | null {
-  const showBanner = canResolvePermission && pendingPermissions.length > 1;
+  const permissionPending = pendingInteractions.filter((entry) => entry.kind === "permission");
+  const showBanner = canResolve && permissionPending.length > 1;
   const showFailure = failure !== null;
 
   if (!showBanner && !showFailure) {
@@ -23,7 +24,7 @@ export function AttemptStatusBar({
   }
 
   const capabilityNames = [
-    ...new Set(pendingPermissions.map((entry) => uiToolLabel(entry.capability))),
+    ...new Set(permissionPending.map((entry) => uiToolLabel(entry.permission.capability))),
   ];
 
   return (
@@ -34,7 +35,7 @@ export function AttemptStatusBar({
           data-testid="multi-pending-banner"
         >
           <span className="font-medium text-foreground">
-            {pendingPermissions.length} tools waiting for approval
+            {permissionPending.length} tools waiting for approval
           </span>
           <span className="mx-1.5 text-border">·</span>
           <span>{capabilityNames.join(", ")}</span>

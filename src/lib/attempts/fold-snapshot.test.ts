@@ -39,20 +39,31 @@ describe("attempt fold snapshot Zod boundary", () => {
   test("rejects invalid CapabilityRisk on pending permission", () => {
     const snap = projectionToFoldSnapshot({
       ...createEmptyMandateProjection(),
-      pendingPermissions: [
+      pendingInteractions: [
         {
           callId: "c1",
-          capability: "shell_run",
-          input: {},
-          risk: "medium",
+          kind: "permission",
+          permission: {
+            capability: "shell_run",
+            input: {},
+            risk: "medium",
+          },
         },
       ],
     });
     expect(
       parseAttemptFoldSnapshot({
         ...snap,
-        pendingPermissions: [
-          { callId: "c1", capability: "shell_run", input: {}, risk: "critical" },
+        pendingInteractions: [
+          {
+            callId: "c1",
+            kind: "permission",
+            permission: {
+              capability: "shell_run",
+              input: {},
+              risk: "critical",
+            },
+          },
         ],
       }),
     ).toBeNull();

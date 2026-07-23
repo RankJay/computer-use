@@ -90,7 +90,7 @@ describe("runCapability", () => {
     );
 
     await Promise.resolve();
-    expect(payloads.some((p) => p.type === "permission.requested")).toBe(true);
+    expect(payloads.some((p) => p.type === "interaction.requested")).toBe(true);
     expect(
       payloads.some(
         (p) =>
@@ -108,7 +108,7 @@ describe("runCapability", () => {
     port.resolve("call-delete", "allow");
     const result = await resultPromise;
     expect(result.ok).toBe(true);
-    expect(payloads.some((p) => p.type === "permission.resolved")).toBe(true);
+    expect(payloads.some((p) => p.type === "interaction.resolved")).toBe(true);
     expect(
       payloads.some(
         (p) =>

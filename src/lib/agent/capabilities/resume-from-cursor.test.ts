@@ -33,16 +33,19 @@ describe("lookupSettledCapability", () => {
     });
   });
 
-  test("returns denied for permission.resolved denied", () => {
+  test("returns denied for interaction.resolved permission denied", () => {
     const events: RuntimeEvent[] = [
       event({
-        type: "permission.resolved",
+        type: "interaction.resolved",
         eventId: "1",
         taskId: "t",
         timestamp: 1,
         schemaVersion: RUNTIME_EVENT_SCHEMA_VERSION,
         callId: "c2",
-        decision: "denied",
+        kind: "permission",
+        permission: {
+          decision: "denied",
+        },
       }),
     ];
     expect(lookupSettledCapability(events, "c2")).toEqual({ ok: false, denied: true });

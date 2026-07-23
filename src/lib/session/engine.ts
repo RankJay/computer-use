@@ -8,8 +8,8 @@ import type { OsLease } from "./control/os-lease";
 import { planRegenerateFromAssistant } from "./control/regenerate-from-message";
 import {
   createRunController,
-  type PermissionDecision,
   type ProduceRun,
+  type ResolveInteraction,
   type RunConfig,
   type RunController,
 } from "./control/run-controller";
@@ -51,11 +51,7 @@ export type AttemptEngine = {
   hydrateFromLedger: (input: LedgerHydrateInput) => void;
   start: (config: RunConfig) => Promise<void>;
   cancel: () => Promise<void>;
-  resolvePermission: (
-    callId: string,
-    decision: PermissionDecision,
-    persist?: boolean,
-  ) => Promise<void>;
+  resolve: (interaction: ResolveInteraction) => Promise<void>;
   retry: () => Promise<void>;
   /**
    * Regenerate the answer at `assistantMessageId`: keep prior turns + its user
@@ -71,7 +67,7 @@ export type AttemptEngine = {
 };
 
 function isActiveStatus(status: RunStatus): boolean {
-  return status === "running" || status === "streaming" || status === "waiting_permission";
+  return status === "running" || status === "streaming" || status === "waiting_interaction";
 }
 
 export type AttemptEngineDeps = {
@@ -192,8 +188,7 @@ export function createAttemptEngine(deps: AttemptEngineDeps): AttemptEngine {
     },
     start: (config) => controller.start(config),
     cancel: () => controller.cancel(),
-    resolvePermission: (callId, decision, persist) =>
-      controller.resolvePermission(callId, decision, persist),
+    resolve: (interaction) => controller.resolve(interaction),
     retry: () => controller.retry(),
     async retryFromMessage(assistantMessageId, config) {
       if (isActiveStatus(projection.status)) {

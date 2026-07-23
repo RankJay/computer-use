@@ -17,7 +17,7 @@ export function projectionToFoldSnapshot(projection: MandateProjection): Attempt
     failure: projection.failure,
     rows: projection.rows,
     chatMessages: projection.chatMessages,
-    pendingPermissions: projection.pendingPermissions,
+    pendingInteractions: projection.pendingInteractions,
     usage: { ...projection.usage },
     budget: { ...projection.budget },
     streamingMessageId: projection.streamingMessageId,
@@ -32,7 +32,7 @@ export function foldStateFromSnapshot(snapshot: AttemptFoldSnapshot): FoldState 
       failure: snapshot.failure,
       rows: snapshot.rows,
       chatMessages: snapshot.chatMessages,
-      pendingPermissions: snapshot.pendingPermissions,
+      pendingInteractions: snapshot.pendingInteractions,
       usage: { ...snapshot.usage },
       budget: { ...snapshot.budget },
       streamingMessageId: snapshot.streamingMessageId,
@@ -89,12 +89,15 @@ export const attemptFoldSnapshotSchema = z.object({
     .nullable(),
   rows: z.array(z.custom<AgentTranscriptRow>(isAgentTranscriptRow)),
   chatMessages: z.array(z.custom<UIMessage>(isUiMessage)),
-  pendingPermissions: z.array(
+  pendingInteractions: z.array(
     z.object({
       callId: z.string(),
-      capability: z.string(),
-      input: z.unknown(),
-      risk: capabilityRiskSchema,
+      kind: z.literal("permission"),
+      permission: z.object({
+        capability: z.string(),
+        input: z.unknown(),
+        risk: capabilityRiskSchema,
+      }),
     }),
   ),
   usage: z.object({

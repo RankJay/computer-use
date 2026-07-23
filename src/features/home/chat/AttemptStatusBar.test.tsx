@@ -2,23 +2,26 @@ import { describe, expect, test } from "bun:test";
 
 import { renderToStaticMarkup } from "react-dom/server";
 
-import type { AttemptFailure, PendingPermission } from "@/lib/session";
+import type { AttemptFailure, PendingInteraction } from "@/lib/session";
 
 import { AttemptStatusBar } from "./AttemptStatusBar";
 
-const pending = (callId: string, capability: string): PendingPermission => ({
+const pending = (callId: string, capability: string): PendingInteraction => ({
   callId,
-  capability,
-  input: {},
-  risk: "high",
+  kind: "permission",
+  permission: {
+    capability,
+    input: {},
+    risk: "high",
+  },
 });
 
 describe("AttemptStatusBar", () => {
   test("hides when fewer than two pending permissions", () => {
     const html = renderToStaticMarkup(
       <AttemptStatusBar
-        pendingPermissions={[pending("c1", "write_file")]}
-        canResolvePermission
+        pendingInteractions={[pending("c1", "write_file")]}
+        canResolve
         failure={null}
       />,
     );
@@ -28,8 +31,8 @@ describe("AttemptStatusBar", () => {
   test("shows banner when two or more pending", () => {
     const html = renderToStaticMarkup(
       <AttemptStatusBar
-        pendingPermissions={[pending("c1", "write_file"), pending("c2", "run_shell")]}
-        canResolvePermission
+        pendingInteractions={[pending("c1", "write_file"), pending("c2", "run_shell")]}
+        canResolve
         failure={null}
       />,
     );
@@ -42,8 +45,8 @@ describe("AttemptStatusBar", () => {
   test("shows friendly labels for mouse and accessibility tools", () => {
     const html = renderToStaticMarkup(
       <AttemptStatusBar
-        pendingPermissions={[pending("c1", "mouse_move"), pending("c2", "accessibility_click")]}
-        canResolvePermission
+        pendingInteractions={[pending("c1", "mouse_move"), pending("c2", "accessibility_click")]}
+        canResolve
         failure={null}
       />,
     );
@@ -53,11 +56,11 @@ describe("AttemptStatusBar", () => {
     expect(html).not.toContain("accessibility_click");
   });
 
-  test("hides banner when canResolvePermission is false", () => {
+  test("hides banner when canResolve is false", () => {
     const html = renderToStaticMarkup(
       <AttemptStatusBar
-        pendingPermissions={[pending("c1", "write_file"), pending("c2", "run_shell")]}
-        canResolvePermission={false}
+        pendingInteractions={[pending("c1", "write_file"), pending("c2", "run_shell")]}
+        canResolve={false}
         failure={null}
       />,
     );
@@ -71,7 +74,7 @@ describe("AttemptStatusBar", () => {
       recoverable: true,
     };
     const html = renderToStaticMarkup(
-      <AttemptStatusBar pendingPermissions={[]} canResolvePermission={false} failure={failure} />,
+      <AttemptStatusBar pendingInteractions={[]} canResolve={false} failure={failure} />,
     );
     expect(html).toContain('data-testid="attempt-failure-line"');
     expect(html).toContain("auth");

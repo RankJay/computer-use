@@ -142,7 +142,7 @@ describe("deriveDisplayRows", () => {
     const display = deriveDisplayRows(
       projection({
         taskId,
-        status: "waiting_permission",
+        status: "waiting_interaction",
         streamingMessageId: assistantId,
         rows,
       }),

@@ -3,15 +3,15 @@ import type { UIMessage } from "ai";
 import type { RuntimeEvent, UIMessagePartSnapshot } from "./events";
 import {
   createEmptyMandateProjection,
-  EMPTY_PENDING_PERMISSIONS,
-  type PendingPermission,
+  EMPTY_PENDING_INTERACTIONS,
+  type PendingInteraction,
   type MandateProjection,
 } from "./projection";
 import type { AgentMessageRowData, AgentTranscriptRow } from "./rows";
 
-/** Clear pending permissions without inventing a new empty-array identity. */
-function clearedPendingPermissions(pending: PendingPermission[]): PendingPermission[] {
-  return pending.length === 0 ? pending : EMPTY_PENDING_PERMISSIONS;
+/** Clear pending interactions without inventing a new empty-array identity. */
+function clearedPendingInteractions(pending: PendingInteraction[]): PendingInteraction[] {
+  return pending.length === 0 ? pending : EMPTY_PENDING_INTERACTIONS;
 }
 
 export type FoldState = {
@@ -19,7 +19,7 @@ export type FoldState = {
   status: MandateProjection["status"];
   failure: MandateProjection["failure"];
   rows: AgentTranscriptRow[];
-  pendingPermissions: PendingPermission[];
+  pendingInteractions: PendingInteraction[];
   usage: MandateProjection["usage"];
   budget: MandateProjection["budget"];
   streamingMessageId: string | null;
@@ -35,7 +35,7 @@ export function createFoldState(
     status: previous.status,
     failure: previous.failure,
     rows: previous.rows,
-    pendingPermissions: previous.pendingPermissions,
+    pendingInteractions: previous.pendingInteractions,
     usage: { ...previous.usage },
     budget: { ...previous.budget },
     streamingMessageId: previous.streamingMessageId,
@@ -194,8 +194,8 @@ const KNOWN_EVENT_TYPES = new Set<RuntimeEvent["type"]>([
   "capability.requested",
   "capability.completed",
   "capability.failed",
-  "permission.requested",
-  "permission.resolved",
+  "interaction.requested",
+  "interaction.resolved",
   "usage.updated",
   "budget.updated",
   "budget.exceeded",
@@ -212,7 +212,7 @@ export function isKnownRuntimeEvent(event: { type: string }): boolean {
 
 /**
  * Pure immutable reducer with structural sharing.
- * Permission events update pendingPermissions only — they never patch tool parts.
+ * Interaction events update pendingInteractions only — they never patch tool parts.
  */
 export function reduceFold(state: FoldState, event: RuntimeEvent): FoldState {
   if (state.seenEventIds.has(event.eventId)) {
@@ -228,7 +228,7 @@ export function reduceFold(state: FoldState, event: RuntimeEvent): FoldState {
         taskId: event.taskId,
         status: "running",
         failure: null,
-        pendingPermissions: clearedPendingPermissions(base.pendingPermissions),
+        pendingInteractions: clearedPendingInteractions(base.pendingInteractions),
         streamingMessageId: null,
         usage: { ...base.usage, modelId: event.modelId },
       };
@@ -268,7 +268,7 @@ export function reduceFold(state: FoldState, event: RuntimeEvent): FoldState {
       return {
         ...base,
         status,
-        pendingPermissions: clearedPendingPermissions(base.pendingPermissions),
+        pendingInteractions: clearedPendingInteractions(base.pendingInteractions),
         streamingMessageId: null,
       };
     }
@@ -282,7 +282,7 @@ export function reduceFold(state: FoldState, event: RuntimeEvent): FoldState {
           message: event.message,
           recoverable: event.recoverable,
         },
-        pendingPermissions: clearedPendingPermissions(base.pendingPermissions),
+        pendingInteractions: clearedPendingInteractions(base.pendingInteractions),
         streamingMessageId: null,
       };
       return appendFailureMessage(withFailure, event.taskId, event.message);
@@ -332,31 +332,30 @@ export function reduceFold(state: FoldState, event: RuntimeEvent): FoldState {
       return { ...base, rows: upsertRow(base.rows, row) };
     }
 
-    case "permission.requested": {
-      const next: PendingPermission = {
+    case "interaction.requested": {
+      const next: PendingInteraction = {
         callId: event.callId,
-        capability: event.capability,
-        input: event.input,
-        risk: event.risk,
+        kind: event.kind,
+        permission: event.permission,
       };
-      const withoutDup = base.pendingPermissions.filter((p) => p.callId !== event.callId);
+      const withoutDup = base.pendingInteractions.filter((p) => p.callId !== event.callId);
       return {
         ...base,
-        status: "waiting_permission",
-        pendingPermissions: [...withoutDup, next],
+        status: "waiting_interaction",
+        pendingInteractions: [...withoutDup, next],
       };
     }
 
-    case "permission.resolved": {
-      const remaining = base.pendingPermissions.filter((p) => p.callId !== event.callId);
-      const pendingPermissions = remaining.length === 0 ? EMPTY_PENDING_PERMISSIONS : remaining;
+    case "interaction.resolved": {
+      const remaining = base.pendingInteractions.filter((p) => p.callId !== event.callId);
+      const pendingInteractions = remaining.length === 0 ? EMPTY_PENDING_INTERACTIONS : remaining;
       return {
         ...base,
-        pendingPermissions,
+        pendingInteractions,
         status:
-          pendingPermissions.length > 0
-            ? "waiting_permission"
-            : base.status === "waiting_permission"
+          pendingInteractions.length > 0
+            ? "waiting_interaction"
+            : base.status === "waiting_interaction"
               ? "running"
               : base.status,
       };
@@ -396,7 +395,7 @@ export function reduceFold(state: FoldState, event: RuntimeEvent): FoldState {
           message,
           recoverable: true,
         },
-        pendingPermissions: clearedPendingPermissions(base.pendingPermissions),
+        pendingInteractions: clearedPendingInteractions(base.pendingInteractions),
         streamingMessageId: null,
       };
       if (base.taskId) {
@@ -435,7 +434,7 @@ export function toProjection(
     failure: state.failure,
     rows: state.rows,
     chatMessages: rowsUnchanged ? previous.chatMessages : chatMessagesFromRows(state.rows),
-    pendingPermissions: state.pendingPermissions,
+    pendingInteractions: state.pendingInteractions,
     usage: state.usage,
     budget: state.budget,
     streamingMessageId: state.streamingMessageId,

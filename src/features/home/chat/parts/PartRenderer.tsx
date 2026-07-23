@@ -27,14 +27,14 @@ export type PartRendererProps = PermissionResolveProps & {
 export const PartRenderer = memo(function PartRenderer({
   message,
   isStreaming = false,
-  pendingPermissions,
+  pendingInteractions,
   permissionMode,
   onResolvePermission,
 }: PartRendererProps): ReactElement {
   return (
     <>
       {renderMessageParts(message, isStreaming, {
-        pendingPermissions,
+        pendingInteractions,
         permissionMode,
         onResolvePermission,
       })}
@@ -121,7 +121,7 @@ function renderMessageParts(
         <ToolPart
           key={`tool-${index}`}
           part={part}
-          pendingPermissions={permission.pendingPermissions}
+          pendingInteractions={permission.pendingInteractions}
           permissionMode={permission.permissionMode}
           onResolvePermission={permission.onResolvePermission}
         />,

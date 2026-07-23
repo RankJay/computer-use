@@ -4,7 +4,7 @@ import type { PermissionDecision } from "@/lib/session/events";
 
 import type { OsLease } from "./os-lease";
 
-/** Port outcome for one Capability call (maps to permission.resolved approved/denied). */
+/** Port outcome for one Capability call (maps to interaction.resolved permission decision). */
 export type EscalationOutcome = "allow" | "deny";
 
 export type EscalationRequest = {

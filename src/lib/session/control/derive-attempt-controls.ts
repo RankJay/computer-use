@@ -7,17 +7,17 @@ export type AttemptControls = {
   cancelVisible: boolean;
   inputDisabled: boolean;
   canRetry: boolean;
-  canResolvePermission: boolean;
+  canResolve: boolean;
 };
 
 function isActiveStatus(status: RunStatus): boolean {
-  return status === "running" || status === "streaming" || status === "waiting_permission";
+  return status === "running" || status === "streaming" || status === "waiting_interaction";
 }
 
 /** Derive presentation/control flags from projection — never store these on MandateProjection. */
 export function deriveAttemptControls(projection: MandateProjection): AttemptControls {
   const active = isActiveStatus(projection.status);
-  const hasPendingPermissions = projection.pendingPermissions.length > 0;
+  const hasPendingInteractions = projection.pendingInteractions.length > 0;
 
   return {
     canSubmit: !active,
@@ -25,6 +25,6 @@ export function deriveAttemptControls(projection: MandateProjection): AttemptCon
     cancelVisible: active,
     inputDisabled: active,
     canRetry: projection.status === "failed" && projection.failure?.recoverable === true,
-    canResolvePermission: hasPendingPermissions,
+    canResolve: hasPendingInteractions,
   };
 }

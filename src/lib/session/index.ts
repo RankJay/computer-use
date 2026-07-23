@@ -28,11 +28,11 @@ export type {
   AttemptFailure,
   AttemptUsage,
   AttemptBudget,
-  PendingPermission,
+  PendingInteraction,
 } from "./projection";
 export {
   createEmptyMandateProjection,
-  EMPTY_PENDING_PERMISSIONS,
+  EMPTY_PENDING_INTERACTIONS,
   EMPTY_ATTEMPT_BUDGET,
   EMPTY_ATTEMPT_USAGE,
 } from "./projection";

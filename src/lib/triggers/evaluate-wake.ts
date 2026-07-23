@@ -11,7 +11,7 @@ export type TriggerWakeAction = "start" | "suppress" | "queue";
 export type TriggerWakeReason =
   | "ok"
   | "mandate_running"
-  | "waiting_permission"
+  | "waiting_interaction"
   | "concurrency_reject"
   | "concurrency_queue";
 
@@ -30,12 +30,12 @@ export type EvaluateTriggerWakeInput = {
 
 const BLOCKING_STATUSES: ReadonlySet<MandateLifecycleStatus> = new Set([
   "running",
-  "waiting_permission",
+  "waiting_interaction",
 ]);
 
 /**
  * Trigger plane gate: read Mandate lifecycle + live Attempt before AttemptControl.start.
- * Default: suppress when already running / waiting_permission.
+ * Default: suppress when already running / waiting_interaction.
  */
 export function evaluateTriggerWake(input: EvaluateTriggerWakeInput): TriggerWakeDecision {
   const { mandate, live } = input;
@@ -44,7 +44,7 @@ export function evaluateTriggerWake(input: EvaluateTriggerWakeInput): TriggerWak
   if (BLOCKING_STATUSES.has(mandate.status)) {
     return {
       action: "suppress",
-      reason: mandate.status === "waiting_permission" ? "waiting_permission" : "mandate_running",
+      reason: mandate.status === "waiting_interaction" ? "waiting_interaction" : "mandate_running",
     };
   }
 

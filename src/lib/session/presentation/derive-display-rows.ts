@@ -17,7 +17,7 @@ export type DisplayRowsInput = {
 };
 
 function isActiveStatus(status: RunStatus): boolean {
-  return status === "running" || status === "streaming" || status === "waiting_permission";
+  return status === "running" || status === "streaming" || status === "waiting_interaction";
 }
 
 /** Demo fixtures fold activity.* into CoT / task / marker rows — pass those through unchanged. */

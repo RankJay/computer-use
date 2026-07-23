@@ -5,7 +5,7 @@ import type { AppSecrets, AppSettings } from "@/lib/settings/types";
 import type { RetryFromMessageConfig, AttemptEngine } from "../engine";
 import { foldModelContext } from "../model-context";
 import type { AttemptRegistry } from "./attempt-registry";
-import type { PermissionDecision, RunConfig } from "./run-controller";
+import type { ResolveInteraction, RunConfig } from "./run-controller";
 
 export type AttemptStartInput = {
   prompt: string;
@@ -42,11 +42,7 @@ export type AttemptControl = {
   retry: () => Promise<AttemptStartResult>;
   retryFromMessage: (assistantMessageId: string) => Promise<AttemptStartResult>;
   cancel: () => Promise<void>;
-  resolvePermission: (
-    callId: string,
-    decision: PermissionDecision,
-    persist?: boolean,
-  ) => Promise<void>;
+  resolve: (interaction: ResolveInteraction) => Promise<void>;
   getFocusedMandateId: () => string | null;
   getLiveIds: () => AttemptIds | null;
   getLiveChatId: () => string | null;
@@ -253,7 +249,6 @@ export function createAttemptControl(deps: AttemptControlDeps): AttemptControl {
 
     cancel: () => deps.engine.cancel(),
 
-    resolvePermission: (callId, decision, persist) =>
-      deps.engine.resolvePermission(callId, decision, persist),
+    resolve: (interaction) => deps.engine.resolve(interaction),
   };
 }

@@ -48,14 +48,20 @@ export type ProduceRunContext = Pick<
 
 export type ProduceRun = (ctx: ProduceRunContext) => Promise<void>;
 
+export type ResolvePermissionInteraction = {
+  callId: string;
+  kind: "permission";
+  decision: PermissionDecision;
+  persist?: boolean;
+};
+
+/** Widen this union when clarification / custom UI kinds land. */
+export type ResolveInteraction = ResolvePermissionInteraction;
+
 export type RunController = {
   start: (config: RunConfig) => Promise<void>;
   cancel: () => Promise<void>;
-  resolvePermission: (
-    callId: string,
-    decision: PermissionDecision,
-    persist?: boolean,
-  ) => Promise<void>;
+  resolve: (interaction: ResolveInteraction) => Promise<void>;
   retry: () => Promise<void>;
 };
 
@@ -140,25 +146,34 @@ export function createRunController(deps: RunControllerDeps): RunController {
 
     cancel,
 
-    async resolvePermission(callId, decision, persist) {
-      if (decision === "approved" && persist && lastConfig) {
-        const pending = deps
-          .getProjection()
-          .pendingPermissions.find((entry) => entry.callId === callId);
-        if (pending) {
-          // Mutate the live run settings object so later tools in this run
-          // see the approval (runnerDeps holds the same reference).
-          if (!lastConfig.settings.persistedApprovals.includes(pending.capability)) {
-            lastConfig.settings.persistedApprovals = [
-              ...lastConfig.settings.persistedApprovals,
-              pending.capability,
-            ];
+    async resolve(interaction) {
+      switch (interaction.kind) {
+        case "permission": {
+          if (interaction.decision === "approved" && interaction.persist && lastConfig) {
+            const pending = deps
+              .getProjection()
+              .pendingInteractions.find((entry) => entry.callId === interaction.callId);
+            if (pending?.kind === "permission") {
+              const capability = pending.permission.capability;
+              // Mutate the live run settings object so later tools in this run
+              // see the approval (runnerDeps holds the same reference).
+              if (!lastConfig.settings.persistedApprovals.includes(capability)) {
+                lastConfig.settings.persistedApprovals = [
+                  ...lastConfig.settings.persistedApprovals,
+                  capability,
+                ];
+              }
+              await lastConfig.persistApproval?.(capability);
+            }
           }
-          await lastConfig.persistApproval?.(pending.capability);
+
+          escalationPort.resolve(
+            interaction.callId,
+            permissionDecisionToEscalation(interaction.decision),
+          );
+          return;
         }
       }
-
-      escalationPort.resolve(callId, permissionDecisionToEscalation(decision));
     },
 
     async retry() {

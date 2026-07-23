@@ -20,7 +20,7 @@ describe("isCheckpointStatus", () => {
     expect(isCheckpointStatus("idle")).toBe(false);
     expect(isCheckpointStatus("running")).toBe(false);
     expect(isCheckpointStatus("streaming")).toBe(false);
-    expect(isCheckpointStatus("waiting_permission")).toBe(false);
+    expect(isCheckpointStatus("waiting_interaction")).toBe(false);
   });
 });
 

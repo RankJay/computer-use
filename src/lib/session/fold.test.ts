@@ -79,7 +79,7 @@ describe("fold", () => {
     });
   });
 
-  test("pendingPermissions supports parallel callIds", () => {
+  test("pendingInteractions supports parallel callIds", () => {
     const projection = projectMandate([
       evt(1, {
         type: "task.started",
@@ -88,27 +88,33 @@ describe("fold", () => {
         agentMode: "live",
       }),
       evt(2, {
-        type: "permission.requested",
+        type: "interaction.requested",
         callId: "call-a",
-        capability: "run_shell",
-        input: { command: "ls" },
-        risk: "high",
+        kind: "permission",
+        permission: {
+          capability: "run_shell",
+          input: { command: "ls" },
+          risk: "high",
+        },
       }),
       evt(3, {
-        type: "permission.requested",
+        type: "interaction.requested",
         callId: "call-b",
-        capability: "write_file",
-        input: { path: "a.ts" },
-        risk: "medium",
+        kind: "permission",
+        permission: {
+          capability: "write_file",
+          input: { path: "a.ts" },
+          risk: "medium",
+        },
       }),
     ]);
 
-    expect(projection.status).toBe("waiting_permission");
-    expect(projection.pendingPermissions).toHaveLength(2);
-    expect(projection.pendingPermissions.map((p) => p.callId)).toEqual(["call-a", "call-b"]);
+    expect(projection.status).toBe("waiting_interaction");
+    expect(projection.pendingInteractions).toHaveLength(2);
+    expect(projection.pendingInteractions.map((p) => p.callId)).toEqual(["call-a", "call-b"]);
   });
 
-  test("permission.resolved removes only that callId", () => {
+  test("interaction.resolved removes only that callId", () => {
     const projection = projectMandate([
       evt(1, {
         type: "task.started",
@@ -117,29 +123,38 @@ describe("fold", () => {
         agentMode: "live",
       }),
       evt(2, {
-        type: "permission.requested",
+        type: "interaction.requested",
         callId: "call-a",
-        capability: "run_shell",
-        input: {},
-        risk: "high",
+        kind: "permission",
+        permission: {
+          capability: "run_shell",
+          input: {},
+          risk: "high",
+        },
       }),
       evt(3, {
-        type: "permission.requested",
+        type: "interaction.requested",
         callId: "call-b",
-        capability: "write_file",
-        input: {},
-        risk: "medium",
+        kind: "permission",
+        permission: {
+          capability: "write_file",
+          input: {},
+          risk: "medium",
+        },
       }),
       evt(4, {
-        type: "permission.resolved",
+        type: "interaction.resolved",
         callId: "call-a",
-        decision: "approved",
+        kind: "permission",
+        permission: {
+          decision: "approved",
+        },
       }),
     ]);
 
-    expect(projection.pendingPermissions).toHaveLength(1);
-    expect(projection.pendingPermissions[0]?.callId).toBe("call-b");
-    expect(projection.status).toBe("waiting_permission");
+    expect(projection.pendingInteractions).toHaveLength(1);
+    expect(projection.pendingInteractions[0]?.callId).toBe("call-b");
+    expect(projection.status).toBe("waiting_interaction");
   });
 
   test("resolving last permission returns status to running", () => {
@@ -151,20 +166,26 @@ describe("fold", () => {
         agentMode: "live",
       }),
       evt(2, {
-        type: "permission.requested",
+        type: "interaction.requested",
         callId: "call-a",
-        capability: "run_shell",
-        input: {},
-        risk: "high",
+        kind: "permission",
+        permission: {
+          capability: "run_shell",
+          input: {},
+          risk: "high",
+        },
       }),
       evt(3, {
-        type: "permission.resolved",
+        type: "interaction.resolved",
         callId: "call-a",
-        decision: "denied",
+        kind: "permission",
+        permission: {
+          decision: "denied",
+        },
       }),
     ]);
 
-    expect(projection.pendingPermissions).toEqual([]);
+    expect(projection.pendingInteractions).toEqual([]);
     expect(projection.status).toBe("running");
   });
 
@@ -182,11 +203,14 @@ describe("fold", () => {
         role: "assistant",
       }),
       evt(3, {
-        type: "permission.requested",
+        type: "interaction.requested",
         callId: "call-a",
-        capability: "run_shell",
-        input: { command: "ls" },
-        risk: "high",
+        kind: "permission",
+        permission: {
+          capability: "run_shell",
+          input: { command: "ls" },
+          risk: "high",
+        },
       }),
     ]);
 
@@ -238,9 +262,9 @@ describe("fold", () => {
     expect(state.rows[0]).toBe(markerRef);
   });
 
-  test("clearing pendingPermissions reuses empty-array identity", () => {
+  test("clearing pendingInteractions reuses empty-array identity", () => {
     let state = createFoldState();
-    const emptyRef = state.pendingPermissions;
+    const emptyRef = state.pendingInteractions;
 
     state = reduceFold(
       state,
@@ -251,7 +275,7 @@ describe("fold", () => {
         agentMode: "demo",
       }),
     );
-    expect(state.pendingPermissions).toBe(emptyRef);
+    expect(state.pendingInteractions).toBe(emptyRef);
 
     state = reduceFold(
       state,
@@ -260,7 +284,7 @@ describe("fold", () => {
         finishReason: "stop",
       }),
     );
-    expect(state.pendingPermissions).toBe(emptyRef);
+    expect(state.pendingInteractions).toBe(emptyRef);
 
     const before = toProjection(state);
     state = reduceFold(
@@ -273,7 +297,7 @@ describe("fold", () => {
       }),
     );
     const after = toProjection(state, before);
-    expect(after.pendingPermissions).toBe(before.pendingPermissions);
+    expect(after.pendingInteractions).toBe(before.pendingInteractions);
   });
 
   test("toProjection reuses usage/budget/chatMessages when unchanged", () => {
