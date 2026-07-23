@@ -202,6 +202,7 @@ describe("AttemptHost durable ledger", () => {
     const host = createAttemptHost({
       produceRun: createTestDemoProducer(createDemoPayloads("life")),
       mandates,
+      eventStore: new MemoryAttemptEventStore(),
       loadRunContext: async () => ({
         settings: { ...DEFAULT_SETTINGS, agentMode: "demo" },
         secrets: DEFAULT_SECRETS,
@@ -232,6 +233,7 @@ describe("AttemptHost durable ledger", () => {
     const host = createAttemptHost({
       produceRun: createTestDemoProducer(createDemoPayloads("manual")),
       mandates,
+      eventStore: new MemoryAttemptEventStore(),
       loadRunContext: async () => ({
         settings: { ...DEFAULT_SETTINGS, agentMode: "demo" },
         secrets: DEFAULT_SECRETS,

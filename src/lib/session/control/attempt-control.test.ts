@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
+import { MemoryAttemptEventStore } from "@/lib/attempts";
 import { MemoryMandatesPersistence } from "@/lib/mandates";
 import { DEFAULT_SECRETS, DEFAULT_SETTINGS } from "@/lib/settings/defaults";
 
@@ -12,6 +13,7 @@ describe("AttemptControl", () => {
     const host = createAttemptHost({
       produceRun: createTestDemoProducer(createDemoPayloads("hi")),
       mandates,
+      eventStore: new MemoryAttemptEventStore(),
       loadRunContext: async () => ({
         settings: { ...DEFAULT_SETTINGS, agentMode: "demo" },
         secrets: DEFAULT_SECRETS,
@@ -51,6 +53,7 @@ describe("AttemptControl", () => {
     const host = createAttemptHost({
       produceRun: createTestDemoProducer(),
       mandates,
+      eventStore: new MemoryAttemptEventStore(),
       loadRunContext: async () => ({
         settings: { ...DEFAULT_SETTINGS, agentMode: "demo" },
         secrets: DEFAULT_SECRETS,
@@ -69,6 +72,7 @@ describe("AttemptControl", () => {
     const host = createAttemptHost({
       produceRun: createTestDemoProducer(),
       mandates: new MemoryMandatesPersistence(),
+      eventStore: new MemoryAttemptEventStore(),
       loadRunContext: async () => null,
     });
 
@@ -93,6 +97,7 @@ describe("AttemptControl", () => {
         append({ type: "task.completed", finishReason: "stop" });
       },
       mandates: new MemoryMandatesPersistence(),
+      eventStore: new MemoryAttemptEventStore(),
       loadRunContext: async () => ({
         settings: { ...DEFAULT_SETTINGS, agentMode: "demo" },
         secrets: DEFAULT_SECRETS,
@@ -150,6 +155,7 @@ describe("AttemptHost.bindChatRoute", () => {
         append({ type: "task.completed", finishReason: "stop" });
       },
       mandates: new MemoryMandatesPersistence(),
+      eventStore: new MemoryAttemptEventStore(),
       loadRunContext: async () => ({
         settings: { ...DEFAULT_SETTINGS, agentMode: "demo" },
         secrets: DEFAULT_SECRETS,
@@ -186,6 +192,7 @@ describe("AttemptHost.bindChatRoute", () => {
     const host = createAttemptHost({
       produceRun: createTestDemoProducer(),
       mandates,
+      eventStore: new MemoryAttemptEventStore(),
       loadRunContext: async () => ({
         settings: { ...DEFAULT_SETTINGS, agentMode: "demo" },
         secrets: DEFAULT_SECRETS,

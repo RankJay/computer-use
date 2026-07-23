@@ -6,14 +6,6 @@ mock.module("sonner", () => ({
   toast: { error: toastErrorMock },
 }));
 
-mock.module("@/lib/runtime/is-tauri-runtime", () => ({
-  isTauriRuntime: () => true,
-}));
-
-mock.module("@/lib/runtime/platform", () => ({
-  isMacOsClient: () => true,
-}));
-
 const { reportMacOsPermissionError } = await import("@/lib/macos-permissions/queries");
 
 describe("reportMacOsPermissionError", () => {

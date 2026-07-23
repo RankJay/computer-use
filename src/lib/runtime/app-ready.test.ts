@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, mock, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 
 const invokeMock = mock(async (command: string) => {
   void command;
@@ -8,15 +8,27 @@ mock.module("@tauri-apps/api/core", () => ({
   invoke: invokeMock,
 }));
 
-mock.module("@/lib/runtime/is-tauri-runtime", () => ({
-  isTauriRuntime: () => true,
-}));
-
 const { signalAppReady } = await import("@/lib/runtime/app-ready");
 
+function installTauriWindow(): void {
+  Object.defineProperty(globalThis, "window", {
+    value: { __TAURI_INTERNALS__: {} },
+    configurable: true,
+  });
+}
+
+function uninstallTauriWindow(): void {
+  Reflect.deleteProperty(globalThis, "window");
+}
+
 describe("signalAppReady", () => {
-  afterEach(() => {
+  beforeEach(() => {
     invokeMock.mockClear();
+    installTauriWindow();
+  });
+
+  afterEach(() => {
+    uninstallTauriWindow();
   });
 
   test("invokes app_ready once after two animation frames", async () => {

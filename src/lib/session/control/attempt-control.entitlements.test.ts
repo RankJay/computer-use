@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
+import { MemoryAttemptEventStore } from "@/lib/attempts";
 import {
   createEntitlementPolicy,
   MemoryMeterStore,
@@ -35,6 +36,7 @@ describe("AttemptControl entitlements", () => {
         return createTestDemoProducer(createDemoPayloads("hi"))(ctx);
       },
       mandates: new MemoryMandatesPersistence(),
+      eventStore: new MemoryAttemptEventStore(),
       entitlements,
       loadRunContext: async () => ({
         settings: { ...DEFAULT_SETTINGS, agentMode: "demo" },
@@ -76,6 +78,7 @@ describe("AttemptControl entitlements", () => {
       createAttemptHost({
         produceRun: createTestDemoProducer(createDemoPayloads("x")),
         mandates: new MemoryMandatesPersistence(),
+        eventStore: new MemoryAttemptEventStore(),
         entitlements: createEntitlementPolicy({
           getSubjectId: async () => "anonymous",
           getPlan: async () => ONE_ATTEMPT,

@@ -1,29 +1,83 @@
-import { afterEach, describe, expect, mock, test } from "bun:test";
+import { describe, expect, test } from "bun:test";
 
-const invokeMock = mock(() =>
-  Promise.resolve({ name: "ACTUATE_UPDATER", value: null as string | null, set: false }),
-);
-const isTauriRuntimeMock = mock(() => true);
+import { isUpdaterEnabled, resolveUpdaterEnabled } from "@/lib/updater/enabled";
 
-mock.module("@tauri-apps/api/core", () => ({
-  invoke: invokeMock,
-}));
-
-mock.module("@/lib/runtime/is-tauri-runtime", () => ({
-  isTauriRuntime: isTauriRuntimeMock,
-}));
-
-describe("isUpdaterEnabled", () => {
-  afterEach(() => {
-    invokeMock.mockClear();
-    isTauriRuntimeMock.mockClear();
-    isTauriRuntimeMock.mockImplementation(() => true);
+describe("resolveUpdaterEnabled", () => {
+  test("false outside Tauri", async () => {
+    expect(
+      await resolveUpdaterEnabled({
+        isTauri: false,
+        isDev: false,
+        viteUpdaterFlag: undefined,
+        readActuateUpdaterEnv: async () => "1",
+      }),
+    ).toBe(false);
   });
 
-  test("false outside Tauri", async () => {
-    isTauriRuntimeMock.mockImplementation(() => false);
-    const { isUpdaterEnabled } = await import("@/lib/updater/enabled");
+  test("true in packaged Tauri builds", async () => {
+    expect(
+      await resolveUpdaterEnabled({
+        isTauri: true,
+        isDev: false,
+        viteUpdaterFlag: undefined,
+        readActuateUpdaterEnv: async () => {
+          throw new Error("should not read env in packaged builds");
+        },
+      }),
+    ).toBe(true);
+  });
+
+  test("true in Tauri dev when VITE_ACTUATE_UPDATER=1", async () => {
+    expect(
+      await resolveUpdaterEnabled({
+        isTauri: true,
+        isDev: true,
+        viteUpdaterFlag: "1",
+        readActuateUpdaterEnv: async () => {
+          throw new Error("should not read env when vite flag is set");
+        },
+      }),
+    ).toBe(true);
+  });
+
+  test("true in Tauri dev when ACTUATE_UPDATER=1", async () => {
+    expect(
+      await resolveUpdaterEnabled({
+        isTauri: true,
+        isDev: true,
+        viteUpdaterFlag: undefined,
+        readActuateUpdaterEnv: async () => "1",
+      }),
+    ).toBe(true);
+  });
+
+  test("false in Tauri dev when env unset", async () => {
+    expect(
+      await resolveUpdaterEnabled({
+        isTauri: true,
+        isDev: true,
+        viteUpdaterFlag: undefined,
+        readActuateUpdaterEnv: async () => null,
+      }),
+    ).toBe(false);
+  });
+
+  test("false in Tauri dev when env read fails", async () => {
+    expect(
+      await resolveUpdaterEnabled({
+        isTauri: true,
+        isDev: true,
+        viteUpdaterFlag: undefined,
+        readActuateUpdaterEnv: async () => {
+          throw new Error("invoke failed");
+        },
+      }),
+    ).toBe(false);
+  });
+});
+
+describe("isUpdaterEnabled", () => {
+  test("false outside Tauri (no window fixture)", async () => {
     expect(await isUpdaterEnabled()).toBe(false);
-    expect(invokeMock).not.toHaveBeenCalled();
   });
 });

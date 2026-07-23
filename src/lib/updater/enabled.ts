@@ -8,27 +8,47 @@ type GetEnvResult = {
   set: boolean;
 };
 
+/** Inputs for updater enablement — kept explicit so tests don't need `mock.module`. */
+export type UpdaterEnablementInput = {
+  isTauri: boolean;
+  isDev: boolean;
+  viteUpdaterFlag: string | undefined;
+  readActuateUpdaterEnv: () => Promise<string | null>;
+};
+
 /**
  * Updater runs in packaged builds. In `tauri dev` / Vite, opt in with
  * `ACTUATE_UPDATER=1` (or `VITE_ACTUATE_UPDATER=1`).
  */
-export async function isUpdaterEnabled(): Promise<boolean> {
-  if (!isTauriRuntime()) {
+export async function resolveUpdaterEnabled(input: UpdaterEnablementInput): Promise<boolean> {
+  if (!input.isTauri) {
     return false;
   }
 
-  if (!import.meta.env.DEV) {
+  if (!input.isDev) {
     return true;
   }
 
-  if (import.meta.env.VITE_ACTUATE_UPDATER === "1") {
+  if (input.viteUpdaterFlag === "1") {
     return true;
   }
 
   try {
-    const result = await invoke<GetEnvResult>("get_env", { name: "ACTUATE_UPDATER" });
-    return result.value === "1";
+    return (await input.readActuateUpdaterEnv()) === "1";
   } catch {
     return false;
   }
+}
+
+/** Production entry — wires runtime + env + invoke into {@link resolveUpdaterEnabled}. */
+export async function isUpdaterEnabled(): Promise<boolean> {
+  return resolveUpdaterEnabled({
+    isTauri: isTauriRuntime(),
+    isDev: import.meta.env.DEV,
+    viteUpdaterFlag: import.meta.env.VITE_ACTUATE_UPDATER,
+    readActuateUpdaterEnv: async () => {
+      const result = await invoke<GetEnvResult>("get_env", { name: "ACTUATE_UPDATER" });
+      return result.value;
+    },
+  });
 }

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, mock, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 
 const invokeMock = mock(async (command: string) => {
   void command;
@@ -9,14 +9,6 @@ const requestPermissionMock = mock(async () => "granted" as const);
 
 mock.module("@tauri-apps/api/core", () => ({
   invoke: invokeMock,
-}));
-
-mock.module("@/lib/runtime/is-tauri-runtime", () => ({
-  isTauriRuntime: () => true,
-}));
-
-mock.module("@/lib/runtime/platform", () => ({
-  isMacOsClient: () => false,
 }));
 
 mock.module("@tauri-apps/plugin-notification", () => ({
@@ -32,11 +24,27 @@ const { notify, notifyIfUnfocused } = await import("@/lib/native/notification");
 
 const sample = { title: "Quietly done", body: "Your reply is ready. Click to hop back in." };
 
+function installTauriWindow(): void {
+  Object.defineProperty(globalThis, "window", {
+    value: { __TAURI_INTERNALS__: {} },
+    configurable: true,
+  });
+}
+
+function uninstallTauriWindow(): void {
+  Reflect.deleteProperty(globalThis, "window");
+}
+
 describe("native/notification", () => {
   beforeEach(() => {
     invokeMock.mockClear();
     isPermissionGrantedMock.mockClear();
     requestPermissionMock.mockClear();
+    installTauriWindow();
+  });
+
+  afterEach(() => {
+    uninstallTauriWindow();
   });
 
   test("notify invokes without onlyIfUnfocused", async () => {
