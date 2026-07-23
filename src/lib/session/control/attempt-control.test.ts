@@ -132,6 +132,87 @@ describe("AttemptControl", () => {
     expect(typeof packedOutput).toBe("string");
     expect(String(packedOutput).length).toBeLessThan(huge.length);
   });
+
+  test("retry workspace_not_ready when loadRunContext returns null", async () => {
+    const host = createAttemptHost({
+      produceRun: createTestDemoProducer(),
+      mandates: new MemoryMandatesPersistence(),
+      eventStore: new MemoryAttemptEventStore(),
+      loadRunContext: async () => null,
+    });
+    expect(await host.control.retry()).toEqual({ ok: false, reason: "workspace_not_ready" });
+  });
+
+  test("retry reuses focused mandate after a prior start", async () => {
+    const mandates = new MemoryMandatesPersistence();
+    const mandate = await mandates.create({ kind: "interactive" });
+    let runs = 0;
+    const host = createAttemptHost({
+      produceRun: async ({ append, config, taskId }) => {
+        runs += 1;
+        append({
+          type: "task.started",
+          prompt: config.prompt,
+          modelId: config.modelId,
+          agentMode: "demo",
+          userMessageId: config.isRetry ? undefined : `user-${taskId}`,
+          omitUserMessage: config.isRetry === true,
+        });
+        if (runs === 1) {
+          append({
+            type: "task.failed",
+            code: "auth",
+            message: "missing key",
+            recoverable: true,
+          });
+          return;
+        }
+        append({ type: "task.completed", finishReason: "stop" });
+      },
+      mandates,
+      eventStore: new MemoryAttemptEventStore(),
+      loadRunContext: async () => ({
+        settings: { ...DEFAULT_SETTINGS, agentMode: "demo" },
+        secrets: DEFAULT_SECRETS,
+        persistApproval: async () => {},
+      }),
+    });
+    host.control.setFocusedMandateId(mandate.id);
+
+    const first = await host.control.start({ prompt: "fail once" });
+    expect(first.ok).toBe(true);
+    await new Promise<void>((resolve) => {
+      const unsub = host.engine.subscribe(() => {
+        if (host.engine.getProjection().status === "failed") {
+          unsub();
+          resolve();
+        }
+      });
+      if (host.engine.getProjection().status === "failed") {
+        unsub();
+        resolve();
+      }
+    });
+
+    const result = await host.control.retry();
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.mandateId).toBe(mandate.id);
+
+    await new Promise<void>((resolve) => {
+      const unsub = host.engine.subscribe(() => {
+        if (host.engine.getProjection().status === "completed") {
+          unsub();
+          resolve();
+        }
+      });
+      if (host.engine.getProjection().status === "completed") {
+        unsub();
+        resolve();
+      }
+    });
+    expect(runs).toBe(2);
+  });
 });
 
 describe("AttemptHost.bindChatRoute", () => {

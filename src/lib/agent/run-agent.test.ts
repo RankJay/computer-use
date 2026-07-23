@@ -1,62 +1,81 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, mock, test } from "bun:test";
 
-import type { LanguageModelV4StreamPart } from "@ai-sdk/provider";
 import { simulateReadableStream } from "ai";
 import { MockLanguageModelV4 } from "ai/test";
 
+import {
+  createMockStreamingModel,
+  errorFinishChunks,
+  reasoningThenTextChunks,
+  textStreamChunks,
+  toolCallStreamChunks,
+} from "@/lib/agent/fixtures/mock-language-model";
 import { createAutoEscalationPort } from "@/lib/session/control/escalation-port";
 import type { RuntimeEventPayload } from "@/lib/session/events";
 import { DEFAULT_SECRETS, DEFAULT_SETTINGS } from "@/lib/settings/defaults";
 
-import { runAgentLoop } from "./run-agent";
-
-const STREAM_CHUNKS: LanguageModelV4StreamPart[] = [
-  { type: "stream-start", warnings: [] },
-  { type: "text-start", id: "text-1" },
-  { type: "text-delta", id: "text-1", delta: "Hello" },
-  { type: "text-end", id: "text-1" },
-  {
-    type: "finish",
-    finishReason: { unified: "stop", raw: undefined },
-    usage: {
-      inputTokens: { total: 10, noCache: 10, cacheRead: undefined, cacheWrite: undefined },
-      outputTokens: { total: 5, text: 5, reasoning: undefined },
-    },
+mock.module("@/lib/agent/capabilities/native-invoke", () => ({
+  createDefaultNativeInvoker: () => {
+    return async (name: string, input: unknown) => {
+      if (name === "read_file") {
+        return { path: (input as { path: string }).path, content: "hello", bytes: 5 };
+      }
+      throw { code: "unknown_capability", message: `No mock for ${name}` };
+    };
   },
-];
+  createMockCapabilityInvoker: (handlers: Record<string, (input: unknown) => Promise<unknown>>) => {
+    return async (name: string, input: unknown) => {
+      const handler = handlers[name];
+      if (!handler) throw { code: "unknown_capability", message: name };
+      return handler(input);
+    };
+  },
+  mapInvokeError: (error: unknown) => {
+    if (typeof error === "object" && error !== null && "code" in error && "message" in error) {
+      const record = error as { code: string; message: string; details?: string; cause?: string };
+      return {
+        code: record.code,
+        message: record.message,
+        details: record.details,
+        cause: record.cause,
+      };
+    }
+    return { code: "invoke_failed", message: String(error) };
+  },
+}));
 
-function createMockModel() {
-  return new MockLanguageModelV4({
-    doStream: async () => ({
-      stream: simulateReadableStream({ chunks: STREAM_CHUNKS }),
-    }),
-  });
+const { runAgentLoop } = await import("./run-agent");
+
+function baseDeps(overrides: Partial<Parameters<typeof runAgentLoop>[0]> = {}) {
+  const payloads: RuntimeEventPayload[] = [];
+  const deps = {
+    taskId: "task-test",
+    messages: [
+      {
+        id: "user-test",
+        role: "user" as const,
+        parts: [{ type: "text" as const, text: "Say hello" }],
+      },
+    ],
+    modelId: "openai/gpt-4o-mini",
+    settings: DEFAULT_SETTINGS,
+    secrets: DEFAULT_SECRETS,
+    signal: new AbortController().signal,
+    workspaceRoot: "D:/Projects/actuate-v3",
+    escalationPort: createAutoEscalationPort("allow"),
+    modelOverride: createMockStreamingModel(textStreamChunks("Hello")),
+    append: (payload: RuntimeEventPayload) => {
+      payloads.push(payload);
+    },
+    ...overrides,
+  };
+  return { deps, payloads };
 }
 
 describe("run-agent", () => {
   test("streams assistant text and completes", async () => {
-    const payloads: RuntimeEventPayload[] = [];
-
-    const result = await runAgentLoop({
-      taskId: "task-test",
-      messages: [
-        {
-          id: "user-test",
-          role: "user",
-          parts: [{ type: "text", text: "Say hello" }],
-        },
-      ],
-      modelId: "openai/gpt-4o-mini",
-      settings: DEFAULT_SETTINGS,
-      secrets: DEFAULT_SECRETS,
-      signal: new AbortController().signal,
-      workspaceRoot: "D:/Projects/actuate-v3",
-      escalationPort: createAutoEscalationPort("allow"),
-      modelOverride: createMockModel(),
-      append: (payload) => {
-        payloads.push(payload);
-      },
-    });
+    const { deps, payloads } = baseDeps();
+    const result = await runAgentLoop(deps);
 
     expect(result.finishReason).toBe("stop");
     expect(payloads.some((event) => event.type === "assistant.part_updated")).toBe(true);
@@ -69,28 +88,25 @@ describe("run-agent", () => {
     }
   });
 
-  test("auth failure emits recoverable task.failed", async () => {
-    const payloads: RuntimeEventPayload[] = [];
-
-    const result = await runAgentLoop({
-      taskId: "task-auth",
-      messages: [
-        {
-          id: "user-auth",
-          role: "user",
-          parts: [{ type: "text", text: "Hi" }],
-        },
-      ],
-      modelId: "openai/gpt-4o-mini",
-      settings: DEFAULT_SETTINGS,
-      secrets: { ...DEFAULT_SECRETS, openaiApiKey: "" },
-      signal: new AbortController().signal,
-      workspaceRoot: "D:/Projects/actuate-v3",
-      escalationPort: createAutoEscalationPort("allow"),
-      append: (payload) => {
-        payloads.push(payload);
-      },
+  test("streams reasoning before text", async () => {
+    const { deps, payloads } = baseDeps({
+      modelOverride: createMockStreamingModel(reasoningThenTextChunks("think", "done")),
     });
+    const result = await runAgentLoop(deps);
+    expect(result.finishReason).toBe("stop");
+    expect(
+      payloads.some(
+        (event) => event.type === "assistant.part_updated" && event.part.type === "reasoning",
+      ),
+    ).toBe(true);
+  });
+
+  test("auth failure emits recoverable task.failed", async () => {
+    const { deps, payloads } = baseDeps({
+      secrets: { ...DEFAULT_SECRETS, openaiApiKey: "" },
+      modelOverride: undefined,
+    });
+    const result = await runAgentLoop(deps);
 
     expect(result.finishReason).toBe("error");
     const failure = payloads.find((event) => event.type === "task.failed");
@@ -102,31 +118,88 @@ describe("run-agent", () => {
   });
 
   test("budget stopWhen fires without isStepCount", async () => {
-    const payloads: RuntimeEventPayload[] = [];
-
-    const result = await runAgentLoop({
-      taskId: "task-budget",
-      messages: [
-        {
-          id: "user-budget",
-          role: "user",
-          parts: [{ type: "text", text: "Hi" }],
-        },
-      ],
-      modelId: "openai/gpt-4o-mini",
+    const { deps, payloads } = baseDeps({
       settings: { ...DEFAULT_SETTINGS, maxSteps: 0, maxWallClockMs: 1 },
-      secrets: DEFAULT_SECRETS,
-      signal: new AbortController().signal,
-      workspaceRoot: "D:/Projects/actuate-v3",
-      escalationPort: createAutoEscalationPort("allow"),
-      modelOverride: createMockModel(),
       budgetStartedAt: Date.now() - 10_000,
-      append: (payload) => {
-        payloads.push(payload);
-      },
     });
+    const result = await runAgentLoop(deps);
 
     expect(result.finishReason).toBe("budget");
     expect(payloads.some((event) => event.type === "budget.exceeded")).toBe(true);
+  });
+
+  test("already-aborted signal returns cancelled without streaming", async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const { deps, payloads } = baseDeps({ signal: controller.signal });
+    const result = await runAgentLoop(deps);
+    expect(result.finishReason).toBe("cancelled");
+    expect(payloads).toEqual([]);
+  });
+
+  test("abort mid-stream returns cancelled", async () => {
+    const controller = new AbortController();
+    const { deps, payloads } = baseDeps({
+      signal: controller.signal,
+      modelOverride: createMockStreamingModel(textStreamChunks("Hello world this is longer")),
+    });
+
+    const run = runAgentLoop(deps);
+    queueMicrotask(() => controller.abort());
+    const result = await run;
+
+    expect(result.finishReason).toBe("cancelled");
+    expect(payloads.some((event) => event.type === "task.failed")).toBe(false);
+  });
+
+  test("provider error finishReason emits recoverable task.failed", async () => {
+    const { deps, payloads } = baseDeps({
+      modelOverride: createMockStreamingModel(errorFinishChunks()),
+    });
+    const result = await runAgentLoop(deps);
+    expect(result.finishReason).toBe("error");
+    const failure = payloads.find((event) => event.type === "task.failed");
+    expect(failure?.type).toBe("task.failed");
+    if (failure?.type === "task.failed") {
+      expect(failure.code).toBe("provider");
+      expect(failure.recoverable).toBe(true);
+    }
+  });
+
+  test("tool-call stream invokes capability then follows up with text", async () => {
+    let streamCalls = 0;
+    const model = new MockLanguageModelV4({
+      doStream: async () => {
+        streamCalls += 1;
+        if (streamCalls === 1) {
+          return {
+            stream: simulateReadableStream({
+              chunks: toolCallStreamChunks({
+                toolCallId: "call-read",
+                toolName: "read_file",
+                argsJson: JSON.stringify({ path: "src/main.tsx" }),
+              }),
+            }),
+          };
+        }
+        return {
+          stream: simulateReadableStream({
+            chunks: textStreamChunks("Read complete"),
+          }),
+        };
+      },
+    });
+
+    const { deps, payloads } = baseDeps({
+      taskId: "task-tool",
+      modelOverride: model,
+      settings: { ...DEFAULT_SETTINGS, permissionMode: "risky", maxSteps: 5 },
+    });
+
+    const result = await runAgentLoop(deps);
+    expect(result.finishReason).toBe("stop");
+    expect(streamCalls).toBeGreaterThanOrEqual(2);
+    expect(payloads.some((event) => event.type === "capability.requested")).toBe(true);
+    expect(payloads.some((event) => event.type === "capability.completed")).toBe(true);
   });
 });

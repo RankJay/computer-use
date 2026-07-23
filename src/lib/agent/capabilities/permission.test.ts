@@ -113,4 +113,23 @@ describe("needsPermission", () => {
       ),
     ).toBe(false);
   });
+
+  test("once-per-class prompts for every non-low / non-persisted capability", () => {
+    expect(
+      needsPermission(
+        { name: "read_clipboard", risk: "medium" },
+        { ...DEFAULT_SETTINGS, permissionMode: "once-per-class" },
+      ),
+    ).toBe(true);
+    expect(
+      needsPermission(
+        { name: "delete_path", risk: "high", destructive: true },
+        {
+          ...DEFAULT_SETTINGS,
+          permissionMode: "once-per-class",
+          persistedApprovals: ["delete_path"],
+        },
+      ),
+    ).toBe(false);
+  });
 });
