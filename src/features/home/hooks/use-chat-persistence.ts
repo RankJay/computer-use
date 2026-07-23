@@ -4,12 +4,11 @@ import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
-import { chatMessagesForCheckpoint } from "@/lib/chats/ledger-discipline";
 import { createChatsPersistence } from "@/lib/chats/persistence";
 import { chatsKeys } from "@/lib/chats/queries";
 import { deriveChatTitle } from "@/lib/chats/title";
 import type { StoredChat } from "@/lib/chats/types";
-import type { BatchedAttemptStore, RunStatus, MandateProjection } from "@/lib/session";
+import type { BatchedAttemptStore, MandateProjection, RunStatus } from "@/lib/session";
 import { useSettingsSelector } from "@/lib/settings/queries";
 import { selectSelectedModelId } from "@/lib/settings/selectors";
 
@@ -23,7 +22,7 @@ type ChatMeta = {
 };
 
 /** True for statuses that should checkpoint. Cancelled is excluded so cancel-then-retry
- *  does not persist a partial transcript (phase 3 verification). */
+ *  does not persist a partial title update. */
 export function isCheckpointStatus(status: RunStatus): boolean {
   return status === "completed" || status === "failed";
 }
@@ -42,19 +41,19 @@ export function firstUserPrompt(messages: readonly UIMessage[]): string {
   return texts.join("");
 }
 
+/** Build Chat Client metadata — transcript lives in the Attempt ledger. */
 export function buildCheckpointChat(input: {
   id: string;
   mandateId: string;
-  messages: readonly UIMessage[];
+  /** In-memory projection messages — used only to derive title when meta is absent. */
+  titleSourceMessages: readonly UIMessage[];
   meta: ChatMeta | null;
   projection: Pick<MandateProjection, "usage">;
   fallbackModelId: string;
-  /** When true, persist empty messages — Attempt ledger owns the transcript. */
-  ledgerOwnsTranscript?: boolean;
   now?: number;
 }): StoredChat {
   const now = input.now ?? Date.now();
-  const { meta, messages, projection } = input;
+  const { meta, projection } = input;
   if (input.mandateId.length === 0) {
     throw new Error("buildCheckpointChat requires mandateId");
   }
@@ -64,12 +63,8 @@ export function buildCheckpointChat(input: {
   return {
     id: input.id,
     mandateId: input.mandateId,
-    title: meta?.title ?? deriveChatTitle(firstUserPrompt(messages)),
+    title: meta?.title ?? deriveChatTitle(firstUserPrompt(input.titleSourceMessages)),
     modelId: meta?.modelId ?? projection.usage.modelId ?? input.fallbackModelId,
-    messages: chatMessagesForCheckpoint({
-      messages,
-      ledgerOwnsTranscript: input.ledgerOwnsTranscript === true,
-    }),
     createdAt: meta?.createdAt ?? now,
     updatedAt: now,
   };
@@ -83,7 +78,7 @@ export function checkpointErrorMessage(error: unknown): string {
 }
 
 /**
- * Route `chatId` → bind (reattach or hydrate); settled Attempt → checkpoint.
+ * Route `chatId` → bind (reattach or ledger hydrate); settled Attempt → metadata checkpoint.
  * Never cancels a live Attempt on navigation.
  */
 export function useChatPersistence(store: BatchedAttemptStore, chatId: string | undefined): void {
@@ -103,7 +98,6 @@ export function useChatPersistence(store: BatchedAttemptStore, chatId: string | 
   const pendingAfterCreateRef = useRef<StoredChat | null>(null);
   const hydrateGenerationRef = useRef(0);
 
-  // Bind route → host (reattach when live; hydrate when idle).
   useEffect(() => {
     const generation = ++hydrateGenerationRef.current;
 
@@ -111,16 +105,6 @@ export function useChatPersistence(store: BatchedAttemptStore, chatId: string | 
       await store.bindChatRoute({
         chatId,
         loadChat: (id) => persistence.load(id),
-        ensureMandateForChat: async (chat) => {
-          const ensured = await store.backfillChatMandate(chat, (next) => persistence.save(next));
-          metaRef.current = {
-            title: ensured.title,
-            modelId: ensured.modelId,
-            createdAt: ensured.createdAt,
-            mandateId: ensured.mandateId,
-          };
-          return ensured;
-        },
       });
 
       if (generation !== hydrateGenerationRef.current) {
@@ -139,12 +123,11 @@ export function useChatPersistence(store: BatchedAttemptStore, chatId: string | 
         if (generation !== hydrateGenerationRef.current || !chat) {
           return;
         }
-        const ensured = await store.backfillChatMandate(chat, (next) => persistence.save(next));
         metaRef.current = {
-          title: ensured.title,
-          modelId: ensured.modelId,
-          createdAt: ensured.createdAt,
-          mandateId: ensured.mandateId,
+          title: chat.title,
+          modelId: chat.modelId,
+          createdAt: chat.createdAt,
+          mandateId: chat.mandateId,
         };
       }
     }
@@ -152,7 +135,6 @@ export function useChatPersistence(store: BatchedAttemptStore, chatId: string | 
     void syncFromRoute();
   }, [chatId, store]);
 
-  // Checkpoint on settle (audit MandateProjection — not ExecutionContext).
   useEffect(() => {
     let prevStatus = store.getMandateProjection().status;
 
@@ -186,18 +168,15 @@ export function useChatPersistence(store: BatchedAttemptStore, chatId: string | 
         return;
       }
 
-      // Capture synchronously — registry may clearLive after settle microtasks.
       const settledLiveIds = store.control.getLiveIds();
       const settledLiveChatId = store.control.getLiveChatId();
       const settledFocusedMandateId = store.control.getFocusedMandateId();
       const settledMeta = metaRef.current;
       const settledRouteChatId = chatIdRef.current;
       const settledFallbackModelId = modelIdRef.current;
-      const settledMessages = projection.chatMessages;
+      const titleSourceMessages = projection.chatMessages;
 
       void (async () => {
-        // Bind checkpoint to the Attempt that settled — not the focused/route chat
-        // (focus≠cancel: user may have navigated elsewhere while the Attempt ran).
         const mandateId =
           settledLiveIds?.mandateId ?? settledMeta?.mandateId ?? settledFocusedMandateId;
         if (!mandateId) {
@@ -207,12 +186,8 @@ export function useChatPersistence(store: BatchedAttemptStore, chatId: string | 
           return;
         }
 
-        // Flush ledger before deciding dual-write discipline.
         await store.flushLedger();
-        const ledgerOwnsTranscript = await store.ledgerOwnsTranscript(mandateId);
 
-        // Prefer live chat; if Attempt was on /new, create — never write into a
-        // different route chat the user focused mid-run.
         const existingId = settledLiveChatId ?? (settledLiveIds ? null : settledRouteChatId);
 
         const checkpointMeta =
@@ -226,11 +201,10 @@ export function useChatPersistence(store: BatchedAttemptStore, chatId: string | 
           const chat = buildCheckpointChat({
             id: existingId,
             mandateId,
-            messages: settledMessages,
+            titleSourceMessages,
             meta: checkpointMeta,
             projection,
             fallbackModelId: settledFallbackModelId,
-            ledgerOwnsTranscript,
           });
           try {
             await persistChat(chat, { navigateToChat: false });
@@ -248,11 +222,10 @@ export function useChatPersistence(store: BatchedAttemptStore, chatId: string | 
           pendingAfterCreateRef.current = buildCheckpointChat({
             id: createId,
             mandateId,
-            messages: settledMessages,
+            titleSourceMessages,
             meta: checkpointMeta,
             projection,
             fallbackModelId: settledFallbackModelId,
-            ledgerOwnsTranscript,
           });
           return;
         }
@@ -263,11 +236,10 @@ export function useChatPersistence(store: BatchedAttemptStore, chatId: string | 
         const chat = buildCheckpointChat({
           id,
           mandateId,
-          messages: settledMessages,
+          titleSourceMessages,
           meta: null,
           projection,
           fallbackModelId: settledFallbackModelId,
-          ledgerOwnsTranscript,
         });
         metaRef.current = {
           title: chat.title,

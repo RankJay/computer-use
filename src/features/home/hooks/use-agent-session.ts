@@ -4,15 +4,15 @@ import { toast } from "sonner";
 
 import { useAttemptHost } from "@/app/providers/AttemptHostProvider";
 import {
+  deriveAttemptControls,
   deriveDisplayRows,
-  deriveSessionControls,
   type AgentTranscriptRow,
+  type AttemptControls,
+  type AttemptFailure,
   type BatchedAttemptStore,
+  type MandateProjection,
   type PendingPermission,
   type PermissionDecision,
-  type SessionControls,
-  type SessionFailure,
-  type MandateProjection,
 } from "@/lib/session";
 import { useSettingsSelector, useUpdateSettings } from "@/lib/settings/queries";
 import { selectPermissionMode, selectSelectedModelId } from "@/lib/settings/selectors";
@@ -61,9 +61,9 @@ export type AgentTranscriptSlice = {
 };
 
 /** Composer / status-bar actions — deliberately excludes usage (own island). */
-export type AgentSessionControls = SessionControls & {
+export type AgentSessionControls = AttemptControls & {
   status: MandateProjection["status"];
-  failure: SessionFailure | null;
+  failure: AttemptFailure | null;
   start: (prompt: string) => Promise<void>;
   cancel: () => Promise<void>;
   retry: () => Promise<void>;
@@ -172,7 +172,7 @@ export function useAgentSessionControls(store: BatchedAttemptStore): AgentSessio
 
   const controls = useMemo(
     () =>
-      deriveSessionControls({
+      deriveAttemptControls({
         ...store.getMandateProjection(),
         status,
         failure,

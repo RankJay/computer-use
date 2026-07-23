@@ -28,7 +28,7 @@ async function waitForStatus(
 }
 
 describe("AttemptHost durable ledger", () => {
-  test("settle writes snapshot; reopen hydrates without messages_json", async () => {
+  test("settle writes snapshot; reopen hydrates from ledger", async () => {
     const mandates = new MemoryMandatesPersistence();
     const eventStore = new MemoryAttemptEventStore();
     const host = createAttemptHost({
@@ -70,11 +70,9 @@ describe("AttemptHost durable ledger", () => {
         title: "T",
         modelId: "openai/gpt-5.4",
         mandateId: started.mandateId,
-        messages: [], // empty Client checkpoint — ledger is truth
         createdAt: 1,
         updatedAt: 1,
       }),
-      ensureMandateForChat: async (chat) => chat,
     });
 
     expect(host2.engine.getProjection().chatMessages.some((m) => m.role === "user")).toBe(true);
@@ -180,11 +178,9 @@ describe("AttemptHost durable ledger", () => {
         title: "T",
         modelId: "m",
         mandateId: started.mandateId,
-        messages: [],
         createdAt: 1,
         updatedAt: 1,
       }),
-      ensureMandateForChat: async (chat) => chat,
     });
 
     expect(
@@ -225,7 +221,6 @@ describe("AttemptHost durable ledger", () => {
       await new Promise((resolve) => setTimeout(resolve, 5));
     }
     expect((await mandates.get(started.mandateId))?.status).toBe("done");
-    expect(await host.ledgerOwnsTranscript(started.mandateId)).toBe(true);
   });
 
   test("manual successCriteria keeps Mandate armed after completed Attempt", async () => {

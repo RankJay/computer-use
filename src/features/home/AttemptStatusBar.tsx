@@ -1,20 +1,20 @@
 import type { ReactElement } from "react";
 
 import { uiToolLabel } from "@/lib/agent/capabilities";
-import type { PendingPermission, SessionFailure } from "@/lib/session";
+import type { AttemptFailure, PendingPermission } from "@/lib/session";
 
-export type SessionStatusBarProps = {
+export type AttemptStatusBarProps = {
   readonly pendingPermissions: readonly PendingPermission[];
   readonly canResolvePermission: boolean;
-  readonly failure: SessionFailure | null;
+  readonly failure: AttemptFailure | null;
 };
 
 /** Compact multi-pending permission summary + failure line above the composer. */
-export function SessionStatusBar({
+export function AttemptStatusBar({
   pendingPermissions,
   canResolvePermission,
   failure,
-}: SessionStatusBarProps): ReactElement | null {
+}: AttemptStatusBarProps): ReactElement | null {
   const showBanner = canResolvePermission && pendingPermissions.length > 1;
   const showFailure = failure !== null;
 
@@ -44,7 +44,7 @@ export function SessionStatusBar({
         <div
           className="rounded-xl ring-1 ring-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive"
           role="alert"
-          data-testid="session-failure-line"
+          data-testid="attempt-failure-line"
         >
           <span className="font-medium">{failure.code}</span>
           <span className="mx-1.5 opacity-50">·</span>

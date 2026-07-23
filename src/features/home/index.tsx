@@ -6,6 +6,7 @@ import { signalAppReady } from "@/lib/app-ready";
 import type { BatchedAttemptStore, PermissionDecision } from "@/lib/session";
 import { settingsKeys } from "@/lib/settings/queries";
 
+import { AttemptStatusBar } from "./AttemptStatusBar";
 import { AgentTranscript } from "./chat/AgentTranscript";
 import { ComposerContextMeter, TaskPromptComposer } from "./Composer";
 import { HomePageHeader } from "./header";
@@ -18,7 +19,6 @@ import {
   useAgentTranscript,
 } from "./hooks/use-agent-session";
 import { useChatPersistence } from "./hooks/use-chat-persistence";
-import { SessionStatusBar } from "./SessionStatusBar";
 
 const ContextUsageIsland = memo(function ContextUsageIsland({
   store,
@@ -91,7 +91,7 @@ const ComposerIsland = memo(function ComposerIsland({
 
   return (
     <div className="flex min-h-12 flex-col gap-2 p-2">
-      <SessionStatusBar
+      <AttemptStatusBar
         pendingPermissions={controls.pendingPermissions}
         canResolvePermission={controls.canResolvePermission}
         failure={controls.failure}

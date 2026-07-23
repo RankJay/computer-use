@@ -1,7 +1,7 @@
 import type { UIMessage } from "ai";
 
 import type { LanguageModelUsageSnapshot, RunStatus, RuntimeEvent } from "@/lib/session/events";
-import type { SessionBudget, SessionFailure, PendingPermission } from "@/lib/session/projection";
+import type { AttemptBudget, AttemptFailure, PendingPermission } from "@/lib/session/projection";
 import type { AgentTranscriptRow } from "@/lib/session/rows";
 
 export const ATTEMPT_FOLD_SNAPSHOT_VERSION = 1 as const;
@@ -14,7 +14,7 @@ export type AttemptFoldSnapshot = {
   version: typeof ATTEMPT_FOLD_SNAPSHOT_VERSION;
   taskId: string | null;
   status: RunStatus;
-  failure: SessionFailure | null;
+  failure: AttemptFailure | null;
   rows: AgentTranscriptRow[];
   chatMessages: UIMessage[];
   pendingPermissions: PendingPermission[];
@@ -24,7 +24,7 @@ export type AttemptFoldSnapshot = {
     usedTokens: number;
     maxTokens: number;
   };
-  budget: SessionBudget;
+  budget: AttemptBudget;
   streamingMessageId: string | null;
 };
 

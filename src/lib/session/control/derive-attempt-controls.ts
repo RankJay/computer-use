@@ -1,7 +1,7 @@
 import type { RunStatus } from "../events";
 import type { MandateProjection } from "../projection";
 
-export type SessionControls = {
+export type AttemptControls = {
   canSubmit: boolean;
   canCancel: boolean;
   cancelVisible: boolean;
@@ -15,7 +15,7 @@ function isActiveStatus(status: RunStatus): boolean {
 }
 
 /** Derive presentation/control flags from projection — never store these on MandateProjection. */
-export function deriveSessionControls(projection: MandateProjection): SessionControls {
+export function deriveAttemptControls(projection: MandateProjection): AttemptControls {
   const active = isActiveStatus(projection.status);
   const hasPendingPermissions = projection.pendingPermissions.length > 0;
 

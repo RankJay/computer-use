@@ -19,16 +19,16 @@ export type {
 
 export type {
   MandateProjection,
-  SessionFailure,
-  SessionUsage,
-  SessionBudget,
+  AttemptFailure,
+  AttemptUsage,
+  AttemptBudget,
   PendingPermission,
 } from "./projection";
 export {
   createEmptyMandateProjection,
   EMPTY_PENDING_PERMISSIONS,
-  EMPTY_SESSION_BUDGET,
-  EMPTY_SESSION_USAGE,
+  EMPTY_ATTEMPT_BUDGET,
+  EMPTY_ATTEMPT_USAGE,
 } from "./projection";
 
 export type { ExecutionContext, ExecutionContextOptions } from "./execution-context";
@@ -61,7 +61,7 @@ export {
   type RegeneratePlan,
 } from "./control/regenerate-from-message";
 
-export { getAttemptHost, registerAttemptHost, resetAttemptHost } from "./active-engine";
+export { getAttemptHost, registerAttemptHost, resetAttemptHost } from "./attempt-host-registry";
 
 export {
   createAttemptHost,
@@ -135,7 +135,7 @@ export {
   type RunControllerDeps,
 } from "./control/run-controller";
 
-export { deriveSessionControls, type SessionControls } from "./control/derive-session-controls";
+export { deriveAttemptControls, type AttemptControls } from "./control/derive-attempt-controls";
 
 export { deriveDisplayRows } from "./presentation/derive-display-rows";
 

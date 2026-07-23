@@ -78,5 +78,19 @@ pub fn migrations() -> Vec<Migration> {
           WHERE success_criteria_json IS NULL;",
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 7,
+            description: "chats metadata-only (ledger owns transcript)",
+            sql: "DROP TABLE IF EXISTS chats;
+        CREATE TABLE chats (
+            id TEXT PRIMARY KEY NOT NULL,
+            title TEXT NOT NULL,
+            model_id TEXT NOT NULL,
+            mandate_id TEXT NOT NULL,
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL
+        );",
+            kind: MigrationKind::Up,
+        },
     ]
 }

@@ -1,5 +1,3 @@
-import type { UIMessage } from "ai";
-
 import {
   createAttemptEventStore,
   projectionToFoldSnapshot,
@@ -46,28 +44,17 @@ export type BatchedAttemptStore = {
    * Route chat change. Never cancels a live Attempt.
    * - live + same chat / same draft mandate → reattach (no reset)
    * - live + different chat → focus pointer only
-   * - idle → reset + hydrate from ledger (else messages)
+   * - idle → reset + hydrate from Attempt ledger (empty when no rows)
    */
   bindChatRoute: (input: {
     chatId: string | undefined;
     loadChat: (id: string) => Promise<StoredChat | null>;
-    ensureMandateForChat: (chat: StoredChat) => Promise<StoredChat>;
   }) => Promise<void>;
-  /** Mint a Mandate for a legacy chat row missing mandateId, persist via save. */
-  backfillChatMandate: (
-    chat: StoredChat,
-    save: (chat: StoredChat) => Promise<void>,
-  ) => Promise<StoredChat>;
   resetForMaintenance: () => Promise<void>;
   /** Flush buffered ledger writes (tests / shutdown). */
   flushLedger: () => Promise<void>;
   /** Last durable-ledger write failure (null when healthy). */
   getLedgerError: () => unknown | null;
-  /**
-   * True when this Mandate has durable Attempt ledger rows.
-   * Chat checkpoints should then omit messages_json (ledger owns transcript).
-   */
-  ledgerOwnsTranscript: (mandateId: string) => Promise<boolean>;
 };
 
 export type AttemptHostDeps = {
@@ -405,22 +392,6 @@ export function createAttemptHost(deps: AttemptHostDeps): BatchedAttemptStore {
     }
   });
 
-  async function backfillChatMandate(
-    chat: StoredChat,
-    save: (next: StoredChat) => Promise<void>,
-  ): Promise<StoredChat> {
-    if (chat.mandateId.length > 0) {
-      if (chat.mandateId === chat.id) {
-        throw new Error("chat.mandateId must not equal chat id");
-      }
-      return chat;
-    }
-    const mandate = await mandates.create({ kind: "interactive" });
-    const next: StoredChat = { ...chat, mandateId: mandate.id };
-    await save(next);
-    return next;
-  }
-
   async function forceSettleUnrecovered(mandateId: string): Promise<void> {
     const projection = engine.getProjection();
     if (!isActiveStatus(projection.status)) {
@@ -443,21 +414,21 @@ export function createAttemptHost(deps: AttemptHostDeps): BatchedAttemptStore {
 
   async function hydrateIdleChat(chat: StoredChat): Promise<void> {
     const ledger = await eventStore.loadForMandateOpen(chat.mandateId);
-    if (ledger) {
-      engine.hydrateFromLedger(ledger);
+    if (!ledger) {
+      // New / never-run Mandate — projection stays empty after reset.
       resetLedgerCursors();
-      durableLogCursor = engine.getEventLog().length;
       lastStatus = engine.getProjection().status;
-      if (isActiveStatus(lastStatus)) {
-        // Crash reopen: no live runner — force-cancel so UI/cancel/permission are coherent.
-        await forceSettleUnrecovered(chat.mandateId);
-        lastStatus = engine.getProjection().status;
-      }
       return;
     }
-    engine.hydrate(chat.messages as UIMessage[]);
+    engine.hydrateFromLedger(ledger);
     resetLedgerCursors();
+    durableLogCursor = engine.getEventLog().length;
     lastStatus = engine.getProjection().status;
+    if (isActiveStatus(lastStatus)) {
+      // Crash reopen: no live runner — force-cancel so UI/cancel/permission are coherent.
+      await forceSettleUnrecovered(chat.mandateId);
+      lastStatus = engine.getProjection().status;
+    }
   }
 
   return {
@@ -476,17 +447,6 @@ export function createAttemptHost(deps: AttemptHostDeps): BatchedAttemptStore {
     },
     flushLedger,
     getLedgerError: () => lastLedgerError,
-    async ledgerOwnsTranscript(mandateId) {
-      if (lastLedgerError !== null) {
-        return false;
-      }
-      const open = await eventStore.loadForMandateOpen(mandateId);
-      return open !== null;
-    },
-
-    async backfillChatMandate(chat, save) {
-      return backfillChatMandate(chat, save);
-    },
 
     async bindChatRoute(input) {
       const generation = ++bindGeneration;
@@ -516,8 +476,7 @@ export function createAttemptHost(deps: AttemptHostDeps): BatchedAttemptStore {
               return true;
             }
             if (chat) {
-              const ensured = await input.ensureMandateForChat(chat);
-              registry.setFocusedMandateId(ensured.mandateId);
+              registry.setFocusedMandateId(chat.mandateId);
             }
           }
           return true;
@@ -566,17 +525,13 @@ export function createAttemptHost(deps: AttemptHostDeps): BatchedAttemptStore {
           return;
         }
 
-        const ensured = await input.ensureMandateForChat(chat);
-        if (generation !== bindGeneration) {
-          return;
-        }
         if (await attachLiveFocus()) {
           return;
         }
 
-        registry.setLiveChatId(ensured.id);
-        registry.setFocusedMandateId(ensured.mandateId);
-        await hydrateIdleChat(ensured);
+        registry.setLiveChatId(chat.id);
+        registry.setFocusedMandateId(chat.mandateId);
+        await hydrateIdleChat(chat);
         if (generation !== bindGeneration) {
           return;
         }

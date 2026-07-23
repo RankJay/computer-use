@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import type { RunStatus } from "../events";
 import { createEmptyMandateProjection, type MandateProjection } from "../projection";
-import { deriveSessionControls } from "./derive-session-controls";
+import { deriveAttemptControls } from "./derive-attempt-controls";
 
 function projection(partial: Partial<MandateProjection>): MandateProjection {
   return { ...createEmptyMandateProjection(), ...partial };
@@ -11,10 +11,10 @@ function projection(partial: Partial<MandateProjection>): MandateProjection {
 const ACTIVE: RunStatus[] = ["running", "streaming", "waiting_permission"];
 const INACTIVE: RunStatus[] = ["idle", "completed", "failed", "cancelled"];
 
-describe("deriveSessionControls", () => {
+describe("deriveAttemptControls", () => {
   for (const status of ACTIVE) {
     test(`${status}: active flags`, () => {
-      const controls = deriveSessionControls(projection({ status }));
+      const controls = deriveAttemptControls(projection({ status }));
       expect(controls.canSubmit).toBe(false);
       expect(controls.canCancel).toBe(true);
       expect(controls.cancelVisible).toBe(true);
@@ -24,7 +24,7 @@ describe("deriveSessionControls", () => {
 
   for (const status of INACTIVE) {
     test(`${status}: inactive flags`, () => {
-      const controls = deriveSessionControls(projection({ status }));
+      const controls = deriveAttemptControls(projection({ status }));
       expect(controls.canSubmit).toBe(true);
       expect(controls.canCancel).toBe(false);
       expect(controls.cancelVisible).toBe(false);
@@ -34,7 +34,7 @@ describe("deriveSessionControls", () => {
 
   test("canRetry only when failed and recoverable", () => {
     expect(
-      deriveSessionControls(
+      deriveAttemptControls(
         projection({
           status: "failed",
           failure: { code: "auth", message: "missing key", recoverable: true },
@@ -43,7 +43,7 @@ describe("deriveSessionControls", () => {
     ).toBe(true);
 
     expect(
-      deriveSessionControls(
+      deriveAttemptControls(
         projection({
           status: "failed",
           failure: { code: "internal", message: "boom", recoverable: false },
@@ -51,16 +51,16 @@ describe("deriveSessionControls", () => {
       ).canRetry,
     ).toBe(false);
 
-    expect(deriveSessionControls(projection({ status: "completed" })).canRetry).toBe(false);
+    expect(deriveAttemptControls(projection({ status: "completed" })).canRetry).toBe(false);
   });
 
   test("canResolvePermission when pendingPermissions non-empty", () => {
-    expect(deriveSessionControls(projection({ pendingPermissions: [] })).canResolvePermission).toBe(
+    expect(deriveAttemptControls(projection({ pendingPermissions: [] })).canResolvePermission).toBe(
       false,
     );
 
     expect(
-      deriveSessionControls(
+      deriveAttemptControls(
         projection({
           status: "waiting_permission",
           pendingPermissions: [

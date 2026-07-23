@@ -5,7 +5,7 @@ import { getDefaultAgentModel } from "@/lib/agent-models";
 import type { LanguageModelUsageSnapshot, RunStatus } from "./events";
 import type { AgentTranscriptRow } from "./rows";
 
-export type SessionFailure = {
+export type AttemptFailure = {
   code: string;
   message: string;
   recoverable: boolean;
@@ -18,14 +18,14 @@ export type PendingPermission = {
   risk: "low" | "medium" | "high";
 };
 
-export type SessionUsage = {
+export type AttemptUsage = {
   modelId: string | null;
   usage: LanguageModelUsageSnapshot | null;
   usedTokens: number;
   maxTokens: number;
 };
 
-export type SessionBudget = {
+export type AttemptBudget = {
   stepsUsed: number;
   maxSteps: number;
   costUsd: number;
@@ -38,16 +38,16 @@ export type SessionBudget = {
 export type MandateProjection = {
   taskId: string | null;
   status: RunStatus;
-  failure: SessionFailure | null;
+  failure: AttemptFailure | null;
   rows: AgentTranscriptRow[];
   chatMessages: UIMessage[];
   pendingPermissions: PendingPermission[];
-  usage: SessionUsage;
-  budget: SessionBudget;
+  usage: AttemptUsage;
+  budget: AttemptBudget;
   streamingMessageId: string | null;
 };
 
-export const EMPTY_SESSION_BUDGET: SessionBudget = {
+export const EMPTY_ATTEMPT_BUDGET: AttemptBudget = {
   stepsUsed: 0,
   maxSteps: 50,
   costUsd: 0,
@@ -56,7 +56,7 @@ export const EMPTY_SESSION_BUDGET: SessionBudget = {
   maxWallClockMs: 900_000,
 };
 
-export const EMPTY_SESSION_USAGE: SessionUsage = {
+export const EMPTY_ATTEMPT_USAGE: AttemptUsage = {
   modelId: null,
   usage: null,
   usedTokens: 0,
@@ -74,8 +74,8 @@ export function createEmptyMandateProjection(): MandateProjection {
     rows: [],
     chatMessages: [],
     pendingPermissions: EMPTY_PENDING_PERMISSIONS,
-    usage: { ...EMPTY_SESSION_USAGE },
-    budget: { ...EMPTY_SESSION_BUDGET },
+    usage: { ...EMPTY_ATTEMPT_USAGE },
+    budget: { ...EMPTY_ATTEMPT_BUDGET },
     streamingMessageId: null,
   };
 }

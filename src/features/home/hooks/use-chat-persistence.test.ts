@@ -54,7 +54,7 @@ describe("buildCheckpointChat", () => {
     const chat = buildCheckpointChat({
       id: "c1",
       mandateId: "m1",
-      messages: [{ id: "u", role: "user", parts: [{ type: "text", text: "hi" }] }],
+      titleSourceMessages: [{ id: "u", role: "user", parts: [{ type: "text", text: "hi" }] }],
       meta: { title: "Saved", modelId: "model-a", createdAt: 10, mandateId: "m1" },
       projection: { usage: { modelId: "model-b", usage: null, usedTokens: 0, maxTokens: 1 } },
       fallbackModelId: "fallback",
@@ -65,7 +65,6 @@ describe("buildCheckpointChat", () => {
       mandateId: "m1",
       title: "Saved",
       modelId: "model-a",
-      messages: [{ id: "u", role: "user", parts: [{ type: "text", text: "hi" }] }],
       createdAt: 10,
       updatedAt: 99,
     });
@@ -75,7 +74,7 @@ describe("buildCheckpointChat", () => {
     const chat = buildCheckpointChat({
       id: "c2",
       mandateId: "m2",
-      messages: [{ id: "u", role: "user", parts: [{ type: "text", text: "Ship it" }] }],
+      titleSourceMessages: [{ id: "u", role: "user", parts: [{ type: "text", text: "Ship it" }] }],
       meta: null,
       projection: { usage: { modelId: "model-b", usage: null, usedTokens: 0, maxTokens: 1 } },
       fallbackModelId: "fallback",
@@ -94,28 +93,12 @@ describe("buildCheckpointChat", () => {
       buildCheckpointChat({
         id: "same",
         mandateId: "same",
-        messages: [],
+        titleSourceMessages: [],
         meta: null,
         projection: { usage: { modelId: null, usage: null, usedTokens: 0, maxTokens: 1 } },
         fallbackModelId: "fallback",
       }),
     ).toThrow("mandateId must not equal chat id");
-  });
-
-  test("ledgerOwnsTranscript persists empty messages but keeps title", () => {
-    const chat = buildCheckpointChat({
-      id: "c3",
-      mandateId: "m3",
-      messages: [{ id: "u", role: "user", parts: [{ type: "text", text: "Ship it" }] }],
-      meta: null,
-      projection: { usage: { modelId: "model-b", usage: null, usedTokens: 0, maxTokens: 1 } },
-      fallbackModelId: "fallback",
-      ledgerOwnsTranscript: true,
-      now: 50,
-    });
-    expect(chat.messages).toEqual([]);
-    expect(chat.title.length).toBeGreaterThan(0);
-    expect(chat.mandateId).toBe("m3");
   });
 });
 

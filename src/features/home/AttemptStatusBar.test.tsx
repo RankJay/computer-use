@@ -2,9 +2,9 @@ import { describe, expect, test } from "bun:test";
 
 import { renderToStaticMarkup } from "react-dom/server";
 
-import type { PendingPermission, SessionFailure } from "@/lib/session";
+import type { AttemptFailure, PendingPermission } from "@/lib/session";
 
-import { SessionStatusBar } from "./SessionStatusBar";
+import { AttemptStatusBar } from "./AttemptStatusBar";
 
 const pending = (callId: string, capability: string): PendingPermission => ({
   callId,
@@ -13,10 +13,10 @@ const pending = (callId: string, capability: string): PendingPermission => ({
   risk: "high",
 });
 
-describe("SessionStatusBar", () => {
+describe("AttemptStatusBar", () => {
   test("hides when fewer than two pending permissions", () => {
     const html = renderToStaticMarkup(
-      <SessionStatusBar
+      <AttemptStatusBar
         pendingPermissions={[pending("c1", "write_file")]}
         canResolvePermission
         failure={null}
@@ -27,7 +27,7 @@ describe("SessionStatusBar", () => {
 
   test("shows banner when two or more pending", () => {
     const html = renderToStaticMarkup(
-      <SessionStatusBar
+      <AttemptStatusBar
         pendingPermissions={[pending("c1", "write_file"), pending("c2", "run_shell")]}
         canResolvePermission
         failure={null}
@@ -41,7 +41,7 @@ describe("SessionStatusBar", () => {
 
   test("shows friendly labels for mouse and accessibility tools", () => {
     const html = renderToStaticMarkup(
-      <SessionStatusBar
+      <AttemptStatusBar
         pendingPermissions={[pending("c1", "mouse_move"), pending("c2", "accessibility_click")]}
         canResolvePermission
         failure={null}
@@ -55,7 +55,7 @@ describe("SessionStatusBar", () => {
 
   test("hides banner when canResolvePermission is false", () => {
     const html = renderToStaticMarkup(
-      <SessionStatusBar
+      <AttemptStatusBar
         pendingPermissions={[pending("c1", "write_file"), pending("c2", "run_shell")]}
         canResolvePermission={false}
         failure={null}
@@ -65,15 +65,15 @@ describe("SessionStatusBar", () => {
   });
 
   test("shows failure line", () => {
-    const failure: SessionFailure = {
+    const failure: AttemptFailure = {
       code: "auth",
       message: "missing API key",
       recoverable: true,
     };
     const html = renderToStaticMarkup(
-      <SessionStatusBar pendingPermissions={[]} canResolvePermission={false} failure={failure} />,
+      <AttemptStatusBar pendingPermissions={[]} canResolvePermission={false} failure={failure} />,
     );
-    expect(html).toContain('data-testid="session-failure-line"');
+    expect(html).toContain('data-testid="attempt-failure-line"');
     expect(html).toContain("auth");
     expect(html).toContain("missing API key");
   });

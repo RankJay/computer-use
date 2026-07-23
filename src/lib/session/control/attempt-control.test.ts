@@ -164,7 +164,6 @@ describe("AttemptHost.bindChatRoute", () => {
     await host.bindChatRoute({
       chatId: undefined,
       loadChat: async () => null,
-      ensureMandateForChat: async (chat) => chat,
     });
 
     expect(host.engine.getProjection().status).toBe("streaming");
@@ -181,7 +180,7 @@ describe("AttemptHost.bindChatRoute", () => {
     });
   });
 
-  test("idle bind hydrates chat messages and focuses mandate", async () => {
+  test("idle bind focuses mandate; empty projection without ledger", async () => {
     const mandates = new MemoryMandatesPersistence();
     const mandate = await mandates.create({ kind: "interactive" });
     const host = createAttemptHost({
@@ -201,15 +200,14 @@ describe("AttemptHost.bindChatRoute", () => {
         title: "T",
         modelId: "openai/gpt-5.4",
         mandateId: mandate.id,
-        messages: [{ id: "u", role: "user", parts: [{ type: "text", text: "hello" }] }],
         createdAt: 1,
         updatedAt: 1,
       }),
-      ensureMandateForChat: async (chat) => chat,
     });
 
     expect(host.control.getFocusedMandateId()).toBe(mandate.id);
     expect(host.control.getLiveChatId()).toBe("chat-1");
-    expect(host.engine.getProjection().chatMessages.some((m) => m.role === "user")).toBe(true);
+    expect(host.engine.getProjection().chatMessages).toEqual([]);
+    expect(host.engine.getProjection().status).toBe("idle");
   });
 });
