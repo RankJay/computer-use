@@ -76,7 +76,7 @@ describe("AttemptControl", () => {
     expect(result).toEqual({ ok: false, reason: "workspace_not_ready" });
   });
 
-  test("start packs RunConfig from ExecutionContext, not raw MandateProjection dump", async () => {
+  test("start packs RunConfig from ModelContext, not raw MandateProjection dump", async () => {
     const huge = "z".repeat(8_000);
     let packedOutput: unknown;
     const host = createAttemptHost({

@@ -19,7 +19,6 @@ import {
   type RuntimeEventPayload,
   type RunStatus,
 } from "./events";
-import { foldExecutionContext } from "./execution-context";
 import {
   createFoldState,
   foldStateFromMessages,
@@ -27,6 +26,7 @@ import {
   toProjection,
   type FoldState,
 } from "./fold";
+import { foldModelContext } from "./model-context";
 import { createEmptyMandateProjection, type MandateProjection } from "./projection";
 
 export type AttemptEngineListener = () => void;
@@ -213,7 +213,7 @@ export function createAttemptEngine(deps: AttemptEngineDeps): AttemptEngine {
       activeTaskId = null;
       notify();
 
-      const execution = foldExecutionContext({ chatMessages: plan.messages });
+      const execution = foldModelContext({ chatMessages: plan.messages });
       await controller.start({
         ...config,
         prompt: plan.prompt,

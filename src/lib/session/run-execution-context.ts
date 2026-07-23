@@ -8,6 +8,7 @@ import type { RuntimeEvent, RuntimeEventPayload } from "./events";
 
 /**
  * Fields threaded through every live run / capability invoke path.
+ * Not the compacted model message pack (`ModelContext` in `model-context.ts`).
  * Agent and capability deps bags extend or Pick from this — not a god-type.
  */
 export type RunExecutionContext = {

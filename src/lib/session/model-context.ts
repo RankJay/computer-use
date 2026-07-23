@@ -8,11 +8,11 @@ type MessagePart = UIMessage["parts"][number];
  * Compact model-facing fold over the same Attempt event log / MandateProjection.
  * Audit/UI Clients read MandateProjection; AttemptControl packs from this.
  */
-export type ExecutionContext = {
+export type ModelContext = {
   readonly messages: UIMessage[];
 };
 
-export type ExecutionContextOptions = {
+export type ModelContextOptions = {
   /** Keep only the last N messages (oldest dropped). Default 40. */
   readonly maxMessages?: number;
   /** Truncate tool/dynamic-tool `output` JSON beyond this many chars. Default 4_000. */
@@ -21,18 +21,18 @@ export type ExecutionContextOptions = {
   readonly maxTextPartChars?: number;
 };
 
-export const DEFAULT_EXECUTION_CONTEXT_OPTIONS = {
+export const DEFAULT_MODEL_CONTEXT_OPTIONS = {
   maxMessages: 40,
   maxToolOutputChars: 4_000,
   maxTextPartChars: 16_000,
-} as const satisfies Required<ExecutionContextOptions>;
+} as const satisfies Required<ModelContextOptions>;
 
 /** Dark-launch / rollback: seam still used, no compaction. */
-export const PASSTHROUGH_EXECUTION_CONTEXT_OPTIONS = {
+export const PASSTHROUGH_MODEL_CONTEXT_OPTIONS = {
   maxMessages: Number.POSITIVE_INFINITY,
   maxToolOutputChars: Number.POSITIVE_INFINITY,
   maxTextPartChars: Number.POSITIVE_INFINITY,
-} as const satisfies Required<ExecutionContextOptions>;
+} as const satisfies Required<ModelContextOptions>;
 
 function truncateChars(value: string, max: number): string {
   if (!Number.isFinite(max) || value.length <= max) {
@@ -60,7 +60,7 @@ function truncateJsonValue(value: unknown, max: number): unknown {
   return truncateChars(serialized, max);
 }
 
-function compactPart(part: MessagePart, options: Required<ExecutionContextOptions>): MessagePart {
+function compactPart(part: MessagePart, options: Required<ModelContextOptions>): MessagePart {
   if (isTextUIPart(part)) {
     const text = truncateChars(part.text, options.maxTextPartChars);
     if (text === part.text) {
@@ -83,7 +83,7 @@ function compactPart(part: MessagePart, options: Required<ExecutionContextOption
   return part;
 }
 
-function compactMessage(message: UIMessage, options: Required<ExecutionContextOptions>): UIMessage {
+function compactMessage(message: UIMessage, options: Required<ModelContextOptions>): UIMessage {
   let changed = false;
   const parts = message.parts.map((part) => {
     const next = compactPart(part, options);
@@ -96,19 +96,18 @@ function compactMessage(message: UIMessage, options: Required<ExecutionContextOp
 }
 
 /**
- * Fold MandateProjection (or any chatMessages view) into ExecutionContext.
+ * Fold MandateProjection (or any chatMessages view) into ModelContext.
  * Same underlying log/view; different deterministic compaction for the model.
  */
-export function foldExecutionContext(
+export function foldModelContext(
   source: Pick<MandateProjection, "chatMessages">,
-  options?: ExecutionContextOptions,
-): ExecutionContext {
-  const resolved: Required<ExecutionContextOptions> = {
-    maxMessages: options?.maxMessages ?? DEFAULT_EXECUTION_CONTEXT_OPTIONS.maxMessages,
+  options?: ModelContextOptions,
+): ModelContext {
+  const resolved: Required<ModelContextOptions> = {
+    maxMessages: options?.maxMessages ?? DEFAULT_MODEL_CONTEXT_OPTIONS.maxMessages,
     maxToolOutputChars:
-      options?.maxToolOutputChars ?? DEFAULT_EXECUTION_CONTEXT_OPTIONS.maxToolOutputChars,
-    maxTextPartChars:
-      options?.maxTextPartChars ?? DEFAULT_EXECUTION_CONTEXT_OPTIONS.maxTextPartChars,
+      options?.maxToolOutputChars ?? DEFAULT_MODEL_CONTEXT_OPTIONS.maxToolOutputChars,
+    maxTextPartChars: options?.maxTextPartChars ?? DEFAULT_MODEL_CONTEXT_OPTIONS.maxTextPartChars,
   };
 
   const all = source.chatMessages;

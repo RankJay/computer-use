@@ -4,7 +4,7 @@ import type { StandingPolicyDocument } from "@/lib/mandates/types";
 import type { AppSecrets, AppSettings } from "@/lib/settings/types";
 
 import type { RuntimeEventPayload, PermissionDecision } from "../events";
-import { foldExecutionContext } from "../execution-context";
+import { foldModelContext } from "../model-context";
 import type { MandateProjection } from "../projection";
 import type { RunExecutionContext } from "../run-execution-context";
 import {
@@ -166,7 +166,7 @@ export function createRunController(deps: RunControllerDeps): RunController {
       if (!lastConfig) return;
       if (projection.status !== "failed" || !projection.failure?.recoverable) return;
 
-      const execution = foldExecutionContext(projection);
+      const execution = foldModelContext(projection);
       await runWithConfig({
         ...lastConfig,
         prompt: lastConfig.prompt,

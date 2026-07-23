@@ -3,30 +3,30 @@ import { describe, expect, test } from "bun:test";
 import type { UIMessage } from "ai";
 
 import {
-  DEFAULT_EXECUTION_CONTEXT_OPTIONS,
-  PASSTHROUGH_EXECUTION_CONTEXT_OPTIONS,
-  foldExecutionContext,
-} from "./execution-context";
+  DEFAULT_MODEL_CONTEXT_OPTIONS,
+  PASSTHROUGH_MODEL_CONTEXT_OPTIONS,
+  foldModelContext,
+} from "./model-context";
 import { createEmptyMandateProjection } from "./projection";
 
 function userText(id: string, text: string): UIMessage {
   return { id, role: "user", parts: [{ type: "text", text }] };
 }
 
-describe("foldExecutionContext", () => {
+describe("foldModelContext", () => {
   test("passthrough keeps audit chatMessages identity when nothing to compact", () => {
     const chatMessages = [userText("u1", "hello"), userText("u2", "world")];
     const projection = { ...createEmptyMandateProjection(), chatMessages };
-    const execution = foldExecutionContext(projection, PASSTHROUGH_EXECUTION_CONTEXT_OPTIONS);
+    const execution = foldModelContext(projection, PASSTHROUGH_MODEL_CONTEXT_OPTIONS);
     expect(execution.messages).toEqual(chatMessages);
     expect(execution.messages[0]).toBe(chatMessages[0]);
   });
 
   test("keeps last maxMessages only", () => {
     const chatMessages = Array.from({ length: 5 }, (_, i) => userText(`u${i}`, `m${i}`));
-    const execution = foldExecutionContext(
+    const execution = foldModelContext(
       { chatMessages },
-      { ...DEFAULT_EXECUTION_CONTEXT_OPTIONS, maxMessages: 2 },
+      { ...DEFAULT_MODEL_CONTEXT_OPTIONS, maxMessages: 2 },
     );
     expect(execution.messages.map((m) => m.id)).toEqual(["u3", "u4"]);
   });
@@ -50,7 +50,7 @@ describe("foldExecutionContext", () => {
       },
     ];
     const projection = { ...createEmptyMandateProjection(), chatMessages };
-    const execution = foldExecutionContext(projection, {
+    const execution = foldModelContext(projection, {
       maxToolOutputChars: 100,
       maxMessages: 40,
       maxTextPartChars: 16_000,
@@ -73,7 +73,7 @@ describe("foldExecutionContext", () => {
   test("truncates long text parts for the model only", () => {
     const long = "y".repeat(1_000);
     const chatMessages: UIMessage[] = [userText("u", long)];
-    const execution = foldExecutionContext(
+    const execution = foldModelContext(
       { chatMessages },
       { maxTextPartChars: 50, maxMessages: 40, maxToolOutputChars: 4_000 },
     );

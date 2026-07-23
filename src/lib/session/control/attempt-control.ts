@@ -3,7 +3,7 @@ import type { MandatesPersistence } from "@/lib/mandates";
 import type { AppSecrets, AppSettings } from "@/lib/settings/types";
 
 import type { RetryFromMessageConfig, AttemptEngine } from "../engine";
-import { foldExecutionContext } from "../execution-context";
+import { foldModelContext } from "../model-context";
 import type { AttemptRegistry } from "./attempt-registry";
 import type { PermissionDecision, RunConfig } from "./run-controller";
 
@@ -199,7 +199,7 @@ export function createAttemptControl(deps: AttemptControlDeps): AttemptControl {
       const mandateId = await resolveMandateId(input.mandateId);
       const mandate = await deps.mandates.get(mandateId);
       await deps.mandates.update(mandateId, { status: "running" });
-      const execution = foldExecutionContext(deps.engine.getProjection());
+      const execution = foldModelContext(deps.engine.getProjection());
       const config: RunConfig = {
         prompt: input.prompt,
         modelId: ctx.settings.selectedModelId,
