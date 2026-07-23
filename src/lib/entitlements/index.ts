@@ -12,6 +12,7 @@ export { HOBBY_PLAN, METER_KEY_ATTEMPTS, METER_KEY_COMPUTER_USE } from "./plans"
 export { utcDayKey } from "./period";
 export {
   createEntitlementPolicy,
+  type AuthorizeOptions,
   type EntitlementPolicy,
   type EntitlementPolicyDeps,
 } from "./policy";

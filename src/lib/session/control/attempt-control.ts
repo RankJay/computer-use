@@ -117,11 +117,27 @@ export function createAttemptControl(deps: AttemptControlDeps): AttemptControl {
       return entitlementStartError(modelDecision);
     }
 
-    const attemptDecision = await policy.authorize({ kind: "attempt_start" });
+    // Dry-run attempt meter — commit only after the Attempt actually begins.
+    const attemptDecision = await policy.authorize(
+      { kind: "attempt_start" },
+      { commit: false },
+    );
     if (attemptDecision.outcome === "deny" || attemptDecision.outcome === "require_upgrade") {
       return entitlementStartError(attemptDecision);
     }
 
+    return null;
+  }
+
+  async function commitAttemptStartMeter(): Promise<AttemptStartError | null> {
+    const policy = deps.entitlements;
+    if (!policy) {
+      return null;
+    }
+    const attemptDecision = await policy.authorize({ kind: "attempt_start" }, { commit: true });
+    if (attemptDecision.outcome === "deny" || attemptDecision.outcome === "require_upgrade") {
+      return entitlementStartError(attemptDecision);
+    }
     return null;
   }
 
@@ -142,6 +158,12 @@ export function createAttemptControl(deps: AttemptControlDeps): AttemptControl {
     const first = await Promise.race([started, run]);
     if (first.kind === "started") {
       const { attemptId } = first;
+      const meterBlocked = await commitAttemptStartMeter();
+      if (meterBlocked) {
+        deps.cancelAttemptStartedWait();
+        await deps.engine.cancel();
+        return meterBlocked;
+      }
       deps.registry.setLive({ mandateId, attemptId });
       void run.finally(() => {
         const live = deps.registry.getLive();

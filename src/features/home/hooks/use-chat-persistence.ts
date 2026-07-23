@@ -180,29 +180,48 @@ export function useChatPersistence(store: BatchedAttemptStore, chatId: string | 
         return;
       }
 
+      // Capture synchronously — registry may clearLive after settle microtasks.
+      const settledLiveIds = store.control.getLiveIds();
+      const settledLiveChatId = store.control.getLiveChatId();
+      const settledFocusedMandateId = store.control.getFocusedMandateId();
+      const settledMeta = metaRef.current;
+      const settledRouteChatId = chatIdRef.current;
+      const settledFallbackModelId = modelIdRef.current;
+      const settledMessages = projection.chatMessages;
+
       void (async () => {
-        const messages = projection.chatMessages;
-        const existingId = chatIdRef.current;
-        const fallbackModelId = modelIdRef.current;
+        // Bind checkpoint to the Attempt that settled — not the focused/route chat
+        // (focus≠cancel: user may have navigated elsewhere while the Attempt ran).
         const mandateId =
-          store.control.getFocusedMandateId() ??
-          store.control.getLiveIds()?.mandateId ??
-          metaRef.current?.mandateId;
+          settledLiveIds?.mandateId ??
+          settledMeta?.mandateId ??
+          settledFocusedMandateId;
         if (!mandateId) {
           toast.error("Could not save chat", {
             description: "Missing mandate id for checkpoint.",
           });
           return;
         }
+        // Prefer live chat; if Attempt was on /new, create — never write into a
+        // different route chat the user focused mid-run.
+        const existingId =
+          settledLiveChatId ?? (settledLiveIds ? null : settledRouteChatId);
+
+        const checkpointMeta =
+          settledMeta?.mandateId === mandateId
+            ? settledMeta
+            : settledMeta
+              ? { ...settledMeta, mandateId }
+              : null;
 
         if (existingId) {
           const chat = buildCheckpointChat({
             id: existingId,
             mandateId,
-            messages,
-            meta: metaRef.current,
+            messages: settledMessages,
+            meta: checkpointMeta,
             projection,
-            fallbackModelId,
+            fallbackModelId: settledFallbackModelId,
           });
           try {
             await persistChat(chat, { navigateToChat: false });
@@ -220,10 +239,10 @@ export function useChatPersistence(store: BatchedAttemptStore, chatId: string | 
           pendingAfterCreateRef.current = buildCheckpointChat({
             id: createId,
             mandateId,
-            messages,
-            meta: metaRef.current,
+            messages: settledMessages,
+            meta: checkpointMeta,
             projection,
-            fallbackModelId,
+            fallbackModelId: settledFallbackModelId,
           });
           return;
         }
@@ -234,10 +253,10 @@ export function useChatPersistence(store: BatchedAttemptStore, chatId: string | 
         const chat = buildCheckpointChat({
           id,
           mandateId,
-          messages,
+          messages: settledMessages,
           meta: null,
           projection,
-          fallbackModelId,
+          fallbackModelId: settledFallbackModelId,
         });
         metaRef.current = {
           title: chat.title,

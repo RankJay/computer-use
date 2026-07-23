@@ -1,9 +1,9 @@
 import type { LiveAttempt } from "./attempt-registry";
 
 /**
- * Swappable conflict policy on AttemptRegistry (ADR 0005).
- * Phase 1 default = cancel_previous (still enforced in RunController).
- * Phase 2+ may reject/queue so unattended work does not kill interactive.
+ * Swappable conflict policy consulted by Trigger wake evaluation (ADR 0005).
+ * Interactive cancel-previous for Chat starts is still enforced in RunController
+ * until AttemptControl wires this policy into the start path.
  */
 export type ConcurrencyConflictDecision = "cancel_previous" | "reject" | "queue";
 
@@ -28,7 +28,8 @@ export const rejectIfBusyConcurrencyPolicy: ConcurrencyPolicy = {
   onConflict: (ctx) => (ctx.live ? "reject" : "cancel_previous"),
 };
 
-/** Named queue seam — v0 still rejects (queue buffer not built). */
-export const queueIfBusyConcurrencyPolicy: ConcurrencyPolicy = {
-  onConflict: (ctx) => (ctx.live ? "queue" : "cancel_previous"),
-};
+/**
+ * Queue buffer is not implemented. Alias of reject so Callers cannot mistake
+ * `action: "queue"` for a durable wake queue. Reintroduce `"queue"` when buffered.
+ */
+export const queueIfBusyConcurrencyPolicy: ConcurrencyPolicy = rejectIfBusyConcurrencyPolicy;

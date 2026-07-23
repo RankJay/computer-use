@@ -57,6 +57,8 @@ export type BatchedAttemptStore = {
   resetForMaintenance: () => Promise<void>;
   /** Flush buffered ledger writes (tests / shutdown). */
   flushLedger: () => Promise<void>;
+  /** Last durable-ledger write failure (null when healthy). */
+  getLedgerError: () => unknown | null;
 };
 
 export type AttemptHostDeps = {
@@ -160,6 +162,53 @@ export function createAttemptHost(deps: AttemptHostDeps): BatchedAttemptStore {
   let flushChain: Promise<void> = Promise.resolve();
   let lastStatus: RunStatus = snapshot.status;
   let ledgerAttemptId: string | null = null;
+  let lastLedgerError: unknown | null = null;
+  let bindChain: Promise<void> = Promise.resolve();
+  let bindGeneration = 0;
+
+  function noteLedgerError(error: unknown): void {
+    lastLedgerError = error;
+    emit();
+  }
+
+  function clearLedgerError(): void {
+    if (lastLedgerError !== null) {
+      lastLedgerError = null;
+      emit();
+    }
+  }
+
+  async function syncMandateLifecycle(status: RunStatus): Promise<void> {
+    const mandateId = resolveMandateId();
+    if (!mandateId) {
+      return;
+    }
+    switch (status) {
+      case "waiting_permission":
+        await mandates.update(mandateId, { status: "waiting_permission" });
+        return;
+      case "running":
+      case "streaming":
+        await mandates.update(mandateId, { status: "running" });
+        return;
+      case "completed":
+        await mandates.update(mandateId, { status: "done" });
+        return;
+      case "failed":
+        await mandates.update(mandateId, { status: "failed" });
+        return;
+      case "cancelled":
+        // Interactive cancel → re-arm so triggers/retries can wake again.
+        await mandates.update(mandateId, { status: "armed" });
+        return;
+      case "idle":
+        return;
+      default: {
+        const _exhaustive: never = status;
+        return _exhaustive;
+      }
+    }
+  }
 
   const emit = () => {
     for (const listener of listeners) {
@@ -233,13 +282,16 @@ export function createAttemptHost(deps: AttemptHostDeps): BatchedAttemptStore {
             const status = engine.getProjection().status;
             if (isSettleStatus(status)) {
               await settleLedger(status);
+              clearLedgerError();
               return;
             }
           }
           await writePendingEvents();
+          clearLedgerError();
         })
-        .catch(() => {
-          // Ledger write failures must not tear down the Attempt; Chat checkpoint remains.
+        .catch((error: unknown) => {
+          // Do not tear down the Attempt; surface error for Clients / diagnostics.
+          noteLedgerError(error);
         });
     };
 
@@ -268,9 +320,23 @@ export function createAttemptHost(deps: AttemptHostDeps): BatchedAttemptStore {
     }
     const status = engine.getProjection().status;
     if (isSettleStatus(status)) {
-      flushChain = flushChain.then(() => settleLedger(status)).catch(() => {});
+      flushChain = flushChain
+        .then(async () => {
+          await settleLedger(status);
+          clearLedgerError();
+        })
+        .catch((error: unknown) => {
+          noteLedgerError(error);
+        });
     } else {
-      flushChain = flushChain.then(() => writePendingEvents()).catch(() => {});
+      flushChain = flushChain
+        .then(async () => {
+          await writePendingEvents();
+          clearLedgerError();
+        })
+        .catch((error: unknown) => {
+          noteLedgerError(error);
+        });
     }
     await flushChain;
   }
@@ -303,6 +369,17 @@ export function createAttemptHost(deps: AttemptHostDeps): BatchedAttemptStore {
     const prev = lastStatus;
     lastStatus = status;
 
+    if (status !== prev) {
+      if (
+        status === "waiting_permission" ||
+        status === "running" ||
+        status === "streaming" ||
+        isSettleStatus(status)
+      ) {
+        void syncMandateLifecycle(status);
+      }
+    }
+
     if (status === "waiting_permission" && prev !== status) {
       scheduleLedgerFlush(true);
       return;
@@ -332,6 +409,25 @@ export function createAttemptHost(deps: AttemptHostDeps): BatchedAttemptStore {
     return next;
   }
 
+  async function forceSettleUnrecovered(mandateId: string): Promise<void> {
+    const projection = engine.getProjection();
+    if (!isActiveStatus(projection.status)) {
+      return;
+    }
+    const log = engine.getEventLog();
+    const lastEvent = log.length > 0 ? log[log.length - 1] : undefined;
+    const attemptId = projection.taskId ?? lastEvent?.taskId ?? `unrecovered-${crypto.randomUUID()}`;
+    registry.setFocusedMandateId(mandateId);
+    // Keep seq past hydrated events so recovery appends are not deduped.
+    engine.beginTask(attemptId, { continueSeq: true });
+    ledgerAttemptId = attemptId;
+    engine.append({ type: "task.status_changed", status: "cancelled" });
+    engine.append({ type: "task.completed", finishReason: "cancelled" });
+    engine.clearTask();
+    await settleLedger("cancelled");
+    await mandates.update(mandateId, { status: "armed" });
+  }
+
   async function hydrateIdleChat(chat: StoredChat): Promise<void> {
     const ledger = await eventStore.loadForMandateOpen(chat.mandateId);
     if (ledger) {
@@ -339,6 +435,11 @@ export function createAttemptHost(deps: AttemptHostDeps): BatchedAttemptStore {
       resetLedgerCursors();
       durableLogCursor = engine.getEventLog().length;
       lastStatus = engine.getProjection().status;
+      if (isActiveStatus(lastStatus)) {
+        // Crash reopen: no live runner — force-cancel so UI/cancel/permission are coherent.
+        await forceSettleUnrecovered(chat.mandateId);
+        lastStatus = engine.getProjection().status;
+      }
       return;
     }
     engine.hydrate(chat.messages as UIMessage[]);
@@ -362,63 +463,115 @@ export function createAttemptHost(deps: AttemptHostDeps): BatchedAttemptStore {
       };
     },
     flushLedger,
+    getLedgerError: () => lastLedgerError,
 
     async backfillChatMandate(chat, save) {
       return backfillChatMandate(chat, save);
     },
 
-    async bindChatRoute({ chatId, loadChat, ensureMandateForChat }) {
-      const status = engine.getProjection().status;
-      const live = registry.getLive();
-      const liveChatId = registry.getLiveChatId();
+    async bindChatRoute(input) {
+      const generation = ++bindGeneration;
+      const run = async (): Promise<void> => {
+        if (generation !== bindGeneration) {
+          return;
+        }
 
-      if (isActiveStatus(status) && live) {
-        if (chatId && chatId === liveChatId) {
-          registry.setFocusedMandateId(live.mandateId);
-          return;
-        }
-        if (!chatId && liveChatId === null) {
-          registry.setFocusedMandateId(live.mandateId);
-          return;
-        }
-        if (chatId) {
-          const chat = await loadChat(chatId);
-          if (chat) {
-            const ensured = await ensureMandateForChat(chat);
-            registry.setFocusedMandateId(ensured.mandateId);
+        const attachLiveFocus = async (): Promise<boolean> => {
+          const status = engine.getProjection().status;
+          const live = registry.getLive();
+          if (!(isActiveStatus(status) && live)) {
+            return false;
           }
+          const liveChatId = registry.getLiveChatId();
+          if (input.chatId && input.chatId === liveChatId) {
+            registry.setFocusedMandateId(live.mandateId);
+            return true;
+          }
+          if (!input.chatId && liveChatId === null) {
+            registry.setFocusedMandateId(live.mandateId);
+            return true;
+          }
+          if (input.chatId) {
+            const chat = await input.loadChat(input.chatId);
+            if (generation !== bindGeneration) {
+              return true;
+            }
+            if (chat) {
+              const ensured = await input.ensureMandateForChat(chat);
+              registry.setFocusedMandateId(ensured.mandateId);
+            }
+          }
+          return true;
+        };
+
+        if (await attachLiveFocus()) {
+          return;
         }
-        return;
-      }
 
-      await flushLedger();
-      await engine.reset();
-      registry.clearLive();
-      resetLedgerCursors();
+        await flushLedger();
+        if (generation !== bindGeneration) {
+          return;
+        }
+        // Start may have landed while we flushed — never reset over a live Attempt.
+        if (await attachLiveFocus()) {
+          return;
+        }
 
-      if (!chatId) {
-        registry.setLiveChatId(null);
-        registry.setFocusedMandateId(null);
-        snapshot = createEmptySessionProjection();
+        await engine.reset();
+        if (generation !== bindGeneration) {
+          return;
+        }
+        if (await attachLiveFocus()) {
+          return;
+        }
+
+        registry.clearLive();
+        resetLedgerCursors();
+
+        if (!input.chatId) {
+          registry.setLiveChatId(null);
+          registry.setFocusedMandateId(null);
+          snapshot = createEmptySessionProjection();
+          lastStatus = snapshot.status;
+          emit();
+          return;
+        }
+
+        const chat = await input.loadChat(input.chatId);
+        if (generation !== bindGeneration) {
+          return;
+        }
+        if (!chat) {
+          registry.setLiveChatId(null);
+          registry.setFocusedMandateId(null);
+          return;
+        }
+
+        const ensured = await input.ensureMandateForChat(chat);
+        if (generation !== bindGeneration) {
+          return;
+        }
+        if (await attachLiveFocus()) {
+          return;
+        }
+
+        registry.setLiveChatId(ensured.id);
+        registry.setFocusedMandateId(ensured.mandateId);
+        await hydrateIdleChat(ensured);
+        if (generation !== bindGeneration) {
+          return;
+        }
+        snapshot = engine.getProjection();
         lastStatus = snapshot.status;
         emit();
-        return;
-      }
+      };
 
-      const chat = await loadChat(chatId);
-      if (!chat) {
-        registry.setLiveChatId(null);
-        registry.setFocusedMandateId(null);
-        return;
-      }
-
-      const ensured = await ensureMandateForChat(chat);
-      registry.setLiveChatId(ensured.id);
-      registry.setFocusedMandateId(ensured.mandateId);
-      await hydrateIdleChat(ensured);
-      snapshot = engine.getProjection();
-      lastStatus = snapshot.status;
-      emit();
+      const queued = bindChain.then(run, run);
+      bindChain = queued.then(
+        () => undefined,
+        () => undefined,
+      );
+      await queued;
     },
 
     async resetForMaintenance() {

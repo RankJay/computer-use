@@ -4,12 +4,21 @@ import { utcDayKey } from "./period";
 import { HOBBY_PLAN, METER_KEY_ATTEMPTS, METER_KEY_COMPUTER_USE } from "./plans";
 import type { EntitlementCheck, EntitlementDecision, PlanDocument } from "./types";
 
+export type AuthorizeOptions = {
+  /**
+   * When false, evaluate ceilings without incrementing meters.
+   * Use before PermissionPolicy / EscalationPort / OS lease; commit after the
+   * side effect is actually allowed (default true).
+   */
+  readonly commit?: boolean;
+};
+
 export type EntitlementPolicy = {
   /**
    * Commercial gate. Evaluates plan + meters; commits meter increments on
-   * `allow_and_meter`. Never talks to humans / OS permission UX.
+   * `allow_and_meter` when `commit` is true (default). Never talks to humans / OS permission UX.
    */
-  authorize(check: EntitlementCheck): Promise<EntitlementDecision>;
+  authorize(check: EntitlementCheck, options?: AuthorizeOptions): Promise<EntitlementDecision>;
 };
 
 export type EntitlementPolicyDeps = {
@@ -29,16 +38,23 @@ async function meterDecision(
   dailyLimit: number | null,
   feature: string,
   limitReason: string,
+  commit: boolean,
 ): Promise<EntitlementDecision> {
-  if (dailyLimit !== null) {
-    const current = await meters.get(subjectId, meterKey, periodKey);
-    if (current + amount > dailyLimit) {
-      return {
-        outcome: "require_upgrade",
-        reason: limitReason,
-        feature,
-      };
-    }
+  const current = await meters.get(subjectId, meterKey, periodKey);
+  if (dailyLimit !== null && current + amount > dailyLimit) {
+    return {
+      outcome: "require_upgrade",
+      reason: limitReason,
+      feature,
+    };
+  }
+  if (!commit) {
+    return {
+      outcome: "allow_and_meter",
+      meterKey,
+      amount,
+      newValue: current + amount,
+    };
   }
   const newValue = await meters.increment(subjectId, meterKey, periodKey, amount);
   return {
@@ -54,7 +70,8 @@ export function createEntitlementPolicy(deps: EntitlementPolicyDeps): Entitlemen
   const now = deps.now ?? (() => new Date());
 
   return {
-    async authorize(check) {
+    async authorize(check, options) {
+      const commit = options?.commit !== false;
       const subjectId = await deps.getSubjectId();
       const plan = await getPlan();
       const periodKey = utcDayKey(now());
@@ -70,6 +87,7 @@ export function createEntitlementPolicy(deps: EntitlementPolicyDeps): Entitlemen
             plan.attemptsPerDay,
             "attempts",
             "Daily attempt limit reached on the hobby plan.",
+            commit,
           );
 
         case "model": {
@@ -104,6 +122,7 @@ export function createEntitlementPolicy(deps: EntitlementPolicyDeps): Entitlemen
             plan.computerUseActionsPerDay,
             "computer_use",
             "Daily computer-use limit reached on the hobby plan.",
+            commit,
           );
         }
 

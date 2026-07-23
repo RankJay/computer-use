@@ -64,7 +64,7 @@ describe("evaluateTriggerWake", () => {
     });
   });
 
-  test("queue policy names queue without starting", () => {
+  test("queueIfBusy is reject until a wake buffer exists", () => {
     expect(
       evaluateTriggerWake({
         mandate: mandate("armed"),
@@ -72,9 +72,9 @@ describe("evaluateTriggerWake", () => {
         concurrencyPolicy: queueIfBusyConcurrencyPolicy,
       }),
     ).toEqual({
-      action: "queue",
-      reason: "concurrency_queue",
-      concurrency: "queue",
+      action: "suppress",
+      reason: "concurrency_reject",
+      concurrency: "reject",
     });
   });
 

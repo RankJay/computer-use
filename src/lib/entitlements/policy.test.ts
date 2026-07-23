@@ -126,4 +126,29 @@ describe("EntitlementPolicy", () => {
     });
     expect(typeof policy.authorize).toBe("function");
   });
+
+  test("commit:false checks ceiling without incrementing", async () => {
+    const meters = new MemoryMeterStore();
+    const policy = createEntitlementPolicy({
+      getSubjectId: async () => "anonymous",
+      getPlan: async () => TIGHT_HOBBY,
+      meters,
+      now: () => new Date("2026-07-23T12:00:00Z"),
+    });
+
+    const preview = await policy.authorize(
+      { kind: "capability", capability: "mouse_click", capabilityClass: "computer_use" },
+      { commit: false },
+    );
+    expect(preview.outcome).toBe("allow_and_meter");
+    expect(await meters.get("user:1", METER_KEY_COMPUTER_USE, "2026-07-23")).toBe(0);
+    expect(await meters.get("anonymous", METER_KEY_COMPUTER_USE, "2026-07-23")).toBe(0);
+
+    const committed = await policy.authorize(
+      { kind: "capability", capability: "mouse_click", capabilityClass: "computer_use" },
+      { commit: true },
+    );
+    expect(committed.outcome).toBe("allow_and_meter");
+    expect(await meters.get("anonymous", METER_KEY_COMPUTER_USE, "2026-07-23")).toBe(1);
+  });
 });

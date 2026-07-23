@@ -11,6 +11,7 @@ export {
   type RequestTriggerWakeInput,
   type RequestTriggerWakeResult,
 } from "./request-wake";
+/** Pure timer helper — not wired into AttemptHost yet (ops-contract stall). */
 export {
   createStallWatchdog,
   type CreateStallWatchdogDeps,

@@ -62,7 +62,11 @@ export type SessionEngine = {
    * prompt, drop that answer and everything after, re-run with isRetry.
    */
   retryFromMessage: (assistantMessageId: string, config: RetryFromMessageConfig) => Promise<void>;
-  beginTask: (taskId: string) => void;
+  /**
+   * @param continueSeq — when true, keep eventSeq (crash-open recovery after hydrateFromLedger).
+   *   Default false resets seq for a fresh Attempt.
+   */
+  beginTask: (taskId: string, options?: { continueSeq?: boolean }) => void;
   clearTask: () => void;
 };
 
@@ -176,9 +180,11 @@ export function createSessionEngine(deps: SessionEngineDeps): SessionEngine {
       activeTaskId = null;
       notify();
     },
-    beginTask(taskId) {
+    beginTask(taskId, options) {
       activeTaskId = taskId;
-      eventSeq = 0;
+      if (!options?.continueSeq) {
+        eventSeq = 0;
+      }
     },
     clearTask() {
       activeTaskId = null;

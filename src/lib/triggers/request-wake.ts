@@ -30,7 +30,7 @@ export type RequestTriggerWakeResult =
 
 /**
  * Thin Trigger Client: evaluate wake → optionally AttemptControl.start.
- * Never drives Chat UI. Queue action is named but not buffered yet.
+ * Never drives Chat UI. Non-start decisions are suppressed (no wake buffer yet).
  */
 export async function requestTriggerWake(
   input: RequestTriggerWakeInput,

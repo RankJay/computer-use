@@ -115,12 +115,15 @@ export async function runCapability(
     return { ok: false, error: capabilityError };
   }
 
+  const entitlementCheck = {
+    kind: "capability" as const,
+    capability: name,
+    capabilityClass: capabilityClassOf(name),
+  };
+
+  // Dry-run commercial gate first — do not burn meters on deny/timeout/lease reject.
   if (deps.entitlements) {
-    const entitlement = await deps.entitlements.authorize({
-      kind: "capability",
-      capability: name,
-      capabilityClass: capabilityClassOf(name),
-    });
+    const entitlement = await deps.entitlements.authorize(entitlementCheck, { commit: false });
 
     if (entitlement.outcome === "deny" || entitlement.outcome === "require_upgrade") {
       append({
@@ -143,17 +146,6 @@ export async function runCapability(
         error: capabilityError,
       });
       return { ok: false, error: capabilityError };
-    }
-
-    if (entitlement.outcome === "allow_and_meter") {
-      append({
-        type: "entitlement.metered",
-        meterKey: entitlement.meterKey,
-        amount: entitlement.amount,
-        newValue: entitlement.newValue,
-        checkKind: "capability",
-        capability: name,
-      });
     }
   }
 
@@ -254,6 +246,43 @@ export async function runCapability(
         error: capabilityError,
       });
       return { ok: false, error: capabilityError };
+    }
+  }
+
+  // Commit meters only once the call is allowed to invoke.
+  if (deps.entitlements) {
+    const committed = await deps.entitlements.authorize(entitlementCheck, { commit: true });
+    if (committed.outcome === "deny" || committed.outcome === "require_upgrade") {
+      append({
+        type: "entitlement.denied",
+        checkKind: "capability",
+        outcome: committed.outcome,
+        reason: committed.reason,
+        feature: committed.outcome === "require_upgrade" ? committed.feature : undefined,
+        capability: name,
+      });
+      const capabilityError: CapabilityError = {
+        code:
+          committed.outcome === "require_upgrade" ? "entitlement_upgrade" : "entitlement_denied",
+        message: committed.reason,
+      };
+      append({
+        type: "capability.failed",
+        callId,
+        capability: name,
+        error: capabilityError,
+      });
+      return { ok: false, error: capabilityError };
+    }
+    if (committed.outcome === "allow_and_meter") {
+      append({
+        type: "entitlement.metered",
+        meterKey: committed.meterKey,
+        amount: committed.amount,
+        newValue: committed.newValue,
+        checkKind: "capability",
+        capability: name,
+      });
     }
   }
 

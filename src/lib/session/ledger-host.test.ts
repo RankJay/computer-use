@@ -192,9 +192,39 @@ describe("AttemptHost durable ledger", () => {
         .getProjection()
         .chatMessages.some((m) => m.parts.some((p) => p.type === "text" && p.text === "partial")),
     ).toBe(true);
+    // Unrecovered mid-run hydrate must not look live (no runner to cancel/resolve).
+    expect(host2.engine.getProjection().status).toBe("cancelled");
+    const mandate = await mandates.get(started.mandateId);
+    expect(mandate?.status).toBe("armed");
 
-    releaseGate();
+    // Leave host1 gated — do not let it overwrite Mandate lifecycle after crash-open settle.
+    void releaseGate;
+  });
+
+  test("Mandate lifecycle leaves running after settle so triggers can wake again", async () => {
+    const mandates = new MemoryMandatesPersistence();
+    const host = createAttemptHost({
+      produceRun: createTestDemoProducer(createDemoPayloads("life")),
+      mandates,
+      loadRunContext: async () => ({
+        settings: { ...DEFAULT_SETTINGS, agentMode: "demo" },
+        secrets: DEFAULT_SECRETS,
+        persistApproval: async () => {},
+      }),
+    });
+
+    const started = await host.control.start({ prompt: "life" });
+    expect(started.ok).toBe(true);
+    if (!started.ok) return;
+
+    expect((await mandates.get(started.mandateId))?.status).toBe("running");
     await waitForStatus(host, "completed");
+    await host.flushLedger();
+    for (let i = 0; i < 30; i += 1) {
+      if ((await mandates.get(started.mandateId))?.status === "done") break;
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    }
+    expect((await mandates.get(started.mandateId))?.status).toBe("done");
   });
 });
 

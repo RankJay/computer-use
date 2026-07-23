@@ -4,6 +4,7 @@ import {
   createEntitlementPolicy,
   MemoryMeterStore,
   HOBBY_PLAN,
+  METER_KEY_COMPUTER_USE,
   type PlanDocument,
 } from "@/lib/entitlements";
 import { createAutoEscalationPort } from "@/lib/session/control/escalation-port";
@@ -110,5 +111,35 @@ describe("runCapability entitlements", () => {
       ok: true,
       output: { path: "src/main.tsx", content: "hi", bytes: 2 },
     });
+  });
+
+  test("permission deny does not consume computer_use meter", async () => {
+    const meters = new MemoryMeterStore();
+    const entitlements = createEntitlementPolicy({
+      getSubjectId: async () => "anonymous",
+      getPlan: async () => ({ ...HOBBY_PLAN, computerUseActionsPerDay: 5 }),
+      meters,
+      now: () => new Date("2026-07-23T00:00:00Z"),
+    });
+
+    const result = await runCapability(
+      "mouse_click",
+      { x: 1, y: 2, button: "left" },
+      {
+        append: () => {},
+        taskId: "task-1",
+        settings: { ...DEFAULT_SETTINGS, permissionMode: "every-meaningful" },
+        workspaceRoot: "D:/Projects/actuate-v3",
+        escalationPort: createAutoEscalationPort("deny"),
+        invokeNative: async () => {
+          throw new Error("should not invoke");
+        },
+        entitlements,
+      },
+      "call-deny",
+    );
+
+    expect(result).toEqual({ ok: false, denied: true });
+    expect(await meters.get("anonymous", METER_KEY_COMPUTER_USE, "2026-07-23")).toBe(0);
   });
 });
