@@ -5,6 +5,7 @@ import { RouteErrorBoundary } from "@/components/boundaries/ErrorBoundary";
 
 import { DeepLinkBootstrap } from "./DeepLinkBootstrap";
 import HomePage from "./pages/home";
+import { AttemptHostProvider } from "./providers/AttemptHostProvider";
 import { AppQueryProvider } from "./providers/QueryProvider";
 import { RouteChunkFallback } from "./route-chunk-fallback";
 import { UpdaterBootstrap } from "./UpdaterBootstrap";
@@ -34,17 +35,19 @@ function LazyRoute(props: { readonly page: ReactNode }): ReactElement {
 function App() {
   return (
     <AppQueryProvider>
-      <BrowserRouter>
-        <DeepLinkBootstrap />
-        <UpdaterBootstrap />
-        <Routes>
-          <Route path="/" element={<HomeRoute />} />
-          <Route path="/chat/:chatId" element={<HomeRoute />} />
-          <Route path="/settings" element={<LazyRoute page={<SettingsPage />} />} />
-          <Route path="/settings/account" element={<LazyRoute page={<AccountPage />} />} />
-          <Route path="/history" element={<LazyRoute page={<HistoryPage />} />} />
-        </Routes>
-      </BrowserRouter>
+      <AttemptHostProvider>
+        <BrowserRouter>
+          <DeepLinkBootstrap />
+          <UpdaterBootstrap />
+          <Routes>
+            <Route path="/" element={<HomeRoute />} />
+            <Route path="/chat/:chatId" element={<HomeRoute />} />
+            <Route path="/settings" element={<LazyRoute page={<SettingsPage />} />} />
+            <Route path="/settings/account" element={<LazyRoute page={<AccountPage />} />} />
+            <Route path="/history" element={<LazyRoute page={<HistoryPage />} />} />
+          </Routes>
+        </BrowserRouter>
+      </AttemptHostProvider>
     </AppQueryProvider>
   );
 }

@@ -5,7 +5,7 @@ import {
   getDefaultAgentModel,
   type AgentModelOption,
   type ModelPricing,
-} from "@/lib/agent-models";
+} from "@/lib/agent/agent-models";
 
 export type UsageCostBreakdown = {
   inputUsd: number;

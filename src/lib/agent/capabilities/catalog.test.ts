@@ -67,7 +67,7 @@ describe("capability catalog", () => {
   test("groups names by risk", () => {
     const byRisk = getCapabilityNamesByRisk();
     expect(byRisk.low).toContain("read_file");
-    expect(byRisk.high).toContain("run_shell");
+    expect(byRisk.medium).toContain("run_shell");
     expect(byRisk.high).toContain("mouse_click");
     expect(byRisk.high).toContain("hotkey");
     expect(byRisk.medium).toContain("read_clipboard");

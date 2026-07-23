@@ -1,11 +1,14 @@
 import type { DynamicToolUIPart } from "ai";
 
-import { notifyIfUnfocused } from "@/lib/native/notification";
+import { capabilityClassOf } from "@/lib/entitlements";
+import { escalationToPermissionDecision } from "@/lib/session/control/escalation-port";
+import { osLeaseScopeOf } from "@/lib/session/control/os-lease-scope";
 import type { RuntimeEventPayload } from "@/lib/session/events";
 
 import { getCapabilityDefinition } from "./catalog";
 import { createDefaultNativeInvoker, mapInvokeError } from "./native-invoke";
-import { needsPermission } from "./permission";
+import { defaultPermissionPolicy } from "./permission-policy";
+import { lookupSettledCapability } from "./resume-from-cursor";
 import type {
   CapabilityError,
   CapabilityRunnerDeps,
@@ -79,8 +82,8 @@ function emitApprovalPart(
 }
 
 /**
- * CapabilityRunner: validate → permission gate → native invoke → audit events.
- * Emits assistant.part_updated for approval UI (deepening #2).
+ * CapabilityRunner: validate → entitlement → PermissionPolicy → EscalationPort → OS lease → invoke.
+ * Policy never notifies; EscalationPort owns wait/park/timeout.
  */
 export async function runCapability(
   name: string,
@@ -92,6 +95,12 @@ export async function runCapability(
   const append = (payload: RuntimeEventPayload) => {
     deps.append(payload);
   };
+
+  // Resume-from-cursor: settled callId → prior outcome, no re-click.
+  const prior = deps.getEventLog ? lookupSettledCapability(deps.getEventLog(), callId) : null;
+  if (prior) {
+    return prior;
+  }
 
   append({
     type: "capability.requested",
@@ -114,33 +123,119 @@ export async function runCapability(
     return { ok: false, error: capabilityError };
   }
 
-  const resolveLocation = () => deps.resolveToolPart?.(callId) ?? null;
+  const entitlementCheck = {
+    kind: "capability" as const,
+    capability: name,
+    capabilityClass: capabilityClassOf(name),
+  };
 
-  if (needsPermission(definition, deps.settings)) {
+  // Dry-run commercial gate first — do not burn meters on deny/timeout/lease reject.
+  if (deps.entitlements) {
+    const entitlement = await deps.entitlements.authorize(entitlementCheck, { commit: false });
+
+    if (entitlement.outcome === "deny" || entitlement.outcome === "require_upgrade") {
+      append({
+        type: "entitlement.denied",
+        checkKind: "capability",
+        outcome: entitlement.outcome,
+        reason: entitlement.reason,
+        feature: entitlement.outcome === "require_upgrade" ? entitlement.feature : undefined,
+        capability: name,
+      });
+      const capabilityError: CapabilityError = {
+        code:
+          entitlement.outcome === "require_upgrade" ? "entitlement_upgrade" : "entitlement_denied",
+        message: entitlement.reason,
+      };
+      append({
+        type: "capability.failed",
+        callId,
+        capability: name,
+        error: capabilityError,
+      });
+      return { ok: false, error: capabilityError };
+    }
+  }
+
+  const resolveLocation = () => deps.resolveToolPart?.(callId) ?? null;
+  const policy = deps.permissionPolicy ?? defaultPermissionPolicy;
+  const policyDecision = policy.resolve({
+    name: definition.name,
+    risk: definition.risk,
+    destructive: definition.destructive,
+    settings: deps.settings,
+    standingPolicy: deps.standingPolicy,
+  });
+
+  if (policyDecision === "deny") {
     append({
-      type: "permission.requested",
+      type: "interaction.requested",
       callId,
+      kind: "permission",
+      permission: {
+        capability: name,
+        input: parsedInput,
+        risk: definition.risk,
+      },
+    });
+    append({
+      type: "interaction.resolved",
+      callId,
+      kind: "permission",
+      permission: {
+        decision: "denied",
+      },
+    });
+    emitApprovalPart(deps, resolveLocation(), name, callId, parsedInput, "output-denied", false);
+    return { ok: false, denied: true };
+  }
+
+  if (policyDecision === "escalate") {
+    if (!deps.escalationPort) {
+      const capabilityError: CapabilityError = {
+        code: "escalation_port_missing",
+        message: "EscalationPort required when PermissionPolicy returns escalate.",
+      };
+      append({
+        type: "capability.failed",
+        callId,
+        capability: name,
+        error: capabilityError,
+      });
+      return { ok: false, error: capabilityError };
+    }
+
+    append({
+      type: "interaction.requested",
+      callId,
+      kind: "permission",
+      permission: {
+        capability: name,
+        input: parsedInput,
+        risk: definition.risk,
+      },
+    });
+    emitApprovalPart(deps, resolveLocation(), name, callId, parsedInput, "approval-requested");
+
+    const outcome = await deps.escalationPort.escalate({
+      callId,
+      attemptId: deps.taskId,
       capability: name,
+      label: uiToolLabel(name),
       input: parsedInput,
       risk: definition.risk,
     });
-    emitApprovalPart(deps, resolveLocation(), name, callId, parsedInput, "approval-requested");
-    notifyIfUnfocused({
-      title: "Approval needed",
-      body: `${uiToolLabel(name)} is waiting. Hop back in to approve or reject.`,
-    });
-
-    const waiter = deps.createPermissionWaiter(callId);
-    const decision = await waiter.waitForDecision();
 
     append({
-      type: "permission.resolved",
+      type: "interaction.resolved",
       callId,
-      decision,
+      kind: "permission",
+      permission: {
+        decision: escalationToPermissionDecision(outcome),
+      },
     });
 
-    // Re-resolve after the waiter — the tool part may have arrived mid-wait.
-    if (decision === "denied") {
+    if (outcome === "deny") {
       emitApprovalPart(deps, resolveLocation(), name, callId, parsedInput, "output-denied", false);
       return { ok: false, denied: true };
     }
@@ -154,6 +249,61 @@ export async function runCapability(
       "approval-responded",
       true,
     );
+  }
+
+  const leaseScope = osLeaseScopeOf(name);
+  if (leaseScope !== "none" && deps.osLease) {
+    const lease = deps.osLease.acquire(deps.taskId, leaseScope);
+    if (lease.outcome === "rejected") {
+      const capabilityError: CapabilityError = {
+        code: "os_lease_held",
+        message: `Desktop OS lease held by another Attempt (${lease.holderAttemptId}).`,
+      };
+      append({
+        type: "capability.failed",
+        callId,
+        capability: name,
+        error: capabilityError,
+      });
+      return { ok: false, error: capabilityError };
+    }
+  }
+
+  // Commit meters only once the call is allowed to invoke.
+  if (deps.entitlements) {
+    const committed = await deps.entitlements.authorize(entitlementCheck, { commit: true });
+    if (committed.outcome === "deny" || committed.outcome === "require_upgrade") {
+      append({
+        type: "entitlement.denied",
+        checkKind: "capability",
+        outcome: committed.outcome,
+        reason: committed.reason,
+        feature: committed.outcome === "require_upgrade" ? committed.feature : undefined,
+        capability: name,
+      });
+      const capabilityError: CapabilityError = {
+        code:
+          committed.outcome === "require_upgrade" ? "entitlement_upgrade" : "entitlement_denied",
+        message: committed.reason,
+      };
+      append({
+        type: "capability.failed",
+        callId,
+        capability: name,
+        error: capabilityError,
+      });
+      return { ok: false, error: capabilityError };
+    }
+    if (committed.outcome === "allow_and_meter") {
+      append({
+        type: "entitlement.metered",
+        meterKey: committed.meterKey,
+        amount: committed.amount,
+        newValue: committed.newValue,
+        checkKind: "capability",
+        capability: name,
+      });
+    }
   }
 
   const invokeNative = deps.invokeNative ?? createDefaultNativeInvoker();

@@ -1,7 +1,7 @@
 import { listen } from "@tauri-apps/api/event";
 
-import { queryClient } from "@/app/query-client";
-import { isTauriRuntime } from "@/lib/agent/is-tauri-runtime";
+import { isTauriRuntime } from "@/lib/runtime/is-tauri-runtime";
+import { queryClient } from "@/lib/runtime/query-client";
 import { settingsKeys, settingsQueryOptions } from "@/lib/settings/queries";
 import type { LoadedSettings } from "@/lib/settings/types";
 import { handleQuitRequested, startLaunchUpdateCheck } from "@/lib/updater/service";

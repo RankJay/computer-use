@@ -41,7 +41,7 @@ class FakeChatsPersistence implements ChatsPersistence {
 function stored(partial: Partial<StoredChat> & Pick<StoredChat, "id" | "title">): StoredChat {
   return {
     modelId: "openai/gpt-5.4",
-    messages: [],
+    mandateId: `mandate-${partial.id}`,
     createdAt: 1,
     updatedAt: 1,
     ...partial,

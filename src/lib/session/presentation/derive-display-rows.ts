@@ -17,7 +17,7 @@ export type DisplayRowsInput = {
 };
 
 function isActiveStatus(status: RunStatus): boolean {
-  return status === "running" || status === "streaming" || status === "waiting_permission";
+  return status === "running" || status === "streaming" || status === "waiting_interaction";
 }
 
 /** Demo fixtures fold activity.* into CoT / task / marker rows — pass those through unchanged. */
@@ -94,7 +94,7 @@ let lastDerive: DeriveCache | null = null;
 
 /**
  * Presentation-plane row list for AgentTranscript.
- * Never mutates SessionProjection — live may insert a synthetic Thinking… marker.
+ * Never mutates MandateProjection — live may insert a synthetic Thinking… marker.
  * Result identity is stable when inputs are Object.is-equal.
  */
 export function deriveDisplayRows(input: DisplayRowsInput): readonly AgentTranscriptRow[] {

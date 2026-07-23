@@ -1,53 +1,48 @@
 import type { UIMessage } from "ai";
 
-import { getDefaultAgentModel } from "@/lib/agent-models";
+import { getDefaultAgentModel } from "@/lib/agent/agent-models";
 
-import type { LanguageModelUsageSnapshot, RunStatus } from "./events";
+import type {
+  BudgetUpdatedPayload,
+  InteractionRequestedPayload,
+  RunStatus,
+  TaskFailedPayload,
+  UsageUpdatedPayload,
+} from "./events";
 import type { AgentTranscriptRow } from "./rows";
 
-export type SessionFailure = {
-  code: string;
-  message: string;
-  recoverable: boolean;
+export type AttemptFailure = Pick<TaskFailedPayload, "code" | "message" | "recoverable">;
+
+export type PendingInteraction = Omit<InteractionRequestedPayload, "type">;
+
+/**
+ * Read-model usage: same fields as UsageUpdatedPayload, with nullability
+ * before the first usage.updated event (modelId/usage unset).
+ */
+export type AttemptUsage = {
+  modelId: UsageUpdatedPayload["modelId"] | null;
+  usage: NonNullable<UsageUpdatedPayload["usage"]> | null;
+  usedTokens: UsageUpdatedPayload["usedTokens"];
+  maxTokens: UsageUpdatedPayload["maxTokens"];
 };
 
-export type PendingPermission = {
-  callId: string;
-  capability: string;
-  input: unknown;
-  risk: "low" | "medium" | "high";
-};
+/** Historical run budget — not current AppSettings (Omit event type tag). */
+export type AttemptBudget = Omit<BudgetUpdatedPayload, "type">;
 
-export type SessionUsage = {
-  modelId: string | null;
-  usage: LanguageModelUsageSnapshot | null;
-  usedTokens: number;
-  maxTokens: number;
-};
-
-export type SessionBudget = {
-  stepsUsed: number;
-  maxSteps: number;
-  costUsd: number;
-  maxCostUsd: number;
-  elapsedMs: number;
-  maxWallClockMs: number;
-};
-
-/** Canonical session read model. Control flags are derived elsewhere — never stored. */
-export type SessionProjection = {
+/** Mandate-scoped audit/UI read model (fold of Attempt events + live tail). */
+export type MandateProjection = {
   taskId: string | null;
   status: RunStatus;
-  failure: SessionFailure | null;
+  failure: AttemptFailure | null;
   rows: AgentTranscriptRow[];
   chatMessages: UIMessage[];
-  pendingPermissions: PendingPermission[];
-  usage: SessionUsage;
-  budget: SessionBudget;
+  pendingInteractions: PendingInteraction[];
+  usage: AttemptUsage;
+  budget: AttemptBudget;
   streamingMessageId: string | null;
 };
 
-export const EMPTY_SESSION_BUDGET: SessionBudget = {
+export const EMPTY_ATTEMPT_BUDGET: AttemptBudget = {
   stepsUsed: 0,
   maxSteps: 50,
   costUsd: 0,
@@ -56,7 +51,7 @@ export const EMPTY_SESSION_BUDGET: SessionBudget = {
   maxWallClockMs: 900_000,
 };
 
-export const EMPTY_SESSION_USAGE: SessionUsage = {
+export const EMPTY_ATTEMPT_USAGE: AttemptUsage = {
   modelId: null,
   usage: null,
   usedTokens: 0,
@@ -64,18 +59,18 @@ export const EMPTY_SESSION_USAGE: SessionUsage = {
 };
 
 /** Shared empty pending list — fold clears must reuse this, never `[]`. */
-export const EMPTY_PENDING_PERMISSIONS: PendingPermission[] = [];
+export const EMPTY_PENDING_INTERACTIONS: PendingInteraction[] = [];
 
-export function createEmptySessionProjection(): SessionProjection {
+export function createEmptyMandateProjection(): MandateProjection {
   return {
     taskId: null,
     status: "idle",
     failure: null,
     rows: [],
     chatMessages: [],
-    pendingPermissions: EMPTY_PENDING_PERMISSIONS,
-    usage: { ...EMPTY_SESSION_USAGE },
-    budget: { ...EMPTY_SESSION_BUDGET },
+    pendingInteractions: EMPTY_PENDING_INTERACTIONS,
+    usage: { ...EMPTY_ATTEMPT_USAGE },
+    budget: { ...EMPTY_ATTEMPT_BUDGET },
     streamingMessageId: null,
   };
 }

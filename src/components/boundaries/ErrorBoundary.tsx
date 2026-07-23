@@ -3,8 +3,8 @@ import { Component, Suspense, type ErrorInfo, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 
-import { queryClient } from "@/app/query-client";
 import { Button } from "@/components/ui/button";
+import { queryClient } from "@/lib/runtime/query-client";
 
 type ErrorBoundaryProps = {
   children: ReactNode;

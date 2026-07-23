@@ -26,13 +26,14 @@ import {
   settingsSelectTriggerClassName,
 } from "@/features/settings/styles";
 import { hostSupportsUiAutomation } from "@/lib/agent/capabilities/shared/ui-automation";
-import { isTauriRuntime } from "@/lib/agent/is-tauri-runtime";
 import {
   getMacOsPermissionStatus,
   openMacOsPrivacySettings,
   requestMacOsPermission,
 } from "@/lib/macos-permissions/commands";
-import { isMacOsClient } from "@/lib/platform";
+import { isTauriRuntime } from "@/lib/runtime/is-tauri-runtime";
+import { isMacOsClient } from "@/lib/runtime/platform";
+import { parsePermissionMode, PERMISSION_MODE_OPTIONS } from "@/lib/settings/options";
 import { useSettingsSelector, useUpdateSettings } from "@/lib/settings/queries";
 import {
   selectInstallUpdateOnClose,
@@ -41,7 +42,6 @@ import {
   selectUiAutomation,
   selectWorkspaceRoot,
 } from "@/lib/settings/selectors";
-import { parsePermissionMode, PERMISSION_MODE_OPTIONS } from "@/lib/settings/utils";
 import { pickWorkspaceFolder } from "@/lib/settings/workspace-picker";
 
 const isMac = isMacOsClient();

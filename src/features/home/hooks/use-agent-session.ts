@@ -1,31 +1,20 @@
-import { useQueryClient } from "@tanstack/react-query";
 import type { LanguageModelUsage } from "ai";
-import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from "react";
+import { useCallback, useMemo, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 
 import {
-  createSessionEngine,
+  deriveAttemptControls,
   deriveDisplayRows,
-  deriveSessionControls,
-  isLiveWorkspaceReady,
-  setActiveSessionEngine,
+  useAttemptHost,
   type AgentTranscriptRow,
-  type PendingPermission,
-  type PermissionDecision,
-  type SessionControls,
-  type SessionEngine,
-  type SessionFailure,
-  type SessionProjection,
+  type AttemptControls,
+  type AttemptFailure,
+  type BatchedAttemptStore,
+  type MandateProjection,
+  type PendingInteraction,
 } from "@/lib/session";
-import { createProduceRun } from "@/lib/session/producers/select-producer";
-import { DEFAULT_SECRETS } from "@/lib/settings/defaults";
-import {
-  ensureSecretsReady,
-  settingsQueryOptions,
-  usePersistToolApproval,
-  useSettingsSelector,
-  useUpdateSettings,
-} from "@/lib/settings/queries";
+import type { ResolveInteraction } from "@/lib/session/control/run-controller";
+import { useSettingsSelector, useUpdateSettings } from "@/lib/settings/queries";
 import { selectPermissionMode, selectSelectedModelId } from "@/lib/settings/selectors";
 import type { PermissionMode } from "@/lib/settings/types";
 
@@ -54,7 +43,7 @@ function emptyLanguageModelUsage(): LanguageModelUsage {
 }
 
 function toContextUsage(
-  usage: SessionProjection["usage"],
+  usage: MandateProjection["usage"],
   fallbackModelId: string,
 ): ComposerContextUsage {
   return {
@@ -65,135 +54,68 @@ function toContextUsage(
   };
 }
 
-type Listener = () => void;
-
-export type BatchedEngine = {
-  engine: SessionEngine;
-  getSnapshot: () => SessionProjection;
-  subscribe: (listener: Listener) => () => void;
-};
-
-function createBatchedEngine(): BatchedEngine {
-  const engine = createSessionEngine({ produceRun: createProduceRun() });
-  let snapshot = engine.getProjection();
-  let pending: SessionProjection | null = null;
-  let rafId: number | null = null;
-  const listeners = new Set<Listener>();
-
-  const emit = () => {
-    for (const listener of listeners) {
-      listener();
-    }
-  };
-
-  const flush = () => {
-    rafId = null;
-    if (!pending) return;
-    snapshot = pending;
-    pending = null;
-    emit();
-  };
-
-  engine.subscribe(() => {
-    pending = engine.getProjection();
-    if (rafId !== null) return;
-    rafId = requestAnimationFrame(flush);
-  });
-
-  return {
-    engine,
-    getSnapshot: () => snapshot,
-    subscribe: (listener) => {
-      listeners.add(listener);
-      return () => {
-        listeners.delete(listener);
-      };
-    },
-  };
-}
-
 export type AgentTranscriptSlice = {
   rows: readonly AgentTranscriptRow[];
   streamingMessageId: string | null;
-  pendingPermissions: readonly PendingPermission[];
+  pendingInteractions: readonly PendingInteraction[];
 };
 
 /** Composer / status-bar actions — deliberately excludes usage (own island). */
-export type AgentSessionControls = SessionControls & {
-  status: SessionProjection["status"];
-  failure: SessionFailure | null;
+export type AgentSessionControls = AttemptControls & {
+  status: MandateProjection["status"];
+  failure: AttemptFailure | null;
   start: (prompt: string) => Promise<void>;
   cancel: () => Promise<void>;
   retry: () => Promise<void>;
   retryFromMessage: (assistantMessageId: string) => Promise<void>;
-  resolvePermission: (
-    callId: string,
-    decision: PermissionDecision,
-    persist?: boolean,
-  ) => Promise<void>;
+  resolve: (interaction: ResolveInteraction) => Promise<void>;
   modelId: string;
-  onModelChange: (modelId: string) => void;
+  onModelChange: (modelId: string) => void | Promise<void>;
   permissionMode: PermissionMode;
-  pendingPermissions: readonly PendingPermission[];
+  pendingInteractions: readonly PendingInteraction[];
 };
 
-/** Stable engine for the home chat session — create once per page mount. */
-export function useAgentSessionStore(): BatchedEngine {
-  const storeRef = useRef<BatchedEngine | null>(null);
-  if (storeRef.current === null) {
-    storeRef.current = createBatchedEngine();
-  }
-
-  useEffect(() => {
-    const store = storeRef.current;
-    if (store === null) {
-      return;
-    }
-    setActiveSessionEngine(store.engine);
-    return () => {
-      setActiveSessionEngine(null);
-    };
-  }, []);
-
-  return storeRef.current;
+/** App-runtime host store — survives Home unmount / route changes. */
+export function useAgentSessionStore(): BatchedAttemptStore {
+  return useAttemptHost();
 }
 
 /** Header chrome only — no settings Suspense; safe outside SuspenseQueryBoundary. */
-export function useAgentInputDisabled(store: BatchedEngine): boolean {
+export function useAgentInputDisabled(store: BatchedAttemptStore): boolean {
   const status = useSyncExternalStore(
     store.subscribe,
-    () => store.getSnapshot().status,
-    () => store.getSnapshot().status,
+    () => store.getMandateProjection().status,
+    () => store.getMandateProjection().status,
   );
-  return status === "running" || status === "streaming" || status === "waiting_permission";
+  return status === "running" || status === "streaming" || status === "waiting_interaction";
 }
 
 /** Hot path: only fields that affect the transcript list / Thinking marker. */
-export function useAgentTranscript(store: BatchedEngine): AgentTranscriptSlice {
+export function useAgentTranscript(store: BatchedAttemptStore): AgentTranscriptSlice {
   const rows = useSyncExternalStore(
     store.subscribe,
-    () => store.getSnapshot().rows,
-    () => store.getSnapshot().rows,
+    () => store.getMandateProjection().rows,
+    () => store.getMandateProjection().rows,
   );
   const streamingMessageId = useSyncExternalStore(
     store.subscribe,
-    () => store.getSnapshot().streamingMessageId,
-    () => store.getSnapshot().streamingMessageId,
+    () => store.getMandateProjection().streamingMessageId,
+    () => store.getMandateProjection().streamingMessageId,
   );
-  const pendingPermissions = useSyncExternalStore(
+  const pendingInteractions = useSyncExternalStore(
     store.subscribe,
-    () => store.getSnapshot().pendingPermissions,
-    () => store.getSnapshot().pendingPermissions,
+    () => store.getMandateProjection().pendingInteractions,
+    () => store.getMandateProjection().pendingInteractions,
   );
   const status = useSyncExternalStore(
     store.subscribe,
-    () => store.getSnapshot().status,
-    () => store.getSnapshot().status,
+    () => store.getMandateProjection().status,
+    () => store.getMandateProjection().status,
   );
   const taskId = useSyncExternalStore(
     store.subscribe,
-    () => store.getSnapshot().taskId,
-    () => store.getSnapshot().taskId,
+    () => store.getMandateProjection().taskId,
+    () => store.getMandateProjection().taskId,
   );
 
   const displayRows = useMemo(
@@ -205,117 +127,114 @@ export function useAgentTranscript(store: BatchedEngine): AgentTranscriptSlice {
     () => ({
       rows: displayRows,
       streamingMessageId,
-      pendingPermissions,
+      pendingInteractions,
     }),
-    [displayRows, streamingMessageId, pendingPermissions],
+    [displayRows, streamingMessageId, pendingInteractions],
   );
 }
 
 /** Context meter only — silent on text chunks when usage identity is shared. */
-export function useAgentContextUsage(store: BatchedEngine): ComposerContextUsage {
-  // Field selector — secrets hydration must not wake this island.
+export function useAgentContextUsage(store: BatchedAttemptStore): ComposerContextUsage {
   const selectedModelId = useSettingsSelector(selectSelectedModelId);
   const usage = useSyncExternalStore(
     store.subscribe,
-    () => store.getSnapshot().usage,
-    () => store.getSnapshot().usage,
+    () => store.getMandateProjection().usage,
+    () => store.getMandateProjection().usage,
   );
   return useMemo(() => toContextUsage(usage, selectedModelId), [usage, selectedModelId]);
 }
 
-/** Warm path: control flags + actions — no usage (keeps composer chrome cold on chunks). */
-export function useAgentSessionControls(store: BatchedEngine): AgentSessionControls {
-  // Field selectors — secrets hydration must not rebuild composer controls.
+/** Warm path: control flags + actions — packing lives in AttemptControl. */
+export function useAgentSessionControls(store: BatchedAttemptStore): AgentSessionControls {
   const selectedModelId = useSettingsSelector(selectSelectedModelId);
   const permissionMode = useSettingsSelector(selectPermissionMode);
-  const queryClient = useQueryClient();
-  // mutate is referentially stable; the full mutation result object is not.
   const { mutate: mutateSettings } = useUpdateSettings();
-  const persistToolApproval = usePersistToolApproval();
 
   const status = useSyncExternalStore(
     store.subscribe,
-    () => store.getSnapshot().status,
-    () => store.getSnapshot().status,
+    () => store.getMandateProjection().status,
+    () => store.getMandateProjection().status,
   );
   const failure = useSyncExternalStore(
     store.subscribe,
-    () => store.getSnapshot().failure,
-    () => store.getSnapshot().failure,
+    () => store.getMandateProjection().failure,
+    () => store.getMandateProjection().failure,
   );
-  const pendingPermissions = useSyncExternalStore(
+  const pendingInteractions = useSyncExternalStore(
     store.subscribe,
-    () => store.getSnapshot().pendingPermissions,
-    () => store.getSnapshot().pendingPermissions,
+    () => store.getMandateProjection().pendingInteractions,
+    () => store.getMandateProjection().pendingInteractions,
   );
 
   const controls = useMemo(
     () =>
-      deriveSessionControls({
-        ...store.getSnapshot(),
+      deriveAttemptControls({
+        ...store.getMandateProjection(),
         status,
         failure,
-        pendingPermissions,
+        pendingInteractions,
       }),
-    [store, status, failure, pendingPermissions],
+    [store, status, failure, pendingInteractions],
   );
+
+  const toastStartError = useCallback((result: { ok: false; reason: string; message?: string }) => {
+    if (result.reason === "workspace_not_ready") {
+      toast.error("Set a workspace root in Settings before running live.");
+      return;
+    }
+    if (result.reason === "require_upgrade") {
+      toast.error(result.message ?? "Upgrade required for this action.");
+      return;
+    }
+    if (result.reason === "entitlement_denied") {
+      toast.error(result.message ?? "This action is not available on your plan.");
+    }
+  }, []);
 
   const start = useCallback(
     async (prompt: string) => {
-      const latest = await queryClient.ensureQueryData(settingsQueryOptions());
-      const { secrets: _placeholder, ...appSettings } = latest;
-      if (!isLiveWorkspaceReady(appSettings)) {
-        toast.error("Set a workspace root in Settings before running live.");
-        return;
-      }
-      // Demo never needs the vault — don't stall first send on Stronghold.
-      const secrets =
-        appSettings.agentMode === "live" ? await ensureSecretsReady() : { ...DEFAULT_SECRETS };
-      const projection = store.engine.getProjection();
-      await store.engine.start({
+      const result = await store.control.start({
         prompt,
-        modelId: appSettings.selectedModelId,
-        chatMessages: projection.chatMessages,
-        settings: appSettings,
-        secrets,
-        persistApproval: persistToolApproval,
+        mandateId: store.control.getFocusedMandateId() ?? undefined,
       });
+      if (!result.ok) {
+        toastStartError(result);
+      }
     },
-    [store, queryClient, persistToolApproval],
+    [store, toastStartError],
   );
 
-  const cancel = useCallback(() => store.engine.cancel(), [store]);
-  const retry = useCallback(() => store.engine.retry(), [store]);
+  const cancel = useCallback(() => store.control.cancel(), [store]);
+  const retry = useCallback(async () => {
+    const result = await store.control.retry();
+    if (!result.ok) {
+      toastStartError(result);
+    }
+  }, [store, toastStartError]);
   const retryFromMessage = useCallback(
     async (assistantMessageId: string) => {
-      const latest = await queryClient.ensureQueryData(settingsQueryOptions());
-      const { secrets: _placeholder, ...appSettings } = latest;
-      if (!isLiveWorkspaceReady(appSettings)) {
-        toast.error("Set a workspace root in Settings before running live.");
-        return;
+      const result = await store.control.retryFromMessage(assistantMessageId);
+      if (!result.ok) {
+        toastStartError(result);
       }
-      const secrets =
-        appSettings.agentMode === "live" ? await ensureSecretsReady() : { ...DEFAULT_SECRETS };
-      await store.engine.retryFromMessage(assistantMessageId, {
-        modelId: appSettings.selectedModelId,
-        settings: appSettings,
-        secrets,
-        persistApproval: persistToolApproval,
-      });
     },
-    [store, queryClient, persistToolApproval],
+    [store, toastStartError],
   );
-  const resolvePermission = useCallback(
-    (callId: string, decision: PermissionDecision, persist?: boolean) =>
-      store.engine.resolvePermission(callId, decision, persist),
+  const resolve = useCallback(
+    (interaction: ResolveInteraction) => store.control.resolve(interaction),
     [store],
   );
 
   const onModelChange = useCallback(
-    (modelId: string) => {
+    async (modelId: string) => {
+      const decision = await store.entitlements?.authorize({ kind: "model", modelId });
+      if (decision?.outcome === "require_upgrade" || decision?.outcome === "deny") {
+        toast.error(decision.reason);
+        return;
+      }
       mutateSettings({ selectedModelId: modelId });
     },
-    [mutateSettings],
+    [mutateSettings, store],
   );
 
   return useMemo(
@@ -327,11 +246,11 @@ export function useAgentSessionControls(store: BatchedEngine): AgentSessionContr
       cancel,
       retry,
       retryFromMessage,
-      resolvePermission,
+      resolve,
       modelId: selectedModelId,
       onModelChange,
       permissionMode,
-      pendingPermissions,
+      pendingInteractions,
     }),
     [
       controls,
@@ -341,11 +260,11 @@ export function useAgentSessionControls(store: BatchedEngine): AgentSessionContr
       cancel,
       retry,
       retryFromMessage,
-      resolvePermission,
+      resolve,
       selectedModelId,
       permissionMode,
       onModelChange,
-      pendingPermissions,
+      pendingInteractions,
     ],
   );
 }

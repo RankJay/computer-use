@@ -1,25 +1,16 @@
 import { memo, useCallback, type ReactElement } from "react";
 
 import { Message, MessageContent } from "@/components/ui/message";
-import type { PendingPermission } from "@/lib/session";
 import { textPartsMarkdown } from "@/lib/session";
-import type { PermissionMode } from "@/lib/settings/types";
 import { cn } from "@/lib/utils";
 
 import { PartRenderer } from "../parts/PartRenderer";
-import type { AgentMessageRowData } from "../types";
+import type { AgentMessageRowData, PermissionResolveProps } from "../types";
 import { AssistantMessageActions } from "./AssistantMessageActions";
 
-export type MessageRowProps = {
+export type MessageRowProps = PermissionResolveProps & {
   readonly row: AgentMessageRowData;
   readonly isStreaming?: boolean;
-  readonly pendingPermissions?: readonly PendingPermission[];
-  readonly permissionMode?: PermissionMode;
-  readonly onResolvePermission?: (
-    callId: string,
-    decision: "approved" | "denied",
-    persist?: boolean,
-  ) => void;
   readonly canRetryMessage?: boolean;
   readonly onRetryMessage?: (messageId: string) => void;
 };
@@ -27,7 +18,7 @@ export type MessageRowProps = {
 export const MessageRow = memo(function MessageRow({
   row,
   isStreaming = false,
-  pendingPermissions,
+  pendingInteractions,
   permissionMode,
   onResolvePermission,
   canRetryMessage = false,
@@ -47,7 +38,7 @@ export const MessageRow = memo(function MessageRow({
         <PartRenderer
           message={row.message}
           isStreaming={isStreaming}
-          pendingPermissions={pendingPermissions}
+          pendingInteractions={pendingInteractions}
           permissionMode={permissionMode}
           onResolvePermission={onResolvePermission}
         />

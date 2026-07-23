@@ -1,6 +1,6 @@
 import type { LanguageModelUsage, UIMessage } from "ai";
 
-import { getModelContextWindow } from "@/lib/agent-models";
+import { getModelContextWindow } from "@/lib/agent/agent-models";
 import { estimateLanguageModelUsageCostUsd } from "@/lib/agent/mode-usage";
 import type { BudgetTracker } from "@/lib/session/control/budget";
 import type { RuntimeEventPayload, UIMessagePartSnapshot } from "@/lib/session/events";

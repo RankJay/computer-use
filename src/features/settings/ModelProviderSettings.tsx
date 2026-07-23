@@ -22,6 +22,12 @@ import {
   settingsInputGroupInputClassName,
   settingsSelectTriggerClassName,
 } from "@/features/settings/styles";
+import {
+  AGENT_MODE_OPTIONS,
+  parseAgentMode,
+  wallClockMinutesFromMs,
+  wallClockMsFromMinutes,
+} from "@/lib/settings/options";
 import { useSettingsSelector, useUpdateSettings } from "@/lib/settings/queries";
 import {
   selectAgentMode,
@@ -29,12 +35,6 @@ import {
   selectMaxSteps,
   selectMaxWallClockMs,
 } from "@/lib/settings/selectors";
-import {
-  AGENT_MODE_OPTIONS,
-  parseAgentMode,
-  wallClockMinutesFromMs,
-  wallClockMsFromMinutes,
-} from "@/lib/settings/utils";
 
 function AgentModeRow(): ReactElement {
   const agentMode = useSettingsSelector(selectAgentMode);

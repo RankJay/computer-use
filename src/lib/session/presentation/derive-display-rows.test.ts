@@ -2,12 +2,12 @@ import { describe, expect, test } from "bun:test";
 
 import type { UIMessage } from "ai";
 
-import { createEmptySessionProjection, type SessionProjection } from "../projection";
+import { createEmptyMandateProjection, type MandateProjection } from "../projection";
 import type { AgentTranscriptRow } from "../rows";
 import { deriveDisplayRows } from "./derive-display-rows";
 
-function projection(partial: Partial<SessionProjection>): SessionProjection {
-  return { ...createEmptySessionProjection(), ...partial };
+function projection(partial: Partial<MandateProjection>): MandateProjection {
+  return { ...createEmptyMandateProjection(), ...partial };
 }
 
 function userRow(id: string, text: string): AgentTranscriptRow {
@@ -142,7 +142,7 @@ describe("deriveDisplayRows", () => {
     const display = deriveDisplayRows(
       projection({
         taskId,
-        status: "waiting_permission",
+        status: "waiting_interaction",
         streamingMessageId: assistantId,
         rows,
       }),

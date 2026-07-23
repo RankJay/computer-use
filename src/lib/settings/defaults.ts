@@ -1,5 +1,12 @@
-import { getDefaultAgentModelId } from "@/lib/agent-models";
-import type { AppSecrets, AppSettings, LoadedSettings } from "@/lib/settings/types";
+import { getDefaultAgentModelId } from "@/lib/agent/agent-models";
+import {
+  appSecretsSchema,
+  appSettingsPartialSchema,
+  appSettingsSchema,
+  type AppSecrets,
+  type AppSettings,
+  type LoadedSettings,
+} from "@/lib/settings/types";
 
 /** Values below one minute were often saved as seconds (e.g. 900 meaning 15 minutes). */
 export function normalizeMaxWallClockMs(ms: number): number {
@@ -33,23 +40,41 @@ export const DEFAULT_SECRETS: AppSecrets = {
   openaiApiKey: "",
 };
 
-export function settingsOrDefault(partial: Partial<AppSettings> | null | undefined): AppSettings {
-  const merged = { ...DEFAULT_SETTINGS, ...partial };
-  return {
-    ...merged,
-    maxWallClockMs: normalizeMaxWallClockMs(merged.maxWallClockMs),
+/** Merge unknown/partial disk settings with defaults; Zod validates the result. */
+export function settingsOrDefault(partial: unknown): AppSettings {
+  const loose = appSettingsPartialSchema.safeParse(
+    partial === null || partial === undefined ? {} : partial,
+  );
+  const patch = loose.success ? loose.data : {};
+  const merged = {
+    ...DEFAULT_SETTINGS,
+    ...patch,
+    maxWallClockMs: normalizeMaxWallClockMs(
+      patch.maxWallClockMs ?? DEFAULT_SETTINGS.maxWallClockMs,
+    ),
   };
+  const parsed = appSettingsSchema.safeParse(merged);
+  return parsed.success ? parsed.data : { ...DEFAULT_SETTINGS };
 }
 
 export function mergeSettingsPatch(current: AppSettings, patch: Partial<AppSettings>): AppSettings {
   return settingsOrDefault({ ...current, ...patch });
 }
 
-export function loadedSettingsOrDefault(
-  partial: Partial<LoadedSettings> | null | undefined,
-): LoadedSettings {
+export function loadedSettingsOrDefault(partial: unknown): LoadedSettings {
+  const settings = settingsOrDefault(partial);
+  const secretsLoose =
+    typeof partial === "object" &&
+    partial !== null &&
+    "secrets" in partial &&
+    typeof partial.secrets === "object" &&
+    partial.secrets !== null
+      ? partial.secrets
+      : {};
+  const secretsParsed = appSecretsSchema.partial().safeParse(secretsLoose);
+  const secretsPatch = secretsParsed.success ? secretsParsed.data : {};
   return {
-    ...settingsOrDefault(partial),
-    secrets: { ...DEFAULT_SECRETS, ...partial?.secrets },
+    ...settings,
+    secrets: { ...DEFAULT_SECRETS, ...secretsPatch },
   };
 }

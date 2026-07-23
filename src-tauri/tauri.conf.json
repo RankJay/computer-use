@@ -55,7 +55,7 @@
     },
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEVCQTkzQjMzRTY0QjVCNTIKUldSU1cwdm1NenVwNnpXYXkwZHFEYTJvWGNTZHhNYTc0MEFidVcvOVUrckJxdWxjRWRmRXpERDUK",
-      "endpoints": ["https://updates.actuate.app/desktop/latest.json"],
+      "endpoints": ["https://actuate-be.vercel.app/api/releases/latest.json"],
       "windows": {
         "installMode": "passive"
       }

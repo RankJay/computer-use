@@ -6,7 +6,7 @@ import { GeneralSettings } from "@/features/settings/GeneralSettings";
 import { SettingsPageHeader } from "@/features/settings/header";
 import { MacOsPermissionsSettings } from "@/features/settings/MacOsPermissionsSettings";
 import { SettingsPageSkeleton } from "@/features/settings/SettingsPageSkeleton";
-import { isMacOsClient } from "@/lib/platform";
+import { isMacOsClient } from "@/lib/runtime/platform";
 import { ensureSecretsReady, settingsKeys } from "@/lib/settings/queries";
 
 import { AccountSettingsNav } from "./AccountSettingsNav";
@@ -33,7 +33,7 @@ function SettingsSections() {
   );
 }
 
-export default function SettingsPageContent() {
+export function SettingsPageContent() {
   return (
     <div className="flex flex-col h-full w-full gap-0 overflow-hidden box-border overscroll-contain">
       <div>

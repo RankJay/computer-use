@@ -1,15 +1,21 @@
 import type { UIMessage } from "ai";
 
+import type { StandingPolicyDocument } from "@/lib/mandates/types";
 import type { AppSecrets, AppSettings } from "@/lib/settings/types";
 
-import type { RuntimeEventPayload } from "../events";
-import type { SessionProjection } from "../projection";
+import type { RuntimeEventPayload, PermissionDecision } from "../events";
+import { foldModelContext } from "../model-context";
+import type { MandateProjection } from "../projection";
+import type { RunExecutionContext } from "../run-execution-context";
+import {
+  createEscalationPort,
+  permissionDecisionToEscalation,
+  type EscalationPort,
+  type EscalationPortMode,
+} from "./escalation-port";
+import type { OsLease } from "./os-lease";
 
-export type PermissionDecision = "approved" | "denied";
-
-export type PermissionWaiter = {
-  waitForDecision: () => Promise<PermissionDecision>;
-};
+export type { PermissionDecision };
 
 export type RunConfig = {
   prompt: string;
@@ -21,26 +27,41 @@ export type RunConfig = {
   isRetry?: boolean;
   /** Persist capability approval into settings (once-per-class). */
   persistApproval?: (capability: string) => Promise<void>;
+  /** Mandate standing policy for Capability PermissionPolicy overlay. */
+  standingPolicy?: StandingPolicyDocument | null;
 };
 
-export type ProduceRunContext = {
+/** Producer seam: shared gates + packed RunConfig (settings/workspace via config). */
+export type ProduceRunContext = Pick<
+  RunExecutionContext,
+  | "taskId"
+  | "append"
+  | "escalationPort"
+  | "entitlements"
+  | "osLease"
+  | "standingPolicy"
+  | "getEventLog"
+> & {
   config: RunConfig;
-  taskId: string;
   signal: AbortSignal;
-  append: (payload: RuntimeEventPayload) => unknown;
-  createPermissionWaiter: (callId: string) => PermissionWaiter;
 };
 
 export type ProduceRun = (ctx: ProduceRunContext) => Promise<void>;
 
+export type ResolvePermissionInteraction = {
+  callId: string;
+  kind: "permission";
+  decision: PermissionDecision;
+  persist?: boolean;
+};
+
+/** Widen this union when clarification / custom UI kinds land. */
+export type ResolveInteraction = ResolvePermissionInteraction;
+
 export type RunController = {
   start: (config: RunConfig) => Promise<void>;
   cancel: () => Promise<void>;
-  resolvePermission: (
-    callId: string,
-    decision: PermissionDecision,
-    persist?: boolean,
-  ) => Promise<void>;
+  resolve: (interaction: ResolveInteraction) => Promise<void>;
   retry: () => Promise<void>;
 };
 
@@ -48,29 +69,38 @@ export type RunControllerDeps = {
   append: (payload: RuntimeEventPayload) => unknown;
   beginTask: (taskId: string) => void;
   clearTask: () => void;
-  getProjection: () => SessionProjection;
+  getProjection: () => MandateProjection;
   produceRun: ProduceRun;
+  /** Fires once the Attempt is in-flight (after beginTask), before produceRun settles. */
+  onAttemptStarted?: (attemptId: string) => void;
+  /** Released when the Attempt settles or is cancelled. */
+  osLease?: OsLease;
+  /** Injected EscalationPort (tests). Default: interactive wait. */
+  escalationPort?: EscalationPort;
+  escalationMode?: EscalationPortMode;
+  escalationTimeoutMs?: number;
 };
 
 export function createRunController(deps: RunControllerDeps): RunController {
   let activeAbort: AbortController | null = null;
   let activeTaskId: string | null = null;
   let lastConfig: RunConfig | null = null;
-  const permissionResolvers = new Map<string, (decision: PermissionDecision) => void>();
 
-  function createPermissionWaiter(callId: string): PermissionWaiter {
-    return {
-      waitForDecision: () =>
-        new Promise((resolve) => {
-          permissionResolvers.set(callId, resolve);
-        }),
-    };
-  }
+  const escalationPort =
+    deps.escalationPort ??
+    createEscalationPort({
+      mode: deps.escalationMode ?? "interactive",
+      timeoutMs: deps.escalationTimeoutMs,
+      osLease: deps.osLease,
+    });
 
   function clearActiveRun(): void {
+    escalationPort.denyAll();
+    if (activeTaskId) {
+      deps.osLease?.release(activeTaskId);
+    }
     activeAbort = null;
     activeTaskId = null;
-    permissionResolvers.clear();
     deps.clearTask();
   }
 
@@ -84,6 +114,7 @@ export function createRunController(deps: RunControllerDeps): RunController {
     lastConfig = config;
     activeAbort = new AbortController();
     deps.beginTask(taskId);
+    deps.onAttemptStarted?.(taskId);
 
     try {
       await deps.produceRun({
@@ -91,7 +122,9 @@ export function createRunController(deps: RunControllerDeps): RunController {
         taskId,
         signal: activeAbort.signal,
         append: deps.append,
-        createPermissionWaiter,
+        escalationPort,
+        osLease: deps.osLease,
+        standingPolicy: config.standingPolicy,
       });
     } finally {
       clearActiveRun();
@@ -101,11 +134,8 @@ export function createRunController(deps: RunControllerDeps): RunController {
   async function cancel(): Promise<void> {
     if (!activeAbort || !activeTaskId) return;
 
-    for (const resolve of permissionResolvers.values()) {
-      resolve("denied");
-    }
-    permissionResolvers.clear();
-
+    escalationPort.denyAll();
+    deps.osLease?.release(activeTaskId);
     activeAbort.abort();
     deps.append({ type: "task.status_changed", status: "cancelled" });
     deps.append({ type: "task.completed", finishReason: "cancelled" });
@@ -116,29 +146,34 @@ export function createRunController(deps: RunControllerDeps): RunController {
 
     cancel,
 
-    async resolvePermission(callId, decision, persist) {
-      const resolve = permissionResolvers.get(callId);
-      if (!resolve) return;
-      permissionResolvers.delete(callId);
-
-      if (decision === "approved" && persist && lastConfig) {
-        const pending = deps
-          .getProjection()
-          .pendingPermissions.find((entry) => entry.callId === callId);
-        if (pending) {
-          // Mutate the live run settings object so later tools in this run
-          // see the approval (runnerDeps holds the same reference).
-          if (!lastConfig.settings.persistedApprovals.includes(pending.capability)) {
-            lastConfig.settings.persistedApprovals = [
-              ...lastConfig.settings.persistedApprovals,
-              pending.capability,
-            ];
+    async resolve(interaction) {
+      switch (interaction.kind) {
+        case "permission": {
+          if (interaction.decision === "approved" && interaction.persist && lastConfig) {
+            const pending = deps
+              .getProjection()
+              .pendingInteractions.find((entry) => entry.callId === interaction.callId);
+            if (pending?.kind === "permission") {
+              const capability = pending.permission.capability;
+              // Mutate the live run settings object so later tools in this run
+              // see the approval (runnerDeps holds the same reference).
+              if (!lastConfig.settings.persistedApprovals.includes(capability)) {
+                lastConfig.settings.persistedApprovals = [
+                  ...lastConfig.settings.persistedApprovals,
+                  capability,
+                ];
+              }
+              await lastConfig.persistApproval?.(capability);
+            }
           }
-          await lastConfig.persistApproval?.(pending.capability);
+
+          escalationPort.resolve(
+            interaction.callId,
+            permissionDecisionToEscalation(interaction.decision),
+          );
+          return;
         }
       }
-
-      resolve(decision);
     },
 
     async retry() {
@@ -146,10 +181,11 @@ export function createRunController(deps: RunControllerDeps): RunController {
       if (!lastConfig) return;
       if (projection.status !== "failed" || !projection.failure?.recoverable) return;
 
+      const execution = foldModelContext(projection);
       await runWithConfig({
         ...lastConfig,
         prompt: lastConfig.prompt,
-        chatMessages: projection.chatMessages,
+        chatMessages: execution.messages,
         isRetry: true,
       });
     },

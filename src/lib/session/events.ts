@@ -1,15 +1,29 @@
 import type { UIMessage } from "ai";
+import { z } from "zod";
+
+import type { CapabilityRisk } from "@/lib/agent/capabilities/risk";
+import type { EntitlementCheckKind } from "@/lib/entitlements/types";
+import type { AgentMode } from "@/lib/settings/types";
 
 export const RUNTIME_EVENT_SCHEMA_VERSION = 1;
 
-export type RunStatus =
-  | "idle"
-  | "running"
-  | "streaming"
-  | "waiting_permission"
-  | "completed"
-  | "failed"
-  | "cancelled";
+export const runStatusSchema = z.enum([
+  "idle",
+  "running",
+  "streaming",
+  "waiting_interaction",
+  "completed",
+  "failed",
+  "cancelled",
+]);
+
+export type RunStatus = z.infer<typeof runStatusSchema>;
+
+/** UI / events / RunController vocabulary (not EscalationOutcome). */
+export type PermissionDecision = "approved" | "denied";
+
+/** Human-visible interaction kinds (EscalationPort may later await non-human waits too). */
+export type InteractionKind = "permission";
 
 export type RuntimeEventEnvelope = {
   eventId: string;
@@ -40,7 +54,7 @@ export type TaskStartedPayload = {
   type: "task.started";
   prompt: string;
   modelId: string;
-  agentMode: "live" | "demo";
+  agentMode: AgentMode;
   userMessageId?: string;
   /** When true (e.g. retry), do not append a new user message row. */
   omitUserMessage?: boolean;
@@ -103,19 +117,25 @@ export type CapabilityFailedPayload = {
   error: { code: string; message: string; details?: string; cause?: string };
 };
 
-export type PermissionRequestedPayload = {
-  type: "permission.requested";
+export type InteractionRequestedPayload = {
+  type: "interaction.requested";
   callId: string;
-  capability: string;
-  input: unknown;
-  risk: "low" | "medium" | "high";
+  kind: "permission";
+  permission: {
+    capability: string;
+    input: unknown;
+    risk: CapabilityRisk;
+  };
 };
 
-export type PermissionResolvedPayload = {
-  type: "permission.resolved";
+export type InteractionResolvedPayload = {
+  type: "interaction.resolved";
   callId: string;
-  decision: "approved" | "denied";
-  persisted?: boolean;
+  kind: "permission";
+  permission: {
+    decision: PermissionDecision;
+    persisted?: boolean;
+  };
 };
 
 export type UsageUpdatedPayload = {
@@ -139,6 +159,25 @@ export type BudgetUpdatedPayload = {
 export type BudgetExceededPayload = {
   type: "budget.exceeded";
   dimension: "steps" | "cost" | "wall_clock";
+};
+
+export type EntitlementDeniedPayload = {
+  type: "entitlement.denied";
+  checkKind: EntitlementCheckKind;
+  outcome: "deny" | "require_upgrade";
+  reason: string;
+  feature?: string;
+  capability?: string;
+  modelId?: string;
+};
+
+export type EntitlementMeteredPayload = {
+  type: "entitlement.metered";
+  meterKey: string;
+  amount: number;
+  newValue: number;
+  checkKind: EntitlementCheckKind;
+  capability?: string;
 };
 
 export type ActivityMarkerPayload = {
@@ -179,11 +218,13 @@ export type RuntimeEventPayload =
   | CapabilityRequestedPayload
   | CapabilityCompletedPayload
   | CapabilityFailedPayload
-  | PermissionRequestedPayload
-  | PermissionResolvedPayload
+  | InteractionRequestedPayload
+  | InteractionResolvedPayload
   | UsageUpdatedPayload
   | BudgetUpdatedPayload
   | BudgetExceededPayload
+  | EntitlementDeniedPayload
+  | EntitlementMeteredPayload
   | ActivityMarkerPayload
   | ActivityChainUpdatedPayload
   | ActivityTaskUpdatedPayload;

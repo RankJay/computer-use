@@ -1,11 +1,17 @@
+/**
+ * Public surface for the live Mandate/Attempt host.
+ * Fold/engine/control internals: import from `@/lib/session/<path>`.
+ */
+
 export type {
   RuntimeEvent,
   RuntimeEventPayload,
   RunStatus,
   UIMessagePartSnapshot,
   LanguageModelUsageSnapshot,
+  PermissionDecision,
 } from "./events";
-export { RUNTIME_EVENT_SCHEMA_VERSION, isRuntimeEvent } from "./events";
+export { RUNTIME_EVENT_SCHEMA_VERSION, isRuntimeEvent, runStatusSchema } from "./events";
 
 export type {
   AgentTranscriptRow,
@@ -18,34 +24,31 @@ export type {
 } from "./rows";
 
 export type {
-  SessionProjection,
-  SessionFailure,
-  SessionUsage,
-  SessionBudget,
-  PendingPermission,
+  MandateProjection,
+  AttemptFailure,
+  AttemptUsage,
+  AttemptBudget,
+  PendingInteraction,
 } from "./projection";
 export {
-  createEmptySessionProjection,
-  EMPTY_PENDING_PERMISSIONS,
-  EMPTY_SESSION_BUDGET,
-  EMPTY_SESSION_USAGE,
+  createEmptyMandateProjection,
+  EMPTY_PENDING_INTERACTIONS,
+  EMPTY_ATTEMPT_BUDGET,
+  EMPTY_ATTEMPT_USAGE,
 } from "./projection";
 
-export {
-  createFoldState,
-  foldStateFromMessages,
-  reduceSession,
-  projectSession,
-  toProjection,
-  type FoldState,
-} from "./project-session";
+export type { RunExecutionContext } from "./run-execution-context";
+
+export { getAttemptHost, registerAttemptHost, resetAttemptHost } from "./attempt-host-registry";
 
 export {
-  createSessionEngine,
-  type SessionEngine,
-  type SessionEngineDeps,
-  type RetryFromMessageConfig,
-} from "./engine";
+  createAttemptHost,
+  type AttemptHostDeps,
+  type AttemptHostListener,
+  type BatchedAttemptStore,
+} from "./attempt-host";
+
+export { AttemptHostContext, useAttemptHost } from "./attempt-host-context";
 
 export {
   planRegenerateFromAssistant,
@@ -53,39 +56,20 @@ export {
   type RegeneratePlan,
 } from "./control/regenerate-from-message";
 
-export {
-  setActiveSessionEngine,
-  getActiveSessionEngine,
-  resetActiveSessionEngine,
-} from "./active-engine";
+export { deriveAttemptControls, type AttemptControls } from "./control/derive-attempt-controls";
 
 export {
-  createBudgetTracker,
-  createBudgetGuard,
-  formatBudgetExceededMessage,
-  type BudgetTracker,
-  type BudgetGuard,
-  type BudgetDimension,
-} from "./control/budget";
-
-export {
-  createRunController,
-  type RunController,
-  type RunConfig,
-  type ProduceRun,
-  type ProduceRunContext,
-  type PermissionDecision,
-  type PermissionWaiter,
-  type RunControllerDeps,
-} from "./control/run-controller";
-
-export { deriveSessionControls, type SessionControls } from "./control/derive-session-controls";
+  createOsLease,
+  type OsLease,
+  type OsLeaseAcquireResult,
+  type OsLeaseHolder,
+  type OsLeaseScope,
+} from "./control/os-lease";
+export { osLeaseScopeOf } from "./control/os-lease-scope";
 
 export { deriveDisplayRows } from "./presentation/derive-display-rows";
 
 export { isLiveWorkspaceReady } from "./live-workspace";
-
-export { createDemoPayloads, createTestDemoProducer } from "./fixtures/demo-payloads";
 
 // Demo/live producers are loaded via dynamic import inside createProduceRun —
 // do not statically re-export them from this barrel (defeats cold-start splitting).

@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 
-import { isTauriRuntime } from "@/lib/agent/is-tauri-runtime";
+import { isTauriRuntime } from "@/lib/runtime/is-tauri-runtime";
 
 type GetEnvResult = {
   name: string;

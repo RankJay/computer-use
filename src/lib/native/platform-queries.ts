@@ -27,7 +27,7 @@ export function usePlatformCapabilities(): PlatformCapabilities | undefined {
     };
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
-  }, [query.refetch]);
+  }, [query]);
 
   return query.data;
 }

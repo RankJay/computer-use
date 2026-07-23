@@ -35,7 +35,11 @@ export async function runAgentLoop(deps: RunAgentDeps): Promise<RunAgentResult> 
       signal: deps.signal,
       append: deps.append,
       workspaceRoot: deps.workspaceRoot,
-      createPermissionWaiter: deps.createPermissionWaiter,
+      escalationPort: deps.escalationPort,
+      entitlements: deps.entitlements,
+      osLease: deps.osLease,
+      standingPolicy: deps.standingPolicy,
+      getEventLog: deps.getEventLog,
       budgetStartedAt: deps.budgetStartedAt,
     });
   } catch (error) {

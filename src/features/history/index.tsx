@@ -4,9 +4,14 @@ import { SuspenseQueryBoundary } from "@/components/boundaries/ErrorBoundary";
 import { ChatRow } from "@/features/history/ChatRow";
 import { HistoryPageHeader } from "@/features/history/header";
 import { HistoryPageSkeleton } from "@/features/history/HistoryPageSkeleton";
-import { groupChatsByRecency, type ChatsByRecency } from "@/lib/chats/grouping";
-import { chatsKeys, useChatsList, useDeleteChat } from "@/lib/chats/queries";
-import type { ChatSummary } from "@/lib/chats/types";
+import {
+  groupChatsByRecency,
+  chatsKeys,
+  useChatsList,
+  useDeleteChat,
+  type ChatSummary,
+  type ChatsByRecency,
+} from "@/lib/chats";
 
 const RECENCY_SECTIONS: readonly { key: keyof ChatsByRecency; label: string }[] = [
   { key: "today", label: "Today" },
@@ -69,7 +74,7 @@ function HistoryChatList(): ReactElement {
   );
 }
 
-export default function HistoryPageContent(): ReactElement {
+export function HistoryPageContent(): ReactElement {
   return (
     <div className="flex h-full w-full flex-col gap-0 overflow-hidden box-border overscroll-contain">
       <div>

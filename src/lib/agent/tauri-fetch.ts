@@ -1,6 +1,6 @@
 import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
 
-import { isTauriRuntime } from "@/lib/agent/is-tauri-runtime";
+import { isTauriRuntime } from "@/lib/runtime/is-tauri-runtime";
 
 const STRIP_HEADERS = [
   "referer",

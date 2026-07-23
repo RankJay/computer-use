@@ -1,10 +1,15 @@
 import type { UIMessage } from "ai";
 
+import type { AttemptFoldSnapshot } from "@/lib/attempts";
+import { foldStateFromSnapshot } from "@/lib/attempts";
+
+import type { EscalationPort, EscalationPortMode } from "./control/escalation-port";
+import type { OsLease } from "./control/os-lease";
 import { planRegenerateFromAssistant } from "./control/regenerate-from-message";
 import {
   createRunController,
-  type PermissionDecision,
   type ProduceRun,
+  type ResolveInteraction,
   type RunConfig,
   type RunController,
 } from "./control/run-controller";
@@ -17,57 +22,70 @@ import {
 import {
   createFoldState,
   foldStateFromMessages,
-  reduceSession,
+  reduceFold,
   toProjection,
   type FoldState,
-} from "./project-session";
-import { createEmptySessionProjection, type SessionProjection } from "./projection";
+} from "./fold";
+import { foldModelContext } from "./model-context";
+import { createEmptyMandateProjection, type MandateProjection } from "./projection";
 
-export type SessionEngineListener = () => void;
+export type AttemptEngineListener = () => void;
 
 export type RetryFromMessageConfig = Omit<RunConfig, "prompt" | "chatMessages" | "isRetry">;
 
-export type SessionEngine = {
+export type LedgerHydrateInput = {
+  snapshot: AttemptFoldSnapshot | null;
+  events: readonly RuntimeEvent[];
+};
+
+export type AttemptEngine = {
   append: (payload: RuntimeEventPayload) => RuntimeEvent | null;
-  getProjection: () => SessionProjection;
+  getProjection: () => MandateProjection;
   getEventLog: () => readonly RuntimeEvent[];
-  subscribe: (listener: SessionEngineListener) => () => void;
+  subscribe: (listener: AttemptEngineListener) => () => void;
   /** Cancel any in-flight run, then clear projection and event log. */
   reset: () => Promise<void>;
-  /** Replace fold/projection from stored messages. Does not touch eventLog. */
+  /** Replace fold/projection from stored messages; clears in-memory eventLog. */
   hydrate: (messages: readonly UIMessage[]) => void;
+  /** Open from durable ledger: settle snapshot + event tail (ADR 0007). */
+  hydrateFromLedger: (input: LedgerHydrateInput) => void;
   start: (config: RunConfig) => Promise<void>;
   cancel: () => Promise<void>;
-  resolvePermission: (
-    callId: string,
-    decision: PermissionDecision,
-    persist?: boolean,
-  ) => Promise<void>;
+  resolve: (interaction: ResolveInteraction) => Promise<void>;
   retry: () => Promise<void>;
   /**
    * Regenerate the answer at `assistantMessageId`: keep prior turns + its user
    * prompt, drop that answer and everything after, re-run with isRetry.
    */
   retryFromMessage: (assistantMessageId: string, config: RetryFromMessageConfig) => Promise<void>;
-  beginTask: (taskId: string) => void;
+  /**
+   * @param continueSeq — when true, keep eventSeq (crash-open recovery after hydrateFromLedger).
+   *   Default false resets seq for a fresh Attempt.
+   */
+  beginTask: (taskId: string, options?: { continueSeq?: boolean }) => void;
   clearTask: () => void;
 };
 
 function isActiveStatus(status: RunStatus): boolean {
-  return status === "running" || status === "streaming" || status === "waiting_permission";
+  return status === "running" || status === "streaming" || status === "waiting_interaction";
 }
 
-export type SessionEngineDeps = {
+export type AttemptEngineDeps = {
   produceRun: ProduceRun;
+  onAttemptStarted?: (attemptId: string) => void;
+  osLease?: OsLease;
+  escalationPort?: EscalationPort;
+  escalationMode?: EscalationPortMode;
+  escalationTimeoutMs?: number;
 };
 
-export function createSessionEngine(deps: SessionEngineDeps): SessionEngine {
+export function createAttemptEngine(deps: AttemptEngineDeps): AttemptEngine {
   let fold: FoldState = createFoldState();
-  let projection: SessionProjection = createEmptySessionProjection();
+  let projection: MandateProjection = createEmptyMandateProjection();
   let eventLog: RuntimeEvent[] = [];
   let eventSeq = 0;
   let activeTaskId: string | null = null;
-  const listeners = new Set<SessionEngineListener>();
+  const listeners = new Set<AttemptEngineListener>();
 
   function notify(): void {
     for (const listener of listeners) {
@@ -93,7 +111,7 @@ export function createSessionEngine(deps: SessionEngineDeps): SessionEngine {
       return null;
     }
 
-    fold = reduceSession(fold, event);
+    fold = reduceFold(fold, event);
     projection = toProjection(fold, projection);
     eventLog = [...eventLog, event];
     notify();
@@ -112,6 +130,11 @@ export function createSessionEngine(deps: SessionEngineDeps): SessionEngine {
     },
     getProjection: () => projection,
     produceRun: deps.produceRun,
+    onAttemptStarted: deps.onAttemptStarted,
+    osLease: deps.osLease,
+    escalationPort: deps.escalationPort,
+    escalationMode: deps.escalationMode,
+    escalationTimeoutMs: deps.escalationTimeoutMs,
   });
 
   return {
@@ -127,7 +150,7 @@ export function createSessionEngine(deps: SessionEngineDeps): SessionEngine {
     async reset() {
       await controller.cancel();
       fold = createFoldState();
-      projection = createEmptySessionProjection();
+      projection = createEmptyMandateProjection();
       eventLog = [];
       eventSeq = 0;
       activeTaskId = null;
@@ -136,11 +159,28 @@ export function createSessionEngine(deps: SessionEngineDeps): SessionEngine {
     hydrate(messages) {
       fold = foldStateFromMessages(messages);
       projection = toProjection(fold, null);
+      eventLog = [];
+      eventSeq = 0;
+      activeTaskId = null;
       notify();
     },
-    beginTask(taskId) {
+    hydrateFromLedger(input) {
+      let next = input.snapshot ? foldStateFromSnapshot(input.snapshot) : createFoldState();
+      for (const event of input.events) {
+        next = reduceFold(next, event);
+      }
+      fold = next;
+      projection = toProjection(fold, null);
+      eventLog = [...input.events];
+      eventSeq = input.events.length;
+      activeTaskId = null;
+      notify();
+    },
+    beginTask(taskId, options) {
       activeTaskId = taskId;
-      eventSeq = 0;
+      if (!options?.continueSeq) {
+        eventSeq = 0;
+      }
     },
     clearTask() {
       activeTaskId = null;
@@ -148,8 +188,7 @@ export function createSessionEngine(deps: SessionEngineDeps): SessionEngine {
     },
     start: (config) => controller.start(config),
     cancel: () => controller.cancel(),
-    resolvePermission: (callId, decision, persist) =>
-      controller.resolvePermission(callId, decision, persist),
+    resolve: (interaction) => controller.resolve(interaction),
     retry: () => controller.retry(),
     async retryFromMessage(assistantMessageId, config) {
       if (isActiveStatus(projection.status)) {
@@ -169,10 +208,11 @@ export function createSessionEngine(deps: SessionEngineDeps): SessionEngine {
       activeTaskId = null;
       notify();
 
+      const execution = foldModelContext({ chatMessages: plan.messages });
       await controller.start({
         ...config,
         prompt: plan.prompt,
-        chatMessages: plan.messages,
+        chatMessages: execution.messages,
         isRetry: true,
       });
     },

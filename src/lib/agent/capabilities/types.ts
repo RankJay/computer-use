@@ -1,17 +1,16 @@
 import type { z } from "zod";
 
-import type { PermissionWaiter } from "@/lib/session/control/run-controller";
-import type { RuntimeEventPayload } from "@/lib/session/events";
+import type { EscalationPort } from "@/lib/session/control/escalation-port";
+import type { CapabilityFailedPayload } from "@/lib/session/events";
+import type { RunExecutionContext } from "@/lib/session/run-execution-context";
 import type { AppSettings } from "@/lib/settings/types";
 
-export type CapabilityRisk = "low" | "medium" | "high";
+import type { PermissionPolicy } from "./permission-policy";
+import type { CapabilityRisk } from "./risk";
 
-export type CapabilityError = {
-  code: string;
-  message: string;
-  details?: string;
-  cause?: string;
-};
+export type { CapabilityRisk } from "./risk";
+
+export type CapabilityError = CapabilityFailedPayload["error"];
 
 export type ToolPartLocation = {
   messageId: string;
@@ -66,12 +65,12 @@ export type CapabilityNativeInvoker = (
   workspaceRoot: string,
 ) => Promise<unknown>;
 
-export type CapabilityRunnerDeps = {
-  append: (payload: RuntimeEventPayload) => unknown;
-  taskId: string;
-  settings: AppSettings;
-  workspaceRoot: string;
-  createPermissionWaiter: (callId: string) => PermissionWaiter;
+/** Capability gate: shared run context with optional escalationPort for tests. */
+export type CapabilityRunnerDeps = Omit<RunExecutionContext, "escalationPort"> & {
+  /** Required when PermissionPolicy returns escalate. */
+  escalationPort?: EscalationPort;
+  /** Defaults to settings-backed policy. */
+  permissionPolicy?: PermissionPolicy;
   invokeNative?: CapabilityNativeInvoker;
   resolveToolPart?: (callId: string) => ToolPartLocation | null;
 };

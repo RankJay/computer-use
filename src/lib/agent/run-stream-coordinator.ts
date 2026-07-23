@@ -23,9 +23,8 @@ import {
 } from "@/lib/agent/ui-stream-sync";
 import { notifyIfUnfocused } from "@/lib/native/notification";
 import { createBudgetGuard, createBudgetTracker } from "@/lib/session/control/budget";
-import type { PermissionWaiter } from "@/lib/session/control/run-controller";
 import type { RuntimeEventPayload } from "@/lib/session/events";
-import type { AppSettings } from "@/lib/settings/types";
+import type { RunExecutionContext } from "@/lib/session/run-execution-context";
 
 /** Reads toolCallId without AI SDK guards (empty TOOLS generics collapse ToolUIPart to never). */
 function getPartToolCallId(part: object): string | null {
@@ -34,17 +33,12 @@ function getPartToolCallId(part: object): string | null {
   return typeof id === "string" ? id : null;
 }
 
-export type RunStreamCoordinatorDeps = {
-  taskId: string;
+export type RunStreamCoordinatorDeps = RunExecutionContext & {
   model: LanguageModel | LanguageModelV4;
   modelId: string;
   system: string;
   messages: UIMessage[];
-  settings: AppSettings;
   signal: AbortSignal;
-  append: (payload: RuntimeEventPayload) => unknown;
-  workspaceRoot: string;
-  createPermissionWaiter: (callId: string) => PermissionWaiter;
   budgetStartedAt?: number;
 };
 
@@ -93,8 +87,12 @@ export async function runStreamCoordinator(
     taskId: deps.taskId,
     settings: deps.settings,
     workspaceRoot: deps.workspaceRoot,
-    createPermissionWaiter: deps.createPermissionWaiter,
+    escalationPort: deps.escalationPort,
     resolveToolPart,
+    entitlements: deps.entitlements,
+    osLease: deps.osLease,
+    standingPolicy: deps.standingPolicy,
+    getEventLog: deps.getEventLog,
   };
 
   const tools = buildAgentTools(runnerDeps);

@@ -2,8 +2,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { isPermissionGranted, requestPermission } from "@tauri-apps/plugin-notification";
 import { toast } from "sonner";
 
-import { isTauriRuntime } from "@/lib/agent/is-tauri-runtime";
-import { isMacOsClient } from "@/lib/platform";
+import { isTauriRuntime } from "@/lib/runtime/is-tauri-runtime";
+import { isMacOsClient } from "@/lib/runtime/platform";
 
 export type NativeNotification = {
   readonly title: string;

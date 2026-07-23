@@ -1,13 +1,14 @@
-﻿import { memo, useCallback, useEffect, useMemo, type ReactElement } from "react";
+import { memo, useCallback, useEffect, useMemo, type ReactElement } from "react";
 
 import { SuspenseQueryBoundary } from "@/components/boundaries/ErrorBoundary";
 import { Container, Item } from "@/components/motion/stagger";
-import { signalAppReady } from "@/lib/app-ready";
-import type { PermissionDecision } from "@/lib/session";
+import { signalAppReady } from "@/lib/runtime/app-ready";
+import type { BatchedAttemptStore, PermissionDecision } from "@/lib/session";
 import { settingsKeys } from "@/lib/settings/queries";
 
 import { AgentTranscript } from "./chat/AgentTranscript";
-import { ComposerContextMeter, TaskPromptComposer } from "./Composer";
+import { AttemptStatusBar } from "./chat/AttemptStatusBar";
+import { ComposerContextMeter, TaskPromptComposer } from "./chat/Composer";
 import { HomePageHeader } from "./header";
 import { HomePageSkeleton } from "./HomePageSkeleton";
 import {
@@ -16,15 +17,13 @@ import {
   useAgentSessionControls,
   useAgentSessionStore,
   useAgentTranscript,
-  type BatchedEngine,
 } from "./hooks/use-agent-session";
 import { useChatPersistence } from "./hooks/use-chat-persistence";
-import { SessionStatusBar } from "./SessionStatusBar";
 
 const ContextUsageIsland = memo(function ContextUsageIsland({
   store,
 }: {
-  readonly store: BatchedEngine;
+  readonly store: BatchedAttemptStore;
 }): ReactElement {
   const contextUsage = useAgentContextUsage(store);
   return (
@@ -40,23 +39,23 @@ const ContextUsageIsland = memo(function ContextUsageIsland({
 const TranscriptIsland = memo(function TranscriptIsland({
   store,
 }: {
-  readonly store: BatchedEngine;
+  readonly store: BatchedAttemptStore;
 }): ReactElement {
-  const { rows, streamingMessageId, pendingPermissions } = useAgentTranscript(store);
+  const { rows, streamingMessageId, pendingInteractions } = useAgentTranscript(store);
   const controls = useAgentSessionControls(store);
 
   const onResolvePermission = useCallback(
     (callId: string, decision: PermissionDecision, persist?: boolean) => {
-      void controls.resolvePermission(callId, decision, persist);
+      void controls.resolve({ callId, kind: "permission", decision, persist });
     },
-    [controls.resolvePermission],
+    [controls],
   );
 
   const onRetryMessage = useCallback(
     (messageId: string) => {
       void controls.retryFromMessage(messageId);
     },
-    [controls.retryFromMessage],
+    [controls],
   );
 
   const empty = rows.length === 0;
@@ -72,7 +71,7 @@ const TranscriptIsland = memo(function TranscriptIsland({
       <AgentTranscript
         rows={rows}
         streamingMessageId={streamingMessageId}
-        pendingPermissions={pendingPermissions}
+        pendingInteractions={pendingInteractions}
         permissionMode={controls.permissionMode}
         onResolvePermission={onResolvePermission}
         canRetryMessage={controls.canSubmit}
@@ -85,16 +84,16 @@ const TranscriptIsland = memo(function TranscriptIsland({
 const ComposerIsland = memo(function ComposerIsland({
   store,
 }: {
-  readonly store: BatchedEngine;
+  readonly store: BatchedAttemptStore;
 }): ReactElement {
   const controls = useAgentSessionControls(store);
   const contextSlot = useMemo(() => <ContextUsageIsland store={store} />, [store]);
 
   return (
     <div className="flex min-h-12 flex-col gap-2 p-2">
-      <SessionStatusBar
-        pendingPermissions={controls.pendingPermissions}
-        canResolvePermission={controls.canResolvePermission}
+      <AttemptStatusBar
+        pendingInteractions={controls.pendingInteractions}
+        canResolve={controls.canResolve}
         failure={controls.failure}
       />
       <TaskPromptComposer
@@ -116,7 +115,7 @@ function HomePageBody({
   store,
   chatId,
 }: {
-  readonly store: BatchedEngine;
+  readonly store: BatchedAttemptStore;
   readonly chatId: string | undefined;
 }): ReactElement {
   useChatPersistence(store, chatId);
