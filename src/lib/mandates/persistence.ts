@@ -1,4 +1,3 @@
-import { isTauriRuntime } from "@/lib/agent/is-tauri-runtime";
 import { MemoryMandatesPersistence } from "@/lib/mandates/adapters/memory-store";
 import { TauriSqlMandatesPersistence } from "@/lib/mandates/adapters/tauri-sql-store";
 import type {
@@ -8,6 +7,7 @@ import type {
   MandateSuccessCriteria,
   StandingPolicyDocument,
 } from "@/lib/mandates/types";
+import { isTauriRuntime } from "@/lib/runtime/is-tauri-runtime";
 
 export type CreateMandateInput = {
   kind?: MandateKind;

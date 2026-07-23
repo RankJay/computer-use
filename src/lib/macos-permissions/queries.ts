@@ -2,14 +2,14 @@ import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/r
 import { toast } from "sonner";
 
 import { mapInvokeError } from "@/lib/agent/capabilities/native-invoke";
-import { isTauriRuntime } from "@/lib/agent/is-tauri-runtime";
 import {
   getMacOsPermissionStatus,
   openMacOsPrivacySettings,
   requestMacOsPermission,
 } from "@/lib/macos-permissions/commands";
 import type { MacOsPermissionKind } from "@/lib/macos-permissions/types";
-import { isMacOsClient } from "@/lib/platform";
+import { isTauriRuntime } from "@/lib/runtime/is-tauri-runtime";
+import { isMacOsClient } from "@/lib/runtime/platform";
 
 export const macosPermissionKeys = {
   all: ["macos-permissions"] as const,

@@ -6,7 +6,7 @@ import { GeneralSettings } from "@/features/settings/GeneralSettings";
 import { SettingsPageHeader } from "@/features/settings/header";
 import { MacOsPermissionsSettings } from "@/features/settings/MacOsPermissionsSettings";
 import { SettingsPageSkeleton } from "@/features/settings/SettingsPageSkeleton";
-import { isMacOsClient } from "@/lib/platform";
+import { isMacOsClient } from "@/lib/runtime/platform";
 import { ensureSecretsReady, settingsKeys } from "@/lib/settings/queries";
 
 import { AccountSettingsNav } from "./AccountSettingsNav";

@@ -1,12 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useRef,
-  type ReactElement,
-  type ReactNode,
-} from "react";
+import { useEffect, useRef, type ReactElement, type ReactNode } from "react";
 
 import {
   createEntitlementPolicy,
@@ -14,6 +7,7 @@ import {
   resolveEntitlementSubjectId,
 } from "@/lib/entitlements";
 import {
+  AttemptHostContext,
   createAttemptHost,
   createProduceRun,
   isLiveWorkspaceReady,
@@ -27,16 +21,6 @@ import {
   usePersistToolApproval,
 } from "@/lib/settings/queries";
 import type { LoadedSettings } from "@/lib/settings/types";
-
-const AttemptHostContext = createContext<BatchedAttemptStore | null>(null);
-
-export function useAttemptHost(): BatchedAttemptStore {
-  const host = useContext(AttemptHostContext);
-  if (!host) {
-    throw new Error("useAttemptHost requires AttemptHostProvider");
-  }
-  return host;
-}
 
 /**
  * Tray-kept webview host: AttemptControl + engine live above the router.

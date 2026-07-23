@@ -1,8 +1,8 @@
 import { getCurrent, onOpenUrl } from "@tauri-apps/plugin-deep-link";
 
-import { isTauriRuntime } from "@/lib/agent/is-tauri-runtime";
 import { parseActuateDeepLinks } from "@/lib/deep-link/parse";
 import { dispatchDeepLink, type DeepLinkSource } from "@/lib/deep-link/router";
+import { isTauriRuntime } from "@/lib/runtime/is-tauri-runtime";
 
 let listenerStarted = false;
 let coldStartConsumed = false;

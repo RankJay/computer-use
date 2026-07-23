@@ -1,6 +1,5 @@
 import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
 
-import { isTauriRuntime } from "@/lib/agent/is-tauri-runtime";
 import { getActuateApiUrl } from "@/lib/auth/config";
 import {
   AuthApiError,
@@ -10,6 +9,7 @@ import {
   type DeviceExchangeSuccess,
   parseAuthUserFromSession,
 } from "@/lib/auth/types";
+import { isTauriRuntime } from "@/lib/runtime/is-tauri-runtime";
 
 async function authFetch(path: string, init?: RequestInit): Promise<Response> {
   const url = `${getActuateApiUrl()}${path}`;

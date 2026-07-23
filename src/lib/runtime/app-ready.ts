@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 
-import { isTauriRuntime } from "@/lib/agent/is-tauri-runtime";
+import { isTauriRuntime } from "./is-tauri-runtime";
 
 let signaled = false;
 

@@ -1,7 +1,7 @@
 import { openUrl } from "@tauri-apps/plugin-opener";
 
-import { isTauriRuntime } from "@/lib/agent/is-tauri-runtime";
 import { getSignInUrl } from "@/lib/auth/config";
+import { isTauriRuntime } from "@/lib/runtime/is-tauri-runtime";
 
 /** Open the web login page in the system browser. */
 export async function openSignInInBrowser(): Promise<void> {

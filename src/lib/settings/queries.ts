@@ -2,7 +2,7 @@ import { queryOptions, useMutation, useQueryClient, useSuspenseQuery } from "@ta
 import { useCallback } from "react";
 import { toast } from "sonner";
 
-import { queryClient } from "@/app/query-client";
+import { queryClient } from "@/lib/runtime/query-client";
 import { sanitizeApiKey } from "@/lib/settings/api-key";
 import { loadedSettingsOrDefault, mergeSettingsPatch } from "@/lib/settings/defaults";
 import { createSettingsPersistence } from "@/lib/settings/persistence";

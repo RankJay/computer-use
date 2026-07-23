@@ -26,13 +26,13 @@ import {
   settingsSelectTriggerClassName,
 } from "@/features/settings/styles";
 import { hostSupportsUiAutomation } from "@/lib/agent/capabilities/shared/ui-automation";
-import { isTauriRuntime } from "@/lib/agent/is-tauri-runtime";
 import {
   getMacOsPermissionStatus,
   openMacOsPrivacySettings,
   requestMacOsPermission,
 } from "@/lib/macos-permissions/commands";
-import { isMacOsClient } from "@/lib/platform";
+import { isTauriRuntime } from "@/lib/runtime/is-tauri-runtime";
+import { isMacOsClient } from "@/lib/runtime/platform";
 import { useSettingsSelector, useUpdateSettings } from "@/lib/settings/queries";
 import {
   selectInstallUpdateOnClose,

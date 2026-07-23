@@ -1,7 +1,7 @@
 import { getVersion } from "@tauri-apps/api/app";
 import { useSyncExternalStore } from "react";
 
-import { isTauriRuntime } from "@/lib/agent/is-tauri-runtime";
+import { isTauriRuntime } from "./is-tauri-runtime";
 
 let cached = "";
 let started = false;

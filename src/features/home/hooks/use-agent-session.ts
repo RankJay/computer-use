@@ -2,10 +2,10 @@ import type { LanguageModelUsage } from "ai";
 import { useCallback, useMemo, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 
-import { useAttemptHost } from "@/app/providers/AttemptHostProvider";
 import {
   deriveAttemptControls,
   deriveDisplayRows,
+  useAttemptHost,
   type AgentTranscriptRow,
   type AttemptControls,
   type AttemptFailure,

@@ -73,6 +73,8 @@ export {
   type BatchedAttemptStore,
 } from "./attempt-host";
 
+export { AttemptHostContext, useAttemptHost } from "./attempt-host-context";
+
 export {
   createAttemptControl,
   type AttemptControl,

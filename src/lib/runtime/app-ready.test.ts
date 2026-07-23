@@ -8,11 +8,11 @@ mock.module("@tauri-apps/api/core", () => ({
   invoke: invokeMock,
 }));
 
-mock.module("@/lib/agent/is-tauri-runtime", () => ({
+mock.module("@/lib/runtime/is-tauri-runtime", () => ({
   isTauriRuntime: () => true,
 }));
 
-const { signalAppReady } = await import("@/lib/app-ready");
+const { signalAppReady } = await import("@/lib/runtime/app-ready");
 
 describe("signalAppReady", () => {
   afterEach(() => {

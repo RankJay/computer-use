@@ -1,6 +1,5 @@
 import { useState, type ReactElement } from "react";
 
-import { queryClient } from "@/app/query-client";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -13,6 +12,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { queryClient } from "@/lib/runtime/query-client";
 import { settingsKeys, useUpdateSettings } from "@/lib/settings/queries";
 import type { LoadedSettings } from "@/lib/settings/types";
 import { useUpdateDialogView } from "@/lib/updater/hooks";

@@ -2,7 +2,7 @@ import type { ReactElement } from "react";
 
 import { SettingsRow } from "@/features/settings/SettingsRow";
 import { SettingsSection } from "@/features/settings/SettingsSection";
-import { isMacOsClient } from "@/lib/platform";
+import { isMacOsClient } from "@/lib/runtime/platform";
 
 function SkeletonControl({ className }: { readonly className: string }): ReactElement {
   return <div className={`animate-pulse rounded-md bg-[#252525] ${className}`} aria-hidden />;

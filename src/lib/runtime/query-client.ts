@@ -1,7 +1,7 @@
 import { QueryClient, focusManager } from "@tanstack/react-query";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
-import { isTauriRuntime } from "@/lib/agent/is-tauri-runtime";
+import { isTauriRuntime } from "./is-tauri-runtime";
 
 export const queryClient = new QueryClient({
   defaultOptions: {

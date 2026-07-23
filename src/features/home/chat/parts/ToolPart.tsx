@@ -17,7 +17,7 @@ import { Shimmer } from "@/components/ai-elements/shimmer";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { toolActivityDetail, uiToolLabel } from "@/lib/agent/capabilities";
-import { isMacOsClient } from "@/lib/platform";
+import { isMacOsClient } from "@/lib/runtime/platform";
 import type { PendingPermission } from "@/lib/session";
 import { cn } from "@/lib/utils";
 

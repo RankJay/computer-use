@@ -6,11 +6,11 @@ mock.module("sonner", () => ({
   toast: { error: toastErrorMock },
 }));
 
-mock.module("@/lib/agent/is-tauri-runtime", () => ({
+mock.module("@/lib/runtime/is-tauri-runtime", () => ({
   isTauriRuntime: () => true,
 }));
 
-mock.module("@/lib/platform", () => ({
+mock.module("@/lib/runtime/platform", () => ({
   isMacOsClient: () => true,
 }));
 

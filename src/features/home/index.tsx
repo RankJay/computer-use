@@ -1,8 +1,8 @@
-﻿import { memo, useCallback, useEffect, useMemo, type ReactElement } from "react";
+import { memo, useCallback, useEffect, useMemo, type ReactElement } from "react";
 
 import { SuspenseQueryBoundary } from "@/components/boundaries/ErrorBoundary";
 import { Container, Item } from "@/components/motion/stagger";
-import { signalAppReady } from "@/lib/app-ready";
+import { signalAppReady } from "@/lib/runtime/app-ready";
 import type { BatchedAttemptStore, PermissionDecision } from "@/lib/session";
 import { settingsKeys } from "@/lib/settings/queries";
 

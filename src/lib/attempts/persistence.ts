@@ -1,7 +1,7 @@
-import { isTauriRuntime } from "@/lib/agent/is-tauri-runtime";
 import { MemoryAttemptEventStore } from "@/lib/attempts/adapters/memory-store";
 import { TauriSqlAttemptEventStore } from "@/lib/attempts/adapters/tauri-sql-store";
 import type { AttemptFoldSnapshot, MandateLedgerOpen } from "@/lib/attempts/types";
+import { isTauriRuntime } from "@/lib/runtime/is-tauri-runtime";
 import type { RuntimeEvent, RunStatus } from "@/lib/session/events";
 
 export type BeginAttemptInput = {

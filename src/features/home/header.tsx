@@ -3,9 +3,9 @@ import { History, Minus, PlusCircle, Settings } from "lucide-react";
 import { useCallback, type ReactElement } from "react";
 import { Link } from "react-router-dom";
 
-import { queryClient } from "@/app/query-client";
-import { useAppVersion } from "@/lib/app-version";
 import { chatsListQueryOptions } from "@/lib/chats/queries";
+import { useAppVersion } from "@/lib/runtime/app-version";
+import { queryClient } from "@/lib/runtime/query-client";
 import { settingsQueryOptions } from "@/lib/settings/queries";
 
 const headerIconClassName =
