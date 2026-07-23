@@ -1,6 +1,6 @@
 import type { UIMessage } from "ai";
 
-import { getDefaultAgentModel } from "@/lib/agent-models";
+import { getDefaultAgentModel } from "@/lib/agent/agent-models";
 
 import type {
   BudgetUpdatedPayload,

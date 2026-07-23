@@ -1,3 +1,8 @@
+/**
+ * Public surface for the live Mandate/Attempt host.
+ * Fold/engine/control internals: import from `@/lib/session/<path>`.
+ */
+
 export type {
   RuntimeEvent,
   RuntimeEventPayload,
@@ -32,37 +37,7 @@ export {
   EMPTY_ATTEMPT_USAGE,
 } from "./projection";
 
-export type { ExecutionContext, ExecutionContextOptions } from "./execution-context";
-export {
-  DEFAULT_EXECUTION_CONTEXT_OPTIONS,
-  PASSTHROUGH_EXECUTION_CONTEXT_OPTIONS,
-  foldExecutionContext,
-} from "./execution-context";
-
 export type { RunExecutionContext } from "./run-execution-context";
-
-export {
-  createFoldState,
-  foldStateFromMessages,
-  reduceSession,
-  projectSession,
-  toProjection,
-  type FoldState,
-} from "./project-session";
-
-export {
-  createSessionEngine,
-  type SessionEngine,
-  type SessionEngineDeps,
-  type RetryFromMessageConfig,
-  type LedgerHydrateInput,
-} from "./engine";
-
-export {
-  planRegenerateFromAssistant,
-  textPartsMarkdown,
-  type RegeneratePlan,
-} from "./control/regenerate-from-message";
 
 export { getAttemptHost, registerAttemptHost, resetAttemptHost } from "./attempt-host-registry";
 
@@ -76,31 +51,12 @@ export {
 export { AttemptHostContext, useAttemptHost } from "./attempt-host-context";
 
 export {
-  createAttemptControl,
-  type AttemptControl,
-  type AttemptControlDeps,
-  type AttemptIds,
-  type AttemptStartError,
-  type AttemptStartInput,
-  type AttemptStartOk,
-  type AttemptStartResult,
-  type LoadedRunContext,
-} from "./control/attempt-control";
+  planRegenerateFromAssistant,
+  textPartsMarkdown,
+  type RegeneratePlan,
+} from "./control/regenerate-from-message";
 
-export {
-  createAttemptRegistry,
-  type AttemptRegistry,
-  type LiveAttempt,
-} from "./control/attempt-registry";
-
-export {
-  cancelPreviousConcurrencyPolicy,
-  rejectIfBusyConcurrencyPolicy,
-  queueIfBusyConcurrencyPolicy,
-  type ConcurrencyPolicy,
-  type ConcurrencyConflictContext,
-  type ConcurrencyConflictDecision,
-} from "./control/concurrency-policy";
+export { deriveAttemptControls, type AttemptControls } from "./control/derive-attempt-controls";
 
 export {
   createOsLease,
@@ -109,45 +65,11 @@ export {
   type OsLeaseHolder,
   type OsLeaseScope,
 } from "./control/os-lease";
-
-export {
-  createEscalationPort,
-  createAutoEscalationPort,
-  DEFAULT_PARK_TIMEOUT_MS,
-  permissionDecisionToEscalation,
-  escalationToPermissionDecision,
-  type EscalationPort,
-  type EscalationPortMode,
-  type EscalationOutcome,
-  type EscalationRequest,
-  type CreateEscalationPortDeps,
-} from "./control/escalation-port";
-
-export {
-  createBudgetTracker,
-  createBudgetGuard,
-  formatBudgetExceededMessage,
-  type BudgetTracker,
-  type BudgetGuard,
-  type BudgetDimension,
-} from "./control/budget";
-
-export {
-  createRunController,
-  type RunController,
-  type RunConfig,
-  type ProduceRun,
-  type ProduceRunContext,
-  type RunControllerDeps,
-} from "./control/run-controller";
-
-export { deriveAttemptControls, type AttemptControls } from "./control/derive-attempt-controls";
+export { osLeaseScopeOf } from "./control/os-lease-scope";
 
 export { deriveDisplayRows } from "./presentation/derive-display-rows";
 
 export { isLiveWorkspaceReady } from "./live-workspace";
-
-export { createDemoPayloads, createTestDemoProducer } from "./fixtures/demo-payloads";
 
 // Demo/live producers are loaded via dynamic import inside createProduceRun —
 // do not statically re-export them from this barrel (defeats cold-start splitting).

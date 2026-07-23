@@ -1,5 +1,6 @@
 import { capabilityClassOf } from "@/lib/entitlements";
-import type { OsLeaseScope } from "@/lib/session/control/os-lease";
+
+import type { OsLeaseScope } from "./os-lease";
 
 /**
  * Which Capabilities require an OS lease before native invoke.

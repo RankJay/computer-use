@@ -1,4 +1,4 @@
-import { getDefaultAgentModelId } from "@/lib/agent-models";
+import { getDefaultAgentModelId } from "@/lib/agent/agent-models";
 import {
   appSecretsSchema,
   appSettingsPartialSchema,

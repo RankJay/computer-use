@@ -4,13 +4,13 @@ import { DEFAULT_SECRETS, DEFAULT_SETTINGS } from "@/lib/settings/defaults";
 
 import { escalationToPermissionDecision } from "./control/escalation-port";
 import type { ProduceRun, PermissionDecision } from "./control/run-controller";
-import { createSessionEngine } from "./engine";
+import { createAttemptEngine } from "./engine";
 import { createDemoPayloads, createTestDemoProducer } from "./fixtures/demo-payloads";
-import { projectSession } from "./project-session";
+import { projectMandate } from "./fold";
 
-describe("SessionEngine", () => {
+describe("AttemptEngine", () => {
   test("demo producer drives a completed projection", async () => {
-    const engine = createSessionEngine({
+    const engine = createAttemptEngine({
       produceRun: createTestDemoProducer(createDemoPayloads("Hello demo")),
     });
 
@@ -29,7 +29,7 @@ describe("SessionEngine", () => {
 
   test("any producer → same log → same projection as batch fold", async () => {
     const payloads = createDemoPayloads("Parity");
-    const engine = createSessionEngine({
+    const engine = createAttemptEngine({
       produceRun: createTestDemoProducer(payloads),
     });
 
@@ -41,7 +41,7 @@ describe("SessionEngine", () => {
     });
 
     const fromEngine = engine.getProjection();
-    const fromBatch = projectSession(engine.getEventLog());
+    const fromBatch = projectMandate(engine.getEventLog());
 
     expect(fromEngine.status).toBe(fromBatch.status);
     expect(fromEngine.rows).toEqual(fromBatch.rows);
@@ -49,7 +49,7 @@ describe("SessionEngine", () => {
   });
 
   test("duplicate eventId is ignored by fold", () => {
-    const engine = createSessionEngine({
+    const engine = createAttemptEngine({
       produceRun: async () => {},
     });
     engine.beginTask("task-dup");
@@ -66,7 +66,7 @@ describe("SessionEngine", () => {
     const rowsAfterFirst = engine.getProjection().rows.length;
 
     // Re-appending a new payload gets a new eventId — not a duplicate.
-    // Dedup is covered in project-session tests; here verify log grows only on apply.
+    // Dedup is covered in fold tests; here verify log grows only on apply.
     engine.append({
       type: "task.status_changed",
       status: "streaming",
@@ -76,7 +76,7 @@ describe("SessionEngine", () => {
   });
 
   test("reset clears projection and log", async () => {
-    const engine = createSessionEngine({
+    const engine = createAttemptEngine({
       produceRun: createTestDemoProducer(),
     });
     await engine.start({
@@ -123,7 +123,7 @@ describe("SessionEngine", () => {
       }
     };
 
-    const engine = createSessionEngine({ produceRun: slowProducer });
+    const engine = createAttemptEngine({ produceRun: slowProducer });
     const startPromise = engine.start({
       prompt: "slow",
       modelId: "openai/gpt-5.4",
@@ -146,7 +146,7 @@ describe("SessionEngine", () => {
   });
 
   test("subscribe notifies once per applied event", () => {
-    const engine = createSessionEngine({ produceRun: async () => {} });
+    const engine = createAttemptEngine({ produceRun: async () => {} });
     let count = 0;
     engine.subscribe(() => {
       count += 1;
@@ -163,7 +163,7 @@ describe("SessionEngine", () => {
   });
 
   test("hydrate seeds projection from messages and clears in-memory eventLog", () => {
-    const engine = createSessionEngine({ produceRun: async () => {} });
+    const engine = createAttemptEngine({ produceRun: async () => {} });
     engine.beginTask("task-pre");
     engine.append({
       type: "task.started",
@@ -199,10 +199,10 @@ describe("SessionEngine", () => {
   test("two producers with same payloads yield identical projections", async () => {
     const payloads = createDemoPayloads("Same");
 
-    const engineA = createSessionEngine({
+    const engineA = createAttemptEngine({
       produceRun: createTestDemoProducer(payloads),
     });
-    const engineB = createSessionEngine({
+    const engineB = createAttemptEngine({
       produceRun: createTestDemoProducer(payloads),
     });
 
@@ -223,7 +223,7 @@ describe("SessionEngine", () => {
   });
 });
 
-describe("RunController via SessionEngine", () => {
+describe("RunController via AttemptEngine", () => {
   test("cancel sets cancelled status", async () => {
     const slowProducer: ProduceRun = async ({ signal, append, config, taskId }) => {
       append({
@@ -243,7 +243,7 @@ describe("RunController via SessionEngine", () => {
       });
     };
 
-    const engine = createSessionEngine({ produceRun: slowProducer });
+    const engine = createAttemptEngine({ produceRun: slowProducer });
     const startPromise = engine.start({
       prompt: "slow",
       modelId: "openai/gpt-5.4",
@@ -292,7 +292,7 @@ describe("RunController via SessionEngine", () => {
       append({ type: "task.completed", finishReason: "stop" });
     };
 
-    const engine = createSessionEngine({ produceRun: producer });
+    const engine = createAttemptEngine({ produceRun: producer });
     const startPromise = engine.start({
       prompt: "need approval",
       modelId: "openai/gpt-5.4",
@@ -345,7 +345,7 @@ describe("RunController via SessionEngine", () => {
       }
     };
 
-    const engine = createSessionEngine({ produceRun: producer });
+    const engine = createAttemptEngine({ produceRun: producer });
     const startPromise = engine.start({
       prompt: "deny me",
       modelId: "openai/gpt-5.4",
@@ -391,7 +391,7 @@ describe("RunController via SessionEngine", () => {
       append({ type: "task.completed", finishReason: "stop" });
     };
 
-    const engine = createSessionEngine({ produceRun: producer });
+    const engine = createAttemptEngine({ produceRun: producer });
     await engine.start({
       prompt: "retry me",
       modelId: "openai/gpt-5.4",
@@ -445,7 +445,7 @@ describe("RunController via SessionEngine", () => {
       append({ type: "task.completed", finishReason: "stop" });
     };
 
-    const engine = createSessionEngine({ produceRun: producer });
+    const engine = createAttemptEngine({ produceRun: producer });
     await engine.start({
       prompt: "first",
       modelId: "openai/gpt-5.4",
@@ -519,7 +519,7 @@ describe("RunController via SessionEngine", () => {
       append({ type: "task.completed", finishReason: "stop" });
     };
 
-    const engine = createSessionEngine({ produceRun: producer });
+    const engine = createAttemptEngine({ produceRun: producer });
     const first = engine.start({
       prompt: "first",
       modelId: "openai/gpt-5.4",

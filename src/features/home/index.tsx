@@ -6,9 +6,9 @@ import { signalAppReady } from "@/lib/runtime/app-ready";
 import type { BatchedAttemptStore, PermissionDecision } from "@/lib/session";
 import { settingsKeys } from "@/lib/settings/queries";
 
-import { AttemptStatusBar } from "./AttemptStatusBar";
 import { AgentTranscript } from "./chat/AgentTranscript";
-import { ComposerContextMeter, TaskPromptComposer } from "./Composer";
+import { AttemptStatusBar } from "./chat/AttemptStatusBar";
+import { ComposerContextMeter, TaskPromptComposer } from "./chat/Composer";
 import { HomePageHeader } from "./header";
 import { HomePageSkeleton } from "./HomePageSkeleton";
 import {

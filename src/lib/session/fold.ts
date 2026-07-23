@@ -214,7 +214,7 @@ export function isKnownRuntimeEvent(event: { type: string }): boolean {
  * Pure immutable reducer with structural sharing.
  * Permission events update pendingPermissions only — they never patch tool parts.
  */
-export function reduceSession(state: FoldState, event: RuntimeEvent): FoldState {
+export function reduceFold(state: FoldState, event: RuntimeEvent): FoldState {
   if (state.seenEventIds.has(event.eventId)) {
     return state;
   }
@@ -443,10 +443,10 @@ export function toProjection(
 }
 
 /** Batch fold for tests and replay. Rebuilds internal seenEventIds from scratch. */
-export function projectSession(events: readonly RuntimeEvent[]): MandateProjection {
+export function projectMandate(events: readonly RuntimeEvent[]): MandateProjection {
   let state = createFoldState();
   for (const event of events) {
-    state = reduceSession(state, event);
+    state = reduceFold(state, event);
   }
   return toProjection(state);
 }

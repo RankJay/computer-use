@@ -19,7 +19,6 @@ export {
   type PermissionPolicyDecision,
   type PermissionPolicyInput,
 } from "./permission-policy";
-export { osLeaseScopeOf } from "./os-lease-scope";
 export {
   createDefaultNativeInvoker,
   createMockCapabilityInvoker,

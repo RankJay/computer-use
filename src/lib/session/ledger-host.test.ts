@@ -6,7 +6,7 @@ import { DEFAULT_SECRETS, DEFAULT_SETTINGS } from "@/lib/settings/defaults";
 
 import { createAttemptHost } from "./attempt-host";
 import { createDemoPayloads, createTestDemoProducer } from "./fixtures/demo-payloads";
-import { projectSession } from "./project-session";
+import { projectMandate } from "./fold";
 
 async function waitForStatus(
   host: ReturnType<typeof createAttemptHost>,
@@ -255,7 +255,7 @@ describe("AttemptHost durable ledger", () => {
 });
 
 describe("hydrateFromLedger vs full replay", () => {
-  test("engine ledger hydrate equals projectSession for event-only open", async () => {
+  test("engine ledger hydrate equals projectMandate for event-only open", async () => {
     const store = new MemoryAttemptEventStore();
     const attemptId = "att-x";
     const mandateId = "man-x";
@@ -301,7 +301,7 @@ describe("hydrateFromLedger vs full replay", () => {
     await store.appendEvents({ attemptId, mandateId, events });
 
     const open = await store.loadForMandateOpen(mandateId);
-    const fromReplay = projectSession(open?.events ?? []);
+    const fromReplay = projectMandate(open?.events ?? []);
 
     const host = createAttemptHost({
       produceRun: createTestDemoProducer(),

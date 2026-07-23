@@ -2,11 +2,11 @@ import type { DynamicToolUIPart } from "ai";
 
 import { capabilityClassOf } from "@/lib/entitlements";
 import { escalationToPermissionDecision } from "@/lib/session/control/escalation-port";
+import { osLeaseScopeOf } from "@/lib/session/control/os-lease-scope";
 import type { RuntimeEventPayload } from "@/lib/session/events";
 
 import { getCapabilityDefinition } from "./catalog";
 import { createDefaultNativeInvoker, mapInvokeError } from "./native-invoke";
-import { osLeaseScopeOf } from "./os-lease-scope";
 import { defaultPermissionPolicy } from "./permission-policy";
 import { lookupSettledCapability } from "./resume-from-cursor";
 import type {

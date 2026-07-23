@@ -5,7 +5,7 @@ import {
   getDefaultAgentModel,
   getModelContextWindow,
   resolveAgentModelId,
-} from "@/lib/agent-models";
+} from "@/lib/agent/agent-models";
 import { estimateUsageCostUsd } from "@/lib/agent/mode-usage";
 
 describe("agent-models catalog", () => {

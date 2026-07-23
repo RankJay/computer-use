@@ -8,10 +8,10 @@ import {
 import {
   createFoldState,
   foldStateFromMessages,
-  projectSession,
-  reduceSession,
+  projectMandate,
+  reduceFold,
   toProjection,
-} from "./project-session";
+} from "./fold";
 
 const TASK_ID = "task-1";
 
@@ -25,9 +25,9 @@ function evt(seq: number, payload: RuntimeEventPayload): RuntimeEvent {
   };
 }
 
-describe("project-session", () => {
+describe("fold", () => {
   test("task.completed with cancelled finishReason sets status cancelled", () => {
-    const projection = projectSession([
+    const projection = projectMandate([
       evt(1, {
         type: "task.started",
         prompt: "hi",
@@ -42,7 +42,7 @@ describe("project-session", () => {
   });
 
   test("task.completed with budget finishReason sets status failed", () => {
-    const projection = projectSession([
+    const projection = projectMandate([
       evt(1, {
         type: "task.started",
         prompt: "hi",
@@ -56,7 +56,7 @@ describe("project-session", () => {
   });
 
   test("task.failed stores recoverable on failure", () => {
-    const projection = projectSession([
+    const projection = projectMandate([
       evt(1, {
         type: "task.started",
         prompt: "hi",
@@ -80,7 +80,7 @@ describe("project-session", () => {
   });
 
   test("pendingPermissions supports parallel callIds", () => {
-    const projection = projectSession([
+    const projection = projectMandate([
       evt(1, {
         type: "task.started",
         prompt: "hi",
@@ -109,7 +109,7 @@ describe("project-session", () => {
   });
 
   test("permission.resolved removes only that callId", () => {
-    const projection = projectSession([
+    const projection = projectMandate([
       evt(1, {
         type: "task.started",
         prompt: "hi",
@@ -143,7 +143,7 @@ describe("project-session", () => {
   });
 
   test("resolving last permission returns status to running", () => {
-    const projection = projectSession([
+    const projection = projectMandate([
       evt(1, {
         type: "task.started",
         prompt: "hi",
@@ -169,7 +169,7 @@ describe("project-session", () => {
   });
 
   test("permission events do not invent dynamic-tool parts", () => {
-    const projection = projectSession([
+    const projection = projectMandate([
       evt(1, {
         type: "task.started",
         prompt: "hi",
@@ -205,9 +205,9 @@ describe("project-session", () => {
       agentMode: "demo",
     });
     let state = createFoldState();
-    state = reduceSession(state, event);
+    state = reduceFold(state, event);
     const afterFirst = toProjection(state);
-    state = reduceSession(state, event);
+    state = reduceFold(state, event);
     const afterDup = toProjection(state);
 
     expect(afterDup.rows).toHaveLength(afterFirst.rows.length);
@@ -216,7 +216,7 @@ describe("project-session", () => {
 
   test("structural sharing preserves untouched row references", () => {
     let state = createFoldState();
-    state = reduceSession(
+    state = reduceFold(
       state,
       evt(1, {
         type: "activity.marker",
@@ -226,7 +226,7 @@ describe("project-session", () => {
       }),
     );
     const markerRef = state.rows[0];
-    state = reduceSession(
+    state = reduceFold(
       state,
       evt(2, {
         type: "task.started",
@@ -242,7 +242,7 @@ describe("project-session", () => {
     let state = createFoldState();
     const emptyRef = state.pendingPermissions;
 
-    state = reduceSession(
+    state = reduceFold(
       state,
       evt(1, {
         type: "task.started",
@@ -253,7 +253,7 @@ describe("project-session", () => {
     );
     expect(state.pendingPermissions).toBe(emptyRef);
 
-    state = reduceSession(
+    state = reduceFold(
       state,
       evt(2, {
         type: "task.completed",
@@ -263,7 +263,7 @@ describe("project-session", () => {
     expect(state.pendingPermissions).toBe(emptyRef);
 
     const before = toProjection(state);
-    state = reduceSession(
+    state = reduceFold(
       state,
       evt(3, {
         type: "task.started",
@@ -278,7 +278,7 @@ describe("project-session", () => {
 
   test("toProjection reuses usage/budget/chatMessages when unchanged", () => {
     let state = createFoldState();
-    state = reduceSession(
+    state = reduceFold(
       state,
       evt(1, {
         type: "task.started",
@@ -287,7 +287,7 @@ describe("project-session", () => {
         agentMode: "demo",
       }),
     );
-    state = reduceSession(
+    state = reduceFold(
       state,
       evt(2, {
         type: "assistant.message_started",
@@ -297,7 +297,7 @@ describe("project-session", () => {
     );
     const before = toProjection(state);
 
-    state = reduceSession(
+    state = reduceFold(
       state,
       evt(3, {
         type: "assistant.part_updated",
@@ -312,7 +312,7 @@ describe("project-session", () => {
     expect(afterPart.budget).toBe(before.budget);
     expect(afterPart.chatMessages).not.toBe(before.chatMessages);
 
-    state = reduceSession(
+    state = reduceFold(
       state,
       evt(4, {
         type: "usage.updated",
@@ -330,7 +330,7 @@ describe("project-session", () => {
   });
 
   test("activity and assistant events build transcript rows", () => {
-    const projection = projectSession([
+    const projection = projectMandate([
       evt(1, {
         type: "activity.marker",
         markerId: "m1",
@@ -366,7 +366,7 @@ describe("project-session", () => {
   });
 
   test("budget.exceeded is recoverable failure", () => {
-    const projection = projectSession([
+    const projection = projectMandate([
       evt(1, {
         type: "task.started",
         prompt: "hi",

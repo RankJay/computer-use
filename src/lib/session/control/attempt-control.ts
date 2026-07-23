@@ -2,7 +2,7 @@ import type { EntitlementPolicy } from "@/lib/entitlements";
 import type { MandatesPersistence } from "@/lib/mandates";
 import type { AppSecrets, AppSettings } from "@/lib/settings/types";
 
-import type { RetryFromMessageConfig, SessionEngine } from "../engine";
+import type { RetryFromMessageConfig, AttemptEngine } from "../engine";
 import { foldExecutionContext } from "../execution-context";
 import type { AttemptRegistry } from "./attempt-registry";
 import type { PermissionDecision, RunConfig } from "./run-controller";
@@ -55,7 +55,7 @@ export type AttemptControl = {
 };
 
 export type AttemptControlDeps = {
-  engine: SessionEngine;
+  engine: AttemptEngine;
   registry: AttemptRegistry;
   mandates: MandatesPersistence;
   loadRunContext: () => Promise<LoadedRunContext | null>;

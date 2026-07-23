@@ -23,13 +23,13 @@ import { foldExecutionContext } from "./execution-context";
 import {
   createFoldState,
   foldStateFromMessages,
-  reduceSession,
+  reduceFold,
   toProjection,
   type FoldState,
-} from "./project-session";
+} from "./fold";
 import { createEmptyMandateProjection, type MandateProjection } from "./projection";
 
-export type SessionEngineListener = () => void;
+export type AttemptEngineListener = () => void;
 
 export type RetryFromMessageConfig = Omit<RunConfig, "prompt" | "chatMessages" | "isRetry">;
 
@@ -38,11 +38,11 @@ export type LedgerHydrateInput = {
   events: readonly RuntimeEvent[];
 };
 
-export type SessionEngine = {
+export type AttemptEngine = {
   append: (payload: RuntimeEventPayload) => RuntimeEvent | null;
   getProjection: () => MandateProjection;
   getEventLog: () => readonly RuntimeEvent[];
-  subscribe: (listener: SessionEngineListener) => () => void;
+  subscribe: (listener: AttemptEngineListener) => () => void;
   /** Cancel any in-flight run, then clear projection and event log. */
   reset: () => Promise<void>;
   /** Replace fold/projection from stored messages; clears in-memory eventLog. */
@@ -74,7 +74,7 @@ function isActiveStatus(status: RunStatus): boolean {
   return status === "running" || status === "streaming" || status === "waiting_permission";
 }
 
-export type SessionEngineDeps = {
+export type AttemptEngineDeps = {
   produceRun: ProduceRun;
   onAttemptStarted?: (attemptId: string) => void;
   osLease?: OsLease;
@@ -83,13 +83,13 @@ export type SessionEngineDeps = {
   escalationTimeoutMs?: number;
 };
 
-export function createSessionEngine(deps: SessionEngineDeps): SessionEngine {
+export function createAttemptEngine(deps: AttemptEngineDeps): AttemptEngine {
   let fold: FoldState = createFoldState();
   let projection: MandateProjection = createEmptyMandateProjection();
   let eventLog: RuntimeEvent[] = [];
   let eventSeq = 0;
   let activeTaskId: string | null = null;
-  const listeners = new Set<SessionEngineListener>();
+  const listeners = new Set<AttemptEngineListener>();
 
   function notify(): void {
     for (const listener of listeners) {
@@ -115,7 +115,7 @@ export function createSessionEngine(deps: SessionEngineDeps): SessionEngine {
       return null;
     }
 
-    fold = reduceSession(fold, event);
+    fold = reduceFold(fold, event);
     projection = toProjection(fold, projection);
     eventLog = [...eventLog, event];
     notify();
@@ -171,7 +171,7 @@ export function createSessionEngine(deps: SessionEngineDeps): SessionEngine {
     hydrateFromLedger(input) {
       let next = input.snapshot ? foldStateFromSnapshot(input.snapshot) : createFoldState();
       for (const event of input.events) {
-        next = reduceSession(next, event);
+        next = reduceFold(next, event);
       }
       fold = next;
       projection = toProjection(fold, null);

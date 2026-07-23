@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { capabilityRiskSchema } from "@/lib/agent/capabilities/risk";
 import { runStatusSchema, type LanguageModelUsageSnapshot } from "@/lib/session/events";
-import { createFoldState, type FoldState } from "@/lib/session/project-session";
+import { createFoldState, type FoldState } from "@/lib/session/fold";
 import type { MandateProjection } from "@/lib/session/projection";
 import type { AgentTranscriptRow } from "@/lib/session/rows";
 

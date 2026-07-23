@@ -21,7 +21,7 @@ import { createAttemptRegistry, type AttemptRegistry } from "./control/attempt-r
 import type { EscalationPort, EscalationPortMode } from "./control/escalation-port";
 import { createOsLease, type OsLease } from "./control/os-lease";
 import type { ProduceRun } from "./control/run-controller";
-import { createSessionEngine, type SessionEngine } from "./engine";
+import { createAttemptEngine, type AttemptEngine } from "./engine";
 import type { RunStatus, RuntimeEvent } from "./events";
 import type { MandateProjection } from "./projection";
 import { createEmptyMandateProjection } from "./projection";
@@ -29,7 +29,7 @@ import { createEmptyMandateProjection } from "./projection";
 export type AttemptHostListener = () => void;
 
 export type BatchedAttemptStore = {
-  engine: SessionEngine;
+  engine: AttemptEngine;
   control: AttemptControl;
   registry: AttemptRegistry;
   eventStore: AttemptEventStore;
@@ -101,7 +101,7 @@ export function createAttemptHost(deps: AttemptHostDeps): BatchedAttemptStore {
       getEventLog: () => engine.getEventLog(),
     });
 
-  const engine = createSessionEngine({
+  const engine = createAttemptEngine({
     produceRun,
     osLease,
     escalationPort: deps.escalationPort,
