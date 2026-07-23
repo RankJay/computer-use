@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 
+import {
+  createAutoEscalationPort,
+  createEscalationPort,
+} from "@/lib/session/control/escalation-port";
 import type { RuntimeEventPayload } from "@/lib/session/events";
 import { DEFAULT_SETTINGS } from "@/lib/settings/defaults";
 
@@ -28,9 +32,7 @@ describe("runCapability", () => {
         taskId: "task-1",
         settings: DEFAULT_SETTINGS,
         workspaceRoot: "D:/Projects/actuate-v3",
-        createPermissionWaiter: () => ({
-          waitForDecision: async () => "approved" as const,
-        }),
+        escalationPort: createAutoEscalationPort("allow"),
         invokeNative: createMockCapabilityInvoker({
           read_file: async () => ({ path: "src/main.tsx", content: "hello", bytes: 5 }),
         }),
@@ -55,9 +57,7 @@ describe("runCapability", () => {
         taskId: "task-1",
         settings: DEFAULT_SETTINGS,
         workspaceRoot: "D:/Projects/actuate-v3",
-        createPermissionWaiter: () => ({
-          waitForDecision: async () => "approved" as const,
-        }),
+        escalationPort: createAutoEscalationPort("allow"),
         invokeNative: createMockCapabilityInvoker({}),
       },
     );
@@ -68,9 +68,9 @@ describe("runCapability", () => {
     expect(payloads[payloads.length - 1]?.type).toBe("capability.failed");
   });
 
-  test("high-risk capability waits for permission and emits approval parts", async () => {
+  test("high-risk capability waits for EscalationPort and emits approval parts", async () => {
     const payloads: RuntimeEventPayload[] = [];
-    let resolveDecision: ((value: "approved" | "denied") => void) | undefined;
+    const port = createEscalationPort({ mode: "interactive" });
 
     const resultPromise = runCapability(
       "delete_path",
@@ -83,12 +83,7 @@ describe("runCapability", () => {
         invokeNative: createMockCapabilityInvoker({
           delete_path: async () => ({ path: "tmp/example.txt" }),
         }),
-        createPermissionWaiter: () => ({
-          waitForDecision: () =>
-            new Promise((resolve) => {
-              resolveDecision = resolve;
-            }),
-        }),
+        escalationPort: port,
         resolveToolPart: () => ({ messageId: "assistant-task-1", partIndex: 0 }),
       },
       "call-delete",
@@ -110,7 +105,7 @@ describe("runCapability", () => {
       body: "Removing a path is waiting. Hop back in to approve or reject.",
     });
 
-    resolveDecision?.("approved");
+    port.resolve("call-delete", "allow");
     const result = await resultPromise;
     expect(result.ok).toBe(true);
     expect(payloads.some((p) => p.type === "permission.resolved")).toBe(true);
@@ -124,7 +119,7 @@ describe("runCapability", () => {
     ).toBe(true);
   });
 
-  test("denied permission returns without executing native handler", async () => {
+  test("denied escalation returns without executing native handler", async () => {
     let nativeCalled = false;
     const payloads: RuntimeEventPayload[] = [];
     const result = await runCapability(
@@ -139,9 +134,7 @@ describe("runCapability", () => {
           nativeCalled = true;
           return {};
         },
-        createPermissionWaiter: () => ({
-          waitForDecision: async () => "denied" as const,
-        }),
+        escalationPort: createAutoEscalationPort("deny"),
         resolveToolPart: () => ({ messageId: "assistant-task-1", partIndex: 0 }),
       },
       "call-deny",
@@ -159,9 +152,12 @@ describe("runCapability", () => {
     ).toBe(true);
   });
 
-  test("re-resolves tool part after waiter when first resolve was null", async () => {
+  test("re-resolves tool part after escalate when first resolve was null", async () => {
     const payloads: RuntimeEventPayload[] = [];
-    let resolveDecision: ((value: "approved" | "denied") => void) | undefined;
+    const port = createEscalationPort({
+      mode: "interactive",
+      notifyIfUnfocused: () => {},
+    });
     let resolveCalls = 0;
 
     const resultPromise = runCapability(
@@ -175,15 +171,9 @@ describe("runCapability", () => {
         invokeNative: createMockCapabilityInvoker({
           delete_path: async () => ({ path: "tmp/late.txt" }),
         }),
-        createPermissionWaiter: () => ({
-          waitForDecision: () =>
-            new Promise((resolve) => {
-              resolveDecision = resolve;
-            }),
-        }),
+        escalationPort: port,
         resolveToolPart: () => {
           resolveCalls += 1;
-          // First emit (approval-requested) misses; post-decision emit finds the part.
           if (resolveCalls === 1) return null;
           return { messageId: "assistant-task-1", partIndex: 0 };
         },
@@ -201,7 +191,7 @@ describe("runCapability", () => {
       ),
     ).toBe(false);
 
-    resolveDecision?.("approved");
+    port.resolve("call-late", "allow");
     const result = await resultPromise;
     expect(result.ok).toBe(true);
     expect(
@@ -214,8 +204,11 @@ describe("runCapability", () => {
     ).toBe(true);
   });
 
-  test("parallel callIds each await their own waiter", async () => {
-    const resolvers = new Map<string, (value: "approved" | "denied") => void>();
+  test("parallel callIds each await their own escalate", async () => {
+    const port = createEscalationPort({
+      mode: "interactive",
+      notifyIfUnfocused: () => {},
+    });
 
     const makeDeps = () => ({
       append: () => {},
@@ -225,26 +218,18 @@ describe("runCapability", () => {
       invokeNative: createMockCapabilityInvoker({
         delete_path: async (input) => input,
       }),
-      createPermissionWaiter: (callId: string) => ({
-        waitForDecision: () =>
-          new Promise<"approved" | "denied">((resolve) => {
-            resolvers.set(callId, resolve);
-          }),
-      }),
+      escalationPort: port,
     });
 
     const a = runCapability("delete_path", { path: "a.txt" }, makeDeps(), "call-a");
     const b = runCapability("delete_path", { path: "b.txt" }, makeDeps(), "call-b");
 
     await Promise.resolve();
-    expect(resolvers.has("call-a")).toBe(true);
-    expect(resolvers.has("call-b")).toBe(true);
-
-    resolvers.get("call-b")?.("approved");
+    port.resolve("call-b", "allow");
     const resultB = await b;
     expect(resultB.ok).toBe(true);
 
-    resolvers.get("call-a")?.("denied");
+    port.resolve("call-a", "deny");
     const resultA = await a;
     expect(resultA).toEqual({ ok: false, denied: true });
   });

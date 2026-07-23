@@ -24,8 +24,8 @@ import {
 import type { EntitlementPolicy } from "@/lib/entitlements";
 import { notifyIfUnfocused } from "@/lib/native/notification";
 import { createBudgetGuard, createBudgetTracker } from "@/lib/session/control/budget";
+import type { EscalationPort } from "@/lib/session/control/escalation-port";
 import type { OsLease } from "@/lib/session/control/os-lease";
-import type { PermissionWaiter } from "@/lib/session/control/run-controller";
 import type { RuntimeEventPayload } from "@/lib/session/events";
 import type { AppSettings } from "@/lib/settings/types";
 
@@ -46,7 +46,7 @@ export type RunStreamCoordinatorDeps = {
   signal: AbortSignal;
   append: (payload: RuntimeEventPayload) => unknown;
   workspaceRoot: string;
-  createPermissionWaiter: (callId: string) => PermissionWaiter;
+  escalationPort: EscalationPort;
   entitlements?: EntitlementPolicy;
   osLease?: OsLease;
   budgetStartedAt?: number;
@@ -97,7 +97,7 @@ export async function runStreamCoordinator(
     taskId: deps.taskId,
     settings: deps.settings,
     workspaceRoot: deps.workspaceRoot,
-    createPermissionWaiter: deps.createPermissionWaiter,
+    escalationPort: deps.escalationPort,
     resolveToolPart,
     entitlements: deps.entitlements,
     osLease: deps.osLease,

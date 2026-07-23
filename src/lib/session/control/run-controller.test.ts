@@ -26,9 +26,15 @@ describe("createRunController persistApproval", () => {
       ],
     };
 
-    const producer: ProduceRun = async ({ createPermissionWaiter, config }) => {
-      const decision = await createPermissionWaiter("c1").waitForDecision();
-      expect(decision).toBe("approved");
+    const producer: ProduceRun = async ({ escalationPort, config }) => {
+      const outcome = await escalationPort.escalate({
+        callId: "c1",
+        attemptId: "attempt-1",
+        capability: "accessibility_click",
+        input: { reference: "e1" },
+        risk: "high",
+      });
+      expect(outcome).toBe("allow");
       expect(needsPermission({ name: "accessibility_click", risk: "high" }, config.settings)).toBe(
         false,
       );

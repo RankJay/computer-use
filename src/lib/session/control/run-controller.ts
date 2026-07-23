@@ -6,10 +6,16 @@ import type { AppSecrets, AppSettings } from "@/lib/settings/types";
 import type { RuntimeEventPayload } from "../events";
 import { foldExecutionContext } from "../execution-context";
 import type { SessionProjection } from "../projection";
+import {
+  createEscalationPort,
+  type EscalationPort,
+  type EscalationPortMode,
+} from "./escalation-port";
 import type { OsLease } from "./os-lease";
 
 export type PermissionDecision = "approved" | "denied";
 
+/** @deprecated Prefer EscalationPort — kept for older test helpers. */
 export type PermissionWaiter = {
   waitForDecision: () => Promise<PermissionDecision>;
 };
@@ -31,7 +37,8 @@ export type ProduceRunContext = {
   taskId: string;
   signal: AbortSignal;
   append: (payload: RuntimeEventPayload) => unknown;
-  createPermissionWaiter: (callId: string) => PermissionWaiter;
+  /** EscalationPort for Capability gate (interactive or park). */
+  escalationPort: EscalationPort;
   /** Injected by AttemptHost — commercial gate for Capability invoke. */
   entitlements?: EntitlementPolicy;
   /** Injected by AttemptHost — desktop lock for UI-automation Capabilities. */
@@ -61,30 +68,32 @@ export type RunControllerDeps = {
   onAttemptStarted?: (attemptId: string) => void;
   /** Released when the Attempt settles or is cancelled. */
   osLease?: OsLease;
+  /** Injected EscalationPort (tests). Default: interactive wait. */
+  escalationPort?: EscalationPort;
+  escalationMode?: EscalationPortMode;
+  escalationTimeoutMs?: number;
 };
 
 export function createRunController(deps: RunControllerDeps): RunController {
   let activeAbort: AbortController | null = null;
   let activeTaskId: string | null = null;
   let lastConfig: RunConfig | null = null;
-  const permissionResolvers = new Map<string, (decision: PermissionDecision) => void>();
 
-  function createPermissionWaiter(callId: string): PermissionWaiter {
-    return {
-      waitForDecision: () =>
-        new Promise((resolve) => {
-          permissionResolvers.set(callId, resolve);
-        }),
-    };
-  }
+  const escalationPort =
+    deps.escalationPort ??
+    createEscalationPort({
+      mode: deps.escalationMode ?? "interactive",
+      timeoutMs: deps.escalationTimeoutMs,
+      osLease: deps.osLease,
+    });
 
   function clearActiveRun(): void {
+    escalationPort.denyAll();
     if (activeTaskId) {
       deps.osLease?.release(activeTaskId);
     }
     activeAbort = null;
     activeTaskId = null;
-    permissionResolvers.clear();
     deps.clearTask();
   }
 
@@ -106,7 +115,7 @@ export function createRunController(deps: RunControllerDeps): RunController {
         taskId,
         signal: activeAbort.signal,
         append: deps.append,
-        createPermissionWaiter,
+        escalationPort,
         osLease: deps.osLease,
       });
     } finally {
@@ -117,11 +126,7 @@ export function createRunController(deps: RunControllerDeps): RunController {
   async function cancel(): Promise<void> {
     if (!activeAbort || !activeTaskId) return;
 
-    for (const resolve of permissionResolvers.values()) {
-      resolve("denied");
-    }
-    permissionResolvers.clear();
-
+    escalationPort.denyAll();
     deps.osLease?.release(activeTaskId);
     activeAbort.abort();
     deps.append({ type: "task.status_changed", status: "cancelled" });
@@ -134,10 +139,6 @@ export function createRunController(deps: RunControllerDeps): RunController {
     cancel,
 
     async resolvePermission(callId, decision, persist) {
-      const resolve = permissionResolvers.get(callId);
-      if (!resolve) return;
-      permissionResolvers.delete(callId);
-
       if (decision === "approved" && persist && lastConfig) {
         const pending = deps
           .getProjection()
@@ -155,7 +156,7 @@ export function createRunController(deps: RunControllerDeps): RunController {
         }
       }
 
-      resolve(decision);
+      escalationPort.resolve(callId, decision === "approved" ? "allow" : "deny");
     },
 
     async retry() {

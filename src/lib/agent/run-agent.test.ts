@@ -4,6 +4,7 @@ import type { LanguageModelV4StreamPart } from "@ai-sdk/provider";
 import { simulateReadableStream } from "ai";
 import { MockLanguageModelV4 } from "ai/test";
 
+import { createAutoEscalationPort } from "@/lib/session/control/escalation-port";
 import type { RuntimeEventPayload } from "@/lib/session/events";
 import { DEFAULT_SECRETS, DEFAULT_SETTINGS } from "@/lib/settings/defaults";
 
@@ -50,9 +51,7 @@ describe("run-agent", () => {
       secrets: DEFAULT_SECRETS,
       signal: new AbortController().signal,
       workspaceRoot: "D:/Projects/actuate-v3",
-      createPermissionWaiter: () => ({
-        waitForDecision: async () => "approved" as const,
-      }),
+      escalationPort: createAutoEscalationPort("allow"),
       modelOverride: createMockModel(),
       append: (payload) => {
         payloads.push(payload);
@@ -87,9 +86,7 @@ describe("run-agent", () => {
       secrets: { ...DEFAULT_SECRETS, openaiApiKey: "" },
       signal: new AbortController().signal,
       workspaceRoot: "D:/Projects/actuate-v3",
-      createPermissionWaiter: () => ({
-        waitForDecision: async () => "approved" as const,
-      }),
+      escalationPort: createAutoEscalationPort("allow"),
       append: (payload) => {
         payloads.push(payload);
       },
@@ -121,9 +118,7 @@ describe("run-agent", () => {
       secrets: DEFAULT_SECRETS,
       signal: new AbortController().signal,
       workspaceRoot: "D:/Projects/actuate-v3",
-      createPermissionWaiter: () => ({
-        waitForDecision: async () => "approved" as const,
-      }),
+      escalationPort: createAutoEscalationPort("allow"),
       modelOverride: createMockModel(),
       budgetStartedAt: Date.now() - 10_000,
       append: (payload) => {

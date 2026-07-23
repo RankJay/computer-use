@@ -257,10 +257,10 @@ describe("RunController via SessionEngine", () => {
     expect(engine.getProjection().status).toBe("cancelled");
   });
 
-  test("resolvePermission unblocks waiter", async () => {
+  test("resolvePermission unblocks EscalationPort", async () => {
     let sawDecision: PermissionDecision | undefined;
 
-    const producer: ProduceRun = async ({ append, createPermissionWaiter, config, taskId }) => {
+    const producer: ProduceRun = async ({ append, escalationPort, config, taskId }) => {
       append({
         type: "task.started",
         prompt: config.prompt,
@@ -275,12 +275,18 @@ describe("RunController via SessionEngine", () => {
         input: {},
         risk: "high",
       });
-      const decision = await createPermissionWaiter("c1").waitForDecision();
-      sawDecision = decision;
+      const outcome = await escalationPort.escalate({
+        callId: "c1",
+        attemptId: taskId,
+        capability: "run_shell",
+        input: {},
+        risk: "high",
+      });
+      sawDecision = outcome === "allow" ? "approved" : "denied";
       append({
         type: "permission.resolved",
         callId: "c1",
-        decision,
+        decision: sawDecision,
       });
       append({ type: "task.completed", finishReason: "stop" });
     };
@@ -307,16 +313,10 @@ describe("RunController via SessionEngine", () => {
     expect(engine.getProjection().pendingPermissions).toEqual([]);
   });
 
-  test("cancel denies pending permission waiters", async () => {
+  test("cancel denies pending EscalationPort waits", async () => {
     let sawDecision: PermissionDecision | undefined;
 
-    const producer: ProduceRun = async ({
-      append,
-      createPermissionWaiter,
-      config,
-      taskId,
-      signal,
-    }) => {
+    const producer: ProduceRun = async ({ append, escalationPort, config, taskId, signal }) => {
       append({
         type: "task.started",
         prompt: config.prompt,
@@ -331,7 +331,14 @@ describe("RunController via SessionEngine", () => {
         input: {},
         risk: "high",
       });
-      sawDecision = await createPermissionWaiter("c1").waitForDecision();
+      const outcome = await escalationPort.escalate({
+        callId: "c1",
+        attemptId: taskId,
+        capability: "run_shell",
+        input: {},
+        risk: "high",
+      });
+      sawDecision = outcome === "allow" ? "approved" : "denied";
       if (!signal.aborted) {
         append({ type: "task.completed", finishReason: "stop" });
       }

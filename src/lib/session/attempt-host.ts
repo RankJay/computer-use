@@ -15,6 +15,7 @@ import {
   type LoadedRunContext,
 } from "./control/attempt-control";
 import { createAttemptRegistry, type AttemptRegistry } from "./control/attempt-registry";
+import type { EscalationPort, EscalationPortMode } from "./control/escalation-port";
 import { createOsLease, type OsLease } from "./control/os-lease";
 import type { ProduceRun } from "./control/run-controller";
 import { createSessionEngine, type SessionEngine } from "./engine";
@@ -67,6 +68,11 @@ export type AttemptHostDeps = {
   entitlements?: EntitlementPolicy;
   /** Desktop lock — defaults to in-process global lease. */
   osLease?: OsLease;
+  /** Inject EscalationPort (tests). Default: interactive via RunController. */
+  escalationPort?: EscalationPort;
+  /** Dark-launch park adapter (unattended-ready). Default interactive. */
+  escalationMode?: EscalationPortMode;
+  escalationTimeoutMs?: number;
 };
 
 function isActiveStatus(status: RunStatus): boolean {
@@ -99,6 +105,9 @@ export function createAttemptHost(deps: AttemptHostDeps): BatchedAttemptStore {
   const engine = createSessionEngine({
     produceRun,
     osLease,
+    escalationPort: deps.escalationPort,
+    escalationMode: deps.escalationMode,
+    escalationTimeoutMs: deps.escalationTimeoutMs,
     onAttemptStarted: (attemptId) => {
       const waiter = attemptStartedWaiter;
       attemptStartedWaiter = null;

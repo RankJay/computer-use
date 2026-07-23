@@ -1,13 +1,12 @@
 import type { DynamicToolUIPart } from "ai";
 
 import { capabilityClassOf } from "@/lib/entitlements";
-import { notifyIfUnfocused } from "@/lib/native/notification";
 import type { RuntimeEventPayload } from "@/lib/session/events";
 
 import { getCapabilityDefinition } from "./catalog";
 import { createDefaultNativeInvoker, mapInvokeError } from "./native-invoke";
 import { osLeaseScopeOf } from "./os-lease-scope";
-import { needsPermission } from "./permission";
+import { defaultPermissionPolicy } from "./permission-policy";
 import type {
   CapabilityError,
   CapabilityRunnerDeps,
@@ -81,8 +80,8 @@ function emitApprovalPart(
 }
 
 /**
- * CapabilityRunner: validate → entitlement → permission → OS lease → native invoke.
- * EntitlementPolicy is commercial; PermissionPolicy is OS safety; OsLease is desktop exclusivity.
+ * CapabilityRunner: validate → entitlement → PermissionPolicy → EscalationPort → OS lease → invoke.
+ * Policy never notifies; EscalationPort owns wait/park/timeout.
  */
 export async function runCapability(
   name: string,
@@ -159,8 +158,46 @@ export async function runCapability(
   }
 
   const resolveLocation = () => deps.resolveToolPart?.(callId) ?? null;
+  const policy = deps.permissionPolicy ?? defaultPermissionPolicy;
+  const policyDecision = policy.resolve({
+    name: definition.name,
+    risk: definition.risk,
+    destructive: definition.destructive,
+    settings: deps.settings,
+  });
 
-  if (needsPermission(definition, deps.settings)) {
+  if (policyDecision === "deny") {
+    append({
+      type: "permission.requested",
+      callId,
+      capability: name,
+      input: parsedInput,
+      risk: definition.risk,
+    });
+    append({
+      type: "permission.resolved",
+      callId,
+      decision: "denied",
+    });
+    emitApprovalPart(deps, resolveLocation(), name, callId, parsedInput, "output-denied", false);
+    return { ok: false, denied: true };
+  }
+
+  if (policyDecision === "escalate") {
+    if (!deps.escalationPort) {
+      const capabilityError: CapabilityError = {
+        code: "escalation_port_missing",
+        message: "EscalationPort required when PermissionPolicy returns escalate.",
+      };
+      append({
+        type: "capability.failed",
+        callId,
+        capability: name,
+        error: capabilityError,
+      });
+      return { ok: false, error: capabilityError };
+    }
+
     append({
       type: "permission.requested",
       callId,
@@ -169,22 +206,23 @@ export async function runCapability(
       risk: definition.risk,
     });
     emitApprovalPart(deps, resolveLocation(), name, callId, parsedInput, "approval-requested");
-    notifyIfUnfocused({
-      title: "Approval needed",
-      body: `${uiToolLabel(name)} is waiting. Hop back in to approve or reject.`,
-    });
 
-    const waiter = deps.createPermissionWaiter(callId);
-    const decision = await waiter.waitForDecision();
+    const outcome = await deps.escalationPort.escalate({
+      callId,
+      attemptId: deps.taskId,
+      capability: name,
+      label: uiToolLabel(name),
+      input: parsedInput,
+      risk: definition.risk,
+    });
 
     append({
       type: "permission.resolved",
       callId,
-      decision,
+      decision: outcome === "allow" ? "approved" : "denied",
     });
 
-    // Re-resolve after the waiter — the tool part may have arrived mid-wait.
-    if (decision === "denied") {
+    if (outcome === "deny") {
       emitApprovalPart(deps, resolveLocation(), name, callId, parsedInput, "output-denied", false);
       return { ok: false, denied: true };
     }

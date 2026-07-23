@@ -3,6 +3,7 @@ import type { UIMessage } from "ai";
 import type { AttemptFoldSnapshot } from "@/lib/attempts";
 import { foldStateFromSnapshot } from "@/lib/attempts";
 
+import type { EscalationPort, EscalationPortMode } from "./control/escalation-port";
 import type { OsLease } from "./control/os-lease";
 import { planRegenerateFromAssistant } from "./control/regenerate-from-message";
 import {
@@ -73,6 +74,9 @@ export type SessionEngineDeps = {
   produceRun: ProduceRun;
   onAttemptStarted?: (attemptId: string) => void;
   osLease?: OsLease;
+  escalationPort?: EscalationPort;
+  escalationMode?: EscalationPortMode;
+  escalationTimeoutMs?: number;
 };
 
 export function createSessionEngine(deps: SessionEngineDeps): SessionEngine {
@@ -128,6 +132,9 @@ export function createSessionEngine(deps: SessionEngineDeps): SessionEngine {
     produceRun: deps.produceRun,
     onAttemptStarted: deps.onAttemptStarted,
     osLease: deps.osLease,
+    escalationPort: deps.escalationPort,
+    escalationMode: deps.escalationMode,
+    escalationTimeoutMs: deps.escalationTimeoutMs,
   });
 
   return {

@@ -35,7 +35,7 @@ export async function runAgentLoop(deps: RunAgentDeps): Promise<RunAgentResult> 
       signal: deps.signal,
       append: deps.append,
       workspaceRoot: deps.workspaceRoot,
-      createPermissionWaiter: deps.createPermissionWaiter,
+      escalationPort: deps.escalationPort,
       entitlements: deps.entitlements,
       osLease: deps.osLease,
       budgetStartedAt: deps.budgetStartedAt,

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 
+import { createAutoEscalationPort } from "@/lib/session/control/escalation-port";
 import { createOsLease } from "@/lib/session/control/os-lease";
 import type { RuntimeEventPayload } from "@/lib/session/events";
 import { DEFAULT_SETTINGS } from "@/lib/settings/defaults";
@@ -31,9 +32,7 @@ describe("runCapability OS lease", () => {
         taskId: "attempt-a",
         settings: { ...DEFAULT_SETTINGS, permissionMode: "risky" },
         workspaceRoot: "D:/Projects/actuate-v3",
-        createPermissionWaiter: () => ({
-          waitForDecision: async () => "approved" as const,
-        }),
+        escalationPort: createAutoEscalationPort("allow"),
         invokeNative: createMockCapabilityInvoker({
           mouse_click: async () => ({ ok: true }),
         }),
@@ -53,9 +52,7 @@ describe("runCapability OS lease", () => {
         taskId: "attempt-b",
         settings: DEFAULT_SETTINGS,
         workspaceRoot: "D:/Projects/actuate-v3",
-        createPermissionWaiter: () => ({
-          waitForDecision: async () => "approved" as const,
-        }),
+        escalationPort: createAutoEscalationPort("allow"),
         invokeNative: createMockCapabilityInvoker({
           read_file: async () => ({ path: "src/main.tsx", content: "x", bytes: 1 }),
         }),
@@ -81,9 +78,7 @@ describe("runCapability OS lease", () => {
         taskId: "attempt-b",
         settings: { ...DEFAULT_SETTINGS, permissionMode: "risky" },
         workspaceRoot: "D:/Projects/actuate-v3",
-        createPermissionWaiter: () => ({
-          waitForDecision: async () => "approved" as const,
-        }),
+        escalationPort: createAutoEscalationPort("allow"),
         invokeNative: async () => {
           invoked = true;
           return {};
@@ -116,9 +111,7 @@ describe("runCapability OS lease", () => {
         taskId: "attempt-b",
         settings: { ...DEFAULT_SETTINGS, permissionMode: "risky" },
         workspaceRoot: "D:/Projects/actuate-v3",
-        createPermissionWaiter: () => ({
-          waitForDecision: async () => "approved" as const,
-        }),
+        escalationPort: createAutoEscalationPort("allow"),
         invokeNative: createMockCapabilityInvoker({
           window_focus: async () => ({ ok: true }),
         }),

@@ -11,6 +11,13 @@ export type {
 export { defineCapability } from "./types";
 
 export { needsPermission, permissionRiskForCapability } from "./permission";
+export {
+  createSettingsPermissionPolicy,
+  defaultPermissionPolicy,
+  type PermissionPolicy,
+  type PermissionPolicyDecision,
+  type PermissionPolicyInput,
+} from "./permission-policy";
 export { osLeaseScopeOf } from "./os-lease-scope";
 export {
   createDefaultNativeInvoker,

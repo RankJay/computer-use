@@ -1,10 +1,12 @@
 import type { z } from "zod";
 
 import type { EntitlementPolicy } from "@/lib/entitlements";
+import type { EscalationPort } from "@/lib/session/control/escalation-port";
 import type { OsLease } from "@/lib/session/control/os-lease";
-import type { PermissionWaiter } from "@/lib/session/control/run-controller";
 import type { RuntimeEventPayload } from "@/lib/session/events";
 import type { AppSettings } from "@/lib/settings/types";
+
+import type { PermissionPolicy } from "./permission-policy";
 
 export type CapabilityRisk = "low" | "medium" | "high";
 
@@ -73,7 +75,10 @@ export type CapabilityRunnerDeps = {
   taskId: string;
   settings: AppSettings;
   workspaceRoot: string;
-  createPermissionWaiter: (callId: string) => PermissionWaiter;
+  /** Required when PermissionPolicy returns escalate. */
+  escalationPort?: EscalationPort;
+  /** Defaults to settings-backed policy. */
+  permissionPolicy?: PermissionPolicy;
   invokeNative?: CapabilityNativeInvoker;
   resolveToolPart?: (callId: string) => ToolPartLocation | null;
   /** Commercial gate before PermissionPolicy. Optional for tests. */

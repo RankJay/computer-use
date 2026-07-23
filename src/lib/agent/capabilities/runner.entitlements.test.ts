@@ -6,6 +6,7 @@ import {
   HOBBY_PLAN,
   type PlanDocument,
 } from "@/lib/entitlements";
+import { createAutoEscalationPort } from "@/lib/session/control/escalation-port";
 import type { RuntimeEventPayload } from "@/lib/session/events";
 import { DEFAULT_SETTINGS } from "@/lib/settings/defaults";
 
@@ -29,9 +30,9 @@ describe("runCapability entitlements", () => {
     notifyIfUnfocusedMock.mockClear();
   });
 
-  test("computer_use require_upgrade fails call without native invoke or permission wait", async () => {
+  test("computer_use require_upgrade fails call without native invoke or escalation", async () => {
     const payloads: RuntimeEventPayload[] = [];
-    let waited = false;
+    let escalated = false;
     let invoked = false;
 
     const entitlements = createEntitlementPolicy({
@@ -48,12 +49,14 @@ describe("runCapability entitlements", () => {
         taskId: "task-1",
         settings: { ...DEFAULT_SETTINGS, permissionMode: "every-meaningful" },
         workspaceRoot: "D:/Projects/actuate-v3",
-        createPermissionWaiter: () => ({
-          waitForDecision: async () => {
-            waited = true;
-            return "approved" as const;
+        escalationPort: {
+          escalate: async () => {
+            escalated = true;
+            return "allow";
           },
-        }),
+          resolve: () => {},
+          denyAll: () => {},
+        },
         invokeNative: async () => {
           invoked = true;
           return {};
@@ -70,7 +73,7 @@ describe("runCapability entitlements", () => {
         message: "Computer use is not included on this plan.",
       },
     });
-    expect(waited).toBe(false);
+    expect(escalated).toBe(false);
     expect(invoked).toBe(false);
     expect(payloads.map((p) => p.type)).toEqual([
       "capability.requested",
@@ -94,9 +97,7 @@ describe("runCapability entitlements", () => {
         taskId: "task-1",
         settings: DEFAULT_SETTINGS,
         workspaceRoot: "D:/Projects/actuate-v3",
-        createPermissionWaiter: () => ({
-          waitForDecision: async () => "approved" as const,
-        }),
+        escalationPort: createAutoEscalationPort("allow"),
         invokeNative: createMockCapabilityInvoker({
           read_file: async () => ({ path: "src/main.tsx", content: "hi", bytes: 2 }),
         }),

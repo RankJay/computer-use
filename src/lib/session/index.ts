@@ -105,6 +105,17 @@ export {
 } from "./control/os-lease";
 
 export {
+  createEscalationPort,
+  createAutoEscalationPort,
+  DEFAULT_PARK_TIMEOUT_MS,
+  type EscalationPort,
+  type EscalationPortMode,
+  type EscalationOutcome,
+  type EscalationRequest,
+  type CreateEscalationPortDeps,
+} from "./control/escalation-port";
+
+export {
   createBudgetTracker,
   createBudgetGuard,
   formatBudgetExceededMessage,
