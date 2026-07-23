@@ -3,6 +3,7 @@ import type { UIMessage } from "ai";
 import type { AttemptFoldSnapshot } from "@/lib/attempts";
 import { foldStateFromSnapshot } from "@/lib/attempts";
 
+import type { OsLease } from "./control/os-lease";
 import { planRegenerateFromAssistant } from "./control/regenerate-from-message";
 import {
   createRunController,
@@ -71,6 +72,7 @@ function isActiveStatus(status: RunStatus): boolean {
 export type SessionEngineDeps = {
   produceRun: ProduceRun;
   onAttemptStarted?: (attemptId: string) => void;
+  osLease?: OsLease;
 };
 
 export function createSessionEngine(deps: SessionEngineDeps): SessionEngine {
@@ -125,6 +127,7 @@ export function createSessionEngine(deps: SessionEngineDeps): SessionEngine {
     getProjection: () => projection,
     produceRun: deps.produceRun,
     onAttemptStarted: deps.onAttemptStarted,
+    osLease: deps.osLease,
   });
 
   return {

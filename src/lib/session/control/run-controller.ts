@@ -6,6 +6,7 @@ import type { AppSecrets, AppSettings } from "@/lib/settings/types";
 import type { RuntimeEventPayload } from "../events";
 import { foldExecutionContext } from "../execution-context";
 import type { SessionProjection } from "../projection";
+import type { OsLease } from "./os-lease";
 
 export type PermissionDecision = "approved" | "denied";
 
@@ -33,6 +34,8 @@ export type ProduceRunContext = {
   createPermissionWaiter: (callId: string) => PermissionWaiter;
   /** Injected by AttemptHost — commercial gate for Capability invoke. */
   entitlements?: EntitlementPolicy;
+  /** Injected by AttemptHost — desktop lock for UI-automation Capabilities. */
+  osLease?: OsLease;
 };
 
 export type ProduceRun = (ctx: ProduceRunContext) => Promise<void>;
@@ -56,6 +59,8 @@ export type RunControllerDeps = {
   produceRun: ProduceRun;
   /** Fires once the Attempt is in-flight (after beginTask), before produceRun settles. */
   onAttemptStarted?: (attemptId: string) => void;
+  /** Released when the Attempt settles or is cancelled. */
+  osLease?: OsLease;
 };
 
 export function createRunController(deps: RunControllerDeps): RunController {
@@ -74,6 +79,9 @@ export function createRunController(deps: RunControllerDeps): RunController {
   }
 
   function clearActiveRun(): void {
+    if (activeTaskId) {
+      deps.osLease?.release(activeTaskId);
+    }
     activeAbort = null;
     activeTaskId = null;
     permissionResolvers.clear();
@@ -99,6 +107,7 @@ export function createRunController(deps: RunControllerDeps): RunController {
         signal: activeAbort.signal,
         append: deps.append,
         createPermissionWaiter,
+        osLease: deps.osLease,
       });
     } finally {
       clearActiveRun();
@@ -113,6 +122,7 @@ export function createRunController(deps: RunControllerDeps): RunController {
     }
     permissionResolvers.clear();
 
+    deps.osLease?.release(activeTaskId);
     activeAbort.abort();
     deps.append({ type: "task.status_changed", status: "cancelled" });
     deps.append({ type: "task.completed", finishReason: "cancelled" });

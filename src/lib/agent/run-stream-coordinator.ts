@@ -24,6 +24,7 @@ import {
 import type { EntitlementPolicy } from "@/lib/entitlements";
 import { notifyIfUnfocused } from "@/lib/native/notification";
 import { createBudgetGuard, createBudgetTracker } from "@/lib/session/control/budget";
+import type { OsLease } from "@/lib/session/control/os-lease";
 import type { PermissionWaiter } from "@/lib/session/control/run-controller";
 import type { RuntimeEventPayload } from "@/lib/session/events";
 import type { AppSettings } from "@/lib/settings/types";
@@ -47,6 +48,7 @@ export type RunStreamCoordinatorDeps = {
   workspaceRoot: string;
   createPermissionWaiter: (callId: string) => PermissionWaiter;
   entitlements?: EntitlementPolicy;
+  osLease?: OsLease;
   budgetStartedAt?: number;
 };
 
@@ -98,6 +100,7 @@ export async function runStreamCoordinator(
     createPermissionWaiter: deps.createPermissionWaiter,
     resolveToolPart,
     entitlements: deps.entitlements,
+    osLease: deps.osLease,
   };
 
   const tools = buildAgentTools(runnerDeps);

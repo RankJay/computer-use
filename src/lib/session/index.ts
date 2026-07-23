@@ -97,6 +97,14 @@ export {
 } from "./control/attempt-registry";
 
 export {
+  createOsLease,
+  type OsLease,
+  type OsLeaseAcquireResult,
+  type OsLeaseHolder,
+  type OsLeaseScope,
+} from "./control/os-lease";
+
+export {
   createBudgetTracker,
   createBudgetGuard,
   formatBudgetExceededMessage,

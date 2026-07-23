@@ -6,7 +6,15 @@ import type { ProduceRun } from "../control/run-controller";
 
 /** Live producer — wires tools via CapabilityRunner (Phase 3). */
 export function createLiveRunProducer(): ProduceRun {
-  return async ({ config, taskId, signal, append, createPermissionWaiter, entitlements }) => {
+  return async ({
+    config,
+    taskId,
+    signal,
+    append,
+    createPermissionWaiter,
+    entitlements,
+    osLease,
+  }) => {
     const workspaceRoot = config.settings.workspaceRoot;
 
     if (!config.isRetry) {
@@ -52,6 +60,7 @@ export function createLiveRunProducer(): ProduceRun {
       workspaceRoot,
       createPermissionWaiter,
       entitlements,
+      osLease,
     });
 
     if (result.finishReason === "error") {

@@ -6,6 +6,7 @@ import type { RuntimeEventPayload } from "@/lib/session/events";
 
 import { getCapabilityDefinition } from "./catalog";
 import { createDefaultNativeInvoker, mapInvokeError } from "./native-invoke";
+import { osLeaseScopeOf } from "./os-lease-scope";
 import { needsPermission } from "./permission";
 import type {
   CapabilityError,
@@ -80,8 +81,8 @@ function emitApprovalPart(
 }
 
 /**
- * CapabilityRunner: validate → entitlement → permission gate → native invoke.
- * EntitlementPolicy is commercial; PermissionPolicy / waiter is OS safety — never conflated.
+ * CapabilityRunner: validate → entitlement → permission → OS lease → native invoke.
+ * EntitlementPolicy is commercial; PermissionPolicy is OS safety; OsLease is desktop exclusivity.
  */
 export async function runCapability(
   name: string,
@@ -197,6 +198,24 @@ export async function runCapability(
       "approval-responded",
       true,
     );
+  }
+
+  const leaseScope = osLeaseScopeOf(name);
+  if (leaseScope !== "none" && deps.osLease) {
+    const lease = deps.osLease.acquire(deps.taskId, leaseScope);
+    if (lease.outcome === "rejected") {
+      const capabilityError: CapabilityError = {
+        code: "os_lease_held",
+        message: `Desktop OS lease held by another Attempt (${lease.holderAttemptId}).`,
+      };
+      append({
+        type: "capability.failed",
+        callId,
+        capability: name,
+        error: capabilityError,
+      });
+      return { ok: false, error: capabilityError };
+    }
   }
 
   const invokeNative = deps.invokeNative ?? createDefaultNativeInvoker();

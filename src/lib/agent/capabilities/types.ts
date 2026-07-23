@@ -1,6 +1,7 @@
 import type { z } from "zod";
 
 import type { EntitlementPolicy } from "@/lib/entitlements";
+import type { OsLease } from "@/lib/session/control/os-lease";
 import type { PermissionWaiter } from "@/lib/session/control/run-controller";
 import type { RuntimeEventPayload } from "@/lib/session/events";
 import type { AppSettings } from "@/lib/settings/types";
@@ -77,4 +78,6 @@ export type CapabilityRunnerDeps = {
   resolveToolPart?: (callId: string) => ToolPartLocation | null;
   /** Commercial gate before PermissionPolicy. Optional for tests. */
   entitlements?: EntitlementPolicy;
+  /** Desktop lock for UI-automation Capabilities. Optional = always grant (tests). */
+  osLease?: OsLease;
 };

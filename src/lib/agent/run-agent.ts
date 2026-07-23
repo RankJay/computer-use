@@ -37,6 +37,7 @@ export async function runAgentLoop(deps: RunAgentDeps): Promise<RunAgentResult> 
       workspaceRoot: deps.workspaceRoot,
       createPermissionWaiter: deps.createPermissionWaiter,
       entitlements: deps.entitlements,
+      osLease: deps.osLease,
       budgetStartedAt: deps.budgetStartedAt,
     });
   } catch (error) {

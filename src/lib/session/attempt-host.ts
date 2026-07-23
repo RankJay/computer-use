@@ -15,6 +15,7 @@ import {
   type LoadedRunContext,
 } from "./control/attempt-control";
 import { createAttemptRegistry, type AttemptRegistry } from "./control/attempt-registry";
+import { createOsLease, type OsLease } from "./control/os-lease";
 import type { ProduceRun } from "./control/run-controller";
 import { createSessionEngine, type SessionEngine } from "./engine";
 import type { RunStatus, RuntimeEvent } from "./events";
@@ -30,6 +31,8 @@ export type BatchedAttemptStore = {
   eventStore: AttemptEventStore;
   /** Commercial policy (undefined in tests that omit it). */
   entitlements: EntitlementPolicy | undefined;
+  /** Desktop OS lease (UI-automation exclusivity). */
+  osLease: OsLease;
   /** MandateProjection (audit/UI). Alias of getSnapshot. */
   getMandateProjection: () => SessionProjection;
   getSnapshot: () => SessionProjection;
@@ -62,6 +65,8 @@ export type AttemptHostDeps = {
   eventStore?: AttemptEventStore;
   /** Commercial gate — Attempt start/model + Capability invoke. */
   entitlements?: EntitlementPolicy;
+  /** Desktop lock — defaults to in-process global lease. */
+  osLease?: OsLease;
 };
 
 function isActiveStatus(status: RunStatus): boolean {
@@ -80,6 +85,7 @@ export function createAttemptHost(deps: AttemptHostDeps): BatchedAttemptStore {
   const mandates = deps.mandates ?? createMandatesPersistence();
   const eventStore = deps.eventStore ?? createAttemptEventStore();
   const registry = createAttemptRegistry();
+  const osLease = deps.osLease ?? createOsLease();
 
   let attemptStartedWaiter: ((attemptId: string) => void) | null = null;
 
@@ -87,10 +93,12 @@ export function createAttemptHost(deps: AttemptHostDeps): BatchedAttemptStore {
     deps.produceRun({
       ...ctx,
       entitlements: deps.entitlements,
+      osLease,
     });
 
   const engine = createSessionEngine({
     produceRun,
+    osLease,
     onAttemptStarted: (attemptId) => {
       const waiter = attemptStartedWaiter;
       attemptStartedWaiter = null;
@@ -335,6 +343,7 @@ export function createAttemptHost(deps: AttemptHostDeps): BatchedAttemptStore {
     registry,
     eventStore,
     entitlements: deps.entitlements,
+    osLease,
     getMandateProjection: () => snapshot,
     getSnapshot: () => snapshot,
     subscribe: (listener) => {
@@ -407,6 +416,7 @@ export function createAttemptHost(deps: AttemptHostDeps): BatchedAttemptStore {
       await flushLedger();
       await engine.reset();
       registry.resetPointers();
+      osLease.clear();
       resetLedgerCursors();
       snapshot = createEmptySessionProjection();
       lastStatus = snapshot.status;

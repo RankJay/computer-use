@@ -11,6 +11,7 @@ export type {
 export { defineCapability } from "./types";
 
 export { needsPermission, permissionRiskForCapability } from "./permission";
+export { osLeaseScopeOf } from "./os-lease-scope";
 export {
   createDefaultNativeInvoker,
   createMockCapabilityInvoker,
