@@ -1,33 +1,25 @@
-import { useQueryClient } from "@tanstack/react-query";
 import type { LanguageModelUsage } from "ai";
-import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from "react";
+import { useCallback, useMemo, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 
+import { useAttemptHost } from "@/app/providers/AttemptHostProvider";
 import {
-  createSessionEngine,
   deriveDisplayRows,
   deriveSessionControls,
-  isLiveWorkspaceReady,
-  setActiveSessionEngine,
   type AgentTranscriptRow,
+  type BatchedAttemptStore,
   type PendingPermission,
   type PermissionDecision,
   type SessionControls,
-  type SessionEngine,
   type SessionFailure,
   type SessionProjection,
 } from "@/lib/session";
-import { createProduceRun } from "@/lib/session/producers/select-producer";
-import { DEFAULT_SECRETS } from "@/lib/settings/defaults";
-import {
-  ensureSecretsReady,
-  settingsQueryOptions,
-  usePersistToolApproval,
-  useSettingsSelector,
-  useUpdateSettings,
-} from "@/lib/settings/queries";
+import { useSettingsSelector, useUpdateSettings } from "@/lib/settings/queries";
 import { selectPermissionMode, selectSelectedModelId } from "@/lib/settings/selectors";
 import type { PermissionMode } from "@/lib/settings/types";
+
+/** @deprecated Alias — host store is the runtime; Home is a Client. */
+export type BatchedEngine = BatchedAttemptStore;
 
 export type ComposerContextUsage = {
   readonly usedTokens: number;
@@ -65,53 +57,6 @@ function toContextUsage(
   };
 }
 
-type Listener = () => void;
-
-export type BatchedEngine = {
-  engine: SessionEngine;
-  getSnapshot: () => SessionProjection;
-  subscribe: (listener: Listener) => () => void;
-};
-
-function createBatchedEngine(): BatchedEngine {
-  const engine = createSessionEngine({ produceRun: createProduceRun() });
-  let snapshot = engine.getProjection();
-  let pending: SessionProjection | null = null;
-  let rafId: number | null = null;
-  const listeners = new Set<Listener>();
-
-  const emit = () => {
-    for (const listener of listeners) {
-      listener();
-    }
-  };
-
-  const flush = () => {
-    rafId = null;
-    if (!pending) return;
-    snapshot = pending;
-    pending = null;
-    emit();
-  };
-
-  engine.subscribe(() => {
-    pending = engine.getProjection();
-    if (rafId !== null) return;
-    rafId = requestAnimationFrame(flush);
-  });
-
-  return {
-    engine,
-    getSnapshot: () => snapshot,
-    subscribe: (listener) => {
-      listeners.add(listener);
-      return () => {
-        listeners.delete(listener);
-      };
-    },
-  };
-}
-
 export type AgentTranscriptSlice = {
   rows: readonly AgentTranscriptRow[];
   streamingMessageId: string | null;
@@ -137,29 +82,13 @@ export type AgentSessionControls = SessionControls & {
   pendingPermissions: readonly PendingPermission[];
 };
 
-/** Stable engine for the home chat session — create once per page mount. */
-export function useAgentSessionStore(): BatchedEngine {
-  const storeRef = useRef<BatchedEngine | null>(null);
-  if (storeRef.current === null) {
-    storeRef.current = createBatchedEngine();
-  }
-
-  useEffect(() => {
-    const store = storeRef.current;
-    if (store === null) {
-      return;
-    }
-    setActiveSessionEngine(store.engine);
-    return () => {
-      setActiveSessionEngine(null);
-    };
-  }, []);
-
-  return storeRef.current;
+/** App-runtime host store — survives Home unmount / route changes. */
+export function useAgentSessionStore(): BatchedAttemptStore {
+  return useAttemptHost();
 }
 
 /** Header chrome only — no settings Suspense; safe outside SuspenseQueryBoundary. */
-export function useAgentInputDisabled(store: BatchedEngine): boolean {
+export function useAgentInputDisabled(store: BatchedAttemptStore): boolean {
   const status = useSyncExternalStore(
     store.subscribe,
     () => store.getSnapshot().status,
@@ -169,7 +98,7 @@ export function useAgentInputDisabled(store: BatchedEngine): boolean {
 }
 
 /** Hot path: only fields that affect the transcript list / Thinking marker. */
-export function useAgentTranscript(store: BatchedEngine): AgentTranscriptSlice {
+export function useAgentTranscript(store: BatchedAttemptStore): AgentTranscriptSlice {
   const rows = useSyncExternalStore(
     store.subscribe,
     () => store.getSnapshot().rows,
@@ -212,8 +141,7 @@ export function useAgentTranscript(store: BatchedEngine): AgentTranscriptSlice {
 }
 
 /** Context meter only — silent on text chunks when usage identity is shared. */
-export function useAgentContextUsage(store: BatchedEngine): ComposerContextUsage {
-  // Field selector — secrets hydration must not wake this island.
+export function useAgentContextUsage(store: BatchedAttemptStore): ComposerContextUsage {
   const selectedModelId = useSettingsSelector(selectSelectedModelId);
   const usage = useSyncExternalStore(
     store.subscribe,
@@ -223,15 +151,11 @@ export function useAgentContextUsage(store: BatchedEngine): ComposerContextUsage
   return useMemo(() => toContextUsage(usage, selectedModelId), [usage, selectedModelId]);
 }
 
-/** Warm path: control flags + actions — no usage (keeps composer chrome cold on chunks). */
-export function useAgentSessionControls(store: BatchedEngine): AgentSessionControls {
-  // Field selectors — secrets hydration must not rebuild composer controls.
+/** Warm path: control flags + actions — packing lives in AttemptControl. */
+export function useAgentSessionControls(store: BatchedAttemptStore): AgentSessionControls {
   const selectedModelId = useSettingsSelector(selectSelectedModelId);
   const permissionMode = useSettingsSelector(selectPermissionMode);
-  const queryClient = useQueryClient();
-  // mutate is referentially stable; the full mutation result object is not.
   const { mutate: mutateSettings } = useUpdateSettings();
-  const persistToolApproval = usePersistToolApproval();
 
   const status = useSyncExternalStore(
     store.subscribe,
@@ -262,52 +186,36 @@ export function useAgentSessionControls(store: BatchedEngine): AgentSessionContr
 
   const start = useCallback(
     async (prompt: string) => {
-      const latest = await queryClient.ensureQueryData(settingsQueryOptions());
-      const { secrets: _placeholder, ...appSettings } = latest;
-      if (!isLiveWorkspaceReady(appSettings)) {
-        toast.error("Set a workspace root in Settings before running live.");
-        return;
-      }
-      // Demo never needs the vault — don't stall first send on Stronghold.
-      const secrets =
-        appSettings.agentMode === "live" ? await ensureSecretsReady() : { ...DEFAULT_SECRETS };
-      const projection = store.engine.getProjection();
-      await store.engine.start({
+      const result = await store.control.start({
         prompt,
-        modelId: appSettings.selectedModelId,
-        chatMessages: projection.chatMessages,
-        settings: appSettings,
-        secrets,
-        persistApproval: persistToolApproval,
+        mandateId: store.control.getFocusedMandateId() ?? undefined,
       });
+      if (!result.ok && result.reason === "workspace_not_ready") {
+        toast.error("Set a workspace root in Settings before running live.");
+      }
     },
-    [store, queryClient, persistToolApproval],
+    [store],
   );
 
-  const cancel = useCallback(() => store.engine.cancel(), [store]);
-  const retry = useCallback(() => store.engine.retry(), [store]);
+  const cancel = useCallback(() => store.control.cancel(), [store]);
+  const retry = useCallback(async () => {
+    const result = await store.control.retry();
+    if (!result.ok && result.reason === "workspace_not_ready") {
+      toast.error("Set a workspace root in Settings before running live.");
+    }
+  }, [store]);
   const retryFromMessage = useCallback(
     async (assistantMessageId: string) => {
-      const latest = await queryClient.ensureQueryData(settingsQueryOptions());
-      const { secrets: _placeholder, ...appSettings } = latest;
-      if (!isLiveWorkspaceReady(appSettings)) {
+      const result = await store.control.retryFromMessage(assistantMessageId);
+      if (!result.ok && result.reason === "workspace_not_ready") {
         toast.error("Set a workspace root in Settings before running live.");
-        return;
       }
-      const secrets =
-        appSettings.agentMode === "live" ? await ensureSecretsReady() : { ...DEFAULT_SECRETS };
-      await store.engine.retryFromMessage(assistantMessageId, {
-        modelId: appSettings.selectedModelId,
-        settings: appSettings,
-        secrets,
-        persistApproval: persistToolApproval,
-      });
     },
-    [store, queryClient, persistToolApproval],
+    [store],
   );
   const resolvePermission = useCallback(
     (callId: string, decision: PermissionDecision, persist?: boolean) =>
-      store.engine.resolvePermission(callId, decision, persist),
+      store.control.resolvePermission(callId, decision, persist),
     [store],
   );
 

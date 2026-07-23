@@ -8,7 +8,7 @@ import { createChatsPersistence } from "@/lib/chats/persistence";
 import { chatsKeys } from "@/lib/chats/queries";
 import { deriveChatTitle } from "@/lib/chats/title";
 import type { StoredChat } from "@/lib/chats/types";
-import type { RunStatus, SessionEngine, SessionProjection } from "@/lib/session";
+import type { BatchedAttemptStore, RunStatus, SessionProjection } from "@/lib/session";
 import { useSettingsSelector } from "@/lib/settings/queries";
 import { selectSelectedModelId } from "@/lib/settings/selectors";
 
@@ -18,10 +18,7 @@ type ChatMeta = {
   title: string;
   modelId: string;
   createdAt: number;
-};
-
-type SessionStore = {
-  engine: SessionEngine;
+  mandateId: string;
 };
 
 /** True for statuses that should checkpoint. Cancelled is excluded so cancel-then-retry
@@ -46,6 +43,7 @@ export function firstUserPrompt(messages: readonly UIMessage[]): string {
 
 export function buildCheckpointChat(input: {
   id: string;
+  mandateId: string;
   messages: readonly UIMessage[];
   meta: ChatMeta | null;
   projection: Pick<SessionProjection, "usage">;
@@ -54,8 +52,15 @@ export function buildCheckpointChat(input: {
 }): StoredChat {
   const now = input.now ?? Date.now();
   const { meta, messages, projection } = input;
+  if (input.mandateId.length === 0) {
+    throw new Error("buildCheckpointChat requires mandateId");
+  }
+  if (input.mandateId === input.id) {
+    throw new Error("mandateId must not equal chat id");
+  }
   return {
     id: input.id,
+    mandateId: input.mandateId,
     title: meta?.title ?? deriveChatTitle(firstUserPrompt(messages)),
     modelId: meta?.modelId ?? projection.usage.modelId ?? input.fallbackModelId,
     messages: [...messages],
@@ -72,10 +77,10 @@ export function checkpointErrorMessage(error: unknown): string {
 }
 
 /**
- * Route `chatId` → hydrate; settled task → checkpoint (create+navigate or update).
+ * Route `chatId` → bind (reattach or hydrate); settled Attempt → checkpoint.
+ * Never cancels a live Attempt on navigation.
  */
-export function useChatPersistence(store: SessionStore, chatId: string | undefined): void {
-  const { engine } = store;
+export function useChatPersistence(store: BatchedAttemptStore, chatId: string | undefined): void {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const selectedModelId = useSettingsSelector(selectSelectedModelId);
@@ -92,45 +97,58 @@ export function useChatPersistence(store: SessionStore, chatId: string | undefin
   const pendingAfterCreateRef = useRef<StoredChat | null>(null);
   const hydrateGenerationRef = useRef(0);
 
-  // Hydrate (or clear) when the route chat changes.
+  // Bind route → host (reattach when live; hydrate when idle).
   useEffect(() => {
     const generation = ++hydrateGenerationRef.current;
 
     async function syncFromRoute(): Promise<void> {
-      await engine.reset();
+      await store.bindChatRoute({
+        chatId,
+        loadChat: (id) => persistence.load(id),
+        ensureMandateForChat: async (chat) => {
+          const ensured = await store.backfillChatMandate(chat, (next) => persistence.save(next));
+          metaRef.current = {
+            title: ensured.title,
+            modelId: ensured.modelId,
+            createdAt: ensured.createdAt,
+            mandateId: ensured.mandateId,
+          };
+          return ensured;
+        },
+      });
+
       if (generation !== hydrateGenerationRef.current) {
         return;
       }
 
       if (!chatId) {
-        metaRef.current = null;
+        if (!store.control.getLiveIds()) {
+          metaRef.current = null;
+        }
         return;
       }
 
-      const chat = await persistence.load(chatId);
-      if (generation !== hydrateGenerationRef.current) {
-        return;
+      if (!metaRef.current) {
+        const chat = await persistence.load(chatId);
+        if (generation !== hydrateGenerationRef.current || !chat) {
+          return;
+        }
+        const ensured = await store.backfillChatMandate(chat, (next) => persistence.save(next));
+        metaRef.current = {
+          title: ensured.title,
+          modelId: ensured.modelId,
+          createdAt: ensured.createdAt,
+          mandateId: ensured.mandateId,
+        };
       }
-
-      if (!chat) {
-        metaRef.current = null;
-        return;
-      }
-
-      metaRef.current = {
-        title: chat.title,
-        modelId: chat.modelId,
-        createdAt: chat.createdAt,
-      };
-      engine.hydrate(chat.messages);
     }
 
     void syncFromRoute();
-  }, [chatId, engine]);
+  }, [chatId, store]);
 
   // Checkpoint on settle.
   useEffect(() => {
-    let prevStatus = engine.getProjection().status;
+    let prevStatus = store.engine.getProjection().status;
 
     async function persistChat(
       chat: StoredChat,
@@ -138,6 +156,8 @@ export function useChatPersistence(store: SessionStore, chatId: string | undefin
     ): Promise<void> {
       try {
         await persistence.save(chat);
+        store.control.setLiveChatId(chat.id);
+        store.control.setFocusedMandateId(chat.mandateId);
         void queryClient.invalidateQueries({ queryKey: chatsKeys.list() });
         if (options.navigateToChat) {
           navigate(`/chat/${chat.id}`, { replace: true });
@@ -150,8 +170,8 @@ export function useChatPersistence(store: SessionStore, chatId: string | undefin
       }
     }
 
-    return engine.subscribe(() => {
-      const projection = engine.getProjection();
+    return store.engine.subscribe(() => {
+      const projection = store.engine.getProjection();
       const status = projection.status;
       const previous = prevStatus;
       prevStatus = status;
@@ -164,10 +184,21 @@ export function useChatPersistence(store: SessionStore, chatId: string | undefin
         const messages = projection.chatMessages;
         const existingId = chatIdRef.current;
         const fallbackModelId = modelIdRef.current;
+        const mandateId =
+          store.control.getFocusedMandateId() ??
+          store.control.getLiveIds()?.mandateId ??
+          metaRef.current?.mandateId;
+        if (!mandateId) {
+          toast.error("Could not save chat", {
+            description: "Missing mandate id for checkpoint.",
+          });
+          return;
+        }
 
         if (existingId) {
           const chat = buildCheckpointChat({
             id: existingId,
+            mandateId,
             messages,
             meta: metaRef.current,
             projection,
@@ -181,7 +212,6 @@ export function useChatPersistence(store: SessionStore, chatId: string | undefin
           return;
         }
 
-        // First settle for a new chat — create, or queue behind an in-flight create.
         if (createInFlightRef.current) {
           const createId = createIdRef.current;
           if (createId === null) {
@@ -189,6 +219,7 @@ export function useChatPersistence(store: SessionStore, chatId: string | undefin
           }
           pendingAfterCreateRef.current = buildCheckpointChat({
             id: createId,
+            mandateId,
             messages,
             meta: metaRef.current,
             projection,
@@ -202,6 +233,7 @@ export function useChatPersistence(store: SessionStore, chatId: string | undefin
         createIdRef.current = id;
         const chat = buildCheckpointChat({
           id,
+          mandateId,
           messages,
           meta: null,
           projection,
@@ -211,6 +243,7 @@ export function useChatPersistence(store: SessionStore, chatId: string | undefin
           title: chat.title,
           modelId: chat.modelId,
           createdAt: chat.createdAt,
+          mandateId: chat.mandateId,
         };
 
         try {
@@ -223,6 +256,7 @@ export function useChatPersistence(store: SessionStore, chatId: string | undefin
               {
                 ...pending,
                 id: chat.id,
+                mandateId: chat.mandateId,
                 createdAt: chat.createdAt,
                 updatedAt: Date.now(),
               },
@@ -238,5 +272,5 @@ export function useChatPersistence(store: SessionStore, chatId: string | undefin
         }
       })();
     });
-  }, [engine, navigate, queryClient]);
+  }, [store, navigate, queryClient]);
 }

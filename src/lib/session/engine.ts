@@ -59,6 +59,7 @@ function isActiveStatus(status: RunStatus): boolean {
 
 export type SessionEngineDeps = {
   produceRun: ProduceRun;
+  onAttemptStarted?: (attemptId: string) => void;
 };
 
 export function createSessionEngine(deps: SessionEngineDeps): SessionEngine {
@@ -112,6 +113,7 @@ export function createSessionEngine(deps: SessionEngineDeps): SessionEngine {
     },
     getProjection: () => projection,
     produceRun: deps.produceRun,
+    onAttemptStarted: deps.onAttemptStarted,
   });
 
   return {

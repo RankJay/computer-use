@@ -56,8 +56,35 @@ export {
 export {
   setActiveSessionEngine,
   getActiveSessionEngine,
+  getAttemptHost,
+  registerAttemptHost,
   resetActiveSessionEngine,
 } from "./active-engine";
+
+export {
+  createAttemptHost,
+  type AttemptHostDeps,
+  type AttemptHostListener,
+  type BatchedAttemptStore,
+} from "./attempt-host";
+
+export {
+  createAttemptControl,
+  type AttemptControl,
+  type AttemptControlDeps,
+  type AttemptIds,
+  type AttemptStartError,
+  type AttemptStartInput,
+  type AttemptStartOk,
+  type AttemptStartResult,
+  type LoadedRunContext,
+} from "./control/attempt-control";
+
+export {
+  createAttemptRegistry,
+  type AttemptRegistry,
+  type LiveAttempt,
+} from "./control/attempt-registry";
 
 export {
   createBudgetTracker,

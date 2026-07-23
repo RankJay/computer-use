@@ -50,6 +50,8 @@ export type RunControllerDeps = {
   clearTask: () => void;
   getProjection: () => SessionProjection;
   produceRun: ProduceRun;
+  /** Fires once the Attempt is in-flight (after beginTask), before produceRun settles. */
+  onAttemptStarted?: (attemptId: string) => void;
 };
 
 export function createRunController(deps: RunControllerDeps): RunController {
@@ -84,6 +86,7 @@ export function createRunController(deps: RunControllerDeps): RunController {
     lastConfig = config;
     activeAbort = new AbortController();
     deps.beginTask(taskId);
+    deps.onAttemptStarted?.(taskId);
 
     try {
       await deps.produceRun({

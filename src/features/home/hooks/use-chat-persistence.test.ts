@@ -53,14 +53,16 @@ describe("buildCheckpointChat", () => {
   test("uses meta when present", () => {
     const chat = buildCheckpointChat({
       id: "c1",
+      mandateId: "m1",
       messages: [{ id: "u", role: "user", parts: [{ type: "text", text: "hi" }] }],
-      meta: { title: "Saved", modelId: "model-a", createdAt: 10 },
+      meta: { title: "Saved", modelId: "model-a", createdAt: 10, mandateId: "m1" },
       projection: { usage: { modelId: "model-b", usage: null, usedTokens: 0, maxTokens: 1 } },
       fallbackModelId: "fallback",
       now: 99,
     });
     expect(chat).toEqual({
       id: "c1",
+      mandateId: "m1",
       title: "Saved",
       modelId: "model-a",
       messages: [{ id: "u", role: "user", parts: [{ type: "text", text: "hi" }] }],
@@ -72,6 +74,7 @@ describe("buildCheckpointChat", () => {
   test("derives title and model when meta missing", () => {
     const chat = buildCheckpointChat({
       id: "c2",
+      mandateId: "m2",
       messages: [{ id: "u", role: "user", parts: [{ type: "text", text: "Ship it" }] }],
       meta: null,
       projection: { usage: { modelId: "model-b", usage: null, usedTokens: 0, maxTokens: 1 } },
@@ -79,10 +82,24 @@ describe("buildCheckpointChat", () => {
       now: 50,
     });
     expect(chat.id).toBe("c2");
+    expect(chat.mandateId).toBe("m2");
     expect(chat.title.length).toBeGreaterThan(0);
     expect(chat.modelId).toBe("model-b");
     expect(chat.createdAt).toBe(50);
     expect(chat.updatedAt).toBe(50);
+  });
+
+  test("rejects aliased mandateId", () => {
+    expect(() =>
+      buildCheckpointChat({
+        id: "same",
+        mandateId: "same",
+        messages: [],
+        meta: null,
+        projection: { usage: { modelId: null, usage: null, usedTokens: 0, maxTokens: 1 } },
+        fallbackModelId: "fallback",
+      }),
+    ).toThrow("mandateId must not equal chat id");
   });
 });
 

@@ -10,6 +10,8 @@ export type StoredChat = {
   id: string;
   title: string;
   modelId: string;
+  /** Linked Mandate — never equal to chat id. Required for new chats; legacy rows backfill on load. */
+  mandateId: string;
   messages: UIMessage[];
   createdAt: number;
   updatedAt: number;
