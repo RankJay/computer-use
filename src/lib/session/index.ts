@@ -45,6 +45,7 @@ export {
   type SessionEngine,
   type SessionEngineDeps,
   type RetryFromMessageConfig,
+  type LedgerHydrateInput,
 } from "./engine";
 
 export {

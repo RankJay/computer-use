@@ -1,5 +1,8 @@
 import type { UIMessage } from "ai";
 
+import type { AttemptFoldSnapshot } from "@/lib/attempts";
+import { foldStateFromSnapshot } from "@/lib/attempts";
+
 import { planRegenerateFromAssistant } from "./control/regenerate-from-message";
 import {
   createRunController,
@@ -27,6 +30,11 @@ export type SessionEngineListener = () => void;
 
 export type RetryFromMessageConfig = Omit<RunConfig, "prompt" | "chatMessages" | "isRetry">;
 
+export type LedgerHydrateInput = {
+  snapshot: AttemptFoldSnapshot | null;
+  events: readonly RuntimeEvent[];
+};
+
 export type SessionEngine = {
   append: (payload: RuntimeEventPayload) => RuntimeEvent | null;
   getProjection: () => SessionProjection;
@@ -34,8 +42,10 @@ export type SessionEngine = {
   subscribe: (listener: SessionEngineListener) => () => void;
   /** Cancel any in-flight run, then clear projection and event log. */
   reset: () => Promise<void>;
-  /** Replace fold/projection from stored messages. Does not touch eventLog. */
+  /** Replace fold/projection from stored messages; clears in-memory eventLog. */
   hydrate: (messages: readonly UIMessage[]) => void;
+  /** Open from durable ledger: settle snapshot + event tail (ADR 0007). */
+  hydrateFromLedger: (input: LedgerHydrateInput) => void;
   start: (config: RunConfig) => Promise<void>;
   cancel: () => Promise<void>;
   resolvePermission: (
@@ -138,6 +148,21 @@ export function createSessionEngine(deps: SessionEngineDeps): SessionEngine {
     hydrate(messages) {
       fold = foldStateFromMessages(messages);
       projection = toProjection(fold, null);
+      eventLog = [];
+      eventSeq = 0;
+      activeTaskId = null;
+      notify();
+    },
+    hydrateFromLedger(input) {
+      let next = input.snapshot ? foldStateFromSnapshot(input.snapshot) : createFoldState();
+      for (const event of input.events) {
+        next = reduceSession(next, event);
+      }
+      fold = next;
+      projection = toProjection(fold, null);
+      eventLog = [...input.events];
+      eventSeq = input.events.length;
+      activeTaskId = null;
       notify();
     },
     beginTask(taskId) {

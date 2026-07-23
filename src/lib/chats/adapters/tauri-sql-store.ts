@@ -1,10 +1,8 @@
-import Database from "@tauri-apps/plugin-sql";
 import type { UIMessage } from "ai";
 
 import type { ChatsPersistence } from "@/lib/chats/persistence";
 import type { ChatSummary, StoredChat } from "@/lib/chats/types";
-
-const CHATS_DB = "sqlite:chats.db";
+import { openLocalDb } from "@/lib/local-db";
 
 type ChatSummaryRow = {
   id: string;
@@ -66,11 +64,8 @@ function rowToStoredChat(row: ChatRow): StoredChat {
 }
 
 export class TauriSqlChatsPersistence implements ChatsPersistence {
-  private dbPromise: Promise<Database> | null = null;
-
-  private db(): Promise<Database> {
-    this.dbPromise ??= Database.load(CHATS_DB);
-    return this.dbPromise;
+  private db() {
+    return openLocalDb();
   }
 
   async list(): Promise<ChatSummary[]> {

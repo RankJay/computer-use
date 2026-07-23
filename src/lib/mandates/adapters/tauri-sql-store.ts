@@ -1,10 +1,6 @@
-import Database from "@tauri-apps/plugin-sql";
-
+import { openLocalDb } from "@/lib/local-db";
 import type { CreateMandateInput, MandatesPersistence } from "@/lib/mandates/persistence";
 import type { Mandate, MandateKind } from "@/lib/mandates/types";
-
-/** Same SQLite file as chats — one local-first DB for Client metadata + Mandates. */
-const CHATS_DB = "sqlite:chats.db";
 
 type MandateRow = {
   id: string;
@@ -21,11 +17,8 @@ function rowToMandate(row: MandateRow): Mandate {
 }
 
 export class TauriSqlMandatesPersistence implements MandatesPersistence {
-  private dbPromise: Promise<Database> | null = null;
-
-  private db(): Promise<Database> {
-    this.dbPromise ??= Database.load(CHATS_DB);
-    return this.dbPromise;
+  private db() {
+    return openLocalDb();
   }
 
   async create(input: CreateMandateInput = {}): Promise<Mandate> {

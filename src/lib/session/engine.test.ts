@@ -161,7 +161,7 @@ describe("SessionEngine", () => {
     expect(count).toBe(2);
   });
 
-  test("hydrate seeds projection from messages without touching eventLog", () => {
+  test("hydrate seeds projection from messages and clears in-memory eventLog", () => {
     const engine = createSessionEngine({ produceRun: async () => {} });
     engine.beginTask("task-pre");
     engine.append({
@@ -170,8 +170,7 @@ describe("SessionEngine", () => {
       modelId: "openai/gpt-5.4",
       agentMode: "demo",
     });
-    const priorLog = engine.getEventLog();
-    expect(priorLog).toHaveLength(1);
+    expect(engine.getEventLog()).toHaveLength(1);
 
     let notified = 0;
     engine.subscribe(() => {
@@ -188,7 +187,7 @@ describe("SessionEngine", () => {
     engine.hydrate(messages);
 
     expect(notified).toBe(1);
-    expect(engine.getEventLog()).toEqual(priorLog);
+    expect(engine.getEventLog()).toEqual([]);
     expect(engine.getProjection().status).toBe("idle");
     expect(engine.getProjection().chatMessages).toEqual(messages);
     expect(engine.getProjection().rows).toEqual([
