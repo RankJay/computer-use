@@ -7,6 +7,7 @@ import { getCapabilityDefinition } from "./catalog";
 import { createDefaultNativeInvoker, mapInvokeError } from "./native-invoke";
 import { osLeaseScopeOf } from "./os-lease-scope";
 import { defaultPermissionPolicy } from "./permission-policy";
+import { lookupSettledCapability } from "./resume-from-cursor";
 import type {
   CapabilityError,
   CapabilityRunnerDeps,
@@ -93,6 +94,12 @@ export async function runCapability(
   const append = (payload: RuntimeEventPayload) => {
     deps.append(payload);
   };
+
+  // Resume-from-cursor: settled callId → prior outcome, no re-click.
+  const prior = deps.getEventLog ? lookupSettledCapability(deps.getEventLog(), callId) : null;
+  if (prior) {
+    return prior;
+  }
 
   append({
     type: "capability.requested",

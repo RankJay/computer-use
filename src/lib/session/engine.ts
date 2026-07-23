@@ -27,7 +27,7 @@ import {
   toProjection,
   type FoldState,
 } from "./project-session";
-import { createEmptySessionProjection, type SessionProjection } from "./projection";
+import { createEmptyMandateProjection, type MandateProjection } from "./projection";
 
 export type SessionEngineListener = () => void;
 
@@ -40,7 +40,7 @@ export type LedgerHydrateInput = {
 
 export type SessionEngine = {
   append: (payload: RuntimeEventPayload) => RuntimeEvent | null;
-  getProjection: () => SessionProjection;
+  getProjection: () => MandateProjection;
   getEventLog: () => readonly RuntimeEvent[];
   subscribe: (listener: SessionEngineListener) => () => void;
   /** Cancel any in-flight run, then clear projection and event log. */
@@ -85,7 +85,7 @@ export type SessionEngineDeps = {
 
 export function createSessionEngine(deps: SessionEngineDeps): SessionEngine {
   let fold: FoldState = createFoldState();
-  let projection: SessionProjection = createEmptySessionProjection();
+  let projection: MandateProjection = createEmptyMandateProjection();
   let eventLog: RuntimeEvent[] = [];
   let eventSeq = 0;
   let activeTaskId: string | null = null;
@@ -154,7 +154,7 @@ export function createSessionEngine(deps: SessionEngineDeps): SessionEngine {
     async reset() {
       await controller.cancel();
       fold = createFoldState();
-      projection = createEmptySessionProjection();
+      projection = createEmptyMandateProjection();
       eventLog = [];
       eventSeq = 0;
       activeTaskId = null;

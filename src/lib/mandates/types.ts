@@ -24,6 +24,15 @@ export type StandingPolicyDocument = {
   readonly denyCapabilities?: readonly string[];
 };
 
+/**
+ * When an Attempt settle may close the Mandate.
+ * - attempt_completed: completed Attempt → Mandate `done` (default)
+ * - manual: completed Attempt → Mandate stays `armed` (operator closes later)
+ */
+export type MandateSuccessCriteria =
+  | { readonly version: 1; readonly kind: "attempt_completed" }
+  | { readonly version: 1; readonly kind: "manual" };
+
 /** Durable intent the runtime may pursue. */
 export type Mandate = {
   id: string;
@@ -33,4 +42,5 @@ export type Mandate = {
   /** Reserved for sub-agent trees (ops-contract §6). */
   parentMandateId: string | null;
   standingPolicy: StandingPolicyDocument | null;
+  successCriteria: MandateSuccessCriteria;
 };

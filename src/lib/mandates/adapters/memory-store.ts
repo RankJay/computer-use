@@ -3,6 +3,7 @@ import type {
   MandatesPersistence,
   UpdateMandateInput,
 } from "@/lib/mandates/persistence";
+import { DEFAULT_SUCCESS_CRITERIA } from "@/lib/mandates/success-criteria";
 import type { Mandate } from "@/lib/mandates/types";
 
 /** In-memory adapter for tests. */
@@ -17,6 +18,7 @@ export class MemoryMandatesPersistence implements MandatesPersistence {
       status: input.status ?? "armed",
       parentMandateId: input.parentMandateId ?? null,
       standingPolicy: input.standingPolicy ?? null,
+      successCriteria: input.successCriteria ?? DEFAULT_SUCCESS_CRITERIA,
     };
     this.mandates.set(mandate.id, mandate);
     return mandate;
@@ -38,6 +40,8 @@ export class MemoryMandatesPersistence implements MandatesPersistence {
         patch.standingPolicy !== undefined ? patch.standingPolicy : existing.standingPolicy,
       parentMandateId:
         patch.parentMandateId !== undefined ? patch.parentMandateId : existing.parentMandateId,
+      successCriteria:
+        patch.successCriteria !== undefined ? patch.successCriteria : existing.successCriteria,
     };
     this.mandates.set(id, next);
     return next;

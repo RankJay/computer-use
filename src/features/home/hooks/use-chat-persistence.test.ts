@@ -101,6 +101,22 @@ describe("buildCheckpointChat", () => {
       }),
     ).toThrow("mandateId must not equal chat id");
   });
+
+  test("ledgerOwnsTranscript persists empty messages but keeps title", () => {
+    const chat = buildCheckpointChat({
+      id: "c3",
+      mandateId: "m3",
+      messages: [{ id: "u", role: "user", parts: [{ type: "text", text: "Ship it" }] }],
+      meta: null,
+      projection: { usage: { modelId: "model-b", usage: null, usedTokens: 0, maxTokens: 1 } },
+      fallbackModelId: "fallback",
+      ledgerOwnsTranscript: true,
+      now: 50,
+    });
+    expect(chat.messages).toEqual([]);
+    expect(chat.title.length).toBeGreaterThan(0);
+    expect(chat.mandateId).toBe("m3");
+  });
 });
 
 describe("checkpointErrorMessage", () => {

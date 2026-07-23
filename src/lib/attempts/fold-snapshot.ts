@@ -1,9 +1,9 @@
 import { createFoldState, type FoldState } from "@/lib/session/project-session";
-import type { SessionProjection } from "@/lib/session/projection";
+import type { MandateProjection } from "@/lib/session/projection";
 
 import { ATTEMPT_FOLD_SNAPSHOT_VERSION, type AttemptFoldSnapshot } from "./types";
 
-export function projectionToFoldSnapshot(projection: SessionProjection): AttemptFoldSnapshot {
+export function projectionToFoldSnapshot(projection: MandateProjection): AttemptFoldSnapshot {
   return {
     version: ATTEMPT_FOLD_SNAPSHOT_VERSION,
     taskId: projection.taskId,

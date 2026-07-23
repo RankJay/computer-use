@@ -4,9 +4,9 @@ import type { EntitlementPolicy } from "@/lib/entitlements";
 import type { StandingPolicyDocument } from "@/lib/mandates/types";
 import type { AppSecrets, AppSettings } from "@/lib/settings/types";
 
-import type { RuntimeEventPayload } from "../events";
+import type { RuntimeEvent, RuntimeEventPayload } from "../events";
 import { foldExecutionContext } from "../execution-context";
-import type { SessionProjection } from "../projection";
+import type { MandateProjection } from "../projection";
 import {
   createEscalationPort,
   type EscalationPort,
@@ -15,11 +15,6 @@ import {
 import type { OsLease } from "./os-lease";
 
 export type PermissionDecision = "approved" | "denied";
-
-/** @deprecated Prefer EscalationPort — kept for older test helpers. */
-export type PermissionWaiter = {
-  waitForDecision: () => Promise<PermissionDecision>;
-};
 
 export type RunConfig = {
   prompt: string;
@@ -48,6 +43,8 @@ export type ProduceRunContext = {
   osLease?: OsLease;
   /** Mandate standing policy (from AttemptControl packing). */
   standingPolicy?: StandingPolicyDocument | null;
+  /** Attempt event log for Capability resume-from-cursor. */
+  getEventLog?: () => readonly RuntimeEvent[];
 };
 
 export type ProduceRun = (ctx: ProduceRunContext) => Promise<void>;
@@ -67,7 +64,7 @@ export type RunControllerDeps = {
   append: (payload: RuntimeEventPayload) => unknown;
   beginTask: (taskId: string) => void;
   clearTask: () => void;
-  getProjection: () => SessionProjection;
+  getProjection: () => MandateProjection;
   produceRun: ProduceRun;
   /** Fires once the Attempt is in-flight (after beginTask), before produceRun settles. */
   onAttemptStarted?: (attemptId: string) => void;

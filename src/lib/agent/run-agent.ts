@@ -39,6 +39,7 @@ export async function runAgentLoop(deps: RunAgentDeps): Promise<RunAgentResult> 
       entitlements: deps.entitlements,
       osLease: deps.osLease,
       standingPolicy: deps.standingPolicy,
+      getEventLog: deps.getEventLog,
       budgetStartedAt: deps.budgetStartedAt,
     });
   } catch (error) {

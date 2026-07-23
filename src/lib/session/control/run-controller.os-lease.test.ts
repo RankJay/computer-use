@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import { DEFAULT_SECRETS, DEFAULT_SETTINGS } from "@/lib/settings/defaults";
 
-import { createEmptySessionProjection } from "../projection";
+import { createEmptyMandateProjection } from "../projection";
 import { createOsLease } from "./os-lease";
 import { createRunController, type ProduceRun } from "./run-controller";
 
@@ -30,7 +30,7 @@ describe("RunController OS lease release", () => {
       append: () => {},
       beginTask: () => {},
       clearTask: () => {},
-      getProjection: () => createEmptySessionProjection(),
+      getProjection: () => createEmptyMandateProjection(),
       produceRun: producer,
       osLease: lease,
     });
@@ -63,7 +63,7 @@ describe("RunController OS lease release", () => {
       append: () => {},
       beginTask: () => {},
       clearTask: () => {},
-      getProjection: () => createEmptySessionProjection(),
+      getProjection: () => createEmptyMandateProjection(),
       produceRun: producer,
       osLease: lease,
     });

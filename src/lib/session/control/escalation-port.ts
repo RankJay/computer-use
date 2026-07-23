@@ -82,7 +82,7 @@ export function createEscalationPort(deps: CreateEscalationPortDeps = {}): Escal
       return new Promise<EscalationOutcome>((resolve) => {
         resolvers.set(request.callId, resolve);
 
-        if (timeoutMs != null && timeoutMs > 0) {
+        if (timeoutMs !== null && timeoutMs !== undefined && timeoutMs > 0) {
           const timer = setTimeout(() => {
             timers.delete(request.callId);
             settle(request.callId, "deny");

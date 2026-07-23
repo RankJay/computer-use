@@ -2,7 +2,7 @@ import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { clearLogs, openLogsFolder, resetSession } from "@/lib/maintenance/commands";
-import { resetActiveSessionEngine } from "@/lib/session";
+import { resetAttemptHost } from "@/lib/session";
 
 function maintenanceMutationError(action: string) {
   return () => {
@@ -30,7 +30,7 @@ export function useClearLogs() {
 export function useResetSession() {
   return useMutation({
     mutationFn: async () => {
-      await resetActiveSessionEngine();
+      await resetAttemptHost();
       await resetSession();
     },
     onSuccess: () => {

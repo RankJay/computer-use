@@ -3,7 +3,7 @@ import { describe, expect, test } from "bun:test";
 import { needsPermission } from "@/lib/agent/capabilities/permission";
 import { DEFAULT_SECRETS, DEFAULT_SETTINGS } from "@/lib/settings/defaults";
 
-import { createEmptySessionProjection, type SessionProjection } from "../projection";
+import { createEmptyMandateProjection, type MandateProjection } from "../projection";
 import { createRunController, type ProduceRun } from "./run-controller";
 
 describe("createRunController persistApproval", () => {
@@ -14,8 +14,8 @@ describe("createRunController persistApproval", () => {
       persistedApprovals: [] as string[],
     };
     const persisted: string[] = [];
-    const projection: SessionProjection = {
-      ...createEmptySessionProjection(),
+    const projection: MandateProjection = {
+      ...createEmptyMandateProjection(),
       pendingPermissions: [
         {
           callId: "c1",

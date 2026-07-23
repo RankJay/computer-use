@@ -69,16 +69,16 @@ export class TauriSqlAttemptEventStore implements AttemptEventStore {
 
     const db = await this.db();
     const last = await this.getLastSeq(input.attemptId);
-    let seq = last;
-    for (const event of compact) {
-      seq += 1;
-      await db.execute(
+    const inserts = compact.map((event, index) => {
+      const seq = last + index + 1;
+      return db.execute(
         `INSERT INTO attempt_events (attempt_id, mandate_id, seq, event_json)
          VALUES ($1, $2, $3, $4)`,
         [input.attemptId, input.mandateId, seq, JSON.stringify(event)],
       );
-    }
-    return seq;
+    });
+    await Promise.all(inserts);
+    return last + compact.length;
   }
 
   async settleAttempt(input: SettleAttemptInput): Promise<void> {
@@ -147,15 +147,20 @@ export class TauriSqlAttemptEventStore implements AttemptEventStore {
       }
       const afterSeq = base.snapshot_last_seq ?? 0;
       events.push(...(await this.loadEvents(base.id, afterSeq)));
-      for (let i = baseIndex + 1; i < attemptRows.length; i += 1) {
-        const next = attemptRows[i];
-        if (next) {
-          events.push(...(await this.loadEvents(next.id, 0)));
-        }
+      const tailChunks = await Promise.all(
+        attemptRows
+          .slice(baseIndex + 1)
+          .map((next) =>
+            next ? this.loadEvents(next.id, 0) : Promise.resolve([] as RuntimeEvent[]),
+          ),
+      );
+      for (const chunk of tailChunks) {
+        events.push(...chunk);
       }
     } else {
-      for (const row of attemptRows) {
-        events.push(...(await this.loadEvents(row.id, 0)));
+      const rowChunks = await Promise.all(attemptRows.map((row) => this.loadEvents(row.id, 0)));
+      for (const chunk of rowChunks) {
+        events.push(...chunk);
       }
     }
 

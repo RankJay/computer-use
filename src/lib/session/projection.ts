@@ -34,10 +34,7 @@ export type SessionBudget = {
   maxWallClockMs: number;
 };
 
-/**
- * Mandate-scoped audit/UI read model (fold of Attempt events + live tail).
- * Prefer `MandateProjection` in new code; `SessionProjection` remains as the legacy alias.
- */
+/** Mandate-scoped audit/UI read model (fold of Attempt events + live tail). */
 export type MandateProjection = {
   taskId: string | null;
   status: RunStatus;
@@ -49,9 +46,6 @@ export type MandateProjection = {
   budget: SessionBudget;
   streamingMessageId: string | null;
 };
-
-/** Legacy name — same shape as MandateProjection (rename-as-we-touch). */
-export type SessionProjection = MandateProjection;
 
 export const EMPTY_SESSION_BUDGET: SessionBudget = {
   stepsUsed: 0,
@@ -85,6 +79,3 @@ export function createEmptyMandateProjection(): MandateProjection {
     streamingMessageId: null,
   };
 }
-
-/** Legacy name — prefer createEmptyMandateProjection in new code. */
-export const createEmptySessionProjection = createEmptyMandateProjection;

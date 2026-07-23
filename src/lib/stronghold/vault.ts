@@ -70,9 +70,7 @@ export async function writeVaultStrings(
   }
   const { stronghold, client } = await getStrongholdSession();
   const store = client.getStore();
-  for (const [key, value] of entries) {
-    await store.insert(key, encodeStrongholdValue(value));
-  }
+  await Promise.all(entries.map(([key, value]) => store.insert(key, encodeStrongholdValue(value))));
   await stronghold.save();
 }
 

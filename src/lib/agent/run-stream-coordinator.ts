@@ -27,7 +27,7 @@ import { notifyIfUnfocused } from "@/lib/native/notification";
 import { createBudgetGuard, createBudgetTracker } from "@/lib/session/control/budget";
 import type { EscalationPort } from "@/lib/session/control/escalation-port";
 import type { OsLease } from "@/lib/session/control/os-lease";
-import type { RuntimeEventPayload } from "@/lib/session/events";
+import type { RuntimeEvent, RuntimeEventPayload } from "@/lib/session/events";
 import type { AppSettings } from "@/lib/settings/types";
 
 /** Reads toolCallId without AI SDK guards (empty TOOLS generics collapse ToolUIPart to never). */
@@ -51,6 +51,7 @@ export type RunStreamCoordinatorDeps = {
   entitlements?: EntitlementPolicy;
   osLease?: OsLease;
   standingPolicy?: StandingPolicyDocument | null;
+  getEventLog?: () => readonly RuntimeEvent[];
   budgetStartedAt?: number;
 };
 
@@ -104,6 +105,7 @@ export async function runStreamCoordinator(
     entitlements: deps.entitlements,
     osLease: deps.osLease,
     standingPolicy: deps.standingPolicy,
+    getEventLog: deps.getEventLog,
   };
 
   const tools = buildAgentTools(runnerDeps);

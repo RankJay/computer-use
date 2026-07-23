@@ -1,11 +1,11 @@
 import { describe, expect, test } from "bun:test";
 
 import type { RunStatus } from "../events";
-import { createEmptySessionProjection, type SessionProjection } from "../projection";
+import { createEmptyMandateProjection, type MandateProjection } from "../projection";
 import { deriveSessionControls } from "./derive-session-controls";
 
-function projection(partial: Partial<SessionProjection>): SessionProjection {
-  return { ...createEmptySessionProjection(), ...partial };
+function projection(partial: Partial<MandateProjection>): MandateProjection {
+  return { ...createEmptyMandateProjection(), ...partial };
 }
 
 const ACTIVE: RunStatus[] = ["running", "streaming", "waiting_permission"];

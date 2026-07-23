@@ -1,5 +1,5 @@
 import type { RunStatus } from "../events";
-import type { SessionProjection } from "../projection";
+import type { MandateProjection } from "../projection";
 
 export type SessionControls = {
   canSubmit: boolean;
@@ -14,8 +14,8 @@ function isActiveStatus(status: RunStatus): boolean {
   return status === "running" || status === "streaming" || status === "waiting_permission";
 }
 
-/** Derive presentation/control flags from projection — never store these on SessionProjection. */
-export function deriveSessionControls(projection: SessionProjection): SessionControls {
+/** Derive presentation/control flags from projection — never store these on MandateProjection. */
+export function deriveSessionControls(projection: MandateProjection): SessionControls {
   const active = isActiveStatus(projection.status);
   const hasPendingPermissions = projection.pendingPermissions.length > 0;
 

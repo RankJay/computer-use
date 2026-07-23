@@ -3,7 +3,7 @@
 import { SuspenseQueryBoundary } from "@/components/boundaries/ErrorBoundary";
 import { Container, Item } from "@/components/motion/stagger";
 import { signalAppReady } from "@/lib/app-ready";
-import type { PermissionDecision } from "@/lib/session";
+import type { BatchedAttemptStore, PermissionDecision } from "@/lib/session";
 import { settingsKeys } from "@/lib/settings/queries";
 
 import { AgentTranscript } from "./chat/AgentTranscript";
@@ -16,7 +16,6 @@ import {
   useAgentSessionControls,
   useAgentSessionStore,
   useAgentTranscript,
-  type BatchedEngine,
 } from "./hooks/use-agent-session";
 import { useChatPersistence } from "./hooks/use-chat-persistence";
 import { SessionStatusBar } from "./SessionStatusBar";
@@ -24,7 +23,7 @@ import { SessionStatusBar } from "./SessionStatusBar";
 const ContextUsageIsland = memo(function ContextUsageIsland({
   store,
 }: {
-  readonly store: BatchedEngine;
+  readonly store: BatchedAttemptStore;
 }): ReactElement {
   const contextUsage = useAgentContextUsage(store);
   return (
@@ -40,7 +39,7 @@ const ContextUsageIsland = memo(function ContextUsageIsland({
 const TranscriptIsland = memo(function TranscriptIsland({
   store,
 }: {
-  readonly store: BatchedEngine;
+  readonly store: BatchedAttemptStore;
 }): ReactElement {
   const { rows, streamingMessageId, pendingPermissions } = useAgentTranscript(store);
   const controls = useAgentSessionControls(store);
@@ -49,14 +48,14 @@ const TranscriptIsland = memo(function TranscriptIsland({
     (callId: string, decision: PermissionDecision, persist?: boolean) => {
       void controls.resolvePermission(callId, decision, persist);
     },
-    [controls.resolvePermission],
+    [controls],
   );
 
   const onRetryMessage = useCallback(
     (messageId: string) => {
       void controls.retryFromMessage(messageId);
     },
-    [controls.retryFromMessage],
+    [controls],
   );
 
   const empty = rows.length === 0;
@@ -85,7 +84,7 @@ const TranscriptIsland = memo(function TranscriptIsland({
 const ComposerIsland = memo(function ComposerIsland({
   store,
 }: {
-  readonly store: BatchedEngine;
+  readonly store: BatchedAttemptStore;
 }): ReactElement {
   const controls = useAgentSessionControls(store);
   const contextSlot = useMemo(() => <ContextUsageIsland store={store} />, [store]);
@@ -116,7 +115,7 @@ function HomePageBody({
   store,
   chatId,
 }: {
-  readonly store: BatchedEngine;
+  readonly store: BatchedAttemptStore;
   readonly chatId: string | undefined;
 }): ReactElement {
   useChatPersistence(store, chatId);

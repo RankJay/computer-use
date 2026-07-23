@@ -5,6 +5,7 @@ import type {
   Mandate,
   MandateKind,
   MandateLifecycleStatus,
+  MandateSuccessCriteria,
   StandingPolicyDocument,
 } from "@/lib/mandates/types";
 
@@ -15,12 +16,14 @@ export type CreateMandateInput = {
   status?: MandateLifecycleStatus;
   parentMandateId?: string | null;
   standingPolicy?: StandingPolicyDocument | null;
+  successCriteria?: MandateSuccessCriteria;
 };
 
 export type UpdateMandateInput = {
   status?: MandateLifecycleStatus;
   standingPolicy?: StandingPolicyDocument | null;
   parentMandateId?: string | null;
+  successCriteria?: MandateSuccessCriteria;
 };
 
 export type MandatesPersistence = {

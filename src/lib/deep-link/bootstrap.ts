@@ -10,13 +10,15 @@ let unlisten: (() => void) | null = null;
 
 async function handleUrls(urls: readonly string[], source: DeepLinkSource): Promise<void> {
   const links = parseActuateDeepLinks(urls);
-  for (const link of links) {
-    try {
-      await dispatchDeepLink(link, source);
-    } catch {
-      // Handlers should catch their own errors; this is a last-resort guard.
-    }
-  }
+  await Promise.all(
+    links.map(async (link) => {
+      try {
+        await dispatchDeepLink(link, source);
+      } catch {
+        // Handlers should catch their own errors; this is a last-resort guard.
+      }
+    }),
+  );
 }
 
 /**

@@ -5,7 +5,7 @@ import type { EntitlementPolicy } from "@/lib/entitlements";
 import type { StandingPolicyDocument } from "@/lib/mandates/types";
 import type { EscalationPort } from "@/lib/session/control/escalation-port";
 import type { OsLease } from "@/lib/session/control/os-lease";
-import type { RuntimeEventPayload } from "@/lib/session/events";
+import type { RuntimeEvent, RuntimeEventPayload } from "@/lib/session/events";
 import type { AppSecrets, AppSettings } from "@/lib/settings/types";
 
 export type RunAgentDeps = {
@@ -21,6 +21,8 @@ export type RunAgentDeps = {
   entitlements?: EntitlementPolicy;
   osLease?: OsLease;
   standingPolicy?: StandingPolicyDocument | null;
+  /** Attempt event log for Capability resume-from-cursor. */
+  getEventLog?: () => readonly RuntimeEvent[];
   /** Test hook — bypasses provider resolution when set. */
   modelOverride?: LanguageModel | LanguageModelV4;
   /** Test hook — simulates an already-elapsed run for budget enforcement. */

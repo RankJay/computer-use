@@ -16,6 +16,7 @@ function mandate(status: Mandate["status"]): Mandate {
     status,
     parentMandateId: null,
     standingPolicy: null,
+    successCriteria: { version: 1, kind: "attempt_completed" },
   };
 }
 

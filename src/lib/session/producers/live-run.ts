@@ -15,6 +15,7 @@ export function createLiveRunProducer(): ProduceRun {
     entitlements,
     osLease,
     standingPolicy,
+    getEventLog,
   }) => {
     const workspaceRoot = config.settings.workspaceRoot;
 
@@ -63,6 +64,7 @@ export function createLiveRunProducer(): ProduceRun {
       entitlements,
       osLease,
       standingPolicy: standingPolicy ?? config.standingPolicy,
+      getEventLog,
     });
 
     if (result.finishReason === "error") {

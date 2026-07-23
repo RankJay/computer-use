@@ -4,7 +4,7 @@ import type { EntitlementPolicy } from "@/lib/entitlements";
 import type { StandingPolicyDocument } from "@/lib/mandates/types";
 import type { EscalationPort } from "@/lib/session/control/escalation-port";
 import type { OsLease } from "@/lib/session/control/os-lease";
-import type { RuntimeEventPayload } from "@/lib/session/events";
+import type { RuntimeEvent, RuntimeEventPayload } from "@/lib/session/events";
 import type { AppSettings } from "@/lib/settings/types";
 
 import type { PermissionPolicy } from "./permission-policy";
@@ -88,4 +88,6 @@ export type CapabilityRunnerDeps = {
   entitlements?: EntitlementPolicy;
   /** Desktop lock for UI-automation Capabilities. Optional = always grant (tests). */
   osLease?: OsLease;
+  /** Attempt event log for resume-from-cursor (skip re-invoke of settled callIds). */
+  getEventLog?: () => readonly RuntimeEvent[];
 };

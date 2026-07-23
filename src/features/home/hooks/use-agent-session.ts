@@ -12,14 +12,11 @@ import {
   type PermissionDecision,
   type SessionControls,
   type SessionFailure,
-  type SessionProjection,
+  type MandateProjection,
 } from "@/lib/session";
 import { useSettingsSelector, useUpdateSettings } from "@/lib/settings/queries";
 import { selectPermissionMode, selectSelectedModelId } from "@/lib/settings/selectors";
 import type { PermissionMode } from "@/lib/settings/types";
-
-/** @deprecated Alias — host store is the runtime; Home is a Client. */
-export type BatchedEngine = BatchedAttemptStore;
 
 export type ComposerContextUsage = {
   readonly usedTokens: number;
@@ -46,7 +43,7 @@ function emptyLanguageModelUsage(): LanguageModelUsage {
 }
 
 function toContextUsage(
-  usage: SessionProjection["usage"],
+  usage: MandateProjection["usage"],
   fallbackModelId: string,
 ): ComposerContextUsage {
   return {
@@ -65,7 +62,7 @@ export type AgentTranscriptSlice = {
 
 /** Composer / status-bar actions — deliberately excludes usage (own island). */
 export type AgentSessionControls = SessionControls & {
-  status: SessionProjection["status"];
+  status: MandateProjection["status"];
   failure: SessionFailure | null;
   start: (prompt: string) => Promise<void>;
   cancel: () => Promise<void>;

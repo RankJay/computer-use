@@ -118,10 +118,7 @@ export function createAttemptControl(deps: AttemptControlDeps): AttemptControl {
     }
 
     // Dry-run attempt meter — commit only after the Attempt actually begins.
-    const attemptDecision = await policy.authorize(
-      { kind: "attempt_start" },
-      { commit: false },
-    );
+    const attemptDecision = await policy.authorize({ kind: "attempt_start" }, { commit: false });
     if (attemptDecision.outcome === "deny" || attemptDecision.outcome === "require_upgrade") {
       return entitlementStartError(attemptDecision);
     }

@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { RUNTIME_EVENT_SCHEMA_VERSION, type RuntimeEvent } from "@/lib/session/events";
-import { createEmptySessionProjection } from "@/lib/session/projection";
+import { createEmptyMandateProjection } from "@/lib/session/projection";
 
 import { projectionToFoldSnapshot } from "../fold-snapshot";
 import { MemoryAttemptEventStore } from "./memory-store";
@@ -65,7 +65,7 @@ describe("MemoryAttemptEventStore", () => {
       ],
     });
 
-    const projection = createEmptySessionProjection();
+    const projection = createEmptyMandateProjection();
     const snap = projectionToFoldSnapshot({
       ...projection,
       taskId: attemptId,

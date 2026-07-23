@@ -94,7 +94,7 @@ let lastDerive: DeriveCache | null = null;
 
 /**
  * Presentation-plane row list for AgentTranscript.
- * Never mutates SessionProjection — live may insert a synthetic Thinking… marker.
+ * Never mutates MandateProjection — live may insert a synthetic Thinking… marker.
  * Result identity is stable when inputs are Object.is-equal.
  */
 export function deriveDisplayRows(input: DisplayRowsInput): readonly AgentTranscriptRow[] {

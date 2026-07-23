@@ -2,10 +2,10 @@ import type { UIMessage } from "ai";
 
 import type { RuntimeEvent, UIMessagePartSnapshot } from "./events";
 import {
-  createEmptySessionProjection,
+  createEmptyMandateProjection,
   EMPTY_PENDING_PERMISSIONS,
   type PendingPermission,
-  type SessionProjection,
+  type MandateProjection,
 } from "./projection";
 import type { AgentMessageRowData, AgentTranscriptRow } from "./rows";
 
@@ -16,18 +16,18 @@ function clearedPendingPermissions(pending: PendingPermission[]): PendingPermiss
 
 export type FoldState = {
   taskId: string | null;
-  status: SessionProjection["status"];
-  failure: SessionProjection["failure"];
+  status: MandateProjection["status"];
+  failure: MandateProjection["failure"];
   rows: AgentTranscriptRow[];
   pendingPermissions: PendingPermission[];
-  usage: SessionProjection["usage"];
-  budget: SessionProjection["budget"];
+  usage: MandateProjection["usage"];
+  budget: MandateProjection["budget"];
   streamingMessageId: string | null;
   seenEventIds: ReadonlySet<string>;
 };
 
 export function createFoldState(
-  previous: SessionProjection = createEmptySessionProjection(),
+  previous: MandateProjection = createEmptyMandateProjection(),
   seenEventIds: ReadonlySet<string> = new Set(),
 ): FoldState {
   return {
@@ -50,7 +50,7 @@ export function foldStateFromMessages(messages: readonly UIMessage[]): FoldState
     id: message.id,
     message,
   }));
-  return createFoldState({ ...createEmptySessionProjection(), rows, chatMessages: [...messages] });
+  return createFoldState({ ...createEmptyMandateProjection(), rows, chatMessages: [...messages] });
 }
 
 function findRowIndex(rows: readonly AgentTranscriptRow[], id: string): number {
@@ -257,7 +257,7 @@ export function reduceSession(state: FoldState, event: RuntimeEvent): FoldState 
       return { ...base, status: event.status };
 
     case "task.completed": {
-      let status: SessionProjection["status"] = base.status;
+      let status: MandateProjection["status"] = base.status;
       if (event.finishReason === "cancelled") {
         status = "cancelled";
       } else if (event.finishReason === "budget" || event.finishReason === "error") {
@@ -426,8 +426,8 @@ export function reduceSession(state: FoldState, event: RuntimeEvent): FoldState 
  */
 export function toProjection(
   state: FoldState,
-  previous: SessionProjection | null = null,
-): SessionProjection {
+  previous: MandateProjection | null = null,
+): MandateProjection {
   const rowsUnchanged = previous !== null && Object.is(previous.rows, state.rows);
   return {
     taskId: state.taskId,
@@ -443,7 +443,7 @@ export function toProjection(
 }
 
 /** Batch fold for tests and replay. Rebuilds internal seenEventIds from scratch. */
-export function projectSession(events: readonly RuntimeEvent[]): SessionProjection {
+export function projectSession(events: readonly RuntimeEvent[]): MandateProjection {
   let state = createFoldState();
   for (const event of events) {
     state = reduceSession(state, event);

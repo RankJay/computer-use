@@ -70,5 +70,13 @@ pub fn migrations() -> Vec<Migration> {
         UPDATE mandates SET status = 'armed' WHERE status IS NULL;",
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 6,
+            description: "mandate success_criteria_json",
+            sql: "ALTER TABLE mandates ADD COLUMN success_criteria_json TEXT;
+        UPDATE mandates SET success_criteria_json = '{\"version\":1,\"kind\":\"attempt_completed\"}'
+          WHERE success_criteria_json IS NULL;",
+            kind: MigrationKind::Up,
+        },
     ]
 }

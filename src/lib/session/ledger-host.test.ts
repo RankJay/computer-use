@@ -225,6 +225,37 @@ describe("AttemptHost durable ledger", () => {
       await new Promise((resolve) => setTimeout(resolve, 5));
     }
     expect((await mandates.get(started.mandateId))?.status).toBe("done");
+    expect(await host.ledgerOwnsTranscript(started.mandateId)).toBe(true);
+  });
+
+  test("manual successCriteria keeps Mandate armed after completed Attempt", async () => {
+    const mandates = new MemoryMandatesPersistence();
+    const mandate = await mandates.create({
+      kind: "interactive",
+      successCriteria: { version: 1, kind: "manual" },
+    });
+    const host = createAttemptHost({
+      produceRun: createTestDemoProducer(createDemoPayloads("manual")),
+      mandates,
+      loadRunContext: async () => ({
+        settings: { ...DEFAULT_SETTINGS, agentMode: "demo" },
+        secrets: DEFAULT_SECRETS,
+        persistApproval: async () => {},
+      }),
+    });
+    host.control.setFocusedMandateId(mandate.id);
+
+    const started = await host.control.start({ prompt: "manual", mandateId: mandate.id });
+    expect(started.ok).toBe(true);
+    if (!started.ok) return;
+
+    await waitForStatus(host, "completed");
+    await host.flushLedger();
+    for (let i = 0; i < 30; i += 1) {
+      if ((await mandates.get(mandate.id))?.status === "armed") break;
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    }
+    expect((await mandates.get(mandate.id))?.status).toBe("armed");
   });
 });
 

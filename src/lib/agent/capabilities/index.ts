@@ -26,6 +26,7 @@ export {
   mapInvokeError,
 } from "./native-invoke";
 export { runCapability } from "./runner";
+export { lookupSettledCapability } from "./resume-from-cursor";
 export {
   buildAgentTools,
   getCapabilityDefinition,

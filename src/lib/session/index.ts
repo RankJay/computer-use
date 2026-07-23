@@ -19,7 +19,6 @@ export type {
 
 export type {
   MandateProjection,
-  SessionProjection,
   SessionFailure,
   SessionUsage,
   SessionBudget,
@@ -27,7 +26,6 @@ export type {
 } from "./projection";
 export {
   createEmptyMandateProjection,
-  createEmptySessionProjection,
   EMPTY_PENDING_PERMISSIONS,
   EMPTY_SESSION_BUDGET,
   EMPTY_SESSION_USAGE,
@@ -63,13 +61,7 @@ export {
   type RegeneratePlan,
 } from "./control/regenerate-from-message";
 
-export {
-  setActiveSessionEngine,
-  getActiveSessionEngine,
-  getAttemptHost,
-  registerAttemptHost,
-  resetActiveSessionEngine,
-} from "./active-engine";
+export { getAttemptHost, registerAttemptHost, resetAttemptHost } from "./active-engine";
 
 export {
   createAttemptHost,
@@ -140,7 +132,6 @@ export {
   type ProduceRun,
   type ProduceRunContext,
   type PermissionDecision,
-  type PermissionWaiter,
   type RunControllerDeps,
 } from "./control/run-controller";
 

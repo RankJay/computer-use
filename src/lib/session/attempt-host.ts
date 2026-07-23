@@ -7,7 +7,12 @@ import {
 } from "@/lib/attempts";
 import type { StoredChat } from "@/lib/chats/types";
 import type { EntitlementPolicy } from "@/lib/entitlements";
-import { createMandatesPersistence, type MandatesPersistence } from "@/lib/mandates";
+import {
+  createMandatesPersistence,
+  DEFAULT_SUCCESS_CRITERIA,
+  nextMandateStatusAfterAttemptSettle,
+  type MandatesPersistence,
+} from "@/lib/mandates";
 
 import {
   createAttemptControl,
@@ -20,8 +25,8 @@ import { createOsLease, type OsLease } from "./control/os-lease";
 import type { ProduceRun } from "./control/run-controller";
 import { createSessionEngine, type SessionEngine } from "./engine";
 import type { RunStatus, RuntimeEvent } from "./events";
-import type { SessionProjection } from "./projection";
-import { createEmptySessionProjection } from "./projection";
+import type { MandateProjection } from "./projection";
+import { createEmptyMandateProjection } from "./projection";
 
 export type AttemptHostListener = () => void;
 
@@ -34,9 +39,8 @@ export type BatchedAttemptStore = {
   entitlements: EntitlementPolicy | undefined;
   /** Desktop OS lease (UI-automation exclusivity). */
   osLease: OsLease;
-  /** MandateProjection (audit/UI). Alias of getSnapshot. */
-  getMandateProjection: () => SessionProjection;
-  getSnapshot: () => SessionProjection;
+  /** MandateProjection (audit/UI). */
+  getMandateProjection: () => MandateProjection;
   subscribe: (listener: AttemptHostListener) => () => void;
   /**
    * Route chat change. Never cancels a live Attempt.
@@ -59,6 +63,11 @@ export type BatchedAttemptStore = {
   flushLedger: () => Promise<void>;
   /** Last durable-ledger write failure (null when healthy). */
   getLedgerError: () => unknown | null;
+  /**
+   * True when this Mandate has durable Attempt ledger rows.
+   * Chat checkpoints should then omit messages_json (ledger owns transcript).
+   */
+  ledgerOwnsTranscript: (mandateId: string) => Promise<boolean>;
 };
 
 export type AttemptHostDeps = {
@@ -102,6 +111,7 @@ export function createAttemptHost(deps: AttemptHostDeps): BatchedAttemptStore {
       ...ctx,
       entitlements: deps.entitlements,
       osLease,
+      getEventLog: () => engine.getEventLog(),
     });
 
   const engine = createSessionEngine({
@@ -147,8 +157,8 @@ export function createAttemptHost(deps: AttemptHostDeps): BatchedAttemptStore {
     },
   });
 
-  let snapshot: SessionProjection = engine.getProjection();
-  let pending: SessionProjection | null = null;
+  let snapshot: MandateProjection = engine.getProjection();
+  let pending: MandateProjection | null = null;
   let rafId: number | null = null;
   const listeners = new Set<AttemptHostListener>();
 
@@ -192,15 +202,14 @@ export function createAttemptHost(deps: AttemptHostDeps): BatchedAttemptStore {
         await mandates.update(mandateId, { status: "running" });
         return;
       case "completed":
-        await mandates.update(mandateId, { status: "done" });
-        return;
       case "failed":
-        await mandates.update(mandateId, { status: "failed" });
+      case "cancelled": {
+        const mandate = await mandates.get(mandateId);
+        const criteria = mandate?.successCriteria ?? DEFAULT_SUCCESS_CRITERIA;
+        const next = nextMandateStatusAfterAttemptSettle(criteria, status);
+        await mandates.update(mandateId, { status: next });
         return;
-      case "cancelled":
-        // Interactive cancel → re-arm so triggers/retries can wake again.
-        await mandates.update(mandateId, { status: "armed" });
-        return;
+      }
       case "idle":
         return;
       default: {
@@ -283,11 +292,12 @@ export function createAttemptHost(deps: AttemptHostDeps): BatchedAttemptStore {
             if (isSettleStatus(status)) {
               await settleLedger(status);
               clearLedgerError();
-              return;
+              return undefined;
             }
           }
           await writePendingEvents();
           clearLedgerError();
+          return undefined;
         })
         .catch((error: unknown) => {
           // Do not tear down the Attempt; surface error for Clients / diagnostics.
@@ -324,6 +334,7 @@ export function createAttemptHost(deps: AttemptHostDeps): BatchedAttemptStore {
         .then(async () => {
           await settleLedger(status);
           clearLedgerError();
+          return undefined;
         })
         .catch((error: unknown) => {
           noteLedgerError(error);
@@ -333,6 +344,7 @@ export function createAttemptHost(deps: AttemptHostDeps): BatchedAttemptStore {
         .then(async () => {
           await writePendingEvents();
           clearLedgerError();
+          return undefined;
         })
         .catch((error: unknown) => {
           noteLedgerError(error);
@@ -416,7 +428,8 @@ export function createAttemptHost(deps: AttemptHostDeps): BatchedAttemptStore {
     }
     const log = engine.getEventLog();
     const lastEvent = log.length > 0 ? log[log.length - 1] : undefined;
-    const attemptId = projection.taskId ?? lastEvent?.taskId ?? `unrecovered-${crypto.randomUUID()}`;
+    const attemptId =
+      projection.taskId ?? lastEvent?.taskId ?? `unrecovered-${crypto.randomUUID()}`;
     registry.setFocusedMandateId(mandateId);
     // Keep seq past hydrated events so recovery appends are not deduped.
     engine.beginTask(attemptId, { continueSeq: true });
@@ -455,7 +468,6 @@ export function createAttemptHost(deps: AttemptHostDeps): BatchedAttemptStore {
     entitlements: deps.entitlements,
     osLease,
     getMandateProjection: () => snapshot,
-    getSnapshot: () => snapshot,
     subscribe: (listener) => {
       listeners.add(listener);
       return () => {
@@ -464,6 +476,13 @@ export function createAttemptHost(deps: AttemptHostDeps): BatchedAttemptStore {
     },
     flushLedger,
     getLedgerError: () => lastLedgerError,
+    async ledgerOwnsTranscript(mandateId) {
+      if (lastLedgerError !== null) {
+        return false;
+      }
+      const open = await eventStore.loadForMandateOpen(mandateId);
+      return open !== null;
+    },
 
     async backfillChatMandate(chat, save) {
       return backfillChatMandate(chat, save);
@@ -531,7 +550,7 @@ export function createAttemptHost(deps: AttemptHostDeps): BatchedAttemptStore {
         if (!input.chatId) {
           registry.setLiveChatId(null);
           registry.setFocusedMandateId(null);
-          snapshot = createEmptySessionProjection();
+          snapshot = createEmptyMandateProjection();
           lastStatus = snapshot.status;
           emit();
           return;
@@ -580,7 +599,7 @@ export function createAttemptHost(deps: AttemptHostDeps): BatchedAttemptStore {
       registry.resetPointers();
       osLease.clear();
       resetLedgerCursors();
-      snapshot = createEmptySessionProjection();
+      snapshot = createEmptyMandateProjection();
       lastStatus = snapshot.status;
       emit();
     },
