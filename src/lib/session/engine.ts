@@ -17,6 +17,7 @@ import {
   type RuntimeEventPayload,
   type RunStatus,
 } from "./events";
+import { foldExecutionContext } from "./execution-context";
 import {
   createFoldState,
   foldStateFromMessages,
@@ -196,10 +197,11 @@ export function createSessionEngine(deps: SessionEngineDeps): SessionEngine {
       activeTaskId = null;
       notify();
 
+      const execution = foldExecutionContext({ chatMessages: plan.messages });
       await controller.start({
         ...config,
         prompt: plan.prompt,
-        chatMessages: plan.messages,
+        chatMessages: execution.messages,
         isRetry: true,
       });
     },

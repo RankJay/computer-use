@@ -2,6 +2,7 @@ import type { MandatesPersistence } from "@/lib/mandates";
 import type { AppSecrets, AppSettings } from "@/lib/settings/types";
 
 import type { RetryFromMessageConfig, SessionEngine } from "../engine";
+import { foldExecutionContext } from "../execution-context";
 import type { AttemptRegistry } from "./attempt-registry";
 import type { PermissionDecision, RunConfig } from "./run-controller";
 
@@ -127,11 +128,11 @@ export function createAttemptControl(deps: AttemptControlDeps): AttemptControl {
       }
 
       const mandateId = await resolveMandateId(input.mandateId);
-      const projection = deps.engine.getProjection();
+      const execution = foldExecutionContext(deps.engine.getProjection());
       const config: RunConfig = {
         prompt: input.prompt,
         modelId: ctx.settings.selectedModelId,
-        chatMessages: projection.chatMessages,
+        chatMessages: execution.messages,
         settings: ctx.settings,
         secrets: ctx.secrets,
         persistApproval: ctx.persistApproval,

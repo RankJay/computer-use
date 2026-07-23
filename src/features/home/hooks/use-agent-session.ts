@@ -91,8 +91,8 @@ export function useAgentSessionStore(): BatchedAttemptStore {
 export function useAgentInputDisabled(store: BatchedAttemptStore): boolean {
   const status = useSyncExternalStore(
     store.subscribe,
-    () => store.getSnapshot().status,
-    () => store.getSnapshot().status,
+    () => store.getMandateProjection().status,
+    () => store.getMandateProjection().status,
   );
   return status === "running" || status === "streaming" || status === "waiting_permission";
 }
@@ -101,28 +101,28 @@ export function useAgentInputDisabled(store: BatchedAttemptStore): boolean {
 export function useAgentTranscript(store: BatchedAttemptStore): AgentTranscriptSlice {
   const rows = useSyncExternalStore(
     store.subscribe,
-    () => store.getSnapshot().rows,
-    () => store.getSnapshot().rows,
+    () => store.getMandateProjection().rows,
+    () => store.getMandateProjection().rows,
   );
   const streamingMessageId = useSyncExternalStore(
     store.subscribe,
-    () => store.getSnapshot().streamingMessageId,
-    () => store.getSnapshot().streamingMessageId,
+    () => store.getMandateProjection().streamingMessageId,
+    () => store.getMandateProjection().streamingMessageId,
   );
   const pendingPermissions = useSyncExternalStore(
     store.subscribe,
-    () => store.getSnapshot().pendingPermissions,
-    () => store.getSnapshot().pendingPermissions,
+    () => store.getMandateProjection().pendingPermissions,
+    () => store.getMandateProjection().pendingPermissions,
   );
   const status = useSyncExternalStore(
     store.subscribe,
-    () => store.getSnapshot().status,
-    () => store.getSnapshot().status,
+    () => store.getMandateProjection().status,
+    () => store.getMandateProjection().status,
   );
   const taskId = useSyncExternalStore(
     store.subscribe,
-    () => store.getSnapshot().taskId,
-    () => store.getSnapshot().taskId,
+    () => store.getMandateProjection().taskId,
+    () => store.getMandateProjection().taskId,
   );
 
   const displayRows = useMemo(
@@ -145,8 +145,8 @@ export function useAgentContextUsage(store: BatchedAttemptStore): ComposerContex
   const selectedModelId = useSettingsSelector(selectSelectedModelId);
   const usage = useSyncExternalStore(
     store.subscribe,
-    () => store.getSnapshot().usage,
-    () => store.getSnapshot().usage,
+    () => store.getMandateProjection().usage,
+    () => store.getMandateProjection().usage,
   );
   return useMemo(() => toContextUsage(usage, selectedModelId), [usage, selectedModelId]);
 }
@@ -159,24 +159,24 @@ export function useAgentSessionControls(store: BatchedAttemptStore): AgentSessio
 
   const status = useSyncExternalStore(
     store.subscribe,
-    () => store.getSnapshot().status,
-    () => store.getSnapshot().status,
+    () => store.getMandateProjection().status,
+    () => store.getMandateProjection().status,
   );
   const failure = useSyncExternalStore(
     store.subscribe,
-    () => store.getSnapshot().failure,
-    () => store.getSnapshot().failure,
+    () => store.getMandateProjection().failure,
+    () => store.getMandateProjection().failure,
   );
   const pendingPermissions = useSyncExternalStore(
     store.subscribe,
-    () => store.getSnapshot().pendingPermissions,
-    () => store.getSnapshot().pendingPermissions,
+    () => store.getMandateProjection().pendingPermissions,
+    () => store.getMandateProjection().pendingPermissions,
   );
 
   const controls = useMemo(
     () =>
       deriveSessionControls({
-        ...store.getSnapshot(),
+        ...store.getMandateProjection(),
         status,
         failure,
         pendingPermissions,

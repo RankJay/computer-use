@@ -75,6 +75,58 @@ describe("AttemptControl", () => {
     const result = await host.control.start({ prompt: "x" });
     expect(result).toEqual({ ok: false, reason: "workspace_not_ready" });
   });
+
+  test("start packs RunConfig from ExecutionContext, not raw MandateProjection dump", async () => {
+    const huge = "z".repeat(8_000);
+    let packedOutput: unknown;
+    const host = createAttemptHost({
+      produceRun: async ({ config, append }) => {
+        const assistant = config.chatMessages?.find((m) => m.role === "assistant");
+        const part = assistant?.parts[0];
+        packedOutput = part && "output" in part ? part.output : undefined;
+        append({
+          type: "task.started",
+          prompt: config.prompt,
+          modelId: config.modelId,
+          agentMode: "demo",
+        });
+        append({ type: "task.completed", finishReason: "stop" });
+      },
+      mandates: new MemoryMandatesPersistence(),
+      loadRunContext: async () => ({
+        settings: { ...DEFAULT_SETTINGS, agentMode: "demo" },
+        secrets: DEFAULT_SECRETS,
+        persistApproval: async () => {},
+      }),
+    });
+
+    host.engine.hydrate([
+      {
+        id: "a1",
+        role: "assistant",
+        parts: [
+          {
+            type: "dynamic-tool",
+            toolName: "read_file",
+            toolCallId: "c1",
+            state: "output-available",
+            input: { path: "/tmp/a" },
+            output: { content: huge },
+          },
+        ],
+      },
+    ]);
+
+    const auditBefore = host.getMandateProjection().chatMessages[0]?.parts[0];
+    expect(auditBefore && "output" in auditBefore ? auditBefore.output : null).toEqual({
+      content: huge,
+    });
+
+    const result = await host.control.start({ prompt: "next" });
+    expect(result.ok).toBe(true);
+    expect(typeof packedOutput).toBe("string");
+    expect(String(packedOutput).length).toBeLessThan(huge.length);
+  });
 });
 
 describe("AttemptHost.bindChatRoute", () => {

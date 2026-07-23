@@ -34,8 +34,11 @@ export type SessionBudget = {
   maxWallClockMs: number;
 };
 
-/** Canonical session read model. Control flags are derived elsewhere — never stored. */
-export type SessionProjection = {
+/**
+ * Mandate-scoped audit/UI read model (fold of Attempt events + live tail).
+ * Prefer `MandateProjection` in new code; `SessionProjection` remains as the legacy alias.
+ */
+export type MandateProjection = {
   taskId: string | null;
   status: RunStatus;
   failure: SessionFailure | null;
@@ -46,6 +49,9 @@ export type SessionProjection = {
   budget: SessionBudget;
   streamingMessageId: string | null;
 };
+
+/** Legacy name — same shape as MandateProjection (rename-as-we-touch). */
+export type SessionProjection = MandateProjection;
 
 export const EMPTY_SESSION_BUDGET: SessionBudget = {
   stepsUsed: 0,
@@ -66,7 +72,7 @@ export const EMPTY_SESSION_USAGE: SessionUsage = {
 /** Shared empty pending list — fold clears must reuse this, never `[]`. */
 export const EMPTY_PENDING_PERMISSIONS: PendingPermission[] = [];
 
-export function createEmptySessionProjection(): SessionProjection {
+export function createEmptyMandateProjection(): MandateProjection {
   return {
     taskId: null,
     status: "idle",
@@ -79,3 +85,6 @@ export function createEmptySessionProjection(): SessionProjection {
     streamingMessageId: null,
   };
 }
+
+/** Legacy name — prefer createEmptyMandateProjection in new code. */
+export const createEmptySessionProjection = createEmptyMandateProjection;

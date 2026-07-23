@@ -27,6 +27,8 @@ export type BatchedAttemptStore = {
   control: AttemptControl;
   registry: AttemptRegistry;
   eventStore: AttemptEventStore;
+  /** MandateProjection (audit/UI). Alias of getSnapshot. */
+  getMandateProjection: () => SessionProjection;
   getSnapshot: () => SessionProjection;
   subscribe: (listener: AttemptHostListener) => () => void;
   /**
@@ -320,6 +322,7 @@ export function createAttemptHost(deps: AttemptHostDeps): BatchedAttemptStore {
     control,
     registry,
     eventStore,
+    getMandateProjection: () => snapshot,
     getSnapshot: () => snapshot,
     subscribe: (listener) => {
       listeners.add(listener);

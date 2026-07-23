@@ -146,9 +146,9 @@ export function useChatPersistence(store: BatchedAttemptStore, chatId: string | 
     void syncFromRoute();
   }, [chatId, store]);
 
-  // Checkpoint on settle.
+  // Checkpoint on settle (audit MandateProjection — not ExecutionContext).
   useEffect(() => {
-    let prevStatus = store.engine.getProjection().status;
+    let prevStatus = store.getMandateProjection().status;
 
     async function persistChat(
       chat: StoredChat,
@@ -170,8 +170,8 @@ export function useChatPersistence(store: BatchedAttemptStore, chatId: string | 
       }
     }
 
-    return store.engine.subscribe(() => {
-      const projection = store.engine.getProjection();
+    return store.subscribe(() => {
+      const projection = store.getMandateProjection();
       const status = projection.status;
       const previous = prevStatus;
       prevStatus = status;

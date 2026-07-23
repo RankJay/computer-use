@@ -3,6 +3,7 @@ import type { UIMessage } from "ai";
 import type { AppSecrets, AppSettings } from "@/lib/settings/types";
 
 import type { RuntimeEventPayload } from "../events";
+import { foldExecutionContext } from "../execution-context";
 import type { SessionProjection } from "../projection";
 
 export type PermissionDecision = "approved" | "denied";
@@ -149,10 +150,11 @@ export function createRunController(deps: RunControllerDeps): RunController {
       if (!lastConfig) return;
       if (projection.status !== "failed" || !projection.failure?.recoverable) return;
 
+      const execution = foldExecutionContext(projection);
       await runWithConfig({
         ...lastConfig,
         prompt: lastConfig.prompt,
-        chatMessages: projection.chatMessages,
+        chatMessages: execution.messages,
         isRetry: true,
       });
     },

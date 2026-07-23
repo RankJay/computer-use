@@ -18,6 +18,7 @@ export type {
 } from "./rows";
 
 export type {
+  MandateProjection,
   SessionProjection,
   SessionFailure,
   SessionUsage,
@@ -25,11 +26,19 @@ export type {
   PendingPermission,
 } from "./projection";
 export {
+  createEmptyMandateProjection,
   createEmptySessionProjection,
   EMPTY_PENDING_PERMISSIONS,
   EMPTY_SESSION_BUDGET,
   EMPTY_SESSION_USAGE,
 } from "./projection";
+
+export type { ExecutionContext, ExecutionContextOptions } from "./execution-context";
+export {
+  DEFAULT_EXECUTION_CONTEXT_OPTIONS,
+  PASSTHROUGH_EXECUTION_CONTEXT_OPTIONS,
+  foldExecutionContext,
+} from "./execution-context";
 
 export {
   createFoldState,
