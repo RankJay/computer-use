@@ -33,7 +33,7 @@ function SettingsSections() {
   );
 }
 
-export default function SettingsPageContent() {
+export function SettingsPageContent() {
   return (
     <div className="flex flex-col h-full w-full gap-0 overflow-hidden box-border overscroll-contain">
       <div>

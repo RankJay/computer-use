@@ -63,5 +63,8 @@ export {
   PERMISSION_MODE_OPTIONS,
   wallClockMinutesFromMs,
   wallClockMsFromMinutes,
-} from "./utils";
+} from "./options";
 export { pickWorkspaceFolder } from "./workspace-picker";
+
+export { clearLogs, openLogsFolder, resetSession } from "./maintenance/commands";
+export { useClearLogs, useOpenLogsFolder, useResetSession } from "./maintenance/queries";

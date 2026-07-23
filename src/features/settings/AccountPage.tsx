@@ -107,7 +107,7 @@ function AccountBody(): ReactElement {
   return <SignedOutAccount />;
 }
 
-export default function AccountPageContent(): ReactElement {
+export function AccountPageContent(): ReactElement {
   return (
     <div className="flex h-full w-full flex-col gap-0 overflow-hidden box-border overscroll-contain">
       <div>

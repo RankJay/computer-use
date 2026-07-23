@@ -1,3 +1,8 @@
+/**
+ * Public capability surface for UI labels + agent tool wiring.
+ * Permission policy, runner, native-invoke, risk: import from subpaths.
+ */
+
 export type {
   CapabilityDefinition,
   CapabilityError,
@@ -7,26 +12,8 @@ export type {
   InvokeCapabilityResult,
   ToolPartLocation,
 } from "./types";
-
-export { capabilityRiskSchema } from "./risk";
 export { defineCapability } from "./types";
 
-export { needsPermission, permissionRiskForCapability } from "./permission";
-export {
-  createSettingsPermissionPolicy,
-  defaultPermissionPolicy,
-  type PermissionPolicy,
-  type PermissionPolicyDecision,
-  type PermissionPolicyInput,
-} from "./permission-policy";
-export {
-  createDefaultNativeInvoker,
-  createMockCapabilityInvoker,
-  invokeCapabilityCommand,
-  mapInvokeError,
-} from "./native-invoke";
-export { runCapability } from "./runner";
-export { lookupSettledCapability } from "./resume-from-cursor";
 export {
   buildAgentTools,
   getCapabilityDefinition,
@@ -35,5 +22,6 @@ export {
   isCapabilityName,
 } from "./registry";
 export type { AgentTools, CapabilityName } from "./registry";
+
 export { toolActivityDetail } from "./ui-activity-detail";
 export { uiToolLabel } from "./ui-labels";

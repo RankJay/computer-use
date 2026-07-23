@@ -8,7 +8,8 @@ mock.module("@tauri-apps/api/core", () => ({
   invoke: invokeMock,
 }));
 
-const { clearLogs, openLogsFolder, resetSession } = await import("@/lib/maintenance/commands");
+const { clearLogs, openLogsFolder, resetSession } =
+  await import("@/lib/settings/maintenance/commands");
 
 describe("maintenance commands", () => {
   afterEach(() => {

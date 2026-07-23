@@ -74,7 +74,7 @@ function HistoryChatList(): ReactElement {
   );
 }
 
-export default function HistoryPageContent(): ReactElement {
+export function HistoryPageContent(): ReactElement {
   return (
     <div className="flex h-full w-full flex-col gap-0 overflow-hidden box-border overscroll-contain">
       <div>
