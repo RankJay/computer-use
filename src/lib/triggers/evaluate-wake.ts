@@ -6,14 +6,13 @@ import type {
 } from "@/lib/session/control/concurrency-policy";
 import { rejectIfBusyConcurrencyPolicy } from "@/lib/session/control/concurrency-policy";
 
-export type TriggerWakeAction = "start" | "suppress" | "queue";
+export type TriggerWakeAction = "start" | "suppress";
 
 export type TriggerWakeReason =
   | "ok"
   | "mandate_running"
   | "waiting_interaction"
-  | "concurrency_reject"
-  | "concurrency_queue";
+  | "concurrency_reject";
 
 export type TriggerWakeDecision = {
   readonly action: TriggerWakeAction;
@@ -63,8 +62,6 @@ export function evaluateTriggerWake(input: EvaluateTriggerWakeInput): TriggerWak
       return { action: "start", reason: "ok", concurrency };
     case "reject":
       return { action: "suppress", reason: "concurrency_reject", concurrency };
-    case "queue":
-      return { action: "queue", reason: "concurrency_queue", concurrency };
     default: {
       const _exhaustive: never = concurrency;
       return _exhaustive;

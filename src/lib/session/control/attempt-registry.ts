@@ -1,7 +1,7 @@
 /**
  * In-process index of the live Attempt + UI focus pointers.
- * ConcurrencyPolicy is swappable here; Phase 1 RunController still cancel-previous
- * for interactive starts. Triggers use evaluateTriggerWake + this policy.
+ * ConcurrencyPolicy is swappable here; AttemptControl consults it on start/retry.
+ * Triggers also evaluate via evaluateTriggerWake (often rejectIfBusy).
  */
 
 import { cancelPreviousConcurrencyPolicy, type ConcurrencyPolicy } from "./concurrency-policy";

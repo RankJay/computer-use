@@ -105,6 +105,8 @@ export function createRunController(deps: RunControllerDeps): RunController {
   }
 
   async function runWithConfig(config: RunConfig): Promise<void> {
+    // Slot yield only — concurrency *decision* lives on AttemptRegistry policy
+    // (AttemptControl). This path runs after a start was already allowed.
     if (activeAbort) {
       await cancel();
     }

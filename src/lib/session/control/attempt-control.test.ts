@@ -6,6 +6,7 @@ import { DEFAULT_SECRETS, DEFAULT_SETTINGS } from "@/lib/settings/defaults";
 
 import { createAttemptHost } from "../attempt-host";
 import { createDemoPayloads, createTestDemoProducer } from "../fixtures/demo-payloads";
+import { rejectIfBusyConcurrencyPolicy } from "./concurrency-policy";
 
 describe("AttemptControl", () => {
   test("start creates a Mandate and returns distinct attemptId", async () => {
@@ -199,6 +200,115 @@ describe("AttemptControl", () => {
     if (!result.ok) return;
     expect(result.mandateId).toBe(mandate.id);
 
+    await new Promise<void>((resolve) => {
+      const unsub = host.engine.subscribe(() => {
+        if (host.engine.getProjection().status === "completed") {
+          unsub();
+          resolve();
+        }
+      });
+      if (host.engine.getProjection().status === "completed") {
+        unsub();
+        resolve();
+      }
+    });
+    expect(runs).toBe(2);
+  });
+
+  test("rejectIfBusy policy rejects start while another Attempt is live", async () => {
+    let releaseGate = () => {};
+    const gate = new Promise<void>((resolve) => {
+      releaseGate = resolve;
+    });
+
+    const host = createAttemptHost({
+      produceRun: async ({ append, config, signal }) => {
+        append({
+          type: "task.started",
+          prompt: config.prompt,
+          modelId: config.modelId,
+          agentMode: "demo",
+        });
+        append({ type: "task.status_changed", status: "streaming" });
+        await gate;
+        if (signal.aborted) return;
+        append({ type: "task.completed", finishReason: "stop" });
+      },
+      mandates: new MemoryMandatesPersistence(),
+      eventStore: new MemoryAttemptEventStore(),
+      loadRunContext: async () => ({
+        settings: { ...DEFAULT_SETTINGS, agentMode: "demo" },
+        secrets: DEFAULT_SECRETS,
+        persistApproval: async () => {},
+      }),
+    });
+
+    host.registry.setConcurrencyPolicy(rejectIfBusyConcurrencyPolicy);
+
+    const first = await host.control.start({ prompt: "hold" });
+    expect(first.ok).toBe(true);
+    expect(host.control.getLiveIds()).not.toBeNull();
+
+    const second = await host.control.start({ prompt: "blocked" });
+    expect(second).toMatchObject({ ok: false, reason: "concurrency_reject" });
+
+    releaseGate();
+    await new Promise<void>((resolve) => {
+      const unsub = host.engine.subscribe(() => {
+        if (host.engine.getProjection().status === "completed") {
+          unsub();
+          resolve();
+        }
+      });
+      if (host.engine.getProjection().status === "completed") {
+        unsub();
+        resolve();
+      }
+    });
+  });
+
+  test("cancel_previous policy still replaces a live Attempt", async () => {
+    let releaseFirst = () => {};
+    const firstGate = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    let runs = 0;
+
+    const host = createAttemptHost({
+      produceRun: async ({ append, config, signal }) => {
+        runs += 1;
+        append({
+          type: "task.started",
+          prompt: config.prompt,
+          modelId: config.modelId,
+          agentMode: "demo",
+        });
+        append({ type: "task.status_changed", status: "streaming" });
+        if (runs === 1) {
+          await firstGate;
+        }
+        if (signal.aborted) return;
+        append({ type: "task.completed", finishReason: "stop" });
+      },
+      mandates: new MemoryMandatesPersistence(),
+      eventStore: new MemoryAttemptEventStore(),
+      loadRunContext: async () => ({
+        settings: { ...DEFAULT_SETTINGS, agentMode: "demo" },
+        secrets: DEFAULT_SECRETS,
+        persistApproval: async () => {},
+      }),
+    });
+
+    const first = await host.control.start({ prompt: "one" });
+    expect(first.ok).toBe(true);
+
+    const second = await host.control.start({ prompt: "two" });
+    expect(second.ok).toBe(true);
+    if (second.ok && first.ok) {
+      expect(second.attemptId).not.toBe(first.attemptId);
+    }
+
+    releaseFirst();
     await new Promise<void>((resolve) => {
       const unsub = host.engine.subscribe(() => {
         if (host.engine.getProjection().status === "completed") {

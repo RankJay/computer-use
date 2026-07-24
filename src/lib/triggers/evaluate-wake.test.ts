@@ -1,10 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import type { Mandate } from "@/lib/mandates";
-import {
-  cancelPreviousConcurrencyPolicy,
-  queueIfBusyConcurrencyPolicy,
-} from "@/lib/session/control/concurrency-policy";
+import { cancelPreviousConcurrencyPolicy } from "@/lib/session/control/concurrency-policy";
 
 import { evaluateTriggerWake, triggerSuppressedFact } from "./evaluate-wake";
 
@@ -57,20 +54,6 @@ describe("evaluateTriggerWake", () => {
       evaluateTriggerWake({
         mandate: mandate("armed"),
         live: { mandateId: "other", attemptId: "a9" },
-      }),
-    ).toEqual({
-      action: "suppress",
-      reason: "concurrency_reject",
-      concurrency: "reject",
-    });
-  });
-
-  test("queueIfBusy is reject until a wake buffer exists", () => {
-    expect(
-      evaluateTriggerWake({
-        mandate: mandate("armed"),
-        live: { mandateId: "other", attemptId: "a9" },
-        concurrencyPolicy: queueIfBusyConcurrencyPolicy,
       }),
     ).toEqual({
       action: "suppress",

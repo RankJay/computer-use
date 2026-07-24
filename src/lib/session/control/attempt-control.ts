@@ -20,7 +20,12 @@ export type AttemptIds = {
 
 export type AttemptStartError = {
   ok: false;
-  reason: "workspace_not_ready" | "noop" | "entitlement_denied" | "require_upgrade";
+  reason:
+    | "workspace_not_ready"
+    | "noop"
+    | "entitlement_denied"
+    | "require_upgrade"
+    | "concurrency_reject";
   message?: string;
   feature?: string;
 };
@@ -134,6 +139,27 @@ export function createAttemptControl(deps: AttemptControlDeps): AttemptControl {
     return null;
   }
 
+  function authorizeConcurrency(mandateId: string): AttemptStartError | null {
+    const decision = deps.registry.getConcurrencyPolicy().onConflict({
+      live: deps.registry.getLive(),
+      incomingMandateId: mandateId,
+    });
+    switch (decision) {
+      case "cancel_previous":
+        return null;
+      case "reject":
+        return {
+          ok: false,
+          reason: "concurrency_reject",
+          message: "Another attempt is already running.",
+        };
+      default: {
+        const _exhaustive: never = decision;
+        return _exhaustive;
+      }
+    }
+  }
+
   async function beginRun(
     mandateId: string,
     start: () => Promise<void>,
@@ -193,6 +219,10 @@ export function createAttemptControl(deps: AttemptControlDeps): AttemptControl {
       }
 
       const mandateId = await resolveMandateId(input.mandateId);
+      const concurrencyBlocked = authorizeConcurrency(mandateId);
+      if (concurrencyBlocked) {
+        return concurrencyBlocked;
+      }
       const mandate = await deps.mandates.get(mandateId);
       await deps.mandates.update(mandateId, { status: "running" });
       const execution = foldModelContext(deps.engine.getProjection());
@@ -221,6 +251,10 @@ export function createAttemptControl(deps: AttemptControlDeps): AttemptControl {
         deps.registry.getLive()?.mandateId ??
         deps.registry.getFocusedMandateId() ??
         (await resolveMandateId(undefined));
+      const concurrencyBlocked = authorizeConcurrency(mandateId);
+      if (concurrencyBlocked) {
+        return concurrencyBlocked;
+      }
       await deps.mandates.update(mandateId, { status: "running" });
       return beginRun(mandateId, () => deps.engine.retry());
     },
@@ -235,6 +269,10 @@ export function createAttemptControl(deps: AttemptControlDeps): AttemptControl {
         return blocked;
       }
       const mandateId = deps.registry.getFocusedMandateId() ?? (await resolveMandateId(undefined));
+      const concurrencyBlocked = authorizeConcurrency(mandateId);
+      if (concurrencyBlocked) {
+        return concurrencyBlocked;
+      }
       const mandate = await deps.mandates.get(mandateId);
       await deps.mandates.update(mandateId, { status: "running" });
       const pack: RetryFromMessageConfig = {

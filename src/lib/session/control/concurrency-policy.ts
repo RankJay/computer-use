@@ -1,11 +1,11 @@
 import type { LiveAttempt } from "./attempt-registry";
 
 /**
- * Swappable conflict policy consulted by Trigger wake evaluation (ADR 0005).
- * Interactive cancel-previous for Chat starts is still enforced in RunController
- * until AttemptControl wires this policy into the start path.
+ * Swappable conflict policy on AttemptRegistry (ADR 0005).
+ * AttemptControl.start/retry consult this; RunController only yields the engine slot
+ * when a start is allowed (cancel-previous actuator, not the decision).
  */
-export type ConcurrencyConflictDecision = "cancel_previous" | "reject" | "queue";
+export type ConcurrencyConflictDecision = "cancel_previous" | "reject";
 
 export type ConcurrencyConflictContext = {
   readonly live: LiveAttempt | null;
@@ -27,9 +27,3 @@ export const cancelPreviousConcurrencyPolicy: ConcurrencyPolicy = {
 export const rejectIfBusyConcurrencyPolicy: ConcurrencyPolicy = {
   onConflict: (ctx) => (ctx.live ? "reject" : "cancel_previous"),
 };
-
-/**
- * Queue buffer is not implemented. Alias of reject so Callers cannot mistake
- * `action: "queue"` for a durable wake queue. Reintroduce `"queue"` when buffered.
- */
-export const queueIfBusyConcurrencyPolicy: ConcurrencyPolicy = rejectIfBusyConcurrencyPolicy;

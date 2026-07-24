@@ -188,6 +188,10 @@ export function useAgentSessionControls(store: BatchedAttemptStore): AgentSessio
     }
     if (result.reason === "entitlement_denied") {
       toast.error(result.message ?? "This action is not available on your plan.");
+      return;
+    }
+    if (result.reason === "concurrency_reject") {
+      toast.error(result.message ?? "Another attempt is already running.");
     }
   }, []);
 
