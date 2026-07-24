@@ -7,6 +7,7 @@ type SettingsRowProps = {
   description?: string;
   children: ReactNode;
   className?: string;
+  id?: string;
 };
 
 export function SettingsRow({
@@ -14,9 +15,13 @@ export function SettingsRow({
   description,
   children,
   className,
+  id,
 }: SettingsRowProps): ReactElement {
   return (
-    <div className={cn("flex items-center justify-between gap-6 px-4 py-3.5", className)}>
+    <div
+      id={id}
+      className={cn("flex items-center justify-between gap-6 px-4 py-3.5 scroll-mt-4", className)}
+    >
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <span className="text-sm text-foreground">{label}</span>
         {description ? (

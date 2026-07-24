@@ -4,6 +4,31 @@ export function selectWorkspaceRoot(settings: LoadedSettings): string {
   return settings.workspaceRoot;
 }
 
+export function selectHasWorkspaceRoot(settings: LoadedSettings): boolean {
+  return settings.workspaceRoot.trim().length > 0;
+}
+
+/** True when Anthropic or OpenAI key is saved (either satisfies provider setup). */
+export function selectHasProviderApiKey(settings: LoadedSettings): boolean {
+  return settings.secrets.anthropicApiKey.length > 0 || settings.secrets.openaiApiKey.length > 0;
+}
+
+export type SetupProgress = {
+  readonly workspaceDone: boolean;
+  readonly apiKeyDone: boolean;
+  readonly incomplete: boolean;
+};
+
+export function selectSetupProgress(settings: LoadedSettings): SetupProgress {
+  const workspaceDone = selectHasWorkspaceRoot(settings);
+  const apiKeyDone = selectHasProviderApiKey(settings);
+  return {
+    workspaceDone,
+    apiKeyDone,
+    incomplete: !workspaceDone || !apiKeyDone,
+  };
+}
+
 export function selectLogRetentionDays(settings: LoadedSettings): number {
   return settings.logRetentionDays;
 }

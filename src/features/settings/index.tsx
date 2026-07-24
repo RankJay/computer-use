@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import { toast } from "sonner";
 
 import { SuspenseQueryBoundary } from "@/components/boundaries/ErrorBoundary";
@@ -14,12 +15,37 @@ import { ApiKeysSettings } from "./ApiKeysSettings";
 import { MaintenanceSettings } from "./MaintenanceSettings";
 import { ModelProviderSettings } from "./ModelProviderSettings";
 
+function scrollToSettingsHash(hash: string): void {
+  const id = hash.replace(/^#/, "");
+  if (id.length === 0) {
+    return;
+  }
+  const target = document.getElementById(id);
+  if (target) {
+    target.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+}
+
 function SettingsSections() {
+  const location = useLocation();
+
   useEffect(() => {
     void ensureSecretsReady().catch(() => {
       toast.error("Could not load API keys from the vault.");
     });
   }, []);
+
+  useEffect(() => {
+    if (!location.hash) {
+      return;
+    }
+    const frame = window.requestAnimationFrame(() => {
+      scrollToSettingsHash(location.hash);
+    });
+    return () => {
+      window.cancelAnimationFrame(frame);
+    };
+  }, [location.hash]);
 
   return (
     <div className="flex flex-col gap-8">

@@ -35,6 +35,7 @@ import { isTauriRuntime } from "@/lib/runtime/is-tauri-runtime";
 import { isMacOsClient } from "@/lib/runtime/platform";
 import { parsePermissionMode, PERMISSION_MODE_OPTIONS } from "@/lib/settings/options";
 import { useSettingsSelector, useUpdateSettings } from "@/lib/settings/queries";
+import { SETTINGS_SECTION_IDS } from "@/lib/settings/section-ids";
 import {
   selectInstallUpdateOnClose,
   selectLogRetentionDays,
@@ -88,6 +89,7 @@ function WorkspaceRootRow(): ReactElement {
 
   return (
     <SettingsRow
+      id={SETTINGS_SECTION_IDS.workspace}
       label="Default workspace root"
       description="Starting directory for agent file operations."
     >

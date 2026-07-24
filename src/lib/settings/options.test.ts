@@ -10,10 +10,13 @@ import {
 import {
   selectAgentMode,
   selectHasPersistedApprovals,
+  selectHasProviderApiKey,
+  selectHasWorkspaceRoot,
   selectMaxSteps,
   selectPermissionMode,
   selectSecretIsSaved,
   selectSelectedModelId,
+  selectSetupProgress,
   selectWorkspaceRoot,
 } from "./selectors";
 import type { LoadedSettings } from "./types";
@@ -40,6 +43,7 @@ describe("settings options", () => {
 describe("settings selectors", () => {
   const loaded: LoadedSettings = {
     ...DEFAULT_SETTINGS,
+    workspaceRoot: "/tmp/work",
     secrets: { ...DEFAULT_SECRETS, openaiApiKey: "sk-x", anthropicApiKey: "" },
     persistedApprovals: ["read_file"],
   };
@@ -56,5 +60,34 @@ describe("settings selectors", () => {
   test("secret saved selectors", () => {
     expect(selectSecretIsSaved.openaiApiKey(loaded)).toBe(true);
     expect(selectSecretIsSaved.anthropicApiKey(loaded)).toBe(false);
+  });
+
+  test("setup progress: workspace + either provider key", () => {
+    expect(selectHasWorkspaceRoot(loaded)).toBe(true);
+    expect(selectHasProviderApiKey(loaded)).toBe(true);
+    expect(selectSetupProgress(loaded)).toEqual({
+      workspaceDone: true,
+      apiKeyDone: true,
+      incomplete: false,
+    });
+
+    const empty: LoadedSettings = {
+      ...DEFAULT_SETTINGS,
+      secrets: { ...DEFAULT_SECRETS },
+    };
+    expect(selectSetupProgress(empty)).toEqual({
+      workspaceDone: false,
+      apiKeyDone: false,
+      incomplete: true,
+    });
+
+    const anthropicOnly: LoadedSettings = {
+      ...DEFAULT_SETTINGS,
+      workspaceRoot: "  ",
+      secrets: { ...DEFAULT_SECRETS, anthropicApiKey: "sk-ant-x" },
+    };
+    expect(selectHasWorkspaceRoot(anthropicOnly)).toBe(false);
+    expect(selectHasProviderApiKey(anthropicOnly)).toBe(true);
+    expect(selectSetupProgress(anthropicOnly).incomplete).toBe(true);
   });
 });

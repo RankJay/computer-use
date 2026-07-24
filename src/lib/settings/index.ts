@@ -43,6 +43,8 @@ export {
 export {
   selectAgentMode,
   selectHasPersistedApprovals,
+  selectHasProviderApiKey,
+  selectHasWorkspaceRoot,
   selectInstallUpdateOnClose,
   selectLogRetentionDays,
   selectMaxCostUsd,
@@ -51,9 +53,14 @@ export {
   selectPermissionMode,
   selectSecretIsSaved,
   selectSelectedModelId,
+  selectSetupProgress,
   selectUiAutomation,
   selectWorkspaceRoot,
 } from "./selectors";
+export type { SetupProgress } from "./selectors";
+
+export { SETTINGS_SECTION_IDS, settingsSectionHref } from "./section-ids";
+export type { SettingsSectionId } from "./section-ids";
 
 export { expectedApiKeyPrefix, sanitizeApiKey, validateApiKeyFormat } from "./api-key";
 export {

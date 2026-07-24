@@ -10,6 +10,7 @@ import {
 } from "@/features/settings/styles";
 import { sanitizeApiKey, validateApiKeyFormat } from "@/lib/settings/api-key";
 import { useSettingsSelector, useUpdateSecret } from "@/lib/settings/queries";
+import { SETTINGS_SECTION_IDS } from "@/lib/settings/section-ids";
 import { selectSecretIsSaved } from "@/lib/settings/selectors";
 import type { AppSecrets } from "@/lib/settings/types";
 
@@ -85,7 +86,7 @@ function ApiKeyRow({
 
 export function ApiKeysSettings(): ReactElement {
   return (
-    <SettingsSection title="API keys">
+    <SettingsSection id={SETTINGS_SECTION_IDS.apiKeys} title="API keys">
       <ApiKeyRow
         label="Anthropic API key"
         description="Required for Claude models."

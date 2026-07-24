@@ -19,6 +19,7 @@ import {
   useAgentTranscript,
 } from "./hooks/use-agent-session";
 import { useChatPersistence } from "./hooks/use-chat-persistence";
+import { SetupCard } from "./SetupCard";
 
 const ContextUsageIsland = memo(function ContextUsageIsland({
   store,
@@ -66,6 +67,9 @@ const TranscriptIsland = memo(function TranscriptIsland({
         <Container className="pointer-events-none absolute inset-0 z-10 flex min-h-0 flex-1 flex-col justify-center px-5">
           <Item className="text-[22px] font-[445] text-foreground">Welcome to Actuate</Item>
           <Item className="text-muted-foreground text-xl">Ready to run your errands?</Item>
+          <Item className="pointer-events-auto mt-6">
+            <SetupCard />
+          </Item>
         </Container>
       ) : null}
       <AgentTranscript
