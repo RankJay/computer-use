@@ -1,5 +1,5 @@
-const DEFAULT_API_URL = "http://localhost:8000";
-const DEFAULT_WEB_URL = "http://localhost:3000";
+const DEFAULT_API_URL = "https://actuate-be.vercel.app";
+const DEFAULT_WEB_URL = "https://actuate-web.vercel.app";
 
 function trimTrailingSlash(url: string): string {
   return url.endsWith("/") ? url.slice(0, -1) : url;

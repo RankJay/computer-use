@@ -1,30 +1,28 @@
 # Actuate
 
-Self-driving software for computers. You describe a task; Actuate runs an agent that acts through gated OS capabilities and shows what happened through a transcript.
+Self-driving software for computers. You describe a task; Actuate runs an agent that acts through gated OS capabilities and shows what happened in a transcript.
 
-The goal is to knock out tedious desktop work so people can stay on reasoning, not clicking through the same chores. Privacy and local durability matter more here than bolting on another cloud integration.
+The point is tedious desktop work: files, shells, windows, UI. Privacy and local durability matter more here than bolting on another cloud integration.
 
 Dogfoods on Windows and macOS. File / shell / clipboard / process work on both; launch / window / input / accessibility need the OS adapters plus (on macOS) Accessibility grants. Other platforms still return `unsupported_platform` for those UI seams.
 
 ## Stack
 
-
-| Layer    | Choice                                                |
-| -------- | ----------------------------------------------------- |
-| Shell    | Tauri 2 (Rust), tray + global shortcut                |
-| Frontend | React 19, Vite 7, TypeScript, Tailwind 4              |
-| Chat UI  | shadcn/ui, AI Elements, Streamdown                    |
-| Agent    | Vercel AI SDK (`@ai-sdk/openai`, `@ai-sdk/anthropic`) |
-| Settings | `tauri-plugin-store`                                  |
-| Secrets  | `tauri-plugin-stronghold`                             |
-| Tooling  | Bun, Oxlint, Oxfmt                                    |
-
-
-
+| Layer    | Choice                                                         |
+| -------- | -------------------------------------------------------------- |
+| Shell    | Tauri 2 (Rust), tray + global shortcut                         |
+| Frontend | React 19, Vite 7, TypeScript, Tailwind 4, React Router         |
+| Data     | TanStack Query; SQLite (`tauri-plugin-sql`) for chats / meters |
+| Chat UI  | shadcn/ui, AI Elements, Streamdown                             |
+| Agent    | Vercel AI SDK (`@ai-sdk/openai`, `@ai-sdk/anthropic`)          |
+| Settings | `tauri-plugin-store`                                           |
+| Secrets  | `tauri-plugin-stronghold`                                      |
+| Desktop  | deep-link, updater, notifications, dialog, http                |
+| Tooling  | Bun, Oxlint, Oxfmt                                             |
 
 ## How it works
 
-Actuate is an event-driven agent session engine. The chat UI is a presentation over projected session state, not the place where tools get called.
+Actuate is an event-driven agent session engine. The chat UI presents projected session state; it is not where tools get called.
 
 ```mermaid
 flowchart TB
@@ -37,31 +35,36 @@ flowchart TB
   G -->|user decisions| B
 ```
 
-
-
 - **Control** — start, cancel, permission pause/resume, budgets (steps / cost / wall-clock)
-- **Execution** — model loop via AI SDK
-- **Capabilities** — OS side effects with risk levels and permission gates
-- **Projection** — deterministic fold of events into session truth
-- **Presentation** — transcript, composer, status
+- **Execution** — model loop via AI SDK (`live` hits providers over `tauri-plugin-http`; `demo` replays fixtures offline)
+- **Capabilities** — OS side effects with risk levels, permission gates, and (when signed in) plan/meter checks
+- **Projection** — deterministic fold of events into attempt/mandate truth
+- **Presentation** — home transcript, composer, status; history and settings are separate routes
 
-Toolsets in the harness: File System, Shell, Clipboard, Window, OS Accessibility, Mouse, Keyboard, Shared (`wait`). Prefer accessibility over raw mouse/keyboard when an element ref exists. Screenshot is in the harness design but not implemented yet.
+Tool groups: File System, Shell (incl. launch / process), Clipboard, Window, Accessibility, Mouse, Keyboard, Shared (`wait`). Prefer accessibility over raw mouse/keyboard when an element ref exists.
 
-Defaults: Claude Haiku 4.5, 50 steps, $5, 15 minutes, permission mode `risky` (prompt on high-risk only). UI automation tools stay off until you enable them. Live mode hits providers over `tauri-plugin-http`; Demo mode replays fixtures offline.
+Defaults: Claude Haiku 4.5, 50 steps, $5, 15 minutes, permission mode `destructive-only`, UI automation on (still platform-gated). Permission modes also include ask-every-action, ask-before-risky, and ask-once-per-class.
 
 ## Layout
 
 ```
-src/app/              routes and providers
-src/features/         home chat, settings
+src/app/              routes, providers, page shell, deep-link / updater bootstrap
+src/features/         home chat, history, settings, account, updater UI
+src/components/       shared UI primitives and AI Elements
+src/lib/session/      live attempt host, events, fold/engine, control
 src/lib/agent/        run loop, models, capability catalog + TS wrappers
-src/lib/session/      events, projection, control, budgets
+src/lib/chats/        durable chat store (SQLite / memory)
+src/lib/attempts/     durable attempt store
+src/lib/mandates/     standing policy / mandate store
 src/lib/settings/     store + stronghold adapters
-src-tauri/src/        tray, shortcuts, Rust capability commands
+src/lib/auth/         account session + sign-in deep link
+src/lib/entitlements/ plan / meter checks
+src/lib/runtime/      Tauri sniff, platform, query client
+src-tauri/src/        tray, shortcuts, Rust capability commands, SQLite
 src-tauri/tests/      launch / window / input / a11y / fs smoke tests
 ```
 
-
+Import direction: `app → features → {lib, components}`. Do not import `app` from `features` / `lib` / `components`.
 
 ## Prerequisites
 
@@ -103,24 +106,20 @@ bun run tauri dev
 
 `Ctrl+Shift+A` toggles the window on Windows; `Cmd+Shift+A` on macOS. Close hides to the tray; quit from the tray menu.
 
-In Settings: set a workspace root (file tools are scoped to it), paste Anthropic and/or OpenAI keys (Stronghold), optionally turn on UI automation.
+In Settings: set a workspace root (file tools are scoped to it), paste Anthropic and/or OpenAI keys (Stronghold), adjust permission mode / budgets / model. Sign in under Settings → Account via the browser deep link when you want plan-backed entitlements.
 
+Optional Vite env (see `src/vite-env.d.ts`): `VITE_ACTUATE_API_URL`, `VITE_ACTUATE_WEB_URL`, `VITE_ACTUATE_UPDATER`.
 
 | Command             | Purpose                       |
 | ------------------- | ----------------------------- |
 | `bun run tauri dev` | Desktop app                   |
 | `bun run build`     | `tsc` + Vite production build |
-| `bun run test`      | Frontend tests                |
+| `bun run test`      | Frontend tests (`bun test`)   |
 | `bun run lint`      | Oxlint                        |
 | `bun run format`    | Oxfmt on `src`                |
 
-
-
-
 ## Status
 
-Dogfoodable on Windows and macOS for file / shell / clipboard / process, plus launch / window / input / accessibility when UI automation is enabled (and macOS TCC grants are present).
-
-Still open: screenshot toolset, Linux UI adapters, discovery-then-inject tool loading (catalog is fully exposed today), voice input, remote orchestrator.
+Dogfoodable on Windows and macOS for file / shell / clipboard / process, plus launch / window / input / accessibility when the host reports those capability groups (and macOS TCC grants are present). Chats persist locally; account sign-in and the desktop updater are wired.
 
 Tracked in Linear: [Actuate - self-driving computer](https://linear.app/rankjay/project/actuate-self-driving-computer-81db63acc802).
