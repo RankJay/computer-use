@@ -3,7 +3,7 @@ import type { UIMessage } from "ai";
 import type { AttemptFoldSnapshot } from "@/lib/attempts";
 import { foldStateFromSnapshot } from "@/lib/attempts";
 
-import type { EscalationPort, EscalationPortMode } from "./control/escalation-port";
+import type { EscalationPort, EscalationPortModeInput } from "./control/escalation-port";
 import type { OsLease } from "./control/os-lease";
 import { planRegenerateFromAssistant } from "./control/regenerate-from-message";
 import {
@@ -71,7 +71,7 @@ export type AttemptEngineDeps = {
   onAttemptStarted?: (attemptId: string) => void;
   osLease?: OsLease;
   escalationPort?: EscalationPort;
-  escalationMode?: EscalationPortMode;
+  escalationMode?: EscalationPortModeInput;
   escalationTimeoutMs?: number;
 };
 

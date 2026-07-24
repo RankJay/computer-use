@@ -1,6 +1,6 @@
 import { describe, expect, mock, test } from "bun:test";
 
-import { createEscalationPort } from "./escalation-port";
+import { createEscalationPort, resolveEscalationModeForWatch } from "./escalation-port";
 import { createOsLease } from "./os-lease";
 
 describe("EscalationPort", () => {
@@ -96,5 +96,89 @@ describe("EscalationPort", () => {
 
     port.denyAll();
     await expect(pending).resolves.toBe("deny");
+  });
+
+  test("mode function parks when Mandate is not focused", async () => {
+    const lease = createOsLease();
+    lease.acquire("attempt-1", "desktop");
+
+    const port = createEscalationPort({
+      mode: (request) =>
+        resolveEscalationModeForWatch({
+          requestAttemptId: request.attemptId,
+          live: { mandateId: "m1", attemptId: "attempt-1" },
+          focusedMandateId: "other-mandate",
+        }),
+      timeoutMs: 20,
+      osLease: lease,
+      notifyIfUnfocused: () => {},
+    });
+
+    const pending = port.escalate({
+      callId: "c1",
+      attemptId: "attempt-1",
+      capability: "delete_path",
+      input: {},
+      risk: "high",
+    });
+
+    await Promise.resolve();
+    expect(lease.holder()).toBeNull();
+    await expect(pending).resolves.toBe("deny");
+  });
+
+  test("mode function stays interactive when focused on live Mandate", async () => {
+    const lease = createOsLease();
+    lease.acquire("attempt-1", "desktop");
+
+    const port = createEscalationPort({
+      mode: (request) =>
+        resolveEscalationModeForWatch({
+          requestAttemptId: request.attemptId,
+          live: { mandateId: "m1", attemptId: "attempt-1" },
+          focusedMandateId: "m1",
+        }),
+      osLease: lease,
+      notifyIfUnfocused: () => {},
+    });
+
+    const pending = port.escalate({
+      callId: "c1",
+      attemptId: "attempt-1",
+      capability: "delete_path",
+      input: {},
+      risk: "high",
+    });
+
+    await Promise.resolve();
+    expect(lease.holder()?.attemptId).toBe("attempt-1");
+    port.resolve("c1", "allow");
+    await expect(pending).resolves.toBe("allow");
+  });
+});
+
+describe("resolveEscalationModeForWatch", () => {
+  test("interactive only when live attempt matches focus", () => {
+    expect(
+      resolveEscalationModeForWatch({
+        requestAttemptId: "a1",
+        live: { mandateId: "m1", attemptId: "a1" },
+        focusedMandateId: "m1",
+      }),
+    ).toBe("interactive");
+    expect(
+      resolveEscalationModeForWatch({
+        requestAttemptId: "a1",
+        live: { mandateId: "m1", attemptId: "a1" },
+        focusedMandateId: "m2",
+      }),
+    ).toBe("park");
+    expect(
+      resolveEscalationModeForWatch({
+        requestAttemptId: "a1",
+        live: null,
+        focusedMandateId: "m1",
+      }),
+    ).toBe("park");
   });
 });

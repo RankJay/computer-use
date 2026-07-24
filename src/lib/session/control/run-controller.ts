@@ -11,7 +11,7 @@ import {
   createEscalationPort,
   permissionDecisionToEscalation,
   type EscalationPort,
-  type EscalationPortMode,
+  type EscalationPortModeInput,
 } from "./escalation-port";
 import type { OsLease } from "./os-lease";
 
@@ -77,7 +77,8 @@ export type RunControllerDeps = {
   osLease?: OsLease;
   /** Injected EscalationPort (tests). Default: interactive wait. */
   escalationPort?: EscalationPort;
-  escalationMode?: EscalationPortMode;
+  /** Used when escalationPort omitted — fixed or per-request resolver. */
+  escalationMode?: EscalationPortModeInput;
   escalationTimeoutMs?: number;
 };
 

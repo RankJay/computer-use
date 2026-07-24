@@ -9,7 +9,12 @@ import {
   type LoadedRunContext,
 } from "./control/attempt-control";
 import { createAttemptRegistry, type AttemptRegistry } from "./control/attempt-registry";
-import type { EscalationPort, EscalationPortMode } from "./control/escalation-port";
+import {
+  createEscalationPort,
+  resolveEscalationModeForWatch,
+  type EscalationPort,
+  type EscalationPortModeInput,
+} from "./control/escalation-port";
 import { createOsLease, type OsLease } from "./control/os-lease";
 import type { ProduceRun } from "./control/run-controller";
 import { createAttemptEngine, type AttemptEngine } from "./engine";
@@ -59,10 +64,13 @@ export type AttemptHostDeps = {
   entitlements?: EntitlementPolicy;
   /** Desktop lock — defaults to in-process global lease. */
   osLease?: OsLease;
-  /** Inject EscalationPort (tests). Default: interactive via RunController. */
+  /** Inject EscalationPort (tests). Default: focus-aware park (ADR 0009). */
   escalationPort?: EscalationPort;
-  /** Dark-launch park adapter (unattended-ready). Default interactive. */
-  escalationMode?: EscalationPortMode;
+  /**
+   * Override mode when escalationPort omitted.
+   * Default: interactive only while this Attempt's Mandate is UI-focused; else park.
+   */
+  escalationMode?: EscalationPortModeInput;
   escalationTimeoutMs?: number;
   /** Progress stall → cancel (ops-contract §5). Default 90s. */
   stallAfterMs?: number;
@@ -82,6 +90,21 @@ export function createAttemptHost(deps: AttemptHostDeps): BatchedAttemptStore {
   const registry = createAttemptRegistry();
   const osLease = deps.osLease ?? createOsLease();
 
+  const escalationPort =
+    deps.escalationPort ??
+    createEscalationPort({
+      mode:
+        deps.escalationMode ??
+        ((request) =>
+          resolveEscalationModeForWatch({
+            requestAttemptId: request.attemptId,
+            live: registry.getLive(),
+            focusedMandateId: registry.getFocusedMandateId(),
+          })),
+      timeoutMs: deps.escalationTimeoutMs,
+      osLease,
+    });
+
   let attemptStartedWaiter: ((attemptId: string) => void) | null = null;
   const ledgerSlot: { bridge?: LedgerBridge } = {};
 
@@ -96,8 +119,7 @@ export function createAttemptHost(deps: AttemptHostDeps): BatchedAttemptStore {
   const engine = createAttemptEngine({
     produceRun,
     osLease,
-    escalationPort: deps.escalationPort,
-    escalationMode: deps.escalationMode,
+    escalationPort,
     escalationTimeoutMs: deps.escalationTimeoutMs,
     onAttemptStarted: (attemptId) => {
       const waiter = attemptStartedWaiter;
