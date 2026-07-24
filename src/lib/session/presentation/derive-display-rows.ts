@@ -8,6 +8,7 @@ import {
 
 import type { RunStatus } from "../events";
 import type { AgentMessageRowData, AgentTranscriptRow } from "../rows";
+import { isLiveRun } from "../run-status";
 
 export type DisplayRowsInput = {
   readonly rows: readonly AgentTranscriptRow[];
@@ -15,10 +16,6 @@ export type DisplayRowsInput = {
   readonly taskId: string | null;
   readonly streamingMessageId: string | null;
 };
-
-function isActiveStatus(status: RunStatus): boolean {
-  return status === "running" || status === "streaming" || status === "waiting_interaction";
-}
 
 /** Demo fixtures fold activity.* into CoT / task / marker rows — pass those through unchanged. */
 function hasAuthoredActivityRows(rows: readonly AgentTranscriptRow[]): boolean {
@@ -125,7 +122,7 @@ function computeDisplayRows(
     return rows;
   }
 
-  if (!isActiveStatus(status) || !taskId) {
+  if (!isLiveRun(status) || !taskId) {
     return rows;
   }
 

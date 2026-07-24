@@ -1,81 +1,22 @@
 import { useQueryClient } from "@tanstack/react-query";
-import type { UIMessage } from "ai";
 import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
-import { chatsKeys, createChatsPersistence, deriveChatTitle, type StoredChat } from "@/lib/chats";
-import type { BatchedAttemptStore, MandateProjection, RunStatus } from "@/lib/session";
+import {
+  chatsKeys,
+  createChatCheckpointController,
+  createChatsPersistence,
+  type ChatCheckpointController,
+} from "@/lib/chats";
+import type { BatchedAttemptStore } from "@/lib/session";
 import { selectSelectedModelId, useSettingsSelector } from "@/lib/settings";
 
 const persistence = createChatsPersistence();
 
-type ChatMeta = {
-  title: string;
-  modelId: string;
-  createdAt: number;
-  mandateId: string;
-};
-
-/** True for statuses that should checkpoint. Cancelled is excluded so cancel-then-retry
- *  does not persist a partial title update. */
-export function isCheckpointStatus(status: RunStatus): boolean {
-  return status === "completed" || status === "failed";
-}
-
-export function firstUserPrompt(messages: readonly UIMessage[]): string {
-  const user = messages.find((message) => message.role === "user");
-  if (!user) {
-    return "";
-  }
-  const texts: string[] = [];
-  for (const part of user.parts) {
-    if (part.type === "text") {
-      texts.push(part.text);
-    }
-  }
-  return texts.join("");
-}
-
-/** Build Chat Client metadata — transcript lives in the Attempt ledger. */
-export function buildCheckpointChat(input: {
-  id: string;
-  mandateId: string;
-  /** In-memory projection messages — used only to derive title when meta is absent. */
-  titleSourceMessages: readonly UIMessage[];
-  meta: ChatMeta | null;
-  projection: Pick<MandateProjection, "usage">;
-  fallbackModelId: string;
-  now?: number;
-}): StoredChat {
-  const now = input.now ?? Date.now();
-  const { meta, projection } = input;
-  if (input.mandateId.length === 0) {
-    throw new Error("buildCheckpointChat requires mandateId");
-  }
-  if (input.mandateId === input.id) {
-    throw new Error("mandateId must not equal chat id");
-  }
-  return {
-    id: input.id,
-    mandateId: input.mandateId,
-    title: meta?.title ?? deriveChatTitle(firstUserPrompt(input.titleSourceMessages)),
-    modelId: meta?.modelId ?? projection.usage.modelId ?? input.fallbackModelId,
-    createdAt: meta?.createdAt ?? now,
-    updatedAt: now,
-  };
-}
-
-export function checkpointErrorMessage(error: unknown): string {
-  if (error instanceof Error && error.message.trim().length > 0) {
-    return error.message;
-  }
-  return "Chat could not be written to this device.";
-}
-
 /**
  * Route `chatId` → bind (reattach or ledger hydrate); settled Attempt → metadata checkpoint.
- * Never cancels a live Attempt on navigation.
+ * Durability policy lives in `lib/chats` — this hook only wires bind + UX adapters.
  */
 export function useChatPersistence(store: BatchedAttemptStore, chatId: string | undefined): void {
   const navigate = useNavigate();
@@ -85,14 +26,52 @@ export function useChatPersistence(store: BatchedAttemptStore, chatId: string | 
   const chatIdRef = useRef(chatId);
   chatIdRef.current = chatId;
 
-  const metaRef = useRef<ChatMeta | null>(null);
   const modelIdRef = useRef(selectedModelId);
   modelIdRef.current = selectedModelId;
 
-  const createInFlightRef = useRef(false);
-  const createIdRef = useRef<string | null>(null);
-  const pendingAfterCreateRef = useRef<StoredChat | null>(null);
+  const navigateRef = useRef(navigate);
+  navigateRef.current = navigate;
+
+  const queryClientRef = useRef(queryClient);
+  queryClientRef.current = queryClient;
+
+  const controllerRef = useRef<ChatCheckpointController | null>(null);
   const hydrateGenerationRef = useRef(0);
+
+  useEffect(() => {
+    const controller = createChatCheckpointController({
+      chats: persistence,
+      flushLedger: () => store.flushLedger(),
+      getLiveIds: () => store.control.getLiveIds(),
+      getLiveChatId: () => store.control.getLiveChatId(),
+      getFocusedMandateId: () => store.control.getFocusedMandateId(),
+      setLiveChatId: (id) => store.control.setLiveChatId(id),
+      setFocusedMandateId: (id) => store.control.setFocusedMandateId(id),
+      getFallbackModelId: () => modelIdRef.current,
+      getRouteChatId: () => chatIdRef.current,
+      onSaved: async (chat, options) => {
+        void queryClientRef.current.invalidateQueries({ queryKey: chatsKeys.list() });
+        if (options.navigateToChat) {
+          navigateRef.current(`/chat/${chat.id}`, { replace: true });
+        }
+      },
+      onError: (message) => {
+        toast.error("Could not save chat", { description: message });
+      },
+    });
+    controllerRef.current = controller;
+
+    const unsub = store.subscribe(() => {
+      controller.onProjectionChange(store.getMandateProjection());
+    });
+
+    return () => {
+      unsub();
+      if (controllerRef.current === controller) {
+        controllerRef.current = null;
+      }
+    };
+  }, [store]);
 
   useEffect(() => {
     const generation = ++hydrateGenerationRef.current;
@@ -107,168 +86,30 @@ export function useChatPersistence(store: BatchedAttemptStore, chatId: string | 
         return;
       }
 
-      if (!chatId) {
-        if (!store.control.getLiveIds()) {
-          metaRef.current = null;
-        }
+      const controller = controllerRef.current;
+      if (!controller) {
         return;
       }
 
-      if (!metaRef.current) {
+      if (!chatId) {
+        controller.clearMetaIfIdle();
+        return;
+      }
+
+      if (!controller.getMeta()) {
         const chat = await persistence.load(chatId);
         if (generation !== hydrateGenerationRef.current || !chat) {
           return;
         }
-        metaRef.current = {
+        controller.setMeta({
           title: chat.title,
           modelId: chat.modelId,
           createdAt: chat.createdAt,
           mandateId: chat.mandateId,
-        };
+        });
       }
     }
 
     void syncFromRoute();
   }, [chatId, store]);
-
-  useEffect(() => {
-    let prevStatus = store.getMandateProjection().status;
-
-    async function persistChat(
-      chat: StoredChat,
-      options: { navigateToChat: boolean },
-    ): Promise<void> {
-      try {
-        await persistence.save(chat);
-        store.control.setLiveChatId(chat.id);
-        store.control.setFocusedMandateId(chat.mandateId);
-        void queryClient.invalidateQueries({ queryKey: chatsKeys.list() });
-        if (options.navigateToChat) {
-          navigate(`/chat/${chat.id}`, { replace: true });
-        }
-      } catch (error) {
-        toast.error("Could not save chat", {
-          description: checkpointErrorMessage(error),
-        });
-        throw error;
-      }
-    }
-
-    return store.subscribe(() => {
-      const projection = store.getMandateProjection();
-      const status = projection.status;
-      const previous = prevStatus;
-      prevStatus = status;
-
-      if (previous === status || !isCheckpointStatus(status)) {
-        return;
-      }
-
-      const settledLiveIds = store.control.getLiveIds();
-      const settledLiveChatId = store.control.getLiveChatId();
-      const settledFocusedMandateId = store.control.getFocusedMandateId();
-      const settledMeta = metaRef.current;
-      const settledRouteChatId = chatIdRef.current;
-      const settledFallbackModelId = modelIdRef.current;
-      const titleSourceMessages = projection.chatMessages;
-
-      void (async () => {
-        const mandateId =
-          settledLiveIds?.mandateId ?? settledMeta?.mandateId ?? settledFocusedMandateId;
-        if (!mandateId) {
-          toast.error("Could not save chat", {
-            description: "Missing mandate id for checkpoint.",
-          });
-          return;
-        }
-
-        await store.flushLedger();
-
-        const existingId = settledLiveChatId ?? (settledLiveIds ? null : settledRouteChatId);
-
-        const checkpointMeta =
-          settledMeta?.mandateId === mandateId
-            ? settledMeta
-            : settledMeta
-              ? { ...settledMeta, mandateId }
-              : null;
-
-        if (existingId) {
-          const chat = buildCheckpointChat({
-            id: existingId,
-            mandateId,
-            titleSourceMessages,
-            meta: checkpointMeta,
-            projection,
-            fallbackModelId: settledFallbackModelId,
-          });
-          try {
-            await persistChat(chat, { navigateToChat: false });
-          } catch {
-            // Toast already shown.
-          }
-          return;
-        }
-
-        if (createInFlightRef.current) {
-          const createId = createIdRef.current;
-          if (createId === null) {
-            return;
-          }
-          pendingAfterCreateRef.current = buildCheckpointChat({
-            id: createId,
-            mandateId,
-            titleSourceMessages,
-            meta: checkpointMeta,
-            projection,
-            fallbackModelId: settledFallbackModelId,
-          });
-          return;
-        }
-
-        createInFlightRef.current = true;
-        const id = crypto.randomUUID();
-        createIdRef.current = id;
-        const chat = buildCheckpointChat({
-          id,
-          mandateId,
-          titleSourceMessages,
-          meta: null,
-          projection,
-          fallbackModelId: settledFallbackModelId,
-        });
-        metaRef.current = {
-          title: chat.title,
-          modelId: chat.modelId,
-          createdAt: chat.createdAt,
-          mandateId: chat.mandateId,
-        };
-
-        try {
-          await persistChat(chat, { navigateToChat: true });
-
-          const pending = pendingAfterCreateRef.current;
-          pendingAfterCreateRef.current = null;
-          if (pending !== null) {
-            await persistChat(
-              {
-                ...pending,
-                id: chat.id,
-                mandateId: chat.mandateId,
-                createdAt: chat.createdAt,
-                updatedAt: Date.now(),
-              },
-              { navigateToChat: false },
-            );
-          }
-        } catch {
-          metaRef.current = null;
-          pendingAfterCreateRef.current = null;
-        } finally {
-          createInFlightRef.current = false;
-          createIdRef.current = null;
-        }
-      })();
-    });
-  }, [store, navigate, queryClient]);
 }

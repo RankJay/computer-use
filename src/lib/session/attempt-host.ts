@@ -25,6 +25,7 @@ import { createAttemptEngine, type AttemptEngine } from "./engine";
 import type { RunStatus, RuntimeEvent } from "./events";
 import type { MandateProjection } from "./projection";
 import { createEmptyMandateProjection } from "./projection";
+import { isLiveRun, shouldSettleLedger } from "./run-status";
 
 export type AttemptHostListener = () => void;
 
@@ -72,14 +73,6 @@ export type AttemptHostDeps = {
   escalationMode?: EscalationPortMode;
   escalationTimeoutMs?: number;
 };
-
-function isActiveStatus(status: RunStatus): boolean {
-  return status === "running" || status === "streaming" || status === "waiting_interaction";
-}
-
-function isSettleStatus(status: RunStatus): boolean {
-  return status === "completed" || status === "failed" || status === "cancelled";
-}
 
 /**
  * App-runtime host: AttemptControl + engine + durable ledger outlive any Chat route.
@@ -276,7 +269,7 @@ export function createAttemptHost(deps: AttemptHostDeps): BatchedAttemptStore {
         .then(async () => {
           if (hard) {
             const status = engine.getProjection().status;
-            if (isSettleStatus(status)) {
+            if (shouldSettleLedger(status)) {
               await settleLedger(status);
               clearLedgerError();
               return undefined;
@@ -316,7 +309,7 @@ export function createAttemptHost(deps: AttemptHostDeps): BatchedAttemptStore {
       flushTimer = null;
     }
     const status = engine.getProjection().status;
-    if (isSettleStatus(status)) {
+    if (shouldSettleLedger(status)) {
       flushChain = flushChain
         .then(async () => {
           await settleLedger(status);
@@ -373,7 +366,7 @@ export function createAttemptHost(deps: AttemptHostDeps): BatchedAttemptStore {
         status === "waiting_interaction" ||
         status === "running" ||
         status === "streaming" ||
-        isSettleStatus(status)
+        shouldSettleLedger(status)
       ) {
         void syncMandateLifecycle(status);
       }
@@ -383,7 +376,7 @@ export function createAttemptHost(deps: AttemptHostDeps): BatchedAttemptStore {
       scheduleLedgerFlush(true);
       return;
     }
-    if (isSettleStatus(status) && prev !== status) {
+    if (shouldSettleLedger(status) && prev !== status) {
       scheduleLedgerFlush(true);
       return;
     }
@@ -394,7 +387,7 @@ export function createAttemptHost(deps: AttemptHostDeps): BatchedAttemptStore {
 
   async function forceSettleUnrecovered(mandateId: string): Promise<void> {
     const projection = engine.getProjection();
-    if (!isActiveStatus(projection.status)) {
+    if (!isLiveRun(projection.status)) {
       return;
     }
     const log = engine.getEventLog();
@@ -424,7 +417,7 @@ export function createAttemptHost(deps: AttemptHostDeps): BatchedAttemptStore {
     resetLedgerCursors();
     durableLogCursor = engine.getEventLog().length;
     lastStatus = engine.getProjection().status;
-    if (isActiveStatus(lastStatus)) {
+    if (isLiveRun(lastStatus)) {
       // Crash reopen: no live runner — force-cancel so UI/cancel/permission are coherent.
       await forceSettleUnrecovered(chat.mandateId);
       lastStatus = engine.getProjection().status;
@@ -458,7 +451,7 @@ export function createAttemptHost(deps: AttemptHostDeps): BatchedAttemptStore {
         const attachLiveFocus = async (): Promise<boolean> => {
           const status = engine.getProjection().status;
           const live = registry.getLive();
-          if (!(isActiveStatus(status) && live)) {
+          if (!(isLiveRun(status) && live)) {
             return false;
           }
           const liveChatId = registry.getLiveChatId();

@@ -1,5 +1,5 @@
-import type { RunStatus } from "../events";
 import type { MandateProjection } from "../projection";
+import { isLiveRun } from "../run-status";
 
 export type AttemptControls = {
   canSubmit: boolean;
@@ -10,13 +10,9 @@ export type AttemptControls = {
   canResolve: boolean;
 };
 
-function isActiveStatus(status: RunStatus): boolean {
-  return status === "running" || status === "streaming" || status === "waiting_interaction";
-}
-
 /** Derive presentation/control flags from projection — never store these on MandateProjection. */
 export function deriveAttemptControls(projection: MandateProjection): AttemptControls {
-  const active = isActiveStatus(projection.status);
+  const active = isLiveRun(projection.status);
   const hasPendingInteractions = projection.pendingInteractions.length > 0;
 
   return {

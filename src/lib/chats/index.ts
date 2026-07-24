@@ -9,3 +9,14 @@ export { TauriSqlChatsPersistence } from "./adapters/tauri-sql-store";
 export { groupChatsByRecency, type ChatsByRecency } from "./grouping";
 export { deriveChatTitle } from "./title";
 export { chatsKeys, chatsListQueryOptions, useChatsList, useDeleteChat } from "./queries";
+
+export {
+  buildCheckpointChat,
+  checkpointErrorMessage,
+  createChatCheckpointController,
+  firstUserPrompt,
+  type ChatCheckpointController,
+  type ChatCheckpointMeta,
+  type ChatCheckpointPorts,
+  type ChatCheckpointProjection,
+} from "./checkpoint";

@@ -17,7 +17,6 @@ import {
   RUNTIME_EVENT_SCHEMA_VERSION,
   type RuntimeEvent,
   type RuntimeEventPayload,
-  type RunStatus,
 } from "./events";
 import {
   createFoldState,
@@ -28,6 +27,7 @@ import {
 } from "./fold";
 import { foldModelContext } from "./model-context";
 import { createEmptyMandateProjection, type MandateProjection } from "./projection";
+import { isLiveRun } from "./run-status";
 
 export type AttemptEngineListener = () => void;
 
@@ -65,10 +65,6 @@ export type AttemptEngine = {
   beginTask: (taskId: string, options?: { continueSeq?: boolean }) => void;
   clearTask: () => void;
 };
-
-function isActiveStatus(status: RunStatus): boolean {
-  return status === "running" || status === "streaming" || status === "waiting_interaction";
-}
 
 export type AttemptEngineDeps = {
   produceRun: ProduceRun;
@@ -191,7 +187,7 @@ export function createAttemptEngine(deps: AttemptEngineDeps): AttemptEngine {
     resolve: (interaction) => controller.resolve(interaction),
     retry: () => controller.retry(),
     async retryFromMessage(assistantMessageId, config) {
-      if (isActiveStatus(projection.status)) {
+      if (isLiveRun(projection.status)) {
         return;
       }
 
