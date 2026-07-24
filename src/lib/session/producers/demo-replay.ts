@@ -26,7 +26,7 @@ function delay(ms: number, signal: AbortSignal): Promise<void> {
 
 /** Paced demo producer for UI — emits fixture payloads through append. */
 export function createDemoReplayProducer(): ProduceRun {
-  return async ({ config, taskId, signal, append }) => {
+  return async ({ config, attemptId, signal, append }) => {
     const payloads = createDemoPayloads(config.prompt);
 
     for (const payload of payloads) {
@@ -40,13 +40,13 @@ export function createDemoReplayProducer(): ProduceRun {
 
       if (signal.aborted) break;
 
-      if (payload.type === "task.started") {
+      if (payload.type === "attempt.started") {
         append({
           ...payload,
           prompt: config.prompt,
           modelId: config.modelId,
           agentMode: "demo",
-          userMessageId: config.isRetry ? undefined : `user-${taskId}`,
+          userMessageId: config.isRetry ? undefined : `user-${attemptId}`,
           omitUserMessage: config.isRetry === true,
         });
         continue;

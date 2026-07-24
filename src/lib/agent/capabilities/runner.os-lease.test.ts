@@ -29,7 +29,7 @@ describe("runCapability OS lease", () => {
       { x: 1, y: 2, button: "left" },
       {
         append: (payload) => payloads.push(payload),
-        taskId: "attempt-a",
+        attemptId: "attempt-a",
         settings: { ...DEFAULT_SETTINGS, permissionMode: "risky" },
         workspaceRoot: "D:/Projects/actuate-v3",
         escalationPort: createAutoEscalationPort("allow"),
@@ -49,7 +49,7 @@ describe("runCapability OS lease", () => {
       { path: "src/main.tsx" },
       {
         append: () => {},
-        taskId: "attempt-b",
+        attemptId: "attempt-b",
         settings: DEFAULT_SETTINGS,
         workspaceRoot: "D:/Projects/actuate-v3",
         escalationPort: createAutoEscalationPort("allow"),
@@ -75,7 +75,7 @@ describe("runCapability OS lease", () => {
       { x: 1, y: 2, button: "left" },
       {
         append: () => {},
-        taskId: "attempt-b",
+        attemptId: "attempt-b",
         settings: { ...DEFAULT_SETTINGS, permissionMode: "risky" },
         workspaceRoot: "D:/Projects/actuate-v3",
         escalationPort: createAutoEscalationPort("allow"),
@@ -108,7 +108,7 @@ describe("runCapability OS lease", () => {
       { windowId: 1 },
       {
         append: () => {},
-        taskId: "attempt-b",
+        attemptId: "attempt-b",
         settings: { ...DEFAULT_SETTINGS, permissionMode: "risky" },
         workspaceRoot: "D:/Projects/actuate-v3",
         escalationPort: createAutoEscalationPort("allow"),

@@ -6,12 +6,12 @@ import type {
   BudgetUpdatedPayload,
   InteractionRequestedPayload,
   RunStatus,
-  TaskFailedPayload,
+  AttemptFailedPayload,
   UsageUpdatedPayload,
 } from "./events";
 import type { AgentTranscriptRow } from "./rows";
 
-export type AttemptFailure = Pick<TaskFailedPayload, "code" | "message" | "recoverable">;
+export type AttemptFailure = Pick<AttemptFailedPayload, "code" | "message" | "recoverable">;
 
 export type PendingInteraction = Omit<InteractionRequestedPayload, "type">;
 
@@ -31,7 +31,7 @@ export type AttemptBudget = Omit<BudgetUpdatedPayload, "type">;
 
 /** Mandate-scoped audit/UI read model (fold of Attempt events + live tail). */
 export type MandateProjection = {
-  taskId: string | null;
+  attemptId: string | null;
   status: RunStatus;
   failure: AttemptFailure | null;
   rows: AgentTranscriptRow[];
@@ -63,7 +63,7 @@ export const EMPTY_PENDING_INTERACTIONS: PendingInteraction[] = [];
 
 export function createEmptyMandateProjection(): MandateProjection {
   return {
-    taskId: null,
+    attemptId: null,
     status: "idle",
     failure: null,
     rows: [],

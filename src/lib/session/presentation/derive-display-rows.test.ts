@@ -36,13 +36,13 @@ function assistantRow(id: string, parts: UIMessage["parts"]): AgentTranscriptRow
 
 describe("deriveDisplayRows", () => {
   test("live running with empty assistant parts inserts Thinking marker before assistant", () => {
-    const taskId = "task-1";
-    const assistantId = `assistant-${taskId}`;
+    const attemptId = "task-1";
+    const assistantId = `assistant-${attemptId}`;
     const rows: AgentTranscriptRow[] = [userRow("user-1", "hi"), assistantRow(assistantId, [])];
 
     const display = deriveDisplayRows(
       projection({
-        taskId,
+        attemptId,
         status: "running",
         streamingMessageId: assistantId,
         rows,
@@ -52,7 +52,7 @@ describe("deriveDisplayRows", () => {
     expect(display).toHaveLength(3);
     expect(display[1]).toEqual({
       type: "marker",
-      id: `live-thinking-${taskId}`,
+      id: `live-thinking-${attemptId}`,
       text: "Thinking…",
       live: true,
       status: true,
@@ -62,12 +62,12 @@ describe("deriveDisplayRows", () => {
   });
 
   test("live running before assistant row inserts marker after user", () => {
-    const taskId = "task-2";
+    const attemptId = "task-2";
     const rows: AgentTranscriptRow[] = [userRow("user-1", "hi")];
 
     const display = deriveDisplayRows(
       projection({
-        taskId,
+        attemptId,
         status: "running",
         streamingMessageId: null,
         rows,
@@ -78,14 +78,14 @@ describe("deriveDisplayRows", () => {
     expect(display[0]?.id).toBe("user-1");
     expect(display[1]).toMatchObject({
       type: "marker",
-      id: `live-thinking-${taskId}`,
+      id: `live-thinking-${attemptId}`,
       text: "Thinking…",
     });
   });
 
   test("reasoning streaming skips marker", () => {
-    const taskId = "task-3";
-    const assistantId = `assistant-${taskId}`;
+    const attemptId = "task-3";
+    const assistantId = `assistant-${attemptId}`;
     const rows: AgentTranscriptRow[] = [
       userRow("user-1", "hi"),
       assistantRow(assistantId, [{ type: "reasoning", text: "Considering…", state: "streaming" }]),
@@ -93,7 +93,7 @@ describe("deriveDisplayRows", () => {
 
     const display = deriveDisplayRows(
       projection({
-        taskId,
+        attemptId,
         status: "streaming",
         streamingMessageId: assistantId,
         rows,
@@ -104,8 +104,8 @@ describe("deriveDisplayRows", () => {
   });
 
   test("text part present skips marker", () => {
-    const taskId = "task-4";
-    const assistantId = `assistant-${taskId}`;
+    const attemptId = "task-4";
+    const assistantId = `assistant-${attemptId}`;
     const rows: AgentTranscriptRow[] = [
       userRow("user-1", "hi"),
       assistantRow(assistantId, [{ type: "text", text: "Hello" }]),
@@ -113,7 +113,7 @@ describe("deriveDisplayRows", () => {
 
     const display = deriveDisplayRows(
       projection({
-        taskId,
+        attemptId,
         status: "streaming",
         streamingMessageId: assistantId,
         rows,
@@ -124,8 +124,8 @@ describe("deriveDisplayRows", () => {
   });
 
   test("tool part present skips marker", () => {
-    const taskId = "task-5";
-    const assistantId = `assistant-${taskId}`;
+    const attemptId = "task-5";
+    const assistantId = `assistant-${attemptId}`;
     const rows: AgentTranscriptRow[] = [
       userRow("user-1", "hi"),
       assistantRow(assistantId, [
@@ -141,7 +141,7 @@ describe("deriveDisplayRows", () => {
 
     const display = deriveDisplayRows(
       projection({
-        taskId,
+        attemptId,
         status: "waiting_interaction",
         streamingMessageId: assistantId,
         rows,
@@ -170,7 +170,7 @@ describe("deriveDisplayRows", () => {
 
     const display = deriveDisplayRows(
       projection({
-        taskId: "demo-task",
+        attemptId: "demo-task",
         status: "streaming",
         rows,
       }),
@@ -180,19 +180,19 @@ describe("deriveDisplayRows", () => {
   });
 
   test("terminal statuses skip synthetic marker", () => {
-    const taskId = "task-6";
+    const attemptId = "task-6";
     const rows: AgentTranscriptRow[] = [userRow("user-1", "hi")];
 
     for (const status of ["idle", "completed", "failed", "cancelled"] as const) {
-      const display = deriveDisplayRows(projection({ taskId, status, rows }));
+      const display = deriveDisplayRows(projection({ attemptId, status, rows }));
       expect(display).toBe(rows);
     }
   });
 
   test("Thinking marker identity is stable across identical derives", () => {
-    const taskId = "task-stable";
+    const attemptId = "task-stable";
     const rows: AgentTranscriptRow[] = [userRow("user-1", "hi")];
-    const input = projection({ taskId, status: "running", rows });
+    const input = projection({ attemptId, status: "running", rows });
 
     const first = deriveDisplayRows(input);
     const second = deriveDisplayRows(input);

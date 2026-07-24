@@ -42,7 +42,7 @@ describe("authorize hierarchy (thermo)", () => {
       { button: "left", x: 1, y: 2 },
       {
         append: (payload) => payloads.push(payload),
-        taskId: "t1",
+        attemptId: "t1",
         settings: { ...DEFAULT_SETTINGS, permissionMode: "every-meaningful", uiAutomation: true },
         workspaceRoot: "D:/Projects/actuate-v3",
         entitlements: policy,
@@ -69,7 +69,7 @@ describe("authorize hierarchy (thermo)", () => {
       { path: "tmp/x.txt" },
       {
         append: (payload) => payloads.push(payload),
-        taskId: "t2",
+        attemptId: "t2",
         settings: { ...DEFAULT_SETTINGS, permissionMode: "every-meaningful" },
         workspaceRoot: "D:/Projects/actuate-v3",
         standingPolicy: { version: 1, denyCapabilities: ["delete_path"] },
@@ -98,7 +98,7 @@ describe("authorize hierarchy (thermo)", () => {
       { path: "tmp/x.txt" },
       {
         append: (payload) => payloads.push(payload),
-        taskId: "t3",
+        attemptId: "t3",
         settings: { ...DEFAULT_SETTINGS, permissionMode: "every-meaningful" },
         workspaceRoot: "D:/Projects/actuate-v3",
         standingPolicy: { version: 1, allowCapabilities: ["delete_path"] },
@@ -140,7 +140,7 @@ describe("authorize hierarchy (thermo)", () => {
       { path: "tmp/x.txt" },
       {
         append: (payload) => payloads.push(payload),
-        taskId: "t4",
+        attemptId: "t4",
         settings: { ...DEFAULT_SETTINGS, permissionMode: "every-meaningful" },
         workspaceRoot: "D:/Projects/actuate-v3",
         escalationPort: port,

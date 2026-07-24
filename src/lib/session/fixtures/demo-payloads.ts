@@ -257,7 +257,7 @@ export function createDemoPayloads(prompt: string): RuntimeEventPayload[] {
       text: "Today",
     },
     {
-      type: "task.started",
+      type: "attempt.started",
       prompt,
       modelId: "openai/gpt-5.4",
       agentMode: "demo",
@@ -271,7 +271,7 @@ export function createDemoPayloads(prompt: string): RuntimeEventPayload[] {
       status: true,
     },
     {
-      type: "task.status_changed",
+      type: "attempt.status_changed",
       status: "streaming",
     },
     {
@@ -331,7 +331,7 @@ export function createDemoPayloads(prompt: string): RuntimeEventPayload[] {
       maxTokens: 128_000,
     },
     {
-      type: "task.completed",
+      type: "attempt.completed",
       finishReason: "stop",
     },
   ];
@@ -339,24 +339,24 @@ export function createDemoPayloads(prompt: string): RuntimeEventPayload[] {
 
 /**
  * Test producer: appends payloads in order. Yields between events so cancel can abort.
- * Rewrites task.started prompt/model from config; supports omitUserMessage for retry.
+ * Rewrites attempt.started prompt/model from config; supports omitUserMessage for retry.
  */
 export function createTestDemoProducer(
   payloads: RuntimeEventPayload[] = createDemoPayloads("demo"),
 ): ProduceRun {
-  return async ({ config, taskId, signal, append }) => {
+  return async ({ config, attemptId, signal, append }) => {
     for (const payload of payloads) {
       if (signal.aborted) break;
       await Promise.resolve();
       if (signal.aborted) break;
 
-      if (payload.type === "task.started") {
+      if (payload.type === "attempt.started") {
         append({
           ...payload,
           prompt: config.prompt,
           modelId: config.modelId,
           agentMode: "demo",
-          userMessageId: config.isRetry ? undefined : `user-${taskId}`,
+          userMessageId: config.isRetry ? undefined : `user-${attemptId}`,
           omitUserMessage: config.isRetry === true,
         });
         continue;

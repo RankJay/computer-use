@@ -84,7 +84,7 @@ export async function runStreamCoordinator(
 
   const runnerDeps: CapabilityRunnerDeps = {
     append: deps.append,
-    taskId: deps.taskId,
+    attemptId: deps.attemptId,
     settings: deps.settings,
     workspaceRoot: deps.workspaceRoot,
     escalationPort: deps.escalationPort,
@@ -141,7 +141,7 @@ export async function runStreamCoordinator(
       onError: formatToolStreamError,
     });
 
-    const assistantMessageId = `assistant-${deps.taskId}`;
+    const assistantMessageId = `assistant-${deps.attemptId}`;
     const seedMessage: UIMessage = {
       id: assistantMessageId,
       role: "assistant",
@@ -157,7 +157,7 @@ export async function runStreamCoordinator(
       }
 
       if (!streamingStatusEmitted) {
-        emit({ type: "task.status_changed", status: "streaming" });
+        emit({ type: "attempt.status_changed", status: "streaming" });
         streamingStatusEmitted = true;
       }
       latestMessage = message;
@@ -185,7 +185,7 @@ export async function runStreamCoordinator(
     const finishReason = await result.finishReason;
     if (finishReason === "error") {
       emit({
-        type: "task.failed",
+        type: "attempt.failed",
         code: "provider",
         message: "The model stopped with an error.",
         recoverable: true,

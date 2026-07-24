@@ -34,7 +34,7 @@ export type RunConfig = {
 /** Producer seam: shared gates + packed RunConfig (settings/workspace via config). */
 export type ProduceRunContext = Pick<
   RunExecutionContext,
-  | "taskId"
+  | "attemptId"
   | "append"
   | "escalationPort"
   | "entitlements"
@@ -67,11 +67,11 @@ export type RunController = {
 
 export type RunControllerDeps = {
   append: (payload: RuntimeEventPayload) => unknown;
-  beginTask: (taskId: string) => void;
-  clearTask: () => void;
+  beginAttempt: (attemptId: string) => void;
+  clearAttempt: () => void;
   getProjection: () => MandateProjection;
   produceRun: ProduceRun;
-  /** Fires once the Attempt is in-flight (after beginTask), before produceRun settles. */
+  /** Fires once the Attempt is in-flight (after beginAttempt), before produceRun settles. */
   onAttemptStarted?: (attemptId: string) => void;
   /** Released when the Attempt settles or is cancelled. */
   osLease?: OsLease;
@@ -83,7 +83,7 @@ export type RunControllerDeps = {
 
 export function createRunController(deps: RunControllerDeps): RunController {
   let activeAbort: AbortController | null = null;
-  let activeTaskId: string | null = null;
+  let activeAttemptId: string | null = null;
   let lastConfig: RunConfig | null = null;
 
   const escalationPort =
@@ -96,12 +96,12 @@ export function createRunController(deps: RunControllerDeps): RunController {
 
   function clearActiveRun(): void {
     escalationPort.denyAll();
-    if (activeTaskId) {
-      deps.osLease?.release(activeTaskId);
+    if (activeAttemptId) {
+      deps.osLease?.release(activeAttemptId);
     }
     activeAbort = null;
-    activeTaskId = null;
-    deps.clearTask();
+    activeAttemptId = null;
+    deps.clearAttempt();
   }
 
   async function runWithConfig(config: RunConfig): Promise<void> {
@@ -111,17 +111,17 @@ export function createRunController(deps: RunControllerDeps): RunController {
       await cancel();
     }
 
-    const taskId = crypto.randomUUID();
-    activeTaskId = taskId;
+    const attemptId = crypto.randomUUID();
+    activeAttemptId = attemptId;
     lastConfig = config;
     activeAbort = new AbortController();
-    deps.beginTask(taskId);
-    deps.onAttemptStarted?.(taskId);
+    deps.beginAttempt(attemptId);
+    deps.onAttemptStarted?.(attemptId);
 
     try {
       await deps.produceRun({
         config,
-        taskId,
+        attemptId,
         signal: activeAbort.signal,
         append: deps.append,
         escalationPort,
@@ -134,13 +134,13 @@ export function createRunController(deps: RunControllerDeps): RunController {
   }
 
   async function cancel(): Promise<void> {
-    if (!activeAbort || !activeTaskId) return;
+    if (!activeAbort || !activeAttemptId) return;
 
     escalationPort.denyAll();
-    deps.osLease?.release(activeTaskId);
+    deps.osLease?.release(activeAttemptId);
     activeAbort.abort();
-    deps.append({ type: "task.status_changed", status: "cancelled" });
-    deps.append({ type: "task.completed", finishReason: "cancelled" });
+    deps.append({ type: "attempt.status_changed", status: "cancelled" });
+    deps.append({ type: "attempt.completed", finishReason: "cancelled" });
   }
 
   return {

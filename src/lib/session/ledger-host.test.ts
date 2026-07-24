@@ -123,12 +123,12 @@ describe("AttemptHost durable ledger", () => {
     const host = createAttemptHost({
       produceRun: async ({ append, config }) => {
         append({
-          type: "task.started",
+          type: "attempt.started",
           prompt: config.prompt,
           modelId: config.modelId,
           agentMode: "demo",
         });
-        append({ type: "task.status_changed", status: "streaming" });
+        append({ type: "attempt.status_changed", status: "streaming" });
         append({
           type: "assistant.message_started",
           messageId: "a1",
@@ -141,7 +141,7 @@ describe("AttemptHost durable ledger", () => {
           part: { type: "text", text: "partial" },
         });
         await gate;
-        append({ type: "task.completed", finishReason: "stop" });
+        append({ type: "attempt.completed", finishReason: "stop" });
       },
       mandates,
       eventStore,
@@ -263,11 +263,11 @@ describe("hydrateFromLedger vs full replay", () => {
     const mandateId = "man-x";
     const events = [
       {
-        type: "task.started" as const,
+        type: "attempt.started" as const,
         eventId: "1",
-        taskId: attemptId,
+        attemptId,
         timestamp: 1,
-        schemaVersion: 1,
+        schemaVersion: 2,
         prompt: "p",
         modelId: "m",
         agentMode: "demo" as const,
@@ -275,28 +275,28 @@ describe("hydrateFromLedger vs full replay", () => {
       {
         type: "assistant.message_started" as const,
         eventId: "2",
-        taskId: attemptId,
+        attemptId,
         timestamp: 2,
-        schemaVersion: 1,
+        schemaVersion: 2,
         messageId: "a",
         role: "assistant" as const,
       },
       {
         type: "assistant.part_updated" as const,
         eventId: "3",
-        taskId: attemptId,
+        attemptId,
         timestamp: 3,
-        schemaVersion: 1,
+        schemaVersion: 2,
         messageId: "a",
         partIndex: 0,
         part: { type: "text" as const, text: "ok" },
       },
       {
-        type: "task.completed" as const,
+        type: "attempt.completed" as const,
         eventId: "4",
-        taskId: attemptId,
+        attemptId,
         timestamp: 4,
-        schemaVersion: 1,
+        schemaVersion: 2,
         finishReason: "stop" as const,
       },
     ];

@@ -47,7 +47,7 @@ describe("runCapability entitlements", () => {
       { x: 1, y: 2, button: "left" },
       {
         append: (payload) => payloads.push(payload),
-        taskId: "task-1",
+        attemptId: "task-1",
         settings: { ...DEFAULT_SETTINGS, permissionMode: "every-meaningful" },
         workspaceRoot: "D:/Projects/actuate-v3",
         escalationPort: {
@@ -95,7 +95,7 @@ describe("runCapability entitlements", () => {
       { path: "src/main.tsx" },
       {
         append: () => {},
-        taskId: "task-1",
+        attemptId: "task-1",
         settings: DEFAULT_SETTINGS,
         workspaceRoot: "D:/Projects/actuate-v3",
         escalationPort: createAutoEscalationPort("allow"),
@@ -127,7 +127,7 @@ describe("runCapability entitlements", () => {
       { x: 1, y: 2, button: "left" },
       {
         append: () => {},
-        taskId: "task-1",
+        attemptId: "task-1",
         settings: { ...DEFAULT_SETTINGS, permissionMode: "every-meaningful" },
         workspaceRoot: "D:/Projects/actuate-v3",
         escalationPort: createAutoEscalationPort("deny"),

@@ -13,9 +13,9 @@ function partUpdated(
   return {
     type: "assistant.part_updated",
     eventId,
-    taskId: "a1",
+    attemptId: "a1",
     timestamp: 1,
-    schemaVersion: 1,
+    schemaVersion: 2,
     messageId,
     partIndex,
     part: { type: "text", text },
@@ -31,9 +31,9 @@ describe("coalesceDurableEvents", () => {
       {
         type: "assistant.message_finished",
         eventId: "e4",
-        taskId: "a1",
+        attemptId: "a1",
         timestamp: 2,
-        schemaVersion: 1,
+        schemaVersion: 2,
         messageId: "m1",
       },
     ];

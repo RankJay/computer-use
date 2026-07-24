@@ -30,7 +30,7 @@ function withEnvelope(
   return {
     ...payload,
     eventId,
-    taskId: TASK_ID,
+    attemptId: TASK_ID,
     timestamp,
     schemaVersion: RUNTIME_EVENT_SCHEMA_VERSION,
   };
@@ -39,18 +39,18 @@ function withEnvelope(
 /** Payload arb — ids for interactions/messages stay small so collisions are intentional. */
 const payloadArb: fc.Arbitrary<RuntimeEventPayload> = fc.oneof(
   fc.record({
-    type: fc.constant("task.started" as const),
+    type: fc.constant("attempt.started" as const),
     prompt: fc.string({ maxLength: 24 }),
     modelId: fc.constantFrom("openai/gpt-4o", "anthropic/claude-sonnet-4"),
     agentMode: fc.constantFrom("live" as const, "demo" as const),
     omitUserMessage: fc.option(fc.boolean(), { nil: undefined }),
   }),
   fc.record({
-    type: fc.constant("task.status_changed" as const),
+    type: fc.constant("attempt.status_changed" as const),
     status: fc.constantFrom(...RUN_STATUSES),
   }),
   fc.record({
-    type: fc.constant("task.completed" as const),
+    type: fc.constant("attempt.completed" as const),
     finishReason: fc.constantFrom(
       "stop" as const,
       "budget" as const,
@@ -59,7 +59,7 @@ const payloadArb: fc.Arbitrary<RuntimeEventPayload> = fc.oneof(
     ),
   }),
   fc.record({
-    type: fc.constant("task.failed" as const),
+    type: fc.constant("attempt.failed" as const),
     code: fc.constantFrom("auth", "provider", "internal"),
     message: fc.string({ maxLength: 32 }),
     recoverable: fc.boolean(),
@@ -163,7 +163,7 @@ function foldAll(events: readonly RuntimeEvent[]): FoldState {
 function projectionKey(state: FoldState) {
   const projection = toProjection(state);
   return {
-    taskId: projection.taskId,
+    attemptId: projection.attemptId,
     status: projection.status,
     failure: projection.failure,
     rows: projection.rows,

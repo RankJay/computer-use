@@ -62,8 +62,8 @@ export type AttemptEngine = {
    * @param continueSeq — when true, keep eventSeq (crash-open recovery after hydrateFromLedger).
    *   Default false resets seq for a fresh Attempt.
    */
-  beginTask: (taskId: string, options?: { continueSeq?: boolean }) => void;
-  clearTask: () => void;
+  beginAttempt: (attemptId: string, options?: { continueSeq?: boolean }) => void;
+  clearAttempt: () => void;
 };
 
 export type AttemptEngineDeps = {
@@ -80,7 +80,7 @@ export function createAttemptEngine(deps: AttemptEngineDeps): AttemptEngine {
   let projection: MandateProjection = createEmptyMandateProjection();
   let eventLog: RuntimeEvent[] = [];
   let eventSeq = 0;
-  let activeTaskId: string | null = null;
+  let activeAttemptId: string | null = null;
   const listeners = new Set<AttemptEngineListener>();
 
   function notify(): void {
@@ -90,15 +90,15 @@ export function createAttemptEngine(deps: AttemptEngineDeps): AttemptEngine {
   }
 
   function append(payload: RuntimeEventPayload): RuntimeEvent | null {
-    if (!activeTaskId) {
+    if (!activeAttemptId) {
       return null;
     }
 
     eventSeq += 1;
     const event: RuntimeEvent = {
       ...payload,
-      eventId: `${activeTaskId}-${eventSeq}`,
-      taskId: activeTaskId,
+      eventId: `${activeAttemptId}-${eventSeq}`,
+      attemptId: activeAttemptId,
       timestamp: Date.now() + eventSeq,
       schemaVersion: RUNTIME_EVENT_SCHEMA_VERSION,
     };
@@ -116,12 +116,12 @@ export function createAttemptEngine(deps: AttemptEngineDeps): AttemptEngine {
 
   const controller: RunController = createRunController({
     append,
-    beginTask: (taskId) => {
-      activeTaskId = taskId;
+    beginAttempt: (attemptId) => {
+      activeAttemptId = attemptId;
       eventSeq = 0;
     },
-    clearTask: () => {
-      activeTaskId = null;
+    clearAttempt: () => {
+      activeAttemptId = null;
       eventSeq = 0;
     },
     getProjection: () => projection,
@@ -149,7 +149,7 @@ export function createAttemptEngine(deps: AttemptEngineDeps): AttemptEngine {
       projection = createEmptyMandateProjection();
       eventLog = [];
       eventSeq = 0;
-      activeTaskId = null;
+      activeAttemptId = null;
       notify();
     },
     hydrate(messages) {
@@ -157,7 +157,7 @@ export function createAttemptEngine(deps: AttemptEngineDeps): AttemptEngine {
       projection = toProjection(fold, null);
       eventLog = [];
       eventSeq = 0;
-      activeTaskId = null;
+      activeAttemptId = null;
       notify();
     },
     hydrateFromLedger(input) {
@@ -169,17 +169,17 @@ export function createAttemptEngine(deps: AttemptEngineDeps): AttemptEngine {
       projection = toProjection(fold, null);
       eventLog = [...input.events];
       eventSeq = input.events.length;
-      activeTaskId = null;
+      activeAttemptId = null;
       notify();
     },
-    beginTask(taskId, options) {
-      activeTaskId = taskId;
+    beginAttempt(attemptId, options) {
+      activeAttemptId = attemptId;
       if (!options?.continueSeq) {
         eventSeq = 0;
       }
     },
-    clearTask() {
-      activeTaskId = null;
+    clearAttempt() {
+      activeAttemptId = null;
       eventSeq = 0;
     },
     start: (config) => controller.start(config),
@@ -201,7 +201,7 @@ export function createAttemptEngine(deps: AttemptEngineDeps): AttemptEngine {
       projection = toProjection(fold, null);
       eventLog = [];
       eventSeq = 0;
-      activeTaskId = null;
+      activeAttemptId = null;
       notify();
 
       const execution = foldModelContext({ chatMessages: plan.messages });

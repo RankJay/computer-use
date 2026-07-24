@@ -219,7 +219,7 @@ export async function runCapability(
 
     const outcome = await deps.escalationPort.escalate({
       callId,
-      attemptId: deps.taskId,
+      attemptId: deps.attemptId,
       capability: name,
       label: uiToolLabel(name),
       input: parsedInput,
@@ -253,7 +253,7 @@ export async function runCapability(
 
   const leaseScope = osLeaseScopeOf(name);
   if (leaseScope !== "none" && deps.osLease) {
-    const lease = deps.osLease.acquire(deps.taskId, leaseScope);
+    const lease = deps.osLease.acquire(deps.attemptId, leaseScope);
     if (lease.outcome === "rejected") {
       const capabilityError: CapabilityError = {
         code: "os_lease_held",

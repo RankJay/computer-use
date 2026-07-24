@@ -45,8 +45,8 @@ describe("createRunController persistApproval", () => {
 
     const controller = createRunController({
       append: () => undefined,
-      beginTask: () => undefined,
-      clearTask: () => undefined,
+      beginAttempt: () => undefined,
+      clearAttempt: () => undefined,
       getProjection: () => projection,
       produceRun: producer,
     });

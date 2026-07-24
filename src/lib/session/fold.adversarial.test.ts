@@ -14,7 +14,7 @@ function evt(seq: number, payload: RuntimeEventPayload): RuntimeEvent {
   return {
     ...payload,
     eventId: `${TASK_ID}-${seq}`,
-    taskId: TASK_ID,
+    attemptId: TASK_ID,
     timestamp: 1_000 + seq,
     schemaVersion: RUNTIME_EVENT_SCHEMA_VERSION,
   };
@@ -23,7 +23,7 @@ function evt(seq: number, payload: RuntimeEventPayload): RuntimeEvent {
 describe("fold adversarial / invariants", () => {
   test("duplicate eventId is a no-op (idempotent replay)", () => {
     const started = evt(1, {
-      type: "task.started",
+      type: "attempt.started",
       prompt: "hi",
       modelId: "openai/gpt-5.4",
       agentMode: "live",
@@ -37,7 +37,7 @@ describe("fold adversarial / invariants", () => {
   });
 
   test("isKnownRuntimeEvent covers live payload types and rejects junk", () => {
-    expect(isKnownRuntimeEvent({ type: "task.started" })).toBe(true);
+    expect(isKnownRuntimeEvent({ type: "attempt.started" })).toBe(true);
     expect(isKnownRuntimeEvent({ type: "assistant.part_updated" })).toBe(true);
     expect(isKnownRuntimeEvent({ type: "budget.exceeded" })).toBe(true);
     expect(isKnownRuntimeEvent({ type: "not.a.real.event" })).toBe(false);
@@ -46,7 +46,7 @@ describe("fold adversarial / invariants", () => {
   test("interaction events never mutate transcript rows", () => {
     const projection = projectMandate([
       evt(1, {
-        type: "task.started",
+        type: "attempt.started",
         prompt: "hi",
         modelId: "openai/gpt-5.4",
         agentMode: "live",
@@ -72,7 +72,7 @@ describe("fold adversarial / invariants", () => {
   test("omitUserMessage on retry does not append a user row", () => {
     const projection = projectMandate([
       evt(1, {
-        type: "task.started",
+        type: "attempt.started",
         prompt: "retry",
         modelId: "openai/gpt-5.4",
         agentMode: "live",
@@ -88,11 +88,11 @@ describe("isRuntimeEvent", () => {
   test("accepts envelope-shaped events", () => {
     expect(
       isRuntimeEvent({
-        type: "task.completed",
+        type: "attempt.completed",
         finishReason: "stop",
         eventId: "e1",
-        taskId: "t1",
-        schemaVersion: 1,
+        attemptId: "t1",
+        schemaVersion: 2,
         timestamp: 1,
       }),
     ).toBe(true);
@@ -100,7 +100,7 @@ describe("isRuntimeEvent", () => {
 
   test("rejects incomplete envelopes", () => {
     expect(isRuntimeEvent(null)).toBe(false);
-    expect(isRuntimeEvent({ type: "task.completed" })).toBe(false);
-    expect(isRuntimeEvent({ type: "task.completed", eventId: "e", taskId: "t" })).toBe(false);
+    expect(isRuntimeEvent({ type: "attempt.completed" })).toBe(false);
+    expect(isRuntimeEvent({ type: "attempt.completed", eventId: "e", attemptId: "t" })).toBe(false);
   });
 });

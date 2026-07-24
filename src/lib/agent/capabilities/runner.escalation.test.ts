@@ -31,7 +31,7 @@ describe("runCapability EscalationPort park", () => {
       { path: "tmp/x.txt" },
       {
         append: (payload) => payloads.push(payload),
-        taskId: "attempt-1",
+        attemptId: "attempt-1",
         settings: { ...DEFAULT_SETTINGS, permissionMode: "every-meaningful" },
         workspaceRoot: "D:/Projects/actuate-v3",
         escalationPort: port,

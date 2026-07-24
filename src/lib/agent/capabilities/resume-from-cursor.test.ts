@@ -19,7 +19,7 @@ describe("lookupSettledCapability", () => {
       event({
         type: "capability.completed",
         eventId: "1",
-        taskId: "t",
+        attemptId: "t",
         timestamp: 1,
         schemaVersion: RUNTIME_EVENT_SCHEMA_VERSION,
         callId: "c1",
@@ -38,7 +38,7 @@ describe("lookupSettledCapability", () => {
       event({
         type: "interaction.resolved",
         eventId: "1",
-        taskId: "t",
+        attemptId: "t",
         timestamp: 1,
         schemaVersion: RUNTIME_EVENT_SCHEMA_VERSION,
         callId: "c2",
@@ -59,7 +59,7 @@ describe("runCapability resume-from-cursor", () => {
       event({
         type: "capability.completed",
         eventId: "1",
-        taskId: "t",
+        attemptId: "t",
         timestamp: 1,
         schemaVersion: RUNTIME_EVENT_SCHEMA_VERSION,
         callId: "resume-1",
@@ -73,7 +73,7 @@ describe("runCapability resume-from-cursor", () => {
       { path: "src/main.tsx" },
       {
         append: () => {},
-        taskId: "t",
+        attemptId: "t",
         settings: DEFAULT_SETTINGS,
         workspaceRoot: "D:/Projects/actuate-v3",
         escalationPort: createAutoEscalationPort("allow"),

@@ -49,7 +49,7 @@ const { runAgentLoop } = await import("./run-agent");
 function baseDeps(overrides: Partial<Parameters<typeof runAgentLoop>[0]> = {}) {
   const payloads: RuntimeEventPayload[] = [];
   const deps = {
-    taskId: "task-test",
+    attemptId: "task-test",
     messages: [
       {
         id: "user-test",
@@ -79,7 +79,7 @@ describe("run-agent", () => {
 
     expect(result.finishReason).toBe("stop");
     expect(payloads.some((event) => event.type === "assistant.part_updated")).toBe(true);
-    expect(payloads.some((event) => event.type === "task.status_changed")).toBe(true);
+    expect(payloads.some((event) => event.type === "attempt.status_changed")).toBe(true);
 
     const started = payloads.find((event) => event.type === "assistant.message_started");
     expect(started?.type).toBe("assistant.message_started");
@@ -101,7 +101,7 @@ describe("run-agent", () => {
     ).toBe(true);
   });
 
-  test("auth failure emits recoverable task.failed", async () => {
+  test("auth failure emits recoverable attempt.failed", async () => {
     const { deps, payloads } = baseDeps({
       secrets: { ...DEFAULT_SECRETS, openaiApiKey: "" },
       modelOverride: undefined,
@@ -109,9 +109,9 @@ describe("run-agent", () => {
     const result = await runAgentLoop(deps);
 
     expect(result.finishReason).toBe("error");
-    const failure = payloads.find((event) => event.type === "task.failed");
-    expect(failure?.type).toBe("task.failed");
-    if (failure?.type === "task.failed") {
+    const failure = payloads.find((event) => event.type === "attempt.failed");
+    expect(failure?.type).toBe("attempt.failed");
+    if (failure?.type === "attempt.failed") {
       expect(failure.recoverable).toBe(true);
       expect(failure.code).toBe("auth");
     }
@@ -149,18 +149,18 @@ describe("run-agent", () => {
     const result = await run;
 
     expect(result.finishReason).toBe("cancelled");
-    expect(payloads.some((event) => event.type === "task.failed")).toBe(false);
+    expect(payloads.some((event) => event.type === "attempt.failed")).toBe(false);
   });
 
-  test("provider error finishReason emits recoverable task.failed", async () => {
+  test("provider error finishReason emits recoverable attempt.failed", async () => {
     const { deps, payloads } = baseDeps({
       modelOverride: createMockStreamingModel(errorFinishChunks()),
     });
     const result = await runAgentLoop(deps);
     expect(result.finishReason).toBe("error");
-    const failure = payloads.find((event) => event.type === "task.failed");
-    expect(failure?.type).toBe("task.failed");
-    if (failure?.type === "task.failed") {
+    const failure = payloads.find((event) => event.type === "attempt.failed");
+    expect(failure?.type).toBe("attempt.failed");
+    if (failure?.type === "attempt.failed") {
       expect(failure.code).toBe("provider");
       expect(failure.recoverable).toBe(true);
     }
@@ -191,7 +191,7 @@ describe("run-agent", () => {
     });
 
     const { deps, payloads } = baseDeps({
-      taskId: "task-tool",
+      attemptId: "task-tool",
       modelOverride: model,
       settings: { ...DEFAULT_SETTINGS, permissionMode: "risky", maxSteps: 5 },
     });

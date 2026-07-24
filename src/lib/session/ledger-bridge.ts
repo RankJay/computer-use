@@ -65,7 +65,7 @@ export function createLedgerBridge(deps: LedgerBridgeDeps): LedgerBridge {
   }
 
   function resolveAttemptId(): string | null {
-    return ledgerAttemptId ?? registry.getLive()?.attemptId ?? engine.getProjection().taskId;
+    return ledgerAttemptId ?? registry.getLive()?.attemptId ?? engine.getProjection().attemptId;
   }
 
   function resetLedgerCursors(): void {
@@ -262,13 +262,13 @@ export function createLedgerBridge(deps: LedgerBridgeDeps): LedgerBridge {
     const log = engine.getEventLog();
     const lastEvent = log.length > 0 ? log[log.length - 1] : undefined;
     const attemptId =
-      projection.taskId ?? lastEvent?.taskId ?? `unrecovered-${crypto.randomUUID()}`;
+      projection.attemptId ?? lastEvent?.attemptId ?? `unrecovered-${crypto.randomUUID()}`;
     registry.setFocusedMandateId(mandateId);
-    engine.beginTask(attemptId, { continueSeq: true });
+    engine.beginAttempt(attemptId, { continueSeq: true });
     ledgerAttemptId = attemptId;
-    engine.append({ type: "task.status_changed", status: "cancelled" });
-    engine.append({ type: "task.completed", finishReason: "cancelled" });
-    engine.clearTask();
+    engine.append({ type: "attempt.status_changed", status: "cancelled" });
+    engine.append({ type: "attempt.completed", finishReason: "cancelled" });
+    engine.clearAttempt();
     await settleLedger("cancelled");
     await mandates.update(mandateId, { status: "armed" });
   }

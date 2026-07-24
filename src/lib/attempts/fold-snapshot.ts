@@ -12,7 +12,7 @@ import { ATTEMPT_FOLD_SNAPSHOT_VERSION, type AttemptFoldSnapshot } from "./types
 export function projectionToFoldSnapshot(projection: MandateProjection): AttemptFoldSnapshot {
   return {
     version: ATTEMPT_FOLD_SNAPSHOT_VERSION,
-    taskId: projection.taskId,
+    attemptId: projection.attemptId,
     status: projection.status,
     failure: projection.failure,
     rows: projection.rows,
@@ -27,7 +27,7 @@ export function projectionToFoldSnapshot(projection: MandateProjection): Attempt
 export function foldStateFromSnapshot(snapshot: AttemptFoldSnapshot): FoldState {
   return createFoldState(
     {
-      taskId: snapshot.taskId,
+      attemptId: snapshot.attemptId,
       status: snapshot.status,
       failure: snapshot.failure,
       rows: snapshot.rows,
@@ -78,7 +78,7 @@ function isLanguageModelUsageSnapshot(value: unknown): value is LanguageModelUsa
  */
 export const attemptFoldSnapshotSchema = z.object({
   version: z.literal(ATTEMPT_FOLD_SNAPSHOT_VERSION),
-  taskId: z.string().nullable(),
+  attemptId: z.string().nullable(),
   status: runStatusSchema,
   failure: z
     .object({

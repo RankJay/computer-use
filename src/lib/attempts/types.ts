@@ -1,7 +1,7 @@
 import type { RunStatus, RuntimeEvent } from "@/lib/session/events";
 import type { MandateProjection } from "@/lib/session/projection";
 
-export const ATTEMPT_FOLD_SNAPSHOT_VERSION = 1 as const;
+export const ATTEMPT_FOLD_SNAPSHOT_VERSION = 2 as const;
 
 /**
  * Fold checkpoint written on Attempt settle.

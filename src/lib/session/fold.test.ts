@@ -19,52 +19,52 @@ function evt(seq: number, payload: RuntimeEventPayload): RuntimeEvent {
   return {
     ...payload,
     eventId: `${TASK_ID}-${seq}`,
-    taskId: TASK_ID,
+    attemptId: TASK_ID,
     timestamp: 1_000 + seq,
     schemaVersion: RUNTIME_EVENT_SCHEMA_VERSION,
   };
 }
 
 describe("fold", () => {
-  test("task.completed with cancelled finishReason sets status cancelled", () => {
+  test("attempt.completed with cancelled finishReason sets status cancelled", () => {
     const projection = projectMandate([
       evt(1, {
-        type: "task.started",
+        type: "attempt.started",
         prompt: "hi",
         modelId: "openai/gpt-5.4",
         agentMode: "demo",
       }),
-      evt(2, { type: "task.status_changed", status: "cancelled" }),
-      evt(3, { type: "task.completed", finishReason: "cancelled" }),
+      evt(2, { type: "attempt.status_changed", status: "cancelled" }),
+      evt(3, { type: "attempt.completed", finishReason: "cancelled" }),
     ]);
 
     expect(projection.status).toBe("cancelled");
   });
 
-  test("task.completed with budget finishReason sets status failed", () => {
+  test("attempt.completed with budget finishReason sets status failed", () => {
     const projection = projectMandate([
       evt(1, {
-        type: "task.started",
+        type: "attempt.started",
         prompt: "hi",
         modelId: "openai/gpt-5.4",
         agentMode: "live",
       }),
-      evt(2, { type: "task.completed", finishReason: "budget" }),
+      evt(2, { type: "attempt.completed", finishReason: "budget" }),
     ]);
 
     expect(projection.status).toBe("failed");
   });
 
-  test("task.failed stores recoverable on failure", () => {
+  test("attempt.failed stores recoverable on failure", () => {
     const projection = projectMandate([
       evt(1, {
-        type: "task.started",
+        type: "attempt.started",
         prompt: "hi",
         modelId: "openai/gpt-5.4",
         agentMode: "live",
       }),
       evt(2, {
-        type: "task.failed",
+        type: "attempt.failed",
         code: "auth",
         message: "missing key",
         recoverable: true,
@@ -82,7 +82,7 @@ describe("fold", () => {
   test("pendingInteractions supports parallel callIds", () => {
     const projection = projectMandate([
       evt(1, {
-        type: "task.started",
+        type: "attempt.started",
         prompt: "hi",
         modelId: "openai/gpt-5.4",
         agentMode: "live",
@@ -117,7 +117,7 @@ describe("fold", () => {
   test("interaction.resolved removes only that callId", () => {
     const projection = projectMandate([
       evt(1, {
-        type: "task.started",
+        type: "attempt.started",
         prompt: "hi",
         modelId: "openai/gpt-5.4",
         agentMode: "live",
@@ -160,7 +160,7 @@ describe("fold", () => {
   test("resolving last permission returns status to running", () => {
     const projection = projectMandate([
       evt(1, {
-        type: "task.started",
+        type: "attempt.started",
         prompt: "hi",
         modelId: "openai/gpt-5.4",
         agentMode: "live",
@@ -192,7 +192,7 @@ describe("fold", () => {
   test("permission events do not invent dynamic-tool parts", () => {
     const projection = projectMandate([
       evt(1, {
-        type: "task.started",
+        type: "attempt.started",
         prompt: "hi",
         modelId: "openai/gpt-5.4",
         agentMode: "live",
@@ -223,7 +223,7 @@ describe("fold", () => {
 
   test("duplicate eventId is a no-op", () => {
     const event = evt(1, {
-      type: "task.started",
+      type: "attempt.started",
       prompt: "hi",
       modelId: "openai/gpt-5.4",
       agentMode: "demo",
@@ -253,7 +253,7 @@ describe("fold", () => {
     state = reduceFold(
       state,
       evt(2, {
-        type: "task.started",
+        type: "attempt.started",
         prompt: "hi",
         modelId: "openai/gpt-5.4",
         agentMode: "demo",
@@ -269,7 +269,7 @@ describe("fold", () => {
     state = reduceFold(
       state,
       evt(1, {
-        type: "task.started",
+        type: "attempt.started",
         prompt: "hi",
         modelId: "openai/gpt-5.4",
         agentMode: "demo",
@@ -280,7 +280,7 @@ describe("fold", () => {
     state = reduceFold(
       state,
       evt(2, {
-        type: "task.completed",
+        type: "attempt.completed",
         finishReason: "stop",
       }),
     );
@@ -290,7 +290,7 @@ describe("fold", () => {
     state = reduceFold(
       state,
       evt(3, {
-        type: "task.started",
+        type: "attempt.started",
         prompt: "again",
         modelId: "openai/gpt-5.4",
         agentMode: "demo",
@@ -305,7 +305,7 @@ describe("fold", () => {
     state = reduceFold(
       state,
       evt(1, {
-        type: "task.started",
+        type: "attempt.started",
         prompt: "hi",
         modelId: "openai/gpt-5.4",
         agentMode: "demo",
@@ -362,7 +362,7 @@ describe("fold", () => {
         variant: "separator",
       }),
       evt(2, {
-        type: "task.started",
+        type: "attempt.started",
         prompt: "Build it",
         modelId: "openai/gpt-5.4",
         agentMode: "demo",
@@ -380,7 +380,7 @@ describe("fold", () => {
         part: { type: "text", text: "Done." },
       }),
       evt(5, { type: "assistant.message_finished", messageId: "asst-1" }),
-      evt(6, { type: "task.completed", finishReason: "stop" }),
+      evt(6, { type: "attempt.completed", finishReason: "stop" }),
     ]);
 
     expect(projection.status).toBe("completed");
@@ -392,7 +392,7 @@ describe("fold", () => {
   test("budget.exceeded is recoverable failure", () => {
     const projection = projectMandate([
       evt(1, {
-        type: "task.started",
+        type: "attempt.started",
         prompt: "hi",
         modelId: "openai/gpt-5.4",
         agentMode: "live",

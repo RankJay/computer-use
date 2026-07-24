@@ -9,17 +9,17 @@ import { MemoryAttemptEventStore } from "./memory-store";
 function event(
   attemptId: string,
   eventId: string,
-  type: "task.started" | "task.completed" | "assistant.part_updated",
+  type: "attempt.started" | "attempt.completed" | "assistant.part_updated",
   extra: Record<string, unknown> = {},
 ): RuntimeEvent {
   const base = {
     eventId,
-    taskId: attemptId,
+    attemptId,
     timestamp: Date.now(),
     schemaVersion: RUNTIME_EVENT_SCHEMA_VERSION,
   };
   switch (type) {
-    case "task.started":
+    case "attempt.started":
       return {
         ...base,
         type,
@@ -28,7 +28,7 @@ function event(
         agentMode: "demo",
         ...extra,
       };
-    case "task.completed":
+    case "attempt.completed":
       return { ...base, type, finishReason: "stop", ...extra };
     case "assistant.part_updated":
       return {
@@ -57,18 +57,18 @@ describe("MemoryAttemptEventStore", () => {
       attemptId,
       mandateId,
       events: [
-        event(attemptId, "e1", "task.started"),
+        event(attemptId, "e1", "attempt.started"),
         event(attemptId, "e2", "assistant.part_updated", {
           part: { type: "text", text: "Hello" },
         }),
-        event(attemptId, "e3", "task.completed"),
+        event(attemptId, "e3", "attempt.completed"),
       ],
     });
 
     const projection = createEmptyMandateProjection();
     const snap = projectionToFoldSnapshot({
       ...projection,
-      taskId: attemptId,
+      attemptId,
       status: "completed",
       chatMessages: [
         { id: "u", role: "user", parts: [{ type: "text", text: "hi" }] },
@@ -113,7 +113,7 @@ describe("MemoryAttemptEventStore", () => {
       attemptId,
       mandateId,
       events: [
-        event(attemptId, "e1", "task.started"),
+        event(attemptId, "e1", "attempt.started"),
         event(attemptId, "e2", "assistant.part_updated", {
           part: { type: "text", text: "partial" },
         }),

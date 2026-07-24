@@ -15,7 +15,7 @@ function clearedPendingInteractions(pending: PendingInteraction[]): PendingInter
 }
 
 export type FoldState = {
-  taskId: string | null;
+  attemptId: string | null;
   status: MandateProjection["status"];
   failure: MandateProjection["failure"];
   rows: AgentTranscriptRow[];
@@ -31,7 +31,7 @@ export function createFoldState(
   seenEventIds: ReadonlySet<string> = new Set(),
 ): FoldState {
   return {
-    taskId: previous.taskId,
+    attemptId: previous.attemptId,
     status: previous.status,
     failure: previous.failure,
     rows: previous.rows,
@@ -138,8 +138,8 @@ function setMessagePart(
   };
 }
 
-function appendFailureMessage(state: FoldState, taskId: string, message: string): FoldState {
-  const errorMessageId = `error-${taskId}`;
+function appendFailureMessage(state: FoldState, attemptId: string, message: string): FoldState {
+  const errorMessageId = `error-${attemptId}`;
   const errorMessage: UIMessage = {
     id: errorMessageId,
     role: "assistant",
@@ -184,10 +184,10 @@ function formatBudgetExceededMessage(dimension: "steps" | "cost" | "wall_clock")
 }
 
 const KNOWN_EVENT_TYPES = new Set<RuntimeEvent["type"]>([
-  "task.started",
-  "task.status_changed",
-  "task.completed",
-  "task.failed",
+  "attempt.started",
+  "attempt.status_changed",
+  "attempt.completed",
+  "attempt.failed",
   "assistant.message_started",
   "assistant.part_updated",
   "assistant.message_finished",
@@ -222,10 +222,10 @@ export function reduceFold(state: FoldState, event: RuntimeEvent): FoldState {
   const base = withSeen(state, event.eventId);
 
   switch (event.type) {
-    case "task.started": {
+    case "attempt.started": {
       const next: FoldState = {
         ...base,
-        taskId: event.taskId,
+        attemptId: event.attemptId,
         status: "running",
         failure: null,
         pendingInteractions: clearedPendingInteractions(base.pendingInteractions),
@@ -235,7 +235,7 @@ export function reduceFold(state: FoldState, event: RuntimeEvent): FoldState {
       if (event.omitUserMessage) {
         return next;
       }
-      const userMessageId = event.userMessageId ?? `user-${event.taskId}`;
+      const userMessageId = event.userMessageId ?? `user-${event.attemptId}`;
       const userMessage: UIMessage = {
         id: userMessageId,
         role: "user",
@@ -253,10 +253,10 @@ export function reduceFold(state: FoldState, event: RuntimeEvent): FoldState {
       };
     }
 
-    case "task.status_changed":
+    case "attempt.status_changed":
       return { ...base, status: event.status };
 
-    case "task.completed": {
+    case "attempt.completed": {
       let status: MandateProjection["status"] = base.status;
       if (event.finishReason === "cancelled") {
         status = "cancelled";
@@ -273,7 +273,7 @@ export function reduceFold(state: FoldState, event: RuntimeEvent): FoldState {
       };
     }
 
-    case "task.failed": {
+    case "attempt.failed": {
       const withFailure: FoldState = {
         ...base,
         status: "failed",
@@ -285,7 +285,7 @@ export function reduceFold(state: FoldState, event: RuntimeEvent): FoldState {
         pendingInteractions: clearedPendingInteractions(base.pendingInteractions),
         streamingMessageId: null,
       };
-      return appendFailureMessage(withFailure, event.taskId, event.message);
+      return appendFailureMessage(withFailure, event.attemptId, event.message);
     }
 
     case "assistant.message_started":
@@ -398,8 +398,8 @@ export function reduceFold(state: FoldState, event: RuntimeEvent): FoldState {
         pendingInteractions: clearedPendingInteractions(base.pendingInteractions),
         streamingMessageId: null,
       };
-      if (base.taskId) {
-        next = appendFailureMessage(next, base.taskId, message);
+      if (base.attemptId) {
+        next = appendFailureMessage(next, base.attemptId, message);
       }
       return next;
     }
@@ -429,7 +429,7 @@ export function toProjection(
 ): MandateProjection {
   const rowsUnchanged = previous !== null && Object.is(previous.rows, state.rows);
   return {
-    taskId: state.taskId,
+    attemptId: state.attemptId,
     status: state.status,
     failure: state.failure,
     rows: state.rows,

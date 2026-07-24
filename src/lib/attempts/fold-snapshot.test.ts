@@ -12,11 +12,11 @@ describe("attempt fold snapshot Zod boundary", () => {
   test("accepts projectionToFoldSnapshot output", () => {
     const snap = projectionToFoldSnapshot({
       ...createEmptyMandateProjection(),
-      taskId: "att-1",
+      attemptId: "att-1",
       status: "completed",
     });
     expect(isAttemptFoldSnapshot(snap)).toBe(true);
-    expect(parseAttemptFoldSnapshot(snap)?.taskId).toBe("att-1");
+    expect(parseAttemptFoldSnapshot(snap)?.attemptId).toBe("att-1");
     expect(parseAttemptFoldSnapshot(snap)?.status).toBe("completed");
   });
 

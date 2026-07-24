@@ -24,7 +24,7 @@ mock.module("@/lib/agent/run-agent", () => ({
 const { createLiveRunProducer } = await import("./live-run");
 
 describe("createLiveRunProducer", () => {
-  test("emits started + running, then task.completed on stop", async () => {
+  test("emits started + running, then attempt.completed on stop", async () => {
     runAgentLoopMock.mockClear();
     const payloads: RuntimeEventPayload[] = [];
     const produce = createLiveRunProducer();
@@ -36,22 +36,22 @@ describe("createLiveRunProducer", () => {
         settings: { ...DEFAULT_SETTINGS, agentMode: "live", workspaceRoot: "D:/ws" },
         secrets: DEFAULT_SECRETS,
       },
-      taskId: "attempt-1",
+      attemptId: "attempt-1",
       signal: new AbortController().signal,
       append: (payload) => payloads.push(payload),
       escalationPort: createAutoEscalationPort("allow"),
     });
 
     expect(payloads[0]).toMatchObject({
-      type: "task.started",
+      type: "attempt.started",
       prompt: "hello live",
       agentMode: "live",
       userMessageId: "user-attempt-1",
     });
-    expect(payloads.some((p) => p.type === "task.status_changed" && p.status === "running")).toBe(
-      true,
-    );
-    expect(payloads.some((p) => p.type === "task.completed" && p.finishReason === "stop")).toBe(
+    expect(
+      payloads.some((p) => p.type === "attempt.status_changed" && p.status === "running"),
+    ).toBe(true);
+    expect(payloads.some((p) => p.type === "attempt.completed" && p.finishReason === "stop")).toBe(
       true,
     );
     expect(runAgentLoopMock).toHaveBeenCalledTimes(1);
@@ -82,14 +82,14 @@ describe("createLiveRunProducer", () => {
         settings: { ...DEFAULT_SETTINGS, agentMode: "live", workspaceRoot: "D:/ws" },
         secrets: DEFAULT_SECRETS,
       },
-      taskId: "attempt-2",
+      attemptId: "attempt-2",
       signal: new AbortController().signal,
       append: (payload) => payloads.push(payload),
       escalationPort: createAutoEscalationPort("allow"),
     });
 
     expect(payloads[0]).toMatchObject({
-      type: "task.started",
+      type: "attempt.started",
       omitUserMessage: true,
     });
     const call = runAgentLoopMock.mock.calls[0]?.[0] as {
@@ -111,18 +111,18 @@ describe("createLiveRunProducer", () => {
         settings: { ...DEFAULT_SETTINGS, agentMode: "live", workspaceRoot: "D:/ws" },
         secrets: DEFAULT_SECRETS,
       },
-      taskId: "attempt-3",
+      attemptId: "attempt-3",
       signal: new AbortController().signal,
       append: (payload) => payloads.push(payload),
       escalationPort: createAutoEscalationPort("allow"),
     });
 
-    expect(payloads.some((p) => p.type === "task.completed" && p.finishReason === "budget")).toBe(
-      true,
-    );
+    expect(
+      payloads.some((p) => p.type === "attempt.completed" && p.finishReason === "budget"),
+    ).toBe(true);
   });
 
-  test("error finishReason does not emit task.completed", async () => {
+  test("error finishReason does not emit attempt.completed", async () => {
     runAgentLoopMock.mockImplementationOnce(async () => ({ finishReason: "error" as const }));
     const payloads: RuntimeEventPayload[] = [];
     const produce = createLiveRunProducer();
@@ -134,12 +134,12 @@ describe("createLiveRunProducer", () => {
         settings: { ...DEFAULT_SETTINGS, agentMode: "live", workspaceRoot: "D:/ws" },
         secrets: DEFAULT_SECRETS,
       },
-      taskId: "attempt-4",
+      attemptId: "attempt-4",
       signal: new AbortController().signal,
       append: (payload) => payloads.push(payload),
       escalationPort: createAutoEscalationPort("allow"),
     });
 
-    expect(payloads.some((p) => p.type === "task.completed")).toBe(false);
+    expect(payloads.some((p) => p.type === "attempt.completed")).toBe(false);
   });
 });

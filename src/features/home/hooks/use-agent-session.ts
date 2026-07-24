@@ -112,15 +112,15 @@ export function useAgentTranscript(store: BatchedAttemptStore): AgentTranscriptS
     () => store.getMandateProjection().status,
     () => store.getMandateProjection().status,
   );
-  const taskId = useSyncExternalStore(
+  const attemptId = useSyncExternalStore(
     store.subscribe,
-    () => store.getMandateProjection().taskId,
-    () => store.getMandateProjection().taskId,
+    () => store.getMandateProjection().attemptId,
+    () => store.getMandateProjection().attemptId,
   );
 
   const displayRows = useMemo(
-    () => deriveDisplayRows({ rows, status, taskId, streamingMessageId }),
-    [rows, status, taskId, streamingMessageId],
+    () => deriveDisplayRows({ rows, status, attemptId, streamingMessageId }),
+    [rows, status, attemptId, streamingMessageId],
   );
 
   return useMemo(

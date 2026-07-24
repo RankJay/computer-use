@@ -36,7 +36,7 @@ describe("createProduceRun", () => {
         settings: { ...DEFAULT_SETTINGS, agentMode: "demo" },
         secrets: DEFAULT_SECRETS,
       },
-      taskId: "t1",
+      attemptId: "t1",
       signal: new AbortController().signal,
       append: () => {},
       escalationPort: {
@@ -60,7 +60,7 @@ describe("createProduceRun", () => {
         settings: { ...DEFAULT_SETTINGS, agentMode: "live" },
         secrets: DEFAULT_SECRETS,
       },
-      taskId: "t2",
+      attemptId: "t2",
       signal: new AbortController().signal,
       append: () => {},
       escalationPort: {

@@ -17,6 +17,7 @@ import { createLedgerBridge, type LedgerBridge } from "./ledger-bridge";
 import type { MandateProjection } from "./projection";
 import { createEmptyMandateProjection } from "./projection";
 import { createRouteBinder } from "./route-binder";
+import { createStallBridge } from "./stall-bridge";
 
 export type AttemptHostListener = () => void;
 
@@ -63,6 +64,12 @@ export type AttemptHostDeps = {
   /** Dark-launch park adapter (unattended-ready). Default interactive. */
   escalationMode?: EscalationPortMode;
   escalationTimeoutMs?: number;
+  /** Progress stall → cancel (ops-contract §5). Default 90s. */
+  stallAfterMs?: number;
+  /** Poll interval while running/streaming. Default 5s. */
+  stallPollIntervalMs?: number;
+  /** Injected clock for stall watchdog tests. */
+  stallNow?: () => number;
 };
 
 /**
@@ -162,6 +169,14 @@ export function createAttemptHost(deps: AttemptHostDeps): BatchedAttemptStore {
 
   ledger.attach();
 
+  const stall = createStallBridge({
+    getStatus: () => engine.getProjection().status,
+    cancel: () => control.cancel(),
+    stallAfterMs: deps.stallAfterMs,
+    pollIntervalMs: deps.stallPollIntervalMs,
+    now: deps.stallNow,
+  });
+
   engine.subscribe(() => {
     pending = engine.getProjection();
     if (typeof requestAnimationFrame !== "function") {
@@ -169,6 +184,7 @@ export function createAttemptHost(deps: AttemptHostDeps): BatchedAttemptStore {
     } else if (rafId === null) {
       rafId = requestAnimationFrame(flushUi);
     }
+    stall.onProjection();
   });
 
   const routeBinder = createRouteBinder({
@@ -200,6 +216,7 @@ export function createAttemptHost(deps: AttemptHostDeps): BatchedAttemptStore {
     bindChatRoute: (input) => routeBinder.bindChatRoute(input),
 
     async resetForMaintenance() {
+      stall.dispose();
       await ledger.flushLedger();
       await engine.reset();
       registry.resetPointers();

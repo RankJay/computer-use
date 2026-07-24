@@ -29,7 +29,7 @@ describe("runCapability", () => {
       { path: "src/main.tsx" },
       {
         append: (payload) => payloads.push(payload),
-        taskId: "task-1",
+        attemptId: "task-1",
         settings: DEFAULT_SETTINGS,
         workspaceRoot: "D:/Projects/actuate-v3",
         escalationPort: createAutoEscalationPort("allow"),
@@ -54,7 +54,7 @@ describe("runCapability", () => {
       {},
       {
         append: (payload) => payloads.push(payload),
-        taskId: "task-1",
+        attemptId: "task-1",
         settings: DEFAULT_SETTINGS,
         workspaceRoot: "D:/Projects/actuate-v3",
         escalationPort: createAutoEscalationPort("allow"),
@@ -77,7 +77,7 @@ describe("runCapability", () => {
       { path: "tmp/example.txt" },
       {
         append: (payload) => payloads.push(payload),
-        taskId: "task-1",
+        attemptId: "task-1",
         settings: { ...DEFAULT_SETTINGS, permissionMode: "every-meaningful" },
         workspaceRoot: "D:/Projects/actuate-v3",
         invokeNative: createMockCapabilityInvoker({
@@ -127,7 +127,7 @@ describe("runCapability", () => {
       { path: "tmp/example.txt" },
       {
         append: (payload) => payloads.push(payload),
-        taskId: "task-1",
+        attemptId: "task-1",
         settings: { ...DEFAULT_SETTINGS, permissionMode: "every-meaningful" },
         workspaceRoot: "D:/Projects/actuate-v3",
         invokeNative: async () => {
@@ -165,7 +165,7 @@ describe("runCapability", () => {
       { path: "tmp/late.txt" },
       {
         append: (payload) => payloads.push(payload),
-        taskId: "task-1",
+        attemptId: "task-1",
         settings: { ...DEFAULT_SETTINGS, permissionMode: "every-meaningful" },
         workspaceRoot: "D:/Projects/actuate-v3",
         invokeNative: createMockCapabilityInvoker({
@@ -212,7 +212,7 @@ describe("runCapability", () => {
 
     const makeDeps = () => ({
       append: () => {},
-      taskId: "task-1",
+      attemptId: "task-1",
       settings: { ...DEFAULT_SETTINGS, permissionMode: "every-meaningful" as const },
       workspaceRoot: "D:/Projects/actuate-v3",
       invokeNative: createMockCapabilityInvoker({

@@ -5,6 +5,11 @@ export function isLiveRun(status: RunStatus): boolean {
   return status === "running" || status === "streaming" || status === "waiting_interaction";
 }
 
+/** Agent is producing progress — stall watchdog arms here, not during human wait. */
+export function isAgentProgressStatus(status: RunStatus): boolean {
+  return status === "running" || status === "streaming";
+}
+
 /** Ledger settle snapshot — includes cancelled. */
 export function shouldSettleLedger(status: RunStatus): boolean {
   return status === "completed" || status === "failed" || status === "cancelled";

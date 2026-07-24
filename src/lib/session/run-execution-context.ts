@@ -12,7 +12,7 @@ import type { RuntimeEvent, RuntimeEventPayload } from "./events";
  * Agent and capability deps bags extend or Pick from this — not a god-type.
  */
 export type RunExecutionContext = {
-  taskId: string;
+  attemptId: string;
   append: (payload: RuntimeEventPayload) => unknown;
   settings: AppSettings;
   workspaceRoot: string;

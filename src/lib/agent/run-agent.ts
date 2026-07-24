@@ -14,7 +14,7 @@ export async function runAgentLoop(deps: RunAgentDeps): Promise<RunAgentResult> 
   } catch (error) {
     const mapped = mapAgentError(error);
     deps.append({
-      type: "task.failed",
+      type: "attempt.failed",
       code: mapped.code,
       message: mapped.message,
       recoverable: mapped.recoverable,
@@ -26,7 +26,7 @@ export async function runAgentLoop(deps: RunAgentDeps): Promise<RunAgentResult> 
 
   try {
     return await runStreamCoordinator({
-      taskId: deps.taskId,
+      attemptId: deps.attemptId,
       model,
       modelId: deps.modelId,
       system,
@@ -49,7 +49,7 @@ export async function runAgentLoop(deps: RunAgentDeps): Promise<RunAgentResult> 
 
     const mapped = mapAgentError(error);
     deps.append({
-      type: "task.failed",
+      type: "attempt.failed",
       code: mapped.code,
       message: mapped.message,
       recoverable: mapped.recoverable,

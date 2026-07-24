@@ -8,7 +8,7 @@ import type { ProduceRun } from "../control/run-controller";
 export function createLiveRunProducer(): ProduceRun {
   return async ({
     config,
-    taskId,
+    attemptId,
     signal,
     append,
     escalationPort,
@@ -21,15 +21,15 @@ export function createLiveRunProducer(): ProduceRun {
 
     if (!config.isRetry) {
       append({
-        type: "task.started",
+        type: "attempt.started",
         prompt: config.prompt,
         modelId: config.modelId,
         agentMode: "live",
-        userMessageId: `user-${taskId}`,
+        userMessageId: `user-${attemptId}`,
       });
     } else {
       append({
-        type: "task.started",
+        type: "attempt.started",
         prompt: config.prompt,
         modelId: config.modelId,
         agentMode: "live",
@@ -37,7 +37,7 @@ export function createLiveRunProducer(): ProduceRun {
       });
     }
 
-    append({ type: "task.status_changed", status: "running" });
+    append({ type: "attempt.status_changed", status: "running" });
 
     const prior = config.chatMessages ?? [];
     const messages: UIMessage[] = config.isRetry
@@ -45,14 +45,14 @@ export function createLiveRunProducer(): ProduceRun {
       : [
           ...prior,
           {
-            id: `user-${taskId}`,
+            id: `user-${attemptId}`,
             role: "user",
             parts: [{ type: "text", text: config.prompt }],
           },
         ];
 
     const result = await runAgentLoop({
-      taskId,
+      attemptId,
       messages,
       modelId: config.modelId,
       settings: config.settings,
@@ -72,7 +72,7 @@ export function createLiveRunProducer(): ProduceRun {
     }
 
     if (result.finishReason === "budget") {
-      append({ type: "task.completed", finishReason: "budget" });
+      append({ type: "attempt.completed", finishReason: "budget" });
       return;
     }
 
@@ -80,6 +80,6 @@ export function createLiveRunProducer(): ProduceRun {
       return;
     }
 
-    append({ type: "task.completed", finishReason: "stop" });
+    append({ type: "attempt.completed", finishReason: "stop" });
   };
 }

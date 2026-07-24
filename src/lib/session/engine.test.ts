@@ -52,9 +52,9 @@ describe("AttemptEngine", () => {
     const engine = createAttemptEngine({
       produceRun: async () => {},
     });
-    engine.beginTask("task-dup");
+    engine.beginAttempt("task-dup");
     engine.append({
-      type: "task.started",
+      type: "attempt.started",
       prompt: "a",
       modelId: "openai/gpt-5.4",
       agentMode: "demo",
@@ -68,7 +68,7 @@ describe("AttemptEngine", () => {
     // Re-appending a new payload gets a new eventId — not a duplicate.
     // Dedup is covered in fold tests; here verify log grows only on apply.
     engine.append({
-      type: "task.status_changed",
+      type: "attempt.status_changed",
       status: "streaming",
     });
     expect(engine.getEventLog().length).toBe(2);
@@ -95,15 +95,15 @@ describe("AttemptEngine", () => {
 
   test("reset mid-run cancels producer then clears", async () => {
     let appendAfterAbort = 0;
-    const slowProducer: ProduceRun = async ({ signal, append, config, taskId }) => {
+    const slowProducer: ProduceRun = async ({ signal, append, config, attemptId }) => {
       append({
-        type: "task.started",
+        type: "attempt.started",
         prompt: config.prompt,
         modelId: config.modelId,
         agentMode: "demo",
-        userMessageId: `user-${taskId}`,
+        userMessageId: `user-${attemptId}`,
       });
-      append({ type: "task.status_changed", status: "streaming" });
+      append({ type: "attempt.status_changed", status: "streaming" });
 
       await new Promise<void>((resolve) => {
         const onAbort = () => {
@@ -119,7 +119,7 @@ describe("AttemptEngine", () => {
 
       if (!signal.aborted) {
         appendAfterAbort += 1;
-        append({ type: "task.completed", finishReason: "stop" });
+        append({ type: "attempt.completed", finishReason: "stop" });
       }
     };
 
@@ -151,22 +151,22 @@ describe("AttemptEngine", () => {
     engine.subscribe(() => {
       count += 1;
     });
-    engine.beginTask("task-sub");
+    engine.beginAttempt("task-sub");
     engine.append({
-      type: "task.started",
+      type: "attempt.started",
       prompt: "a",
       modelId: "openai/gpt-5.4",
       agentMode: "demo",
     });
-    engine.append({ type: "task.status_changed", status: "streaming" });
+    engine.append({ type: "attempt.status_changed", status: "streaming" });
     expect(count).toBe(2);
   });
 
   test("hydrate seeds projection from messages and clears in-memory eventLog", () => {
     const engine = createAttemptEngine({ produceRun: async () => {} });
-    engine.beginTask("task-pre");
+    engine.beginAttempt("task-pre");
     engine.append({
-      type: "task.started",
+      type: "attempt.started",
       prompt: "prior",
       modelId: "openai/gpt-5.4",
       agentMode: "demo",
@@ -225,15 +225,15 @@ describe("AttemptEngine", () => {
 
 describe("RunController via AttemptEngine", () => {
   test("cancel sets cancelled status", async () => {
-    const slowProducer: ProduceRun = async ({ signal, append, config, taskId }) => {
+    const slowProducer: ProduceRun = async ({ signal, append, config, attemptId }) => {
       append({
-        type: "task.started",
+        type: "attempt.started",
         prompt: config.prompt,
         modelId: config.modelId,
         agentMode: "demo",
-        userMessageId: `user-${taskId}`,
+        userMessageId: `user-${attemptId}`,
       });
-      append({ type: "task.status_changed", status: "streaming" });
+      append({ type: "attempt.status_changed", status: "streaming" });
       await new Promise<void>((resolve) => {
         const timer = setTimeout(resolve, 500);
         signal.addEventListener("abort", () => {
@@ -261,13 +261,13 @@ describe("RunController via AttemptEngine", () => {
   test("resolve unblocks EscalationPort", async () => {
     let sawDecision: PermissionDecision | undefined;
 
-    const producer: ProduceRun = async ({ append, escalationPort, config, taskId }) => {
+    const producer: ProduceRun = async ({ append, escalationPort, config, attemptId }) => {
       append({
-        type: "task.started",
+        type: "attempt.started",
         prompt: config.prompt,
         modelId: config.modelId,
         agentMode: "live",
-        userMessageId: `user-${taskId}`,
+        userMessageId: `user-${attemptId}`,
       });
       append({
         type: "interaction.requested",
@@ -281,7 +281,7 @@ describe("RunController via AttemptEngine", () => {
       });
       const outcome = await escalationPort.escalate({
         callId: "c1",
-        attemptId: taskId,
+        attemptId,
         capability: "run_shell",
         input: {},
         risk: "high",
@@ -295,7 +295,7 @@ describe("RunController via AttemptEngine", () => {
           decision: sawDecision,
         },
       });
-      append({ type: "task.completed", finishReason: "stop" });
+      append({ type: "attempt.completed", finishReason: "stop" });
     };
 
     const engine = createAttemptEngine({ produceRun: producer });
@@ -323,13 +323,13 @@ describe("RunController via AttemptEngine", () => {
   test("cancel denies pending EscalationPort waits", async () => {
     let sawDecision: PermissionDecision | undefined;
 
-    const producer: ProduceRun = async ({ append, escalationPort, config, taskId, signal }) => {
+    const producer: ProduceRun = async ({ append, escalationPort, config, attemptId, signal }) => {
       append({
-        type: "task.started",
+        type: "attempt.started",
         prompt: config.prompt,
         modelId: config.modelId,
         agentMode: "live",
-        userMessageId: `user-${taskId}`,
+        userMessageId: `user-${attemptId}`,
       });
       append({
         type: "interaction.requested",
@@ -343,14 +343,14 @@ describe("RunController via AttemptEngine", () => {
       });
       const outcome = await escalationPort.escalate({
         callId: "c1",
-        attemptId: taskId,
+        attemptId,
         capability: "run_shell",
         input: {},
         risk: "high",
       });
       sawDecision = escalationToPermissionDecision(outcome);
       if (!signal.aborted) {
-        append({ type: "task.completed", finishReason: "stop" });
+        append({ type: "attempt.completed", finishReason: "stop" });
       }
     };
 
@@ -376,20 +376,20 @@ describe("RunController via AttemptEngine", () => {
 
   test("retry after recoverable failure omits duplicate user message", async () => {
     let runs = 0;
-    const producer: ProduceRun = async ({ append, config, taskId }) => {
+    const producer: ProduceRun = async ({ append, config, attemptId }) => {
       runs += 1;
       append({
-        type: "task.started",
+        type: "attempt.started",
         prompt: config.prompt,
         modelId: config.modelId,
         agentMode: "demo",
-        userMessageId: config.isRetry ? undefined : `user-${taskId}`,
+        userMessageId: config.isRetry ? undefined : `user-${attemptId}`,
         omitUserMessage: config.isRetry === true,
       });
 
       if (runs === 1) {
         append({
-          type: "task.failed",
+          type: "attempt.failed",
           code: "auth",
           message: "missing key",
           recoverable: true,
@@ -397,7 +397,7 @@ describe("RunController via AttemptEngine", () => {
         return;
       }
 
-      append({ type: "task.completed", finishReason: "stop" });
+      append({ type: "attempt.completed", finishReason: "stop" });
     };
 
     const engine = createAttemptEngine({ produceRun: producer });
@@ -430,19 +430,19 @@ describe("RunController via AttemptEngine", () => {
     let lastIsRetry: boolean | undefined;
     let lastChatIds: string[] = [];
 
-    const producer: ProduceRun = async ({ append, config, taskId }) => {
+    const producer: ProduceRun = async ({ append, config, attemptId }) => {
       lastPrompt = config.prompt;
       lastIsRetry = config.isRetry === true;
       lastChatIds = (config.chatMessages ?? []).map((message) => message.id);
       append({
-        type: "task.started",
+        type: "attempt.started",
         prompt: config.prompt,
         modelId: config.modelId,
         agentMode: "demo",
-        userMessageId: config.isRetry ? undefined : `user-${taskId}`,
+        userMessageId: config.isRetry ? undefined : `user-${attemptId}`,
         omitUserMessage: config.isRetry === true,
       });
-      const assistantId = `assistant-${taskId}`;
+      const assistantId = `assistant-${attemptId}`;
       append({ type: "assistant.message_started", messageId: assistantId, role: "assistant" });
       append({
         type: "assistant.part_updated",
@@ -451,7 +451,7 @@ describe("RunController via AttemptEngine", () => {
         part: { type: "text", text: `answer for ${config.prompt}` },
       });
       append({ type: "assistant.message_finished", messageId: assistantId });
-      append({ type: "task.completed", finishReason: "stop" });
+      append({ type: "attempt.completed", finishReason: "stop" });
     };
 
     const engine = createAttemptEngine({ produceRun: producer });
@@ -506,14 +506,14 @@ describe("RunController via AttemptEngine", () => {
 
   test("cancel-before-start replaces prior run", async () => {
     let runs = 0;
-    const producer: ProduceRun = async ({ append, config, taskId, signal }) => {
+    const producer: ProduceRun = async ({ append, config, attemptId, signal }) => {
       runs += 1;
       append({
-        type: "task.started",
+        type: "attempt.started",
         prompt: config.prompt,
         modelId: config.modelId,
         agentMode: "demo",
-        userMessageId: `user-${taskId}`,
+        userMessageId: `user-${attemptId}`,
       });
       if (runs === 1) {
         await new Promise<void>((resolve) => {
@@ -525,7 +525,7 @@ describe("RunController via AttemptEngine", () => {
         });
         return;
       }
-      append({ type: "task.completed", finishReason: "stop" });
+      append({ type: "attempt.completed", finishReason: "stop" });
     };
 
     const engine = createAttemptEngine({ produceRun: producer });

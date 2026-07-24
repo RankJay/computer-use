@@ -90,12 +90,12 @@ describe("AttemptControl", () => {
         const part = assistant?.parts[0];
         packedOutput = part && "output" in part ? part.output : undefined;
         append({
-          type: "task.started",
+          type: "attempt.started",
           prompt: config.prompt,
           modelId: config.modelId,
           agentMode: "demo",
         });
-        append({ type: "task.completed", finishReason: "stop" });
+        append({ type: "attempt.completed", finishReason: "stop" });
       },
       mandates: new MemoryMandatesPersistence(),
       eventStore: new MemoryAttemptEventStore(),
@@ -149,26 +149,26 @@ describe("AttemptControl", () => {
     const mandate = await mandates.create({ kind: "interactive" });
     let runs = 0;
     const host = createAttemptHost({
-      produceRun: async ({ append, config, taskId }) => {
+      produceRun: async ({ append, config, attemptId }) => {
         runs += 1;
         append({
-          type: "task.started",
+          type: "attempt.started",
           prompt: config.prompt,
           modelId: config.modelId,
           agentMode: "demo",
-          userMessageId: config.isRetry ? undefined : `user-${taskId}`,
+          userMessageId: config.isRetry ? undefined : `user-${attemptId}`,
           omitUserMessage: config.isRetry === true,
         });
         if (runs === 1) {
           append({
-            type: "task.failed",
+            type: "attempt.failed",
             code: "auth",
             message: "missing key",
             recoverable: true,
           });
           return;
         }
-        append({ type: "task.completed", finishReason: "stop" });
+        append({ type: "attempt.completed", finishReason: "stop" });
       },
       mandates,
       eventStore: new MemoryAttemptEventStore(),
@@ -224,15 +224,15 @@ describe("AttemptControl", () => {
     const host = createAttemptHost({
       produceRun: async ({ append, config, signal }) => {
         append({
-          type: "task.started",
+          type: "attempt.started",
           prompt: config.prompt,
           modelId: config.modelId,
           agentMode: "demo",
         });
-        append({ type: "task.status_changed", status: "streaming" });
+        append({ type: "attempt.status_changed", status: "streaming" });
         await gate;
         if (signal.aborted) return;
-        append({ type: "task.completed", finishReason: "stop" });
+        append({ type: "attempt.completed", finishReason: "stop" });
       },
       mandates: new MemoryMandatesPersistence(),
       eventStore: new MemoryAttemptEventStore(),
@@ -278,17 +278,17 @@ describe("AttemptControl", () => {
       produceRun: async ({ append, config, signal }) => {
         runs += 1;
         append({
-          type: "task.started",
+          type: "attempt.started",
           prompt: config.prompt,
           modelId: config.modelId,
           agentMode: "demo",
         });
-        append({ type: "task.status_changed", status: "streaming" });
+        append({ type: "attempt.status_changed", status: "streaming" });
         if (runs === 1) {
           await firstGate;
         }
         if (signal.aborted) return;
-        append({ type: "task.completed", finishReason: "stop" });
+        append({ type: "attempt.completed", finishReason: "stop" });
       },
       mandates: new MemoryMandatesPersistence(),
       eventStore: new MemoryAttemptEventStore(),
@@ -335,15 +335,15 @@ describe("AttemptHost.bindChatRoute", () => {
     const host = createAttemptHost({
       produceRun: async ({ append, config, signal }) => {
         append({
-          type: "task.started",
+          type: "attempt.started",
           prompt: config.prompt,
           modelId: config.modelId,
           agentMode: "demo",
         });
-        append({ type: "task.status_changed", status: "streaming" });
+        append({ type: "attempt.status_changed", status: "streaming" });
         await gate;
         if (signal.aborted) return;
-        append({ type: "task.completed", finishReason: "stop" });
+        append({ type: "attempt.completed", finishReason: "stop" });
       },
       mandates: new MemoryMandatesPersistence(),
       eventStore: new MemoryAttemptEventStore(),

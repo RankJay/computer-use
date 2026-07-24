@@ -13,7 +13,7 @@ import { isLiveRun } from "../run-status";
 export type DisplayRowsInput = {
   readonly rows: readonly AgentTranscriptRow[];
   readonly status: RunStatus;
-  readonly taskId: string | null;
+  readonly attemptId: string | null;
   readonly streamingMessageId: string | null;
 };
 
@@ -65,24 +65,24 @@ function findLastUserRowIndex(rows: readonly AgentTranscriptRow[]): number {
 
 const thinkingMarkers = new Map<string, AgentTranscriptRow>();
 
-function thinkingMarkerFor(taskId: string): AgentTranscriptRow {
-  const cached = thinkingMarkers.get(taskId);
+function thinkingMarkerFor(attemptId: string): AgentTranscriptRow {
+  const cached = thinkingMarkers.get(attemptId);
   if (cached) return cached;
   const marker: AgentTranscriptRow = {
     type: "marker",
-    id: `live-thinking-${taskId}`,
+    id: `live-thinking-${attemptId}`,
     text: "Thinking…",
     live: true,
     status: true,
   };
-  thinkingMarkers.set(taskId, marker);
+  thinkingMarkers.set(attemptId, marker);
   return marker;
 }
 
 type DeriveCache = {
   rows: readonly AgentTranscriptRow[];
   status: RunStatus;
-  taskId: string | null;
+  attemptId: string | null;
   streamingMessageId: string | null;
   result: readonly AgentTranscriptRow[];
 };
@@ -95,34 +95,34 @@ let lastDerive: DeriveCache | null = null;
  * Result identity is stable when inputs are Object.is-equal.
  */
 export function deriveDisplayRows(input: DisplayRowsInput): readonly AgentTranscriptRow[] {
-  const { rows, status, taskId, streamingMessageId } = input;
+  const { rows, status, attemptId, streamingMessageId } = input;
 
   if (
     lastDerive &&
     Object.is(lastDerive.rows, rows) &&
     lastDerive.status === status &&
-    lastDerive.taskId === taskId &&
+    lastDerive.attemptId === attemptId &&
     lastDerive.streamingMessageId === streamingMessageId
   ) {
     return lastDerive.result;
   }
 
-  const result = computeDisplayRows(rows, status, taskId, streamingMessageId);
-  lastDerive = { rows, status, taskId, streamingMessageId, result };
+  const result = computeDisplayRows(rows, status, attemptId, streamingMessageId);
+  lastDerive = { rows, status, attemptId, streamingMessageId, result };
   return result;
 }
 
 function computeDisplayRows(
   rows: readonly AgentTranscriptRow[],
   status: RunStatus,
-  taskId: string | null,
+  attemptId: string | null,
   streamingMessageId: string | null,
 ): readonly AgentTranscriptRow[] {
   if (hasAuthoredActivityRows(rows)) {
     return rows;
   }
 
-  if (!isLiveRun(status) || !taskId) {
+  if (!isLiveRun(status) || !attemptId) {
     return rows;
   }
 
@@ -132,7 +132,7 @@ function computeDisplayRows(
       (row): row is AgentMessageRowData =>
         row.type === "message" &&
         row.message.role === "assistant" &&
-        row.id === `assistant-${taskId}`,
+        row.id === `assistant-${attemptId}`,
     );
 
   const parts = assistantRow?.message.parts ?? [];
@@ -140,7 +140,7 @@ function computeDisplayRows(
     return rows;
   }
 
-  const marker = thinkingMarkerFor(taskId);
+  const marker = thinkingMarkerFor(attemptId);
 
   if (assistantRow) {
     const index = rows.findIndex((row) => row.id === assistantRow.id);

@@ -137,19 +137,19 @@ describe("AttemptHost concurrency", () => {
     const host = createAttemptHost({
       produceRun: async ({ append, config, signal }) => {
         append({
-          type: "task.started",
+          type: "attempt.started",
           prompt: config.prompt,
           modelId: config.modelId,
           agentMode: "demo",
         });
         for (let i = 0; i < 20; i += 1) {
-          append({ type: "task.status_changed", status: "streaming" });
+          append({ type: "attempt.status_changed", status: "streaming" });
           await yieldTurn();
           if (signal.aborted) return;
         }
         await gate;
         if (signal.aborted) return;
-        append({ type: "task.completed", finishReason: "stop" });
+        append({ type: "attempt.completed", finishReason: "stop" });
       },
       mandates: new MemoryMandatesPersistence(),
       eventStore,
@@ -200,15 +200,15 @@ describe("AttemptHost concurrency", () => {
     const host = createAttemptHost({
       produceRun: async ({ append, config, signal }) => {
         append({
-          type: "task.started",
+          type: "attempt.started",
           prompt: config.prompt,
           modelId: config.modelId,
           agentMode: "demo",
         });
-        append({ type: "task.status_changed", status: "streaming" });
+        append({ type: "attempt.status_changed", status: "streaming" });
         await gate;
         if (!signal.aborted) {
-          append({ type: "task.completed", finishReason: "stop" });
+          append({ type: "attempt.completed", finishReason: "stop" });
         }
       },
       mandates,
@@ -272,21 +272,21 @@ describe("AttemptHost concurrency", () => {
   });
 
   test("overlapping starts return without hanging the control plane", async () => {
-    const produceRun: ProduceRun = async ({ append, config, signal, taskId }) => {
+    const produceRun: ProduceRun = async ({ append, config, signal, attemptId }) => {
       append({
-        type: "task.started",
+        type: "attempt.started",
         prompt: config.prompt,
         modelId: config.modelId,
         agentMode: "demo",
-        userMessageId: `user-${taskId}`,
+        userMessageId: `user-${attemptId}`,
       });
-      append({ type: "task.status_changed", status: "streaming" });
+      append({ type: "attempt.status_changed", status: "streaming" });
       await yieldTurn();
       await yieldTurn();
       if (signal.aborted) {
         return;
       }
-      append({ type: "task.completed", finishReason: "stop" });
+      append({ type: "attempt.completed", finishReason: "stop" });
     };
 
     const host = createAttemptHost({
@@ -336,15 +336,15 @@ describe("AttemptHost ledger error under flush pressure", () => {
     const host = createAttemptHost({
       produceRun: async ({ append, config, signal }) => {
         append({
-          type: "task.started",
+          type: "attempt.started",
           prompt: config.prompt,
           modelId: config.modelId,
           agentMode: "demo",
         });
-        append({ type: "task.status_changed", status: "streaming" });
+        append({ type: "attempt.status_changed", status: "streaming" });
         await gate;
         if (!signal.aborted) {
-          append({ type: "task.completed", finishReason: "stop" });
+          append({ type: "attempt.completed", finishReason: "stop" });
         }
       },
       mandates: new MemoryMandatesPersistence(),

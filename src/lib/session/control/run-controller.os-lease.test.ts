@@ -14,8 +14,8 @@ describe("RunController OS lease release", () => {
       resolveHold = resolve;
     });
 
-    const producer: ProduceRun = async ({ taskId, osLease, signal }) => {
-      expect(osLease?.acquire(taskId, "desktop").outcome).toBe("granted");
+    const producer: ProduceRun = async ({ attemptId, osLease, signal }) => {
+      expect(osLease?.acquire(attemptId, "desktop").outcome).toBe("granted");
       await new Promise<void>((resolve) => {
         if (signal.aborted) {
           resolve();
@@ -28,8 +28,8 @@ describe("RunController OS lease release", () => {
 
     const controller = createRunController({
       append: () => {},
-      beginTask: () => {},
-      clearTask: () => {},
+      beginAttempt: () => {},
+      clearAttempt: () => {},
       getProjection: () => createEmptyMandateProjection(),
       produceRun: producer,
       osLease: lease,
@@ -55,14 +55,14 @@ describe("RunController OS lease release", () => {
   test("settle path releases lease in finally", async () => {
     const lease = createOsLease();
 
-    const producer: ProduceRun = async ({ taskId, osLease }) => {
-      osLease?.acquire(taskId, "desktop");
+    const producer: ProduceRun = async ({ attemptId, osLease }) => {
+      osLease?.acquire(attemptId, "desktop");
     };
 
     const controller = createRunController({
       append: () => {},
-      beginTask: () => {},
-      clearTask: () => {},
+      beginAttempt: () => {},
+      clearAttempt: () => {},
       getProjection: () => createEmptyMandateProjection(),
       produceRun: producer,
       osLease: lease,

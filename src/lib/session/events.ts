@@ -5,7 +5,7 @@ import type { CapabilityRisk } from "@/lib/agent/capabilities/risk";
 import type { EntitlementCheckKind } from "@/lib/entitlements/types";
 import type { AgentMode } from "@/lib/settings/types";
 
-export const RUNTIME_EVENT_SCHEMA_VERSION = 1;
+export const RUNTIME_EVENT_SCHEMA_VERSION = 2;
 
 export const runStatusSchema = z.enum([
   "idle",
@@ -27,7 +27,7 @@ export type InteractionKind = "permission";
 
 export type RuntimeEventEnvelope = {
   eventId: string;
-  taskId: string;
+  attemptId: string;
   timestamp: number;
   schemaVersion: number;
 };
@@ -50,8 +50,8 @@ export type LanguageModelUsageSnapshot = {
   };
 };
 
-export type TaskStartedPayload = {
-  type: "task.started";
+export type AttemptStartedPayload = {
+  type: "attempt.started";
   prompt: string;
   modelId: string;
   agentMode: AgentMode;
@@ -60,19 +60,19 @@ export type TaskStartedPayload = {
   omitUserMessage?: boolean;
 };
 
-export type TaskStatusChangedPayload = {
-  type: "task.status_changed";
+export type AttemptStatusChangedPayload = {
+  type: "attempt.status_changed";
   status: RunStatus;
   reason?: string;
 };
 
-export type TaskCompletedPayload = {
-  type: "task.completed";
+export type AttemptCompletedPayload = {
+  type: "attempt.completed";
   finishReason: "stop" | "budget" | "cancelled" | "error";
 };
 
-export type TaskFailedPayload = {
-  type: "task.failed";
+export type AttemptFailedPayload = {
+  type: "attempt.failed";
   code: string;
   message: string;
   recoverable: boolean;
@@ -208,10 +208,10 @@ export type ActivityTaskUpdatedPayload = {
 };
 
 export type RuntimeEventPayload =
-  | TaskStartedPayload
-  | TaskStatusChangedPayload
-  | TaskCompletedPayload
-  | TaskFailedPayload
+  | AttemptStartedPayload
+  | AttemptStatusChangedPayload
+  | AttemptCompletedPayload
+  | AttemptFailedPayload
   | AssistantMessageStartedPayload
   | AssistantPartUpdatedPayload
   | AssistantMessageFinishedPayload
@@ -237,7 +237,7 @@ export function isRuntimeEvent(value: unknown): value is RuntimeEvent {
     value !== null &&
     "type" in value &&
     "eventId" in value &&
-    "taskId" in value &&
+    "attemptId" in value &&
     "schemaVersion" in value
   );
 }
