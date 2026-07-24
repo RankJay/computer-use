@@ -147,7 +147,8 @@ describe("createChatCheckpointController", () => {
 
     expect(saved).toHaveLength(1);
     expect(saved[0]?.navigate).toBe(true);
-    expect(liveChatId).toBe(saved[0]?.id);
+    expect(liveChatId).not.toBeNull();
+    expect(liveChatId!).toBe(saved[0]!.id);
     const loaded = await p.chats.load(saved[0]!.id);
     expect(loaded?.mandateId).toBe("m1");
     expect(loaded?.title.length).toBeGreaterThan(0);

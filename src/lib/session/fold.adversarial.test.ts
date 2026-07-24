@@ -61,7 +61,7 @@ describe("fold adversarial / invariants", () => {
         type: "interaction.resolved",
         callId: "c1",
         kind: "permission",
-        permission: { decision: "allowed" },
+        permission: { decision: "approved" },
       }),
     ]);
 

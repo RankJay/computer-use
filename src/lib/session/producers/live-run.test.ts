@@ -1,21 +1,21 @@
 import { describe, expect, mock, test } from "bun:test";
 
+import type { RunAgentDeps, RunAgentResult } from "@/lib/agent/types";
 import { createAutoEscalationPort } from "@/lib/session/control/escalation-port";
 import type { RuntimeEventPayload } from "@/lib/session/events";
 import { DEFAULT_SECRETS, DEFAULT_SETTINGS } from "@/lib/settings/defaults";
 
-const runAgentLoopMock = mock(
-  async (deps: { append: (payload: RuntimeEventPayload) => void; signal: AbortSignal }) => {
-    if (deps.signal.aborted) {
-      return { finishReason: "cancelled" as const };
-    }
-    deps.append({
-      type: "assistant.message_started",
-      messageId: "assistant-live",
-    });
-    return { finishReason: "stop" as const };
-  },
-);
+const runAgentLoopMock = mock(async (deps: RunAgentDeps): Promise<RunAgentResult> => {
+  if (deps.signal.aborted) {
+    return { finishReason: "cancelled" };
+  }
+  deps.append({
+    type: "assistant.message_started",
+    messageId: "assistant-live",
+    role: "assistant",
+  });
+  return { finishReason: "stop" };
+});
 
 mock.module("@/lib/agent/run-agent", () => ({
   runAgentLoop: runAgentLoopMock,
@@ -55,11 +55,10 @@ describe("createLiveRunProducer", () => {
       true,
     );
     expect(runAgentLoopMock).toHaveBeenCalledTimes(1);
-    const call = runAgentLoopMock.mock.calls[0]?.[0] as {
-      messages: Array<{ role: string; parts: Array<{ text?: string }> }>;
-    };
-    expect(call.messages.at(-1)?.role).toBe("user");
-    expect(call.messages.at(-1)?.parts[0]?.text).toBe("hello live");
+    const call = runAgentLoopMock.mock.calls[0]?.[0] as RunAgentDeps | undefined;
+    const lastMessage = call?.messages[call.messages.length - 1];
+    expect(lastMessage?.role).toBe("user");
+    expect(lastMessage?.parts[0]).toMatchObject({ type: "text", text: "hello live" });
   });
 
   test("retry omits user message and still completes", async () => {
@@ -92,15 +91,17 @@ describe("createLiveRunProducer", () => {
       type: "attempt.started",
       omitUserMessage: true,
     });
-    const call = runAgentLoopMock.mock.calls[0]?.[0] as {
-      messages: Array<{ id: string }>;
-    };
-    expect(call.messages).toHaveLength(1);
-    expect(call.messages[0]?.id).toBe("u1");
+    const call = runAgentLoopMock.mock.calls[0]?.[0] as RunAgentDeps | undefined;
+    expect(call?.messages).toHaveLength(1);
+    expect(call?.messages[0]?.id).toBe("u1");
   });
 
   test("budget finishReason completes as budget", async () => {
-    runAgentLoopMock.mockImplementationOnce(async () => ({ finishReason: "budget" as const }));
+    runAgentLoopMock.mockImplementationOnce(
+      async (): Promise<RunAgentResult> => ({
+        finishReason: "budget",
+      }),
+    );
     const payloads: RuntimeEventPayload[] = [];
     const produce = createLiveRunProducer();
 
@@ -123,7 +124,11 @@ describe("createLiveRunProducer", () => {
   });
 
   test("error finishReason does not emit attempt.completed", async () => {
-    runAgentLoopMock.mockImplementationOnce(async () => ({ finishReason: "error" as const }));
+    runAgentLoopMock.mockImplementationOnce(
+      async (): Promise<RunAgentResult> => ({
+        finishReason: "error",
+      }),
+    );
     const payloads: RuntimeEventPayload[] = [];
     const produce = createLiveRunProducer();
 
