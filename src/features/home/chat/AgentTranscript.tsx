@@ -1,4 +1,4 @@
-import { lazy, memo, Suspense, type ReactElement } from "react";
+import { lazy, memo, Suspense, useEffect, type ReactElement } from "react";
 
 import {
   MessageScroller,
@@ -14,12 +14,34 @@ import { MarkerRow } from "./rows/MarkerRow";
 import type { AgentMessageRowData, AgentTranscriptRow, PermissionResolveProps } from "./types";
 
 /** Heavy rows (markdown / CoT / ai type-guards) — kept off empty-home cold path. */
-const MessageRow = lazy(() =>
-  import("./rows/MessageRow").then((mod) => ({ default: mod.MessageRow })),
-);
-const SpecialRow = lazy(() =>
-  import("./rows/SpecialRow").then((mod) => ({ default: mod.SpecialRow })),
-);
+const loadMessageRow = () =>
+  import("./rows/MessageRow").then((mod) => ({ default: mod.MessageRow }));
+const loadSpecialRow = () =>
+  import("./rows/SpecialRow").then((mod) => ({ default: mod.SpecialRow }));
+
+const MessageRow = lazy(loadMessageRow);
+const SpecialRow = lazy(loadSpecialRow);
+
+/**
+ * Prefetch row chunks once the main thread is idle so the first send does not
+ * flash MessageRowChunkFallback while Streamdown / ai still resolve.
+ */
+function useWarmTranscriptRowChunks(): void {
+  useEffect(() => {
+    const warm = (): void => {
+      void loadMessageRow();
+      void loadSpecialRow();
+    };
+
+    if (typeof requestIdleCallback === "function") {
+      const id = requestIdleCallback(warm, { timeout: 2000 });
+      return () => cancelIdleCallback(id);
+    }
+
+    const id = window.setTimeout(warm, 150);
+    return () => clearTimeout(id);
+  }, []);
+}
 
 export type AgentTranscriptProps = PermissionResolveProps & {
   readonly rows: readonly AgentTranscriptRow[];
@@ -28,7 +50,10 @@ export type AgentTranscriptProps = PermissionResolveProps & {
   readonly onRetryMessage?: (messageId: string) => void;
 };
 
-/** Plain-text stand-in while the MessageRow chunk loads — no Streamdown / ai imports. */
+/**
+ * Plain-text stand-in while the MessageRow chunk loads — no Streamdown / ai imports.
+ * Layout must match MessageRow + TextPart (user is full-width start, not justify-end).
+ */
 function MessageRowChunkFallback({ row }: { readonly row: AgentMessageRowData }): ReactElement {
   const text = row.message.parts
     .flatMap((part) => (part.type === "text" && typeof part.text === "string" ? [part.text] : []))
@@ -36,9 +61,9 @@ function MessageRowChunkFallback({ row }: { readonly row: AgentMessageRowData })
   const isUser = row.message.role === "user";
 
   return (
-    <div className={cn(isUser ? "flex justify-end" : "px-2")}>
+    <div className={cn(!isUser && "px-2")}>
       {isUser ? (
-        <div className="text-sm bg-[#161616] px-3 py-2.5 rounded-xl whitespace-pre-wrap text-foreground max-w-[85%]">
+        <div className="text-sm bg-[#161616] px-3 py-2.5 rounded-xl whitespace-pre-wrap text-foreground">
           {text}
         </div>
       ) : (
@@ -129,6 +154,8 @@ export const AgentTranscript = memo(function AgentTranscript({
   canRetryMessage = false,
   onRetryMessage,
 }: AgentTranscriptProps): ReactElement {
+  useWarmTranscriptRowChunks();
+
   return (
     <MessageScrollerProvider autoScroll defaultScrollPosition="last-anchor">
       <MessageScroller className="min-h-0 flex-1">

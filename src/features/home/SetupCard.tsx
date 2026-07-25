@@ -27,12 +27,14 @@ function SetupTodo({ done, title, subtitle, to }: SetupTodoProps): ReactElement 
       <div className="flex min-w-0 flex-1 items-start gap-3">
         <span
           className={cn(
-            "mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-sm border-0",
-            done ? "border-foreground/40 bg-emerald-800" : "border-emerald-500/10",
+            "mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-sm border-0 ring-1",
+            done
+              ? "border-foreground/40 bg-emerald-900/90 ring-emerald-500/50"
+              : "bg-stone-500/10 ring-stone-500/50",
           )}
           aria-hidden
         >
-          {done ? <Check className="size-2.5 text-white" strokeWidth={3} /> : null}
+          {done ? <Check className="size-2.5 text-emerald-400" strokeWidth={3} /> : null}
         </span>
         <span className="flex min-w-0 flex-col gap-0.5">
           <span className={cn("text-sm", done ? "text-muted-foreground" : "text-foreground")}>
