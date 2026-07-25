@@ -18,5 +18,6 @@ describe("osLeaseScopeOf", () => {
     expect(osLeaseScopeOf("read_clipboard")).toBe("none");
     expect(osLeaseScopeOf("window_list")).toBe("none");
     expect(osLeaseScopeOf("get_active_window")).toBe("none");
+    expect(osLeaseScopeOf("screenshot")).toBe("none");
   });
 });

@@ -100,6 +100,7 @@ export async function runStreamCoordinator(
   try {
     const modelMessages = await convertToModelMessages(deps.messages, {
       ignoreIncompleteToolCalls: true,
+      tools,
     });
 
     if (budgetGuard.checkAndStop()) {

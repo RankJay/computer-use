@@ -24,6 +24,7 @@ describe("capability catalog", () => {
         "search_files",
         "window_list",
         "get_active_window",
+        "screenshot",
         "process_list",
         "run_shell",
         "accessibility_snapshot",
@@ -61,7 +62,7 @@ describe("capability catalog", () => {
       ]),
     );
     expect(names).not.toContain("accessibility_expand_node");
-    expect(names).toHaveLength(59);
+    expect(names).toHaveLength(60);
   });
 
   test("groups names by risk", () => {
@@ -73,6 +74,7 @@ describe("capability catalog", () => {
     expect(byRisk.medium).toContain("read_clipboard");
     expect(byRisk.medium).toContain("read_clipboard_image");
     expect(byRisk.medium).toContain("write_clipboard_html");
+    expect(byRisk.medium).toContain("screenshot");
   });
 
   test("filters accessibility tools when uiAutomation is off", () => {
@@ -121,9 +123,11 @@ describe("capability catalog", () => {
       expect(byRisk.low).toContain("window_list");
       expect(byRisk.low).toContain("get_active_window");
       expect(byRisk.medium).toContain("window_focus");
+      expect(byRisk.medium).toContain("screenshot");
     } else {
       expect(byRisk.low).not.toContain("window_list");
       expect(byRisk.medium).not.toContain("window_focus");
+      expect(byRisk.medium).not.toContain("screenshot");
     }
   });
 

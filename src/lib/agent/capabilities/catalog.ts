@@ -44,6 +44,7 @@ import { mouseHoverCapability } from "./mouse/hover";
 import { mouseMoveCapability } from "./mouse/move";
 import { mouseScrollCapability } from "./mouse/scroll";
 import { mouseUpCapability } from "./mouse/up";
+import { screenshotCapability } from "./screenshot/screenshot";
 import { waitCapability } from "./shared/wait";
 import { getEnvCapability } from "./shell/get-env";
 import { getSystemInfoCapability } from "./shell/get-system-info";
@@ -94,6 +95,7 @@ export const CAPABILITIES = [
   windowMoveCapability,
   windowResizeCapability,
   getActiveWindowCapability,
+  screenshotCapability,
   accessibilitySnapshotCapability,
   accessibilityQueryCapability,
   accessibilityFindElementCapability,

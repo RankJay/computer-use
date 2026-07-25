@@ -5,6 +5,7 @@ mod accessibility;
 mod clipboard;
 mod file_system;
 mod input;
+mod screenshot;
 mod shared;
 mod shell;
 #[cfg(any(windows, target_os = "macos"))]
@@ -36,6 +37,7 @@ pub use input::{
     hotkey, key_down, key_press, key_up, mouse_click, mouse_down, mouse_drag, mouse_hover,
     mouse_move, mouse_scroll, mouse_up,
 };
+pub use screenshot::screenshot;
 pub use shared::wait;
 pub use shell::{
     get_env, get_system_info, launch, process_info, process_kill, process_list, run_shell, set_env,

@@ -11,6 +11,8 @@ pub enum ErrorCode {
     AlreadyExists,
     AmbiguousProcessName,
     AmbiguousReference,
+    CaptureFailed,
+    CaptureUnavailable,
     ClickFailed,
     ClickTimeout,
     ClipboardImageEncodeFailed,
@@ -130,6 +132,8 @@ impl ErrorCode {
             Self::AlreadyExists => "already_exists",
             Self::AmbiguousProcessName => "ambiguous_process_name",
             Self::AmbiguousReference => "ambiguous_reference",
+            Self::CaptureFailed => "capture_failed",
+            Self::CaptureUnavailable => "capture_unavailable",
             Self::ClickFailed => "click_failed",
             Self::ClickTimeout => "click_timeout",
             Self::ClipboardImageEncodeFailed => "clipboard_image_encode_failed",
@@ -300,6 +304,11 @@ mod tests {
         assert_eq!(
             ErrorCode::AmbiguousReference.as_str(),
             "ambiguous_reference"
+        );
+        assert_eq!(ErrorCode::CaptureFailed.as_str(), "capture_failed");
+        assert_eq!(
+            ErrorCode::CaptureUnavailable.as_str(),
+            "capture_unavailable"
         );
         assert_eq!(ErrorCode::ClickFailed.as_str(), "click_failed");
         assert_eq!(ErrorCode::ClickTimeout.as_str(), "click_timeout");
@@ -494,6 +503,14 @@ mod tests {
         assert_eq!(
             serde_json::to_value(ErrorCode::AmbiguousReference).unwrap(),
             json!("ambiguous_reference")
+        );
+        assert_eq!(
+            serde_json::to_value(ErrorCode::CaptureFailed).unwrap(),
+            json!("capture_failed")
+        );
+        assert_eq!(
+            serde_json::to_value(ErrorCode::CaptureUnavailable).unwrap(),
+            json!("capture_unavailable")
         );
         assert_eq!(
             serde_json::to_value(ErrorCode::ClickFailed).unwrap(),

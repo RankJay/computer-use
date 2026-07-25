@@ -65,6 +65,8 @@ const UI_TOOL_LABELS: Readonly<Record<string, string>> = {
   window_resize: "Reshaping a window",
   window_state: "Changing a window's state",
 
+  screenshot: "Taking a screenshot",
+
   wait: "Pausing for a moment",
 };
 

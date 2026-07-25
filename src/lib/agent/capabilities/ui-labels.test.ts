@@ -10,6 +10,7 @@ describe("uiToolLabel", () => {
     expect(uiToolLabel("write_file")).toBe("Writing a file");
     expect(uiToolLabel("run_shell")).toBe("Running a command");
     expect(uiToolLabel("window_focus")).toBe("Bringing a window forward");
+    expect(uiToolLabel("screenshot")).toBe("Taking a screenshot");
     expect(uiToolLabel("wait")).toBe("Pausing for a moment");
   });
 
