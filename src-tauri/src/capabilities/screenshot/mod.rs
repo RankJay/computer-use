@@ -130,10 +130,32 @@ pub fn screenshot(
     }
 }
 
+/// Capture a screen-space rectangle (host remaps image-space zoom rects before calling).
+#[tauri::command]
+pub fn screenshot_region(
+    x: i32,
+    y: i32,
+    width: i32,
+    height: i32,
+) -> Result<ScreenshotResult, CommandError> {
+    #[cfg(windows)]
+    {
+        return finish_capture(win32::capture_screen_region(x, y, width, height)?);
+    }
+    #[cfg(target_os = "macos")]
+    {
+        return finish_capture(macos::capture_screen_region(x, y, width, height)?);
+    }
+    #[cfg(not(any(windows, target_os = "macos")))]
+    {
+        let _ = (x, y, width, height);
+        return Err(unsupported_platform("screenshot_region"));
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use encode::CapturedRgba;
 
     #[test]
     fn blank_capture_rejected() {

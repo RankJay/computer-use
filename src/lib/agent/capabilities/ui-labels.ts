@@ -3,6 +3,7 @@ const UI_TOOL_LABELS: Readonly<Record<string, string>> = {
   mouse_move: "Surfing through your screen",
   mouse_hover: "Lingering over a spot",
   mouse_click: "Tapping the screen",
+  mouse_click_image: "Tapping a spot in the screenshot",
   mouse_scroll: "Gliding through the page",
   mouse_drag: "Sweeping across the screen",
   mouse_down: "Pinning the cursor",
@@ -66,6 +67,7 @@ const UI_TOOL_LABELS: Readonly<Record<string, string>> = {
   window_state: "Changing a window's state",
 
   screenshot: "Taking a screenshot",
+  screenshot_region: "Zooming into the screenshot",
 
   wait: "Pausing for a moment",
 };

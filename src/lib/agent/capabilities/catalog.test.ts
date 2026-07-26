@@ -25,6 +25,7 @@ describe("capability catalog", () => {
         "window_list",
         "get_active_window",
         "screenshot",
+        "screenshot_region",
         "process_list",
         "run_shell",
         "accessibility_snapshot",
@@ -50,6 +51,7 @@ describe("capability catalog", () => {
         "write_clipboard_image",
         "mouse_move",
         "mouse_click",
+        "mouse_click_image",
         "mouse_scroll",
         "mouse_drag",
         "mouse_hover",
@@ -62,7 +64,7 @@ describe("capability catalog", () => {
       ]),
     );
     expect(names).not.toContain("accessibility_expand_node");
-    expect(names).toHaveLength(60);
+    expect(names).toHaveLength(62);
   });
 
   test("groups names by risk", () => {
@@ -70,11 +72,13 @@ describe("capability catalog", () => {
     expect(byRisk.low).toContain("read_file");
     expect(byRisk.medium).toContain("run_shell");
     expect(byRisk.high).toContain("mouse_click");
+    expect(byRisk.high).toContain("mouse_click_image");
     expect(byRisk.high).toContain("hotkey");
     expect(byRisk.medium).toContain("read_clipboard");
     expect(byRisk.medium).toContain("read_clipboard_image");
     expect(byRisk.medium).toContain("write_clipboard_html");
     expect(byRisk.medium).toContain("screenshot");
+    expect(byRisk.medium).toContain("screenshot_region");
   });
 
   test("filters accessibility tools when uiAutomation is off", () => {
@@ -87,6 +91,7 @@ describe("capability catalog", () => {
     expect(off.high).not.toContain("accessibility_get_value");
     expect(off.high).not.toContain("accessibility_invoke_action");
     expect(off.high).not.toContain("mouse_move");
+    expect(off.high).not.toContain("mouse_click_image");
     expect(off.high).not.toContain("hotkey");
     expect(off.high).not.toContain("key_press");
 
@@ -111,6 +116,7 @@ describe("capability catalog", () => {
     expect(on.high).toContain("accessibility_right_click_element");
     expect(on.high).toContain("accessibility_invoke_action");
     expect(on.high).toContain("mouse_click");
+    expect(on.high).toContain("mouse_click_image");
     expect(on.high).toContain("mouse_drag");
     expect(on.high).toContain("hotkey");
     expect(on.high).toContain("key_down");
@@ -124,10 +130,12 @@ describe("capability catalog", () => {
       expect(byRisk.low).toContain("get_active_window");
       expect(byRisk.medium).toContain("window_focus");
       expect(byRisk.medium).toContain("screenshot");
+      expect(byRisk.medium).toContain("screenshot_region");
     } else {
       expect(byRisk.low).not.toContain("window_list");
       expect(byRisk.medium).not.toContain("window_focus");
       expect(byRisk.medium).not.toContain("screenshot");
+      expect(byRisk.medium).not.toContain("screenshot_region");
     }
   });
 

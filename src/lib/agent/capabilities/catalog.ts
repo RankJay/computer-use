@@ -38,6 +38,7 @@ import { keyDownCapability } from "./keyboard/key-down";
 import { keyPressCapability } from "./keyboard/key-press";
 import { keyUpCapability } from "./keyboard/key-up";
 import { mouseClickCapability } from "./mouse/click";
+import { mouseClickImageCapability } from "./mouse/click-image";
 import { mouseDownCapability } from "./mouse/down";
 import { mouseDragCapability } from "./mouse/drag";
 import { mouseHoverCapability } from "./mouse/hover";
@@ -45,6 +46,7 @@ import { mouseMoveCapability } from "./mouse/move";
 import { mouseScrollCapability } from "./mouse/scroll";
 import { mouseUpCapability } from "./mouse/up";
 import { screenshotCapability } from "./screenshot/screenshot";
+import { screenshotRegionCapability } from "./screenshot/screenshot-region";
 import { waitCapability } from "./shared/wait";
 import { getEnvCapability } from "./shell/get-env";
 import { getSystemInfoCapability } from "./shell/get-system-info";
@@ -96,6 +98,7 @@ export const CAPABILITIES = [
   windowResizeCapability,
   getActiveWindowCapability,
   screenshotCapability,
+  screenshotRegionCapability,
   accessibilitySnapshotCapability,
   accessibilityQueryCapability,
   accessibilityFindElementCapability,
@@ -115,6 +118,7 @@ export const CAPABILITIES = [
   accessibilityFocusCapability,
   mouseMoveCapability,
   mouseClickCapability,
+  mouseClickImageCapability,
   mouseScrollCapability,
   mouseDragCapability,
   mouseHoverCapability,

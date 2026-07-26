@@ -38,6 +38,7 @@ describe("imageToolToModelOutput", () => {
 
   test("capabilityUsesImageModelOutput", () => {
     expect(capabilityUsesImageModelOutput("screenshot")).toBe(true);
+    expect(capabilityUsesImageModelOutput("screenshot_region")).toBe(true);
     expect(capabilityUsesImageModelOutput("read_clipboard_image")).toBe(true);
     expect(capabilityUsesImageModelOutput("read_clipboard")).toBe(false);
   });

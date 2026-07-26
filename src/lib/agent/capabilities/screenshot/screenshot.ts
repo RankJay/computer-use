@@ -51,9 +51,11 @@ export const screenshotCapability = defineCapability({
   name: "screenshot",
   description: [
     "Capture a PNG of the primary display or a top-level window (window need not be focused).",
-    "Returns image pixels plus screen-space bounds and scale so image coords map to mouse_*/accessibility_element_at_point.",
+    "Returns image pixels plus screen-space bounds and scale. To click a point in this image, prefer mouse_click_image (host remaps); do not compute screen coords yourself.",
+    "If a control is small, dense, or illegible, call screenshot_region once on that image rect before mouse_click_image — do not chain region→region.",
     SCREEN_COORD_DESC,
     "Images are downscaled to max long edge 1280. On capture_unavailable the pixels are not usable; on macOS os_permission_denied means Screen Recording is required.",
+    "Use to orient or to verify after a batch of actions or after a UI transition — not after every micro-step.",
   ].join(" "),
   risk: "medium",
   inputSchema: screenshotInputSchema,

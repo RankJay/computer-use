@@ -28,7 +28,7 @@ export type MouseOkOutput = {
 export const mouseClickCapability = defineCapability({
   name: "mouse_click",
   description:
-    "Click left/right/middle button n times at the current cursor (or optional screen coords). Prefer accessibility_click when a ref exists.",
+    "Click left/right/middle button n times at optional screen coords (or current cursor). For points in a screenshot image, prefer mouse_click_image instead. When you already have screen x,y, pass them here — avoid a prior mouse_move for a simple click. Prefer accessibility_click when a ref exists.",
   risk: "high",
   inputSchema: mouseClickInputSchema,
   enabledWhen: uiAutomationEnabled,

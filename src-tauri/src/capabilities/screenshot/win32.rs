@@ -3,8 +3,8 @@
 use windows::Win32::Foundation::{HWND, POINT, RECT};
 use windows::Win32::Graphics::Gdi::{
     BitBlt, ClientToScreen, CreateCompatibleBitmap, CreateCompatibleDC, DeleteDC, DeleteObject,
-    GetDC, GetDIBits, ReleaseDC, SelectObject, BITMAPINFO, BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS,
-    HBITMAP, HDC, SRCCOPY,
+    GetDC, GetDIBits, ReleaseDC, SelectObject, BITMAPINFO, BITMAPINFOHEADER, BI_RGB,
+    DIB_RGB_COLORS, HBITMAP, HDC, SRCCOPY,
 };
 use windows::Win32::Storage::Xps::{PrintWindow, PRINT_WINDOW_FLAGS};
 use windows::Win32::UI::WindowsAndMessaging::{
@@ -137,6 +137,22 @@ fn dib_to_rgba(gdi: &GdiBitmap) -> Result<CapturedRgba, CommandError> {
 pub(super) fn capture_primary_display() -> Result<RawCapture, CommandError> {
     let width = unsafe { GetSystemMetrics(SM_CXSCREEN) };
     let height = unsafe { GetSystemMetrics(SM_CYSCREEN) };
+    capture_screen_region(0, 0, width, height)
+}
+
+/// Capture a screen-space rectangle (same coords as `SetCursorPos` / screenshot bounds).
+pub(super) fn capture_screen_region(
+    x: i32,
+    y: i32,
+    width: i32,
+    height: i32,
+) -> Result<RawCapture, CommandError> {
+    if width <= 0 || height <= 0 {
+        return Err(CommandError::new(
+            ErrorCode::InvalidCoordinates,
+            format!("Region size must be positive (got {width}x{height})"),
+        ));
+    }
     let gdi = create_compatible(width, height)?;
     let ok = unsafe {
         BitBlt(
@@ -146,23 +162,23 @@ pub(super) fn capture_primary_display() -> Result<RawCapture, CommandError> {
             width,
             height,
             Some(gdi.screen_dc),
-            0,
-            0,
+            x,
+            y,
             SRCCOPY,
         )
     };
     if ok.is_err() {
         return Err(CommandError::new(
             ErrorCode::CaptureFailed,
-            "BitBlt of primary display failed",
+            format!("BitBlt of screen region ({x},{y},{width}x{height}) failed"),
         ));
     }
     let image = dib_to_rgba(&gdi)?;
     Ok(RawCapture {
         image,
         bounds: ScreenshotBounds {
-            x: 0,
-            y: 0,
+            x,
+            y,
             width,
             height,
         },
@@ -229,10 +245,7 @@ pub(super) fn capture_window(id: WindowId) -> Result<RawCapture, CommandError> {
     }
 
     let image = dib_to_rgba(&gdi)?;
-    Ok(RawCapture {
-        image,
-        bounds,
-    })
+    Ok(RawCapture { image, bounds })
 }
 
 /// Outer window rect when valid; otherwise client rect mapped to screen.

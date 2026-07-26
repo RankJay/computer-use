@@ -10,14 +10,15 @@ pub use capabilities::{
     accessibility_get_text, accessibility_get_value, accessibility_inspect,
     accessibility_invoke_action, accessibility_query, accessibility_right_click_element,
     accessibility_scroll_element, accessibility_send_keys, accessibility_set_value,
-    accessibility_snapshot, accessibility_wait, create_directory, delete_path, duplicate_path,
-    get_active_window, get_env, get_system_info, hotkey, key_down, key_press, key_up, launch,
-    mouse_click, mouse_down, mouse_drag, mouse_hover, mouse_move, mouse_scroll, mouse_up,
-    move_path, patch_file, process_info, process_kill, process_list, read_clipboard,
-    read_clipboard_html, read_clipboard_image, read_directory, read_file, run_shell, screenshot,
-    search_files, set_env, stat_path, wait, window_focus, window_list, window_move, window_resize,
-    window_state, write_clipboard, write_clipboard_html, write_clipboard_image, write_file,
-    SnapshotStore, WindowId, WindowStateOp,
+    accessibility_snapshot, accessibility_wait, create_directory, delete_path, dpi_awareness_label,
+    duplicate_path, ensure_dpi_awareness, get_active_window, get_env, get_system_info, hotkey,
+    is_per_monitor_aware, key_down, key_press, key_up, launch, mouse_click, mouse_down, mouse_drag,
+    mouse_hover, mouse_move, mouse_scroll, mouse_up, move_path, patch_file, process_info,
+    process_kill, process_list, read_clipboard, read_clipboard_html, read_clipboard_image,
+    read_directory, read_file, run_shell, screenshot, screenshot_region, search_files, set_env,
+    stat_path, wait, window_focus, window_list, window_move, window_resize, window_state,
+    write_clipboard, write_clipboard_html, write_clipboard_image, write_file, SnapshotStore,
+    WindowId, WindowStateOp,
 };
 
 #[cfg(any(windows, target_os = "macos"))]
@@ -194,6 +195,9 @@ fn setup_desktop(app: &mut tauri::App) -> tauri::Result<()> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Before any user32 metrics / capture / cursor work (agent tools share this process).
+    capabilities::ensure_dpi_awareness();
+
     #[allow(unused_mut)]
     let mut builder = tauri::Builder::default().plugin(tauri_plugin_process::init());
 
@@ -260,6 +264,7 @@ pub fn run() {
             window_resize,
             get_active_window,
             screenshot,
+            screenshot_region,
             process_list,
             process_info,
             process_kill,

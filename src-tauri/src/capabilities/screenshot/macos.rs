@@ -4,7 +4,7 @@ use std::ptr;
 
 use objc2_core_foundation::{CFDictionary, CFRetained, CFString, CFType, CGPoint, CGRect, CGSize};
 use objc2_core_graphics::{
-    kCGWindowBounds, kCGWindowIsOnscreen, kCGWindowNumber, CGBitmapContextCreate,
+    kCGNullWindowID, kCGWindowBounds, kCGWindowIsOnscreen, kCGWindowNumber, CGBitmapContextCreate,
     CGBitmapContextGetData, CGBitmapInfo, CGColorSpaceCreateDeviceRGB, CGContextDrawImage,
     CGDisplayBounds, CGDisplayCreateImage, CGImage, CGImageAlphaInfo, CGImageGetHeight,
     CGImageGetWidth, CGMainDisplayID, CGPreflightScreenCaptureAccess,
@@ -114,6 +114,48 @@ pub(super) fn capture_primary_display() -> Result<RawCapture, CommandError> {
     Ok(RawCapture {
         image: rgba,
         bounds: bounds_from_cg_rect(bounds),
+    })
+}
+
+/// Capture a screen-space rectangle (global top-left origin, points — same as mouse/CGEvent).
+pub(super) fn capture_screen_region(
+    x: i32,
+    y: i32,
+    width: i32,
+    height: i32,
+) -> Result<RawCapture, CommandError> {
+    require_screen_recording()?;
+    if width <= 0 || height <= 0 {
+        return Err(CommandError::new(
+            ErrorCode::InvalidCoordinates,
+            format!("Region size must be positive (got {width}x{height})"),
+        ));
+    }
+    let rect = CGRect::new(
+        CGPoint::new(f64::from(x), f64::from(y)),
+        CGSize::new(f64::from(width), f64::from(height)),
+    );
+    let image = CGWindowListCreateImage(
+        rect,
+        CGWindowListOption::OptionOnScreenOnly,
+        kCGNullWindowID,
+        CGWindowImageOption::BestResolution,
+    )
+    .ok_or_else(|| {
+        CommandError::new(
+            ErrorCode::CaptureUnavailable,
+            format!("Could not capture screen region ({x},{y},{width}x{height})"),
+        )
+    })?;
+    let rgba = cgimage_to_rgba(&image)?;
+    Ok(RawCapture {
+        image: rgba,
+        bounds: ScreenshotBounds {
+            x,
+            y,
+            width,
+            height,
+        },
     })
 }
 

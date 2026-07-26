@@ -82,7 +82,7 @@ export function imageToolToModelOutput(options: {
   if (typeof image.scale === "number") {
     metaParts.push(`scale=${image.scale}`);
     metaParts.push(
-      "screenX=bounds.x+imageX*scale; screenY=bounds.y+imageY*(bounds.height/imageHeight)",
+      "To click a point in this image use mouse_click_image with imageX/imageY (host remaps). Do not compute screen coords yourself.",
     );
   }
 
@@ -102,5 +102,5 @@ export function imageToolToModelOutput(options: {
 }
 
 export function capabilityUsesImageModelOutput(name: string): boolean {
-  return name === "screenshot" || name === "read_clipboard_image";
+  return name === "screenshot" || name === "screenshot_region" || name === "read_clipboard_image";
 }

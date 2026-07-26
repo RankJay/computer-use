@@ -6,9 +6,11 @@ import { osLeaseScopeOf } from "@/lib/session/control/os-lease-scope";
 import type { RuntimeEventPayload } from "@/lib/session/events";
 
 import { getCapabilityDefinition } from "./catalog";
+import { runMouseClickImage } from "./mouse/click-image";
 import { createDefaultNativeInvoker, mapInvokeError } from "./native-invoke";
 import { defaultPermissionPolicy } from "./permission-policy";
 import { lookupSettledCapability } from "./resume-from-cursor";
+import { runScreenshotRegion } from "./screenshot/screenshot-region";
 import type {
   CapabilityError,
   CapabilityRunnerDeps,
@@ -309,7 +311,12 @@ export async function runCapability(
   const invokeNative = deps.invokeNative ?? createDefaultNativeInvoker();
 
   try {
-    const output = await invokeNative(name, parsedInput, deps.workspaceRoot);
+    const output =
+      name === "mouse_click_image"
+        ? await runMouseClickImage(parsedInput, deps, invokeNative)
+        : name === "screenshot_region"
+          ? await runScreenshotRegion(parsedInput, deps, invokeNative)
+          : await invokeNative(name, parsedInput, deps.workspaceRoot);
     append({
       type: "capability.completed",
       callId,
