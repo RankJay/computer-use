@@ -222,7 +222,8 @@ describe("runCapability", () => {
           mimeType: "image/png",
           base64: "x",
           bounds: { x: 10, y: 20, width: 200, height: 100 },
-          scale: 2,
+          scaleX: 2,
+          scaleY: 2,
         },
       },
     ];
@@ -260,7 +261,7 @@ describe("runCapability", () => {
     expect(payloads.map((p) => p.type)).toEqual(["capability.requested", "capability.completed"]);
   });
 
-  test("mouse_click_image prefers latest screenshot_region geometry", async () => {
+  test("mouse_click_image prefers latest screenshot_zoom geometry", async () => {
     let clicked: unknown;
     const log = [
       {
@@ -277,7 +278,8 @@ describe("runCapability", () => {
           mimeType: "image/png",
           base64: "x",
           bounds: { x: 10, y: 20, width: 200, height: 100 },
-          scale: 2,
+          scaleX: 2,
+          scaleY: 2,
         },
       },
       {
@@ -287,14 +289,15 @@ describe("runCapability", () => {
         schemaVersion: RUNTIME_EVENT_SCHEMA_VERSION,
         type: "capability.completed" as const,
         callId: "crop-1",
-        capability: "screenshot_region",
+        capability: "screenshot_zoom",
         output: {
           width: 40,
           height: 20,
           mimeType: "image/png",
           base64: "zoom",
           bounds: { x: 20, y: 40, width: 80, height: 40 },
-          scale: 2,
+          scaleX: 2,
+          scaleY: 2,
         },
       },
     ];
@@ -356,7 +359,8 @@ describe("runCapability", () => {
               mimeType: "image/png",
               base64: "x",
               bounds: { x: 0, y: 0, width: 200, height: 100 },
-              scale: 2,
+              scaleX: 2,
+              scaleY: 2,
             },
           },
         ],
@@ -373,7 +377,7 @@ describe("runCapability", () => {
     expect(result.error.message).toContain("outside screenshot");
   });
 
-  test("screenshot_region remaps image rect then invokes native screenshot_region", async () => {
+  test("screenshot_zoom remaps image rect then invokes native screenshot_region", async () => {
     let regionArgs: unknown;
     const log = [
       {
@@ -390,13 +394,14 @@ describe("runCapability", () => {
           mimeType: "image/png",
           base64: "x",
           bounds: { x: 10, y: 20, width: 200, height: 100 },
-          scale: 2,
+          scaleX: 2,
+          scaleY: 2,
         },
       },
     ];
 
     const result = await runCapability(
-      "screenshot_region",
+      "screenshot_zoom",
       { imageX: 5, imageY: 10, imageWidth: 10, imageHeight: 5 },
       {
         append: () => {},
@@ -414,7 +419,8 @@ describe("runCapability", () => {
               mimeType: "image/png",
               base64: "zoom",
               bounds: { x: 20, y: 40, width: 19, height: 9 },
-              scale: 0.475,
+              scaleX: 0.475,
+              scaleY: 0.45,
             };
           },
         }),
@@ -426,9 +432,9 @@ describe("runCapability", () => {
     expect(regionArgs).toEqual({ x: 20, y: 40, width: 19, height: 9 });
   });
 
-  test("screenshot_region rejects out-of-bounds image rect", async () => {
+  test("screenshot_zoom rejects out-of-bounds image rect", async () => {
     const result = await runCapability(
-      "screenshot_region",
+      "screenshot_zoom",
       { imageX: 90, imageY: 0, imageWidth: 20, imageHeight: 10 },
       {
         append: () => {},
@@ -451,7 +457,8 @@ describe("runCapability", () => {
               mimeType: "image/png",
               base64: "x",
               bounds: { x: 0, y: 0, width: 200, height: 100 },
-              scale: 2,
+              scaleX: 2,
+              scaleY: 2,
             },
           },
         ],

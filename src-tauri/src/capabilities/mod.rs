@@ -38,7 +38,7 @@ pub use input::{
     mouse_move, mouse_scroll, mouse_up,
 };
 pub use screenshot::{screenshot, screenshot_region};
-pub use shared::{dpi_awareness_label, ensure_dpi_awareness, is_per_monitor_aware, wait};
+pub use shared::{ensure_dpi_awareness, wait};
 pub use shell::{
     get_env, get_system_info, launch, process_info, process_kill, process_list, run_shell, set_env,
 };

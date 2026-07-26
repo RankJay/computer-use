@@ -12,7 +12,7 @@ describe("uiToolLabel", () => {
     expect(uiToolLabel("run_shell")).toBe("Running a command");
     expect(uiToolLabel("window_focus")).toBe("Bringing a window forward");
     expect(uiToolLabel("screenshot")).toBe("Taking a screenshot");
-    expect(uiToolLabel("screenshot_region")).toBe("Zooming into the screenshot");
+    expect(uiToolLabel("screenshot_zoom")).toBe("Zooming into the screenshot");
     expect(uiToolLabel("wait")).toBe("Pausing for a moment");
   });
 

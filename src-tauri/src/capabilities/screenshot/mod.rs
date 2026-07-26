@@ -44,7 +44,9 @@ pub struct ScreenshotResult {
     pub base64: String,
     pub bounds: ScreenshotBounds,
     /// Screen units per image pixel (x-axis).
-    pub scale: f64,
+    pub scale_x: f64,
+    /// Screen units per image pixel (y-axis).
+    pub scale_y: f64,
 }
 
 struct RawCapture {
@@ -74,7 +76,8 @@ fn finish_capture(raw: RawCapture) -> Result<ScreenshotResult, CommandError> {
 
     let scaled = maybe_downscale(raw.image)?;
     let (width, height, base64) = encode_png_base64(scaled)?;
-    let scale = f64::from(raw.bounds.width) / f64::from(width);
+    let scale_x = f64::from(raw.bounds.width) / f64::from(width);
+    let scale_y = f64::from(raw.bounds.height) / f64::from(height);
 
     Ok(ScreenshotResult {
         width,
@@ -82,7 +85,8 @@ fn finish_capture(raw: RawCapture) -> Result<ScreenshotResult, CommandError> {
         mime_type: "image/png".to_string(),
         base64,
         bounds: raw.bounds,
-        scale,
+        scale_x,
+        scale_y,
     })
 }
 
@@ -203,7 +207,8 @@ mod tests {
         .expect("encode");
         assert!(result.width <= MAX_LONG_EDGE);
         assert!(result.height <= MAX_LONG_EDGE);
-        assert!((result.scale - f64::from(2000) / f64::from(result.width)).abs() < 0.01);
+        assert!((result.scale_x - f64::from(2000) / f64::from(result.width)).abs() < 0.01);
+        assert!((result.scale_y - f64::from(1000) / f64::from(result.height)).abs() < 0.01);
         assert_eq!(result.bounds.x, 10);
         assert_eq!(result.mime_type, "image/png");
         assert!(!result.base64.is_empty());

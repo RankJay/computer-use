@@ -1,7 +1,10 @@
 import type { RuntimeEvent } from "@/lib/session/events";
 
 import type { CapabilityError } from "../types";
+import { isRecord } from "./is-record";
+import { isScreenshotGeometrySource } from "./screenshot-geometry-sources";
 
+/** Canonical screen-space rect for screenshot geometry. */
 export type ScreenshotBounds = {
   x: number;
   y: number;
@@ -15,28 +18,30 @@ export type ScreenshotGeometry = {
   width: number;
   height: number;
   bounds: ScreenshotBounds;
-  scale: number;
+  /** Screen units per image pixel (x). */
+  scaleX: number;
+  /** Screen units per image pixel (y). */
+  scaleY: number;
 };
 
 export type ImageToScreenInput = {
   imageX: number;
   imageY: number;
   bounds: ScreenshotBounds;
-  scale: number;
-  imageWidth: number;
-  imageHeight: number;
+  scaleX: number;
+  scaleY: number;
 };
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
+export type ResolveScreenshotGeometryResult =
+  | { ok: true; geometry: ScreenshotGeometry }
+  | { ok: false; error: CapabilityError };
 
 function readFiniteNumber(record: Record<string, unknown>, key: string): number | null {
   const value = record[key];
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
-/** Parse screenshot tool output into geometry, or null if unusable. */
+/** Parse screenshot tool output into geometry, or null if unusable. Requires scaleX/scaleY. */
 export function parseScreenshotGeometry(
   callId: string,
   output: unknown,
@@ -46,8 +51,7 @@ export function parseScreenshotGeometry(
   }
   const width = readFiniteNumber(output, "width");
   const height = readFiniteNumber(output, "height");
-  const scale = readFiniteNumber(output, "scale");
-  if (width === null || height === null || scale === null || width <= 0 || height <= 0) {
+  if (width === null || height === null || width <= 0 || height <= 0) {
     return null;
   }
   if (!isRecord(output.bounds)) {
@@ -60,49 +64,57 @@ export function parseScreenshotGeometry(
   if (x === null || y === null || bw === null || bh === null || bw <= 0 || bh <= 0) {
     return null;
   }
+
+  const scaleX = readFiniteNumber(output, "scaleX");
+  const scaleY = readFiniteNumber(output, "scaleY");
+  if (scaleX === null || scaleY === null || scaleX <= 0 || scaleY <= 0) {
+    return null;
+  }
+
   return {
     callId,
     width,
     height,
-    scale,
+    scaleX,
+    scaleY,
     bounds: { x, y, width: bw, height: bh },
   };
 }
 
-const SCREENSHOT_GEOMETRY_CAPABILITIES = new Set(["screenshot", "screenshot_region"]);
-
-function isScreenshotGeometryCapability(name: string): boolean {
-  return SCREENSHOT_GEOMETRY_CAPABILITIES.has(name);
-}
-
 /**
  * Resolve screenshot geometry from the attempt event log.
- * Default: latest successful `screenshot` or `screenshot_region`.
+ * Default: latest successful screenshot / screenshot_zoom (registered via providesScreenshotGeometry).
  * Optional: specific `screenshotCallId`.
  */
 export function resolveScreenshotGeometry(
   events: readonly RuntimeEvent[],
   screenshotCallId?: string,
-): ScreenshotGeometry | CapabilityError {
+): ResolveScreenshotGeometryResult {
   if (screenshotCallId !== undefined) {
     for (let i = events.length - 1; i >= 0; i--) {
       const event = events[i];
       if (!event) continue;
       if (event.type !== "capability.completed") continue;
-      if (!isScreenshotGeometryCapability(event.capability)) continue;
+      if (!isScreenshotGeometrySource(event.capability)) continue;
       if (event.callId !== screenshotCallId) continue;
       const geometry = parseScreenshotGeometry(event.callId, event.output);
       if (!geometry) {
         return {
-          code: "invalid_input",
-          message: `Screenshot ${screenshotCallId} has no usable bounds/scale geometry`,
+          ok: false,
+          error: {
+            code: "invalid_input",
+            message: `Screenshot ${screenshotCallId} has no usable bounds/scale geometry`,
+          },
         };
       }
-      return geometry;
+      return { ok: true, geometry };
     }
     return {
-      code: "invalid_input",
-      message: `No successful screenshot with callId ${screenshotCallId}`,
+      ok: false,
+      error: {
+        code: "invalid_input",
+        message: `No successful screenshot with callId ${screenshotCallId}`,
+      },
     };
   }
 
@@ -110,17 +122,20 @@ export function resolveScreenshotGeometry(
     const event = events[i];
     if (!event) continue;
     if (event.type !== "capability.completed") continue;
-    if (!isScreenshotGeometryCapability(event.capability)) continue;
+    if (!isScreenshotGeometrySource(event.capability)) continue;
     const geometry = parseScreenshotGeometry(event.callId, event.output);
     if (geometry) {
-      return geometry;
+      return { ok: true, geometry };
     }
   }
 
   return {
-    code: "invalid_input",
-    message:
-      "No successful screenshot in this attempt — call screenshot or screenshot_region first",
+    ok: false,
+    error: {
+      code: "invalid_input",
+      message:
+        "No successful screenshot in this attempt — call screenshot or screenshot_zoom first",
+    },
   };
 }
 
@@ -166,9 +181,8 @@ export function isImageRectInBounds(
 
 /** Map image pixel → screen coords (ints). Does not bounds-check. */
 export function imageToScreen(input: ImageToScreenInput): { screenX: number; screenY: number } {
-  const scaleY = input.bounds.height / input.imageHeight;
-  const screenX = Math.round(input.bounds.x + input.imageX * input.scale);
-  const screenY = Math.round(input.bounds.y + input.imageY * scaleY);
+  const screenX = Math.round(input.bounds.x + input.imageX * input.scaleX);
+  const screenY = Math.round(input.bounds.y + input.imageY * input.scaleY);
   return { screenX, screenY };
 }
 
@@ -179,25 +193,22 @@ export function imageRectToScreenBounds(input: {
   imageWidth: number;
   imageHeight: number;
   bounds: ScreenshotBounds;
-  scale: number;
-  sourceImageWidth: number;
-  sourceImageHeight: number;
+  scaleX: number;
+  scaleY: number;
 }): ScreenshotBounds {
   const tl = imageToScreen({
     imageX: input.imageX,
     imageY: input.imageY,
     bounds: input.bounds,
-    scale: input.scale,
-    imageWidth: input.sourceImageWidth,
-    imageHeight: input.sourceImageHeight,
+    scaleX: input.scaleX,
+    scaleY: input.scaleY,
   });
   const br = imageToScreen({
     imageX: input.imageX + input.imageWidth - 1,
     imageY: input.imageY + input.imageHeight - 1,
     bounds: input.bounds,
-    scale: input.scale,
-    imageWidth: input.sourceImageWidth,
-    imageHeight: input.sourceImageHeight,
+    scaleX: input.scaleX,
+    scaleY: input.scaleY,
   });
   const x = Math.min(tl.screenX, br.screenX);
   const y = Math.min(tl.screenY, br.screenY);

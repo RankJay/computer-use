@@ -7,8 +7,7 @@ use crate::capabilities::window::WindowId;
 
 use super::state::SnapshotStore;
 use super::types::{
-    ActionResult, InspectResult, QueryInput, SnapshotInput, TextResult, TIMEOUT_ACTION_MS,
-    TIMEOUT_SNAPSHOT_MS,
+    ActionResult, QueryInput, SnapshotInput, TextResult, TIMEOUT_ACTION_MS, TIMEOUT_SNAPSHOT_MS,
 };
 use super::worker::{map_worker_outcome, run};
 
@@ -76,41 +75,5 @@ pub async fn click(store: &SnapshotStore, reference: &str) -> Result<ActionResul
         .await,
         ErrorCode::ClickTimeout,
         "Accessibility click timed out",
-    )
-}
-
-pub async fn element_at_point(
-    store: &SnapshotStore,
-    x: i32,
-    y: i32,
-    window_id: Option<WindowId>,
-) -> Result<TextResult, CommandError> {
-    let store = store.clone();
-    map_worker_outcome(
-        run(Duration::from_millis(TIMEOUT_ACTION_MS), move |ctx| {
-            let session = ctx.session_mut()?;
-            session.element_at_point(&store, x, y, window_id)
-        })
-        .await,
-        ErrorCode::ElementAtPointTimeout,
-        "Element-at-point lookup timed out",
-    )
-}
-
-pub async fn inspect(
-    store: &SnapshotStore,
-    reference: &str,
-) -> Result<InspectResult, CommandError> {
-    let store = store.clone();
-    let reference = reference.to_string();
-    map_worker_outcome(
-        run(Duration::from_millis(TIMEOUT_ACTION_MS), move |ctx| {
-            let deadline = ctx.deadline;
-            let session = ctx.session_mut()?;
-            session.inspect(&store, &reference, deadline)
-        })
-        .await,
-        ErrorCode::InspectTimeout,
-        "Accessibility inspect timed out",
     )
 }

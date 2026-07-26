@@ -1,8 +1,11 @@
 import { z } from "zod";
 
 import { SCREEN_COORD_DESC } from "../shared/screen-coords";
+import type { ScreenshotBounds } from "../shared/screenshot-geometry";
 import { windowAutomationEnabled } from "../shared/ui-automation";
 import { defineCapability } from "../types";
+
+export type { ScreenshotBounds };
 
 /** Plain object (not discriminatedUnion) so Anthropic gets top-level `type: "object"`. */
 export const screenshotInputSchema = z
@@ -26,13 +29,6 @@ export const screenshotInputSchema = z
     }
   });
 
-export type ScreenshotBounds = {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-};
-
 export type ScreenshotOutput = {
   width: number;
   height: number;
@@ -40,19 +36,18 @@ export type ScreenshotOutput = {
   base64: string;
   /** Screen-space rect of the captured region. */
   bounds: ScreenshotBounds;
-  /**
-   * Screen units per image pixel (x-axis). Map image (px, py) → screen:
-   * `bounds.x + px * scale`, `bounds.y + py * (bounds.height / height)`.
-   */
-  scale: number;
+  /** Screen units per image pixel (x). */
+  scaleX: number;
+  /** Screen units per image pixel (y). */
+  scaleY: number;
 };
 
 export const screenshotCapability = defineCapability({
   name: "screenshot",
   description: [
     "Capture a PNG of the primary display or a top-level window (window need not be focused).",
-    "Returns image pixels plus screen-space bounds and scale. To click a point in this image, prefer mouse_click_image (host remaps); do not compute screen coords yourself.",
-    "If a control is small, dense, or illegible, call screenshot_region once on that image rect before mouse_click_image — do not chain region→region.",
+    "Returns image pixels plus screen-space bounds and scaleX/scaleY. To click a point in this image, prefer mouse_click_image (host remaps); do not compute screen coords yourself.",
+    "If a control is small, dense, or illegible, call screenshot_zoom once on that image rect before mouse_click_image — do not chain zoom→zoom.",
     SCREEN_COORD_DESC,
     "Images are downscaled to max long edge 1280. On capture_unavailable the pixels are not usable; on macOS os_permission_denied means Screen Recording is required.",
     "Use to orient or to verify after a batch of actions or after a UI transition — not after every micro-step.",
@@ -60,4 +55,6 @@ export const screenshotCapability = defineCapability({
   risk: "medium",
   inputSchema: screenshotInputSchema,
   enabledWhen: windowAutomationEnabled,
+  providesScreenshotGeometry: true,
+  usesImageModelOutput: true,
 });

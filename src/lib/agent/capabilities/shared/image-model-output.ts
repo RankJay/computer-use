@@ -1,5 +1,7 @@
 import type { ToolResultOutput } from "@ai-sdk/provider-utils";
 
+import { isRecord } from "./is-record";
+
 /** Tool outputs that carry a PNG (or other image) as base64 for vision models. */
 export type ImageToolOutput = {
   mimeType?: string;
@@ -13,11 +15,13 @@ export type ImageToolOutput = {
     width: number;
     height: number;
   };
-  scale?: number;
+  scaleX?: number;
+  scaleY?: number;
 };
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
+function readFiniteNumber(record: Record<string, unknown>, key: string): number | undefined {
+  const value = record[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
 
 function readImageFields(output: unknown): ImageToolOutput | null {
@@ -29,7 +33,8 @@ function readImageFields(output: unknown): ImageToolOutput | null {
   const empty = typeof output.empty === "boolean" ? output.empty : undefined;
   const width = typeof output.width === "number" ? output.width : undefined;
   const height = typeof output.height === "number" ? output.height : undefined;
-  const scale = typeof output.scale === "number" ? output.scale : undefined;
+  const scaleX = readFiniteNumber(output, "scaleX");
+  const scaleY = readFiniteNumber(output, "scaleY");
 
   let bounds: ImageToolOutput["bounds"];
   if (isRecord(output.bounds)) {
@@ -44,7 +49,7 @@ function readImageFields(output: unknown): ImageToolOutput | null {
     }
   }
 
-  return { mimeType, base64, empty, width, height, bounds, scale };
+  return { mimeType, base64, empty, width, height, bounds, scaleX, scaleY };
 }
 
 /**
@@ -79,8 +84,9 @@ export function imageToolToModelOutput(options: {
       `bounds={x:${image.bounds.x},y:${image.bounds.y},width:${image.bounds.width},height:${image.bounds.height}}`,
     );
   }
-  if (typeof image.scale === "number") {
-    metaParts.push(`scale=${image.scale}`);
+  if (typeof image.scaleX === "number" && typeof image.scaleY === "number") {
+    metaParts.push(`scaleX=${image.scaleX}`);
+    metaParts.push(`scaleY=${image.scaleY}`);
     metaParts.push(
       "To click a point in this image use mouse_click_image with imageX/imageY (host remaps). Do not compute screen coords yourself.",
     );
@@ -99,8 +105,4 @@ export function imageToolToModelOutput(options: {
   });
 
   return { type: "content", value };
-}
-
-export function capabilityUsesImageModelOutput(name: string): boolean {
-  return name === "screenshot" || name === "screenshot_region" || name === "read_clipboard_image";
 }

@@ -17,4 +17,5 @@ export const readClipboardImageCapability = defineCapability({
   description: "Read an image from the system clipboard as PNG base64",
   risk: "medium",
   inputSchema: readClipboardImageInputSchema,
+  usesImageModelOutput: true,
 });

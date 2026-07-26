@@ -6,7 +6,7 @@ import {
   resolveScreenshotGeometry,
 } from "../shared/screenshot-geometry";
 import { uiAutomationEnabled } from "../shared/ui-automation";
-import type { CapabilityNativeInvoker, CapabilityRunnerDeps } from "../types";
+import type { CapabilityHostRunContext } from "../types";
 import { defineCapability } from "../types";
 import { mouseButtonSchema } from "./click";
 
@@ -30,7 +30,7 @@ export const mouseClickImageInputSchema = z.object({
     .min(1)
     .optional()
     .describe(
-      "Tool call id of a prior screenshot or screenshot_region; default is the latest successful one in this attempt",
+      "Tool call id of a prior screenshot or screenshot_zoom; default is the latest successful one in this attempt",
     ),
 });
 
@@ -43,35 +43,20 @@ export type MouseClickImageOutput = {
   screenshotCallId: string;
 };
 
-export const mouseClickImageCapability = defineCapability({
-  name: "mouse_click_image",
-  description: [
-    "Click at a point in the latest screenshot image (host remaps image pixels to screen).",
-    'Args are two separate integers, e.g. {"imageX":138,"imageY":360} — never put both coords in one field.',
-    "Pass imageX/imageY from the screenshot you see — do not multiply by scale or add bounds.",
-    "Optional screenshotCallId targets an earlier screenshot or screenshot_region; otherwise uses the latest successful one.",
-    "Prefer accessibility_click when a ref exists. Prefer this over mouse_click(x,y) after a screenshot.",
-  ].join(" "),
-  risk: "high",
-  inputSchema: mouseClickImageInputSchema,
-  enabledWhen: uiAutomationEnabled,
-});
-
 /**
  * Host path: resolve screenshot geometry → remap → native mouse_click.
- * Throws CapabilityError-shaped objects on validation failure.
+ * Input is already Zod-parsed by the runner.
  */
-export async function runMouseClickImage(
-  rawInput: unknown,
-  deps: Pick<CapabilityRunnerDeps, "getEventLog" | "workspaceRoot">,
-  invokeNative: CapabilityNativeInvoker,
+async function runMouseClickImage(
+  input: MouseClickImageInput,
+  ctx: CapabilityHostRunContext,
 ): Promise<MouseClickImageOutput> {
-  const input = mouseClickImageInputSchema.parse(rawInput);
-  const events = deps.getEventLog?.() ?? [];
-  const geometry = resolveScreenshotGeometry(events, input.screenshotCallId);
-  if ("code" in geometry) {
-    throw geometry;
+  const events = ctx.getEventLog?.() ?? [];
+  const resolved = resolveScreenshotGeometry(events, input.screenshotCallId);
+  if (!resolved.ok) {
+    throw resolved.error;
   }
+  const { geometry } = resolved;
 
   if (!isImageCoordInBounds(input.imageX, input.imageY, geometry.width, geometry.height)) {
     throw {
@@ -84,18 +69,17 @@ export async function runMouseClickImage(
     imageX: input.imageX,
     imageY: input.imageY,
     bounds: geometry.bounds,
-    scale: geometry.scale,
-    imageWidth: geometry.width,
-    imageHeight: geometry.height,
+    scaleX: geometry.scaleX,
+    scaleY: geometry.scaleY,
   });
 
   const button = input.button ?? "left";
   const count = input.count ?? 1;
 
-  const nativeOut = await invokeNative(
+  const nativeOut = await ctx.invokeNative(
     "mouse_click",
     { button, count, x: screenX, y: screenY },
-    deps.workspaceRoot,
+    ctx.workspaceRoot,
   );
 
   return {
@@ -114,3 +98,18 @@ function nativeClickSucceeded(nativeOut: unknown): boolean {
     nativeOut.ok === true
   );
 }
+
+export const mouseClickImageCapability = defineCapability({
+  name: "mouse_click_image",
+  description: [
+    "Click at a point in the latest screenshot image (host remaps image pixels to screen).",
+    'Args are two separate integers, e.g. {"imageX":138,"imageY":360} — never put both coords in one field.',
+    "Pass imageX/imageY from the screenshot you see — do not multiply by scale or add bounds.",
+    "Optional screenshotCallId targets an earlier screenshot or screenshot_zoom; otherwise uses the latest successful one.",
+    "Prefer accessibility_click when a ref exists. Prefer this over mouse_click(x,y) after a screenshot.",
+  ].join(" "),
+  risk: "high",
+  inputSchema: mouseClickImageInputSchema,
+  enabledWhen: uiAutomationEnabled,
+  run: runMouseClickImage,
+});

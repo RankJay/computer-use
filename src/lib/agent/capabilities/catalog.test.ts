@@ -4,6 +4,7 @@ import { hostSupportsUiAutomation } from "@/lib/agent/capabilities/shared/ui-aut
 import { DEFAULT_SETTINGS } from "@/lib/settings/defaults";
 
 import { getCapabilities, getCapabilityNamesByRisk } from "./catalog";
+import { listScreenshotGeometrySources } from "./shared/screenshot-geometry-sources";
 
 describe("capability catalog", () => {
   test("registers full toolset", () => {
@@ -25,7 +26,7 @@ describe("capability catalog", () => {
         "window_list",
         "get_active_window",
         "screenshot",
-        "screenshot_region",
+        "screenshot_zoom",
         "process_list",
         "run_shell",
         "accessibility_snapshot",
@@ -78,7 +79,7 @@ describe("capability catalog", () => {
     expect(byRisk.medium).toContain("read_clipboard_image");
     expect(byRisk.medium).toContain("write_clipboard_html");
     expect(byRisk.medium).toContain("screenshot");
-    expect(byRisk.medium).toContain("screenshot_region");
+    expect(byRisk.medium).toContain("screenshot_zoom");
   });
 
   test("filters accessibility tools when uiAutomation is off", () => {
@@ -130,13 +131,36 @@ describe("capability catalog", () => {
       expect(byRisk.low).toContain("get_active_window");
       expect(byRisk.medium).toContain("window_focus");
       expect(byRisk.medium).toContain("screenshot");
-      expect(byRisk.medium).toContain("screenshot_region");
+      expect(byRisk.medium).toContain("screenshot_zoom");
     } else {
       expect(byRisk.low).not.toContain("window_list");
       expect(byRisk.medium).not.toContain("window_focus");
       expect(byRisk.medium).not.toContain("screenshot");
-      expect(byRisk.medium).not.toContain("screenshot_region");
+      expect(byRisk.medium).not.toContain("screenshot_zoom");
     }
+  });
+
+  test("screenshot geometry / image-output tags stay in sync with name lists", () => {
+    const geometryNames = getCapabilities()
+      .filter((c) => c.providesScreenshotGeometry)
+      .map((c) => c.name)
+      .sort();
+    expect(geometryNames).toEqual(listScreenshotGeometrySources());
+    expect(geometryNames).toEqual(["screenshot", "screenshot_zoom"]);
+
+    const imageOut = getCapabilities()
+      .filter((c) => c.usesImageModelOutput)
+      .map((c) => c.name)
+      .sort();
+    expect(imageOut).toEqual(["read_clipboard_image", "screenshot", "screenshot_zoom"]);
+  });
+
+  test("host adapters register run; native peers do not", () => {
+    const byName = Object.fromEntries(getCapabilities().map((c) => [c.name, c]));
+    expect(byName.mouse_click_image?.run).toBeDefined();
+    expect(byName.screenshot_zoom?.run).toBeDefined();
+    expect(byName.screenshot?.run).toBeUndefined();
+    expect(byName.mouse_click?.run).toBeUndefined();
   });
 
   test("workspace-root flag is set only on filesystem tools", () => {
