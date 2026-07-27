@@ -70,6 +70,8 @@ const UI_TOOL_LABELS: Readonly<Record<string, string>> = {
   screenshot_zoom: "Zooming into the screenshot",
 
   wait: "Pausing for a moment",
+
+  web_search: "Searching on web",
 };
 
 /** Human-readable label for chat/status UI. Falls back to the canonical tool name. */

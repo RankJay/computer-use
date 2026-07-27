@@ -18,20 +18,29 @@ export class ModelProviderError extends Error {
   }
 }
 
-function parseModelId(modelId: string): { provider: string; model: string } {
+/** Returns provider/model parts, or null when `modelId` is not `provider/model`. */
+export function tryParseModelId(modelId: string): { provider: string; model: string } | null {
   const slashIndex = modelId.indexOf("/");
   if (slashIndex <= 0 || slashIndex === modelId.length - 1) {
-    throw new ModelProviderError(
-      "invalid_model",
-      `Model id must be provider/model format. Got: ${modelId}`,
-      false,
-    );
+    return null;
   }
 
   return {
     provider: modelId.slice(0, slashIndex),
     model: modelId.slice(slashIndex + 1),
   };
+}
+
+export function parseModelId(modelId: string): { provider: string; model: string } {
+  const parsed = tryParseModelId(modelId);
+  if (!parsed) {
+    throw new ModelProviderError(
+      "invalid_model",
+      `Model id must be provider/model format. Got: ${modelId}`,
+      false,
+    );
+  }
+  return parsed;
 }
 
 export function resolveLanguageModel(modelId: string, secrets: AppSecrets): LanguageModel {

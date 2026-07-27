@@ -14,6 +14,7 @@ describe("uiToolLabel", () => {
     expect(uiToolLabel("screenshot")).toBe("Taking a screenshot");
     expect(uiToolLabel("screenshot_zoom")).toBe("Zooming into the screenshot");
     expect(uiToolLabel("wait")).toBe("Pausing for a moment");
+    expect(uiToolLabel("web_search")).toBe("Searching on web");
   });
 
   test("falls back to the canonical name for unmapped tools", () => {

@@ -15,8 +15,8 @@
     "format:check": "oxfmt --check src"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "^4.0.10",
-    "@ai-sdk/openai": "^4.0.9",
+    "@ai-sdk/anthropic": "^4.0.21",
+    "@ai-sdk/openai": "^4.0.20",
     "@base-ui/react": "^1.6.0",
     "@fontsource-variable/geist": "^5.2.9",
     "@radix-ui/react-use-controllable-state": "^1.2.3",
@@ -38,7 +38,7 @@
     "@tauri-apps/plugin-store": "^2.4.3",
     "@tauri-apps/plugin-stronghold": "^2.3.1",
     "@tauri-apps/plugin-updater": "^2.0.0",
-    "ai": "^7.0.17",
+    "ai": "^7.0.37",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.4.0",

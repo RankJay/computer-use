@@ -5,6 +5,7 @@ import {
   ClipboardIcon,
   EyeIcon,
   FileCode2Icon,
+  GlobeIcon,
   KeyboardIcon,
   type LucideIcon,
   MousePointer2Icon,
@@ -59,6 +60,9 @@ function toolActivityIcon(toolName: string): LucideIcon {
   }
   if (toolName === "wait") {
     return TimerIcon;
+  }
+  if (toolName === "web_search") {
+    return GlobeIcon;
   }
   return TerminalIcon;
 }
