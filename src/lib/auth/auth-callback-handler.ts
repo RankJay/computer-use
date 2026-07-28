@@ -66,7 +66,9 @@ const handleAuthCallback: DeepLinkHandler = async (link, ctx) => {
   processedTokens.add(token);
 
   const goToAccount = (): void => {
-    ctx.navigate("/settings/account", { replace: true });
+    // Push so Home (or prior route) stays under Account; Account→Settings
+    // still replaces, leaving a single back target instead of a dead-end stack.
+    ctx.navigate("/settings/account");
   };
 
   if (ctx.source === "open") {

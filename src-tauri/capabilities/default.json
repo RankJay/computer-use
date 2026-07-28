@@ -22,7 +22,10 @@
       "allow": [
         { "url": "https://api.anthropic.com/**" },
         { "url": "https://api.openai.com/**" },
-        { "url": "http://localhost:8000/**" }
+        { "url": "https://actuate-be.vercel.app/**" },
+        { "url": "http://localhost:8000/**" },
+        { "url": "http://127.0.0.1:11434/**" },
+        { "url": "http://localhost:11434/**" }
       ]
     }
   ]

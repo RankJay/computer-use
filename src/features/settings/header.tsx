@@ -2,6 +2,8 @@ import { ArrowLeft } from "lucide-react";
 import { useCallback, type ReactElement } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
+import { canNavigateBack } from "@/lib/runtime/can-navigate-back";
+
 type SettingsPageHeaderProps = {
   title?: string;
   /** Parent route for nested settings pages (e.g. Account → Settings). */
@@ -21,7 +23,7 @@ export function SettingsPageHeader({
       navigate(backTo, { replace: true });
       return;
     }
-    if (location.key === "default") {
+    if (!canNavigateBack(location.key)) {
       navigate("/");
       return;
     }
