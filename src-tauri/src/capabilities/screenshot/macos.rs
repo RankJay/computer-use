@@ -226,7 +226,7 @@ pub(super) fn capture_window(id: WindowId) -> Result<RawCapture, CommandError> {
         CGWindowImageOption::BoundsIgnoreFraming | CGWindowImageOption::BestResolution;
     let image = CGWindowListCreateImage(
         // CGRectNull ⇒ use the window's own bounds.
-        CGRectNull,
+        unsafe { CGRectNull },
         CGWindowListOption::OptionIncludingWindow,
         id.0 as u32,
         image_option,
