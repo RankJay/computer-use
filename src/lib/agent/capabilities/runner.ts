@@ -309,7 +309,13 @@ export async function runCapability(
   const invokeNative = deps.invokeNative ?? createDefaultNativeInvoker();
 
   try {
-    const output = await invokeNative(name, parsedInput, deps.workspaceRoot);
+    const output = definition.run
+      ? await definition.run(parsedInput, {
+          workspaceRoot: deps.workspaceRoot,
+          invokeNative,
+          getEventLog: deps.getEventLog,
+        })
+      : await invokeNative(name, parsedInput, deps.workspaceRoot);
     append({
       type: "capability.completed",
       callId,

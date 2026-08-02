@@ -13,6 +13,8 @@ import {
   type CapabilityRunnerDeps,
   type ToolPartLocation,
 } from "@/lib/agent/capabilities";
+import { prepareMessagesForModel } from "@/lib/agent/prepare-messages-for-model";
+import { buildProviderWebSearchTools } from "@/lib/agent/provider-tools";
 import { formatToolStreamError } from "@/lib/agent/tool-errors";
 import type { RunAgentFinishReason } from "@/lib/agent/types";
 import {
@@ -95,11 +97,15 @@ export async function runStreamCoordinator(
     getEventLog: deps.getEventLog,
   };
 
-  const tools = buildAgentTools(runnerDeps);
+  const tools = {
+    ...buildAgentTools(runnerDeps),
+    ...buildProviderWebSearchTools(deps.modelId),
+  };
 
   try {
-    const modelMessages = await convertToModelMessages(deps.messages, {
+    const modelMessages = await convertToModelMessages(prepareMessagesForModel(deps.messages), {
       ignoreIncompleteToolCalls: true,
+      tools,
     });
 
     if (budgetGuard.checkAndStop()) {

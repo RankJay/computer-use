@@ -16,7 +16,7 @@ export type MouseOkOutput = {
 export const mouseMoveCapability = defineCapability({
   name: "mouse_move",
   description:
-    "Move the system cursor to screen coordinates (same space as window_move). Prefer accessibility_click when an element ref is available.",
+    "Move the system cursor to screen coordinates (same space as window_move). Use for hover or to stage a drag — not as preparation for a simple mouse_click (pass x,y on mouse_click instead). Prefer accessibility_click when a ref exists.",
   risk: "high",
   inputSchema: mouseMoveInputSchema,
   enabledWhen: uiAutomationEnabled,

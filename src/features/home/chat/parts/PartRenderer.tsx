@@ -6,7 +6,6 @@ import {
   isReasoningUIPart,
   isTextUIPart,
   isToolUIPart,
-  type SourceUrlUIPart,
   type UIMessage,
 } from "ai";
 import { memo, type ReactElement, type ReactNode } from "react";
@@ -14,8 +13,9 @@ import { memo, type ReactElement, type ReactNode } from "react";
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
 
 import type { PermissionResolveProps } from "../types";
+import { buildProseCitationRun, collectProseRunParts, isProseRunPart } from "./prose-citation-run";
+import { ProseWithCitationsPart } from "./ProseWithCitationsPart";
 import { ReasoningPart } from "./ReasoningPart";
-import { SourcesPart } from "./SourcesPart";
 import { TextPart } from "./TextPart";
 import { ToolPart } from "./ToolPart";
 
@@ -68,17 +68,47 @@ function renderMessageParts(
       continue;
     }
 
-    if (part.type === "source-url") {
-      const sourceParts: SourceUrlUIPart[] = [];
+    // Text interrupted only by source-url → summary Sources + inline cites in one Streamdown.
+    if (isProseRunPart(part)) {
       const startIndex = index;
-      while (index < message.parts.length && message.parts[index]?.type === "source-url") {
-        const sourcePart = message.parts[index];
-        if (sourcePart?.type === "source-url") {
-          sourceParts.push(sourcePart);
-        }
-        index += 1;
+      const { runParts, endIndex } = collectProseRunParts(message.parts, index);
+      index = endIndex;
+
+      const run = buildProseCitationRun(runParts);
+      const runIncludesActiveText =
+        isStreaming && activeTextIndex >= startIndex && activeTextIndex < endIndex;
+
+      const firstSegment = run.segments[0];
+      const onlyPlainText =
+        run.summarySources.length === 0 &&
+        run.segments.length === 1 &&
+        firstSegment !== undefined &&
+        firstSegment.citations.length === 0;
+
+      if (onlyPlainText) {
+        elements.push(
+          <TextPart
+            key={`text-${startIndex}`}
+            part={{ type: "text", text: firstSegment.text }}
+            messageRole={message.role}
+            isAnimating={runIncludesActiveText}
+          />,
+        );
+        continue;
       }
-      elements.push(<SourcesPart key={`sources-${startIndex}`} parts={sourceParts} />);
+
+      if (run.summarySources.length === 0 && run.segments.length === 0) {
+        continue;
+      }
+
+      elements.push(
+        <ProseWithCitationsPart
+          key={`prose-${startIndex}`}
+          summarySources={run.summarySources}
+          segments={run.segments}
+          isAnimating={runIncludesActiveText}
+        />,
+      );
       continue;
     }
 
@@ -100,19 +130,6 @@ function renderMessageParts(
           isStreaming={isStreaming && last?.state === "streaming"}
         />,
       );
-      continue;
-    }
-
-    if (isTextUIPart(part)) {
-      elements.push(
-        <TextPart
-          key={`text-${index}`}
-          part={part}
-          messageRole={message.role}
-          isAnimating={isStreaming && index === activeTextIndex}
-        />,
-      );
-      index += 1;
       continue;
     }
 

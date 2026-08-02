@@ -1,8 +1,7 @@
 import type { TextUIPart } from "ai";
 import { memo, type ReactElement } from "react";
 
-import { MessageResponse } from "@/components/ai-elements/message";
-import { Bubble, BubbleContent } from "@/components/ui/bubble";
+import { AssistantProseBubble } from "./AssistantProseBubble";
 
 export type TextPartProps = {
   readonly part: TextUIPart;
@@ -23,19 +22,5 @@ export const TextPart = memo(function TextPart({
     );
   }
 
-  const isError = part.text.startsWith("Error");
-
-  return (
-    <Bubble
-      variant={isError ? "destructive" : "ghost"}
-      align="start"
-      className={
-        isError ? "w-full max-w-full text-foreground font-[350]" : "text-foreground px-1 font-[350]"
-      }
-    >
-      <BubbleContent className={isError ? "w-full" : undefined}>
-        <MessageResponse isAnimating={isAnimating}>{part.text}</MessageResponse>
-      </BubbleContent>
-    </Bubble>
-  );
+  return <AssistantProseBubble markdown={part.text} isAnimating={isAnimating} />;
 });

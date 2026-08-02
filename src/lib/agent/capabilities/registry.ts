@@ -4,6 +4,7 @@ import { formatCapabilityError } from "@/lib/agent/tool-errors";
 
 import { getCapabilities, type CapabilityName } from "./catalog";
 import { runCapability } from "./runner";
+import { imageToolToModelOutput } from "./shared/image-model-output";
 import type { CapabilityDefinition, CapabilityError, CapabilityRunnerDeps } from "./types";
 
 export {
@@ -45,6 +46,16 @@ async function executeViaRunner(
 }
 
 function makeAgentTool(capability: CapabilityDefinition, deps: CapabilityRunnerDeps) {
+  if (capability.usesImageModelOutput) {
+    return tool({
+      description: capability.description,
+      inputSchema: zodSchema(capability.inputSchema),
+      execute: async (input, { toolCallId }) =>
+        executeViaRunner(capability.name, input, deps, toolCallId),
+      toModelOutput: imageToolToModelOutput,
+    });
+  }
+
   return tool({
     description: capability.description,
     inputSchema: zodSchema(capability.inputSchema),

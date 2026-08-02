@@ -4,6 +4,7 @@ import { hostSupportsUiAutomation } from "@/lib/agent/capabilities/shared/ui-aut
 import { DEFAULT_SETTINGS } from "@/lib/settings/defaults";
 
 import { getCapabilities, getCapabilityNamesByRisk } from "./catalog";
+import { listScreenshotGeometrySources } from "./shared/screenshot-geometry-sources";
 
 describe("capability catalog", () => {
   test("registers full toolset", () => {
@@ -24,6 +25,8 @@ describe("capability catalog", () => {
         "search_files",
         "window_list",
         "get_active_window",
+        "screenshot",
+        "screenshot_zoom",
         "process_list",
         "run_shell",
         "accessibility_snapshot",
@@ -49,6 +52,7 @@ describe("capability catalog", () => {
         "write_clipboard_image",
         "mouse_move",
         "mouse_click",
+        "mouse_click_image",
         "mouse_scroll",
         "mouse_drag",
         "mouse_hover",
@@ -61,7 +65,7 @@ describe("capability catalog", () => {
       ]),
     );
     expect(names).not.toContain("accessibility_expand_node");
-    expect(names).toHaveLength(59);
+    expect(names).toHaveLength(62);
   });
 
   test("groups names by risk", () => {
@@ -69,10 +73,13 @@ describe("capability catalog", () => {
     expect(byRisk.low).toContain("read_file");
     expect(byRisk.medium).toContain("run_shell");
     expect(byRisk.high).toContain("mouse_click");
+    expect(byRisk.high).toContain("mouse_click_image");
     expect(byRisk.high).toContain("hotkey");
     expect(byRisk.medium).toContain("read_clipboard");
     expect(byRisk.medium).toContain("read_clipboard_image");
     expect(byRisk.medium).toContain("write_clipboard_html");
+    expect(byRisk.medium).toContain("screenshot");
+    expect(byRisk.medium).toContain("screenshot_zoom");
   });
 
   test("filters accessibility tools when uiAutomation is off", () => {
@@ -85,6 +92,7 @@ describe("capability catalog", () => {
     expect(off.high).not.toContain("accessibility_get_value");
     expect(off.high).not.toContain("accessibility_invoke_action");
     expect(off.high).not.toContain("mouse_move");
+    expect(off.high).not.toContain("mouse_click_image");
     expect(off.high).not.toContain("hotkey");
     expect(off.high).not.toContain("key_press");
 
@@ -109,6 +117,7 @@ describe("capability catalog", () => {
     expect(on.high).toContain("accessibility_right_click_element");
     expect(on.high).toContain("accessibility_invoke_action");
     expect(on.high).toContain("mouse_click");
+    expect(on.high).toContain("mouse_click_image");
     expect(on.high).toContain("mouse_drag");
     expect(on.high).toContain("hotkey");
     expect(on.high).toContain("key_down");
@@ -121,10 +130,37 @@ describe("capability catalog", () => {
       expect(byRisk.low).toContain("window_list");
       expect(byRisk.low).toContain("get_active_window");
       expect(byRisk.medium).toContain("window_focus");
+      expect(byRisk.medium).toContain("screenshot");
+      expect(byRisk.medium).toContain("screenshot_zoom");
     } else {
       expect(byRisk.low).not.toContain("window_list");
       expect(byRisk.medium).not.toContain("window_focus");
+      expect(byRisk.medium).not.toContain("screenshot");
+      expect(byRisk.medium).not.toContain("screenshot_zoom");
     }
+  });
+
+  test("screenshot geometry / image-output tags stay in sync with name lists", () => {
+    const geometryNames = getCapabilities()
+      .filter((c) => c.providesScreenshotGeometry)
+      .map((c) => c.name)
+      .sort();
+    expect(geometryNames).toEqual(listScreenshotGeometrySources());
+    expect(geometryNames).toEqual(["screenshot", "screenshot_zoom"]);
+
+    const imageOut = getCapabilities()
+      .filter((c) => c.usesImageModelOutput)
+      .map((c) => c.name)
+      .sort();
+    expect(imageOut).toEqual(["read_clipboard_image", "screenshot", "screenshot_zoom"]);
+  });
+
+  test("host adapters register run; native peers do not", () => {
+    const byName = Object.fromEntries(getCapabilities().map((c) => [c.name, c]));
+    expect(byName.mouse_click_image?.run).toBeDefined();
+    expect(byName.screenshot_zoom?.run).toBeDefined();
+    expect(byName.screenshot?.run).toBeUndefined();
+    expect(byName.mouse_click?.run).toBeUndefined();
   });
 
   test("workspace-root flag is set only on filesystem tools", () => {

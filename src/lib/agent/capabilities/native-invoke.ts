@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { isTauriRuntime } from "@/lib/runtime/is-tauri-runtime";
 
 import { getCapabilityDefinition } from "./catalog";
+import { isRecord } from "./shared/is-record";
 import type { CapabilityError, CapabilityNativeInvoker } from "./types";
 
 export type TauriCommandError = {
@@ -11,10 +12,6 @@ export type TauriCommandError = {
   details?: string;
   cause?: string;
 };
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
 
 function readStringField(record: Record<string, unknown>, key: string): string | undefined {
   const value = record[key];
@@ -101,7 +98,7 @@ export function mapInvokeError(error: unknown): CapabilityError {
   return { code: "invoke_failed", message: "Unknown native command failure" };
 }
 
-/** Single execution path: capability name is the Tauri command name. */
+/** Invoke a Tauri command by name (native capability peers). Host adapters use `definition.run`. */
 export async function invokeCapabilityCommand<T>(
   command: string,
   args: Record<string, unknown>,

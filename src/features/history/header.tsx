@@ -2,12 +2,14 @@ import { ArrowLeft } from "lucide-react";
 import { useCallback, type ReactElement } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
+import { canNavigateBack } from "@/lib/runtime/can-navigate-back";
+
 export function HistoryPageHeader(): ReactElement {
   const navigate = useNavigate();
   const location = useLocation();
 
   const goBack = useCallback((): void => {
-    if (location.key === "default") {
+    if (!canNavigateBack(location.key)) {
       navigate("/");
       return;
     }

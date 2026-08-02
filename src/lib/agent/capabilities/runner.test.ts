@@ -4,7 +4,7 @@ import {
   createAutoEscalationPort,
   createEscalationPort,
 } from "@/lib/session/control/escalation-port";
-import type { RuntimeEventPayload } from "@/lib/session/events";
+import { RUNTIME_EVENT_SCHEMA_VERSION, type RuntimeEventPayload } from "@/lib/session/events";
 import { DEFAULT_SETTINGS } from "@/lib/settings/defaults";
 
 const notifyIfUnfocusedMock = mock((_notification: { title: string; body: string }) => {});
@@ -202,6 +202,300 @@ describe("runCapability", () => {
           p.part.state === "approval-responded",
       ),
     ).toBe(true);
+  });
+
+  test("mouse_click_image remaps via last screenshot then invokes mouse_click", async () => {
+    const payloads: RuntimeEventPayload[] = [];
+    let clicked: unknown;
+    const log = [
+      {
+        eventId: "evt-shot",
+        attemptId: "task-1",
+        timestamp: 1,
+        schemaVersion: RUNTIME_EVENT_SCHEMA_VERSION,
+        type: "capability.completed" as const,
+        callId: "shot-1",
+        capability: "screenshot",
+        output: {
+          width: 100,
+          height: 50,
+          mimeType: "image/png",
+          base64: "x",
+          bounds: { x: 10, y: 20, width: 200, height: 100 },
+          scaleX: 2,
+          scaleY: 2,
+        },
+      },
+    ];
+
+    const result = await runCapability(
+      "mouse_click_image",
+      { imageX: 5, imageY: 10 },
+      {
+        append: (payload) => payloads.push(payload),
+        attemptId: "task-1",
+        settings: { ...DEFAULT_SETTINGS, uiAutomation: true },
+        workspaceRoot: "D:/Projects/actuate-v3",
+        escalationPort: createAutoEscalationPort("allow"),
+        getEventLog: () => log,
+        invokeNative: createMockCapabilityInvoker({
+          mouse_click: async (input) => {
+            clicked = input;
+            return { ok: true };
+          },
+        }),
+      },
+      "click-img-1",
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      output: {
+        ok: true,
+        screenX: 20,
+        screenY: 40,
+        screenshotCallId: "shot-1",
+      },
+    });
+    expect(clicked).toEqual({ button: "left", count: 1, x: 20, y: 40 });
+    expect(payloads.map((p) => p.type)).toEqual(["capability.requested", "capability.completed"]);
+  });
+
+  test("mouse_click_image prefers latest screenshot_zoom geometry", async () => {
+    let clicked: unknown;
+    const log = [
+      {
+        eventId: "evt-shot",
+        attemptId: "task-1",
+        timestamp: 1,
+        schemaVersion: RUNTIME_EVENT_SCHEMA_VERSION,
+        type: "capability.completed" as const,
+        callId: "shot-1",
+        capability: "screenshot",
+        output: {
+          width: 100,
+          height: 50,
+          mimeType: "image/png",
+          base64: "x",
+          bounds: { x: 10, y: 20, width: 200, height: 100 },
+          scaleX: 2,
+          scaleY: 2,
+        },
+      },
+      {
+        eventId: "evt-crop",
+        attemptId: "task-1",
+        timestamp: 2,
+        schemaVersion: RUNTIME_EVENT_SCHEMA_VERSION,
+        type: "capability.completed" as const,
+        callId: "crop-1",
+        capability: "screenshot_zoom",
+        output: {
+          width: 40,
+          height: 20,
+          mimeType: "image/png",
+          base64: "zoom",
+          bounds: { x: 20, y: 40, width: 80, height: 40 },
+          scaleX: 2,
+          scaleY: 2,
+        },
+      },
+    ];
+
+    const result = await runCapability(
+      "mouse_click_image",
+      { imageX: 5, imageY: 10 },
+      {
+        append: () => {},
+        attemptId: "task-1",
+        settings: { ...DEFAULT_SETTINGS, uiAutomation: true },
+        workspaceRoot: "D:/Projects/actuate-v3",
+        escalationPort: createAutoEscalationPort("allow"),
+        getEventLog: () => log,
+        invokeNative: createMockCapabilityInvoker({
+          mouse_click: async (input) => {
+            clicked = input;
+            return { ok: true };
+          },
+        }),
+      },
+      "click-region-1",
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      output: {
+        ok: true,
+        screenX: 30,
+        screenY: 60,
+        screenshotCallId: "crop-1",
+      },
+    });
+    expect(clicked).toEqual({ button: "left", count: 1, x: 30, y: 60 });
+  });
+
+  test("mouse_click_image rejects out-of-bounds image coords", async () => {
+    const result = await runCapability(
+      "mouse_click_image",
+      { imageX: 100, imageY: 0 },
+      {
+        append: () => {},
+        attemptId: "task-1",
+        settings: { ...DEFAULT_SETTINGS, uiAutomation: true },
+        workspaceRoot: "D:/Projects/actuate-v3",
+        escalationPort: createAutoEscalationPort("allow"),
+        getEventLog: () => [
+          {
+            eventId: "evt-shot",
+            attemptId: "task-1",
+            timestamp: 1,
+            schemaVersion: RUNTIME_EVENT_SCHEMA_VERSION,
+            type: "capability.completed" as const,
+            callId: "shot-1",
+            capability: "screenshot",
+            output: {
+              width: 100,
+              height: 50,
+              mimeType: "image/png",
+              base64: "x",
+              bounds: { x: 0, y: 0, width: 200, height: 100 },
+              scaleX: 2,
+              scaleY: 2,
+            },
+          },
+        ],
+        invokeNative: createMockCapabilityInvoker({
+          mouse_click: async () => ({ ok: true }),
+        }),
+      },
+      "click-oob",
+    );
+
+    expect(result.ok).toBe(false);
+    if (result.ok || !("error" in result)) return;
+    expect(result.error.code).toBe("invalid_input");
+    expect(result.error.message).toContain("outside screenshot");
+  });
+
+  test("screenshot_zoom remaps image rect then invokes native screenshot_region", async () => {
+    let regionArgs: unknown;
+    const log = [
+      {
+        eventId: "evt-shot",
+        attemptId: "task-1",
+        timestamp: 1,
+        schemaVersion: RUNTIME_EVENT_SCHEMA_VERSION,
+        type: "capability.completed" as const,
+        callId: "shot-1",
+        capability: "screenshot",
+        output: {
+          width: 100,
+          height: 50,
+          mimeType: "image/png",
+          base64: "x",
+          bounds: { x: 10, y: 20, width: 200, height: 100 },
+          scaleX: 2,
+          scaleY: 2,
+        },
+      },
+    ];
+
+    const result = await runCapability(
+      "screenshot_zoom",
+      { imageX: 5, imageY: 10, imageWidth: 10, imageHeight: 5 },
+      {
+        append: () => {},
+        attemptId: "task-1",
+        settings: { ...DEFAULT_SETTINGS, uiAutomation: true },
+        workspaceRoot: "D:/Projects/actuate-v3",
+        escalationPort: createAutoEscalationPort("allow"),
+        getEventLog: () => log,
+        invokeNative: createMockCapabilityInvoker({
+          screenshot_region: async (input) => {
+            regionArgs = input;
+            return {
+              width: 40,
+              height: 20,
+              mimeType: "image/png",
+              base64: "zoom",
+              bounds: { x: 20, y: 40, width: 19, height: 9 },
+              scaleX: 0.475,
+              scaleY: 0.45,
+            };
+          },
+        }),
+      },
+      "region-1",
+    );
+
+    expect(result.ok).toBe(true);
+    expect(regionArgs).toEqual({ x: 20, y: 40, width: 19, height: 9 });
+  });
+
+  test("screenshot_zoom rejects out-of-bounds image rect", async () => {
+    const result = await runCapability(
+      "screenshot_zoom",
+      { imageX: 90, imageY: 0, imageWidth: 20, imageHeight: 10 },
+      {
+        append: () => {},
+        attemptId: "task-1",
+        settings: { ...DEFAULT_SETTINGS, uiAutomation: true },
+        workspaceRoot: "D:/Projects/actuate-v3",
+        escalationPort: createAutoEscalationPort("allow"),
+        getEventLog: () => [
+          {
+            eventId: "evt-shot",
+            attemptId: "task-1",
+            timestamp: 1,
+            schemaVersion: RUNTIME_EVENT_SCHEMA_VERSION,
+            type: "capability.completed" as const,
+            callId: "shot-1",
+            capability: "screenshot",
+            output: {
+              width: 100,
+              height: 50,
+              mimeType: "image/png",
+              base64: "x",
+              bounds: { x: 0, y: 0, width: 200, height: 100 },
+              scaleX: 2,
+              scaleY: 2,
+            },
+          },
+        ],
+        invokeNative: createMockCapabilityInvoker({
+          screenshot_region: async () => ({ ok: true }),
+        }),
+      },
+      "region-oob",
+    );
+
+    expect(result.ok).toBe(false);
+    if (result.ok || !("error" in result)) return;
+    expect(result.error.code).toBe("invalid_input");
+  });
+
+  test("mouse_click_image fails when no screenshot in event log", async () => {
+    const result = await runCapability(
+      "mouse_click_image",
+      { imageX: 1, imageY: 1 },
+      {
+        append: () => {},
+        attemptId: "task-1",
+        settings: { ...DEFAULT_SETTINGS, uiAutomation: true },
+        workspaceRoot: "D:/Projects/actuate-v3",
+        escalationPort: createAutoEscalationPort("allow"),
+        getEventLog: () => [],
+        invokeNative: createMockCapabilityInvoker({
+          mouse_click: async () => ({ ok: true }),
+        }),
+      },
+      "click-no-shot",
+    );
+
+    expect(result.ok).toBe(false);
+    if (result.ok || !("error" in result)) return;
+    expect(result.error.code).toBe("invalid_input");
+    expect(result.error.message).toContain("screenshot");
   });
 
   test("parallel callIds each await their own escalate", async () => {
