@@ -82,7 +82,10 @@ function emitApprovalPart(
 }
 
 /**
- * CapabilityRunner: validate → entitlement → PermissionPolicy → EscalationPort → OS lease → invoke.
+ * Public authorize + invoke seam for Capabilities.
+ * Order: validate → entitlement → PermissionPolicy (settings + standing overlay) →
+ * EscalationPort → OS lease → invoke → meter commit.
+ * Planes stay separate adapters — do not merge into lib/authorization/.
  * Policy never notifies; EscalationPort owns wait/park/timeout.
  */
 export async function runCapability(

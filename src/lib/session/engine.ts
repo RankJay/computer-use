@@ -2,6 +2,7 @@ import type { UIMessage } from "ai";
 
 import type { AttemptFoldSnapshot } from "@/lib/attempts";
 import { foldStateFromSnapshot } from "@/lib/attempts";
+import type { EntitlementPolicy } from "@/lib/entitlements";
 
 import type { EscalationPort, EscalationPortModeInput } from "./control/escalation-port";
 import type { OsLease } from "./control/os-lease";
@@ -73,6 +74,7 @@ export type AttemptEngineDeps = {
   escalationPort?: EscalationPort;
   escalationMode?: EscalationPortModeInput;
   escalationTimeoutMs?: number;
+  entitlements?: EntitlementPolicy;
 };
 
 export function createAttemptEngine(deps: AttemptEngineDeps): AttemptEngine {
@@ -131,6 +133,8 @@ export function createAttemptEngine(deps: AttemptEngineDeps): AttemptEngine {
     escalationPort: deps.escalationPort,
     escalationMode: deps.escalationMode,
     escalationTimeoutMs: deps.escalationTimeoutMs,
+    entitlements: deps.entitlements,
+    getEventLog: () => eventLog,
   });
 
   return {

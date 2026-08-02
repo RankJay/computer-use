@@ -69,15 +69,23 @@ export class TauriSqlAttemptEventStore implements AttemptEventStore {
 
     const db = await this.db();
     const last = await this.getLastSeq(input.attemptId);
-    const inserts = compact.map((event, index) => {
-      const seq = last + index + 1;
-      return db.execute(
-        `INSERT INTO attempt_events (attempt_id, mandate_id, seq, event_json)
-         VALUES ($1, $2, $3, $4)`,
-        [input.attemptId, input.mandateId, seq, JSON.stringify(event)],
-      );
-    });
-    await Promise.all(inserts);
+    await db.execute("BEGIN");
+    try {
+      for (let index = 0; index < compact.length; index += 1) {
+        const event = compact[index];
+        if (!event) continue;
+        const seq = last + index + 1;
+        await db.execute(
+          `INSERT INTO attempt_events (attempt_id, mandate_id, seq, event_json)
+           VALUES ($1, $2, $3, $4)`,
+          [input.attemptId, input.mandateId, seq, JSON.stringify(event)],
+        );
+      }
+      await db.execute("COMMIT");
+    } catch (error) {
+      await db.execute("ROLLBACK");
+      throw error;
+    }
     return last + compact.length;
   }
 

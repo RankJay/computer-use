@@ -1,8 +1,14 @@
 import type { z } from "zod";
 
+import type { EntitlementPolicy } from "@/lib/entitlements";
+import type { StandingPolicyDocument } from "@/lib/mandates/types";
 import type { EscalationPort } from "@/lib/session/control/escalation-port";
-import type { CapabilityFailedPayload, RuntimeEvent } from "@/lib/session/events";
-import type { RunExecutionContext } from "@/lib/session/run-execution-context";
+import type { OsLease } from "@/lib/session/control/os-lease";
+import type {
+  CapabilityFailedPayload,
+  RuntimeEvent,
+  RuntimeEventPayload,
+} from "@/lib/session/events";
 import type { AppSettings } from "@/lib/settings/types";
 
 import type { PermissionPolicy } from "./permission-policy";
@@ -93,8 +99,19 @@ export type InvokeCapabilityResult =
   | { ok: false; denied: true }
   | { ok: false; error: CapabilityError };
 
-/** Capability gate: shared run context with optional escalationPort for tests. */
-export type CapabilityRunnerDeps = Omit<RunExecutionContext, "escalationPort"> & {
+/**
+ * Capability gate deps — projected once from LiveRunContext in the stream coordinator.
+ * Not a session packing hop; tests may construct this flat shape directly.
+ */
+export type CapabilityRunnerDeps = {
+  attemptId: string;
+  append: (payload: RuntimeEventPayload) => unknown;
+  settings: AppSettings;
+  workspaceRoot: string;
+  standingPolicy?: StandingPolicyDocument | null;
+  entitlements?: EntitlementPolicy;
+  osLease?: OsLease;
+  getEventLog?: () => readonly RuntimeEvent[];
   /** Required when PermissionPolicy returns escalate. */
   escalationPort?: EscalationPort;
   /** Defaults to settings-backed policy. */

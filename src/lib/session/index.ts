@@ -37,7 +37,7 @@ export {
   EMPTY_ATTEMPT_USAGE,
 } from "./projection";
 
-export type { RunExecutionContext } from "./run-execution-context";
+export type { LiveRunContext, RunConfig, RunExecutionContext } from "./run-execution-context";
 
 export { getAttemptHost, registerAttemptHost, resetAttemptHost } from "./attempt-host-registry";
 

@@ -1,12 +1,11 @@
 import { applyStandingPolicyOverlay } from "@/lib/mandates/standing-policy";
-import type { StandingPolicyDocument } from "@/lib/mandates/types";
+import type { PermissionPolicyDecision, StandingPolicyDocument } from "@/lib/mandates/types";
 import type { AppSettings } from "@/lib/settings/types";
 
 import { needsPermission } from "./permission";
 import type { CapabilityRisk } from "./types";
 
-/** Rules-only result. Never talks to humans or OS notifications. */
-export type PermissionPolicyDecision = "allow" | "deny" | "escalate";
+export type { PermissionPolicyDecision };
 
 export type PermissionPolicyInput = {
   readonly name: string;

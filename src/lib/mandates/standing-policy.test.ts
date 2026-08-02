@@ -26,4 +26,13 @@ describe("applyStandingPolicyOverlay", () => {
     expect(applyStandingPolicyOverlay("allow", "run_shell", doc)).toBe("deny");
     expect(applyStandingPolicyOverlay("escalate", "run_shell", doc)).toBe("deny");
   });
+
+  test("deny beats allow when both lists name the capability", () => {
+    const doc: StandingPolicyDocument = {
+      version: 1,
+      allowCapabilities: ["run_shell"],
+      denyCapabilities: ["run_shell"],
+    };
+    expect(applyStandingPolicyOverlay("escalate", "run_shell", doc)).toBe("deny");
+  });
 });

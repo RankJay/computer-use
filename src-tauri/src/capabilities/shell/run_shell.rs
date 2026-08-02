@@ -8,7 +8,7 @@ use serde::Serialize;
 
 use crate::capabilities::error::{CommandError, ErrorCode};
 
-use super::common::resolve_cwd;
+use super::common::{resolve_cwd, suppress_console_window};
 
 const SHELL_TIMEOUT: Duration = Duration::from_secs(120);
 const MAX_CAPTURE_BYTES: usize = 512_000;
@@ -89,6 +89,7 @@ pub fn run_shell(
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
+    suppress_console_window(&mut command);
 
     if let Some(dir) = &working_dir {
         command.current_dir(dir);

@@ -49,7 +49,7 @@ export type BatchedAttemptStore = {
     loadChat: (id: string) => Promise<StoredChat | null>;
   }) => Promise<void>;
   resetForMaintenance: () => Promise<void>;
-  /** Flush buffered ledger writes (tests / shutdown). */
+  /** Hard-flush buffered ledger writes (teardown / route bind / chat checkpoint / tests). */
   flushLedger: () => Promise<void>;
   /** Last durable-ledger write failure (null when healthy). */
   getLedgerError: () => unknown | null;
@@ -108,19 +108,12 @@ export function createAttemptHost(deps: AttemptHostDeps): BatchedAttemptStore {
   let attemptStartedWaiter: ((attemptId: string) => void) | null = null;
   const ledgerSlot: { bridge?: LedgerBridge } = {};
 
-  const produceRun: ProduceRun = async (ctx) =>
-    deps.produceRun({
-      ...ctx,
-      entitlements: deps.entitlements,
-      osLease,
-      getEventLog: () => engine.getEventLog(),
-    });
-
   const engine = createAttemptEngine({
-    produceRun,
+    produceRun: deps.produceRun,
     osLease,
     escalationPort,
     escalationTimeoutMs: deps.escalationTimeoutMs,
+    entitlements: deps.entitlements,
     onAttemptStarted: (attemptId) => {
       const waiter = attemptStartedWaiter;
       attemptStartedWaiter = null;

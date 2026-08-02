@@ -1,12 +1,9 @@
-import type { UIMessage } from "ai";
+import type { EntitlementPolicy } from "@/lib/entitlements";
 
-import type { StandingPolicyDocument } from "@/lib/mandates/types";
-import type { AppSecrets, AppSettings } from "@/lib/settings/types";
-
-import type { RuntimeEventPayload, PermissionDecision } from "../events";
+import type { RuntimeEventPayload, PermissionDecision, RuntimeEvent } from "../events";
 import { foldModelContext } from "../model-context";
 import type { MandateProjection } from "../projection";
-import type { RunExecutionContext } from "../run-execution-context";
+import type { LiveRunContext, RunConfig } from "../run-execution-context";
 import {
   createEscalationPort,
   permissionDecisionToEscalation,
@@ -15,38 +12,10 @@ import {
 } from "./escalation-port";
 import type { OsLease } from "./os-lease";
 
-export type { PermissionDecision };
+export type { PermissionDecision, RunConfig };
 
-export type RunConfig = {
-  prompt: string;
-  modelId: string;
-  chatMessages?: UIMessage[];
-  settings: AppSettings;
-  secrets: AppSecrets;
-  /** When true, producers should omit appending a new user message row. */
-  isRetry?: boolean;
-  /** Persist capability approval into settings (once-per-class). */
-  persistApproval?: (capability: string) => Promise<void>;
-  /** Mandate standing policy for Capability PermissionPolicy overlay. */
-  standingPolicy?: StandingPolicyDocument | null;
-};
-
-/** Producer seam: shared gates + packed RunConfig (settings/workspace via config). */
-export type ProduceRunContext = Pick<
-  RunExecutionContext,
-  | "attemptId"
-  | "append"
-  | "escalationPort"
-  | "entitlements"
-  | "osLease"
-  | "standingPolicy"
-  | "getEventLog"
-> & {
-  config: RunConfig;
-  signal: AbortSignal;
-};
-
-export type ProduceRun = (ctx: ProduceRunContext) => Promise<void>;
+/** Producer seam: opaque LiveRunContext from RunController. */
+export type ProduceRun = (ctx: LiveRunContext) => Promise<void>;
 
 export type ResolvePermissionInteraction = {
   callId: string;
@@ -80,6 +49,10 @@ export type RunControllerDeps = {
   /** Used when escalationPort omitted — fixed or per-request resolver. */
   escalationMode?: EscalationPortModeInput;
   escalationTimeoutMs?: number;
+  /** Commercial gate — injected from Host (not via produceRun wrapper). */
+  entitlements?: EntitlementPolicy;
+  /** Live event log for resume-from-cursor / geometry — from Host/engine. */
+  getEventLog?: () => readonly RuntimeEvent[];
 };
 
 export function createRunController(deps: RunControllerDeps): RunController {
@@ -119,16 +92,19 @@ export function createRunController(deps: RunControllerDeps): RunController {
     deps.beginAttempt(attemptId);
     deps.onAttemptStarted?.(attemptId);
 
+    const live: LiveRunContext = {
+      config,
+      attemptId,
+      signal: activeAbort.signal,
+      append: deps.append,
+      escalationPort,
+      osLease: deps.osLease,
+      entitlements: deps.entitlements,
+      getEventLog: deps.getEventLog,
+    };
+
     try {
-      await deps.produceRun({
-        config,
-        attemptId,
-        signal: activeAbort.signal,
-        append: deps.append,
-        escalationPort,
-        osLease: deps.osLease,
-        standingPolicy: config.standingPolicy,
-      });
+      await deps.produceRun(live);
     } finally {
       clearActiveRun();
     }

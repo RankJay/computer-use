@@ -3,6 +3,7 @@ export type {
   MandateKind,
   MandateLifecycleStatus,
   MandateSuccessCriteria,
+  PermissionPolicyDecision,
   StandingPolicyDocument,
 } from "./types";
 export type { CreateMandateInput, MandatesPersistence, UpdateMandateInput } from "./persistence";

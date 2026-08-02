@@ -16,7 +16,7 @@ import {
 import { prepareMessagesForModel } from "@/lib/agent/prepare-messages-for-model";
 import { buildProviderWebSearchTools } from "@/lib/agent/provider-tools";
 import { formatToolStreamError } from "@/lib/agent/tool-errors";
-import type { RunAgentFinishReason } from "@/lib/agent/types";
+import type { RunAgentDeps, RunAgentFinishReason } from "@/lib/agent/types";
 import {
   emitUsageAndBudget,
   finishAssistantMessage,
@@ -26,7 +26,6 @@ import {
 import { notifyIfUnfocused } from "@/lib/native/notification";
 import { createBudgetGuard, createBudgetTracker } from "@/lib/session/control/budget";
 import type { RuntimeEventPayload } from "@/lib/session/events";
-import type { RunExecutionContext } from "@/lib/session/run-execution-context";
 
 /** Reads toolCallId without AI SDK guards (empty TOOLS generics collapse ToolUIPart to never). */
 function getPartToolCallId(part: object): string | null {
@@ -35,13 +34,9 @@ function getPartToolCallId(part: object): string | null {
   return typeof id === "string" ? id : null;
 }
 
-export type RunStreamCoordinatorDeps = RunExecutionContext & {
+export type RunStreamCoordinatorDeps = RunAgentDeps & {
   model: LanguageModel | LanguageModelV4;
-  modelId: string;
   system: string;
-  messages: UIMessage[];
-  signal: AbortSignal;
-  budgetStartedAt?: number;
 };
 
 /**
@@ -55,7 +50,10 @@ export async function runStreamCoordinator(
     deps.append(payload);
   };
 
-  const budget = createBudgetTracker(deps.settings, deps.budgetStartedAt ?? Date.now());
+  const settings = deps.config.settings;
+  const modelId = deps.config.modelId;
+
+  const budget = createBudgetTracker(settings, deps.budgetStartedAt ?? Date.now());
   const streamAbort = new AbortController();
   deps.signal.addEventListener("abort", () => streamAbort.abort(), { once: true });
 
@@ -87,19 +85,19 @@ export async function runStreamCoordinator(
   const runnerDeps: CapabilityRunnerDeps = {
     append: deps.append,
     attemptId: deps.attemptId,
-    settings: deps.settings,
-    workspaceRoot: deps.workspaceRoot,
+    settings,
+    workspaceRoot: settings.workspaceRoot,
     escalationPort: deps.escalationPort,
     resolveToolPart,
     entitlements: deps.entitlements,
     osLease: deps.osLease,
-    standingPolicy: deps.standingPolicy,
+    standingPolicy: deps.config.standingPolicy,
     getEventLog: deps.getEventLog,
   };
 
   const tools = {
     ...buildAgentTools(runnerDeps),
-    ...buildProviderWebSearchTools(deps.modelId),
+    ...buildProviderWebSearchTools(modelId),
   };
 
   try {
@@ -124,7 +122,7 @@ export async function runStreamCoordinator(
       stopWhen: () => budgetGuard.checkAndStop(),
       onStepFinish: ({ usage }) => {
         budget.incrementStep();
-        emitUsageAndBudget(emit, deps.modelId, budget, usage);
+        emitUsageAndBudget(emit, modelId, budget, usage);
         finishAssistantMessage(emit, messageSync);
         messageSync = null;
         budgetGuard.checkAndStop();

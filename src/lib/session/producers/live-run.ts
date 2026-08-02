@@ -4,20 +4,10 @@ import { runAgentLoop } from "@/lib/agent/run-agent";
 
 import type { ProduceRun } from "../control/run-controller";
 
-/** Live producer — wires tools via CapabilityRunner (Phase 3). */
+/** Live producer — wires tools via CapabilityRunner. */
 export function createLiveRunProducer(): ProduceRun {
-  return async ({
-    config,
-    attemptId,
-    signal,
-    append,
-    escalationPort,
-    entitlements,
-    osLease,
-    standingPolicy,
-    getEventLog,
-  }) => {
-    const workspaceRoot = config.settings.workspaceRoot;
+  return async (ctx) => {
+    const { config, attemptId, append } = ctx;
 
     if (!config.isRetry) {
       append({
@@ -52,19 +42,8 @@ export function createLiveRunProducer(): ProduceRun {
         ];
 
     const result = await runAgentLoop({
-      attemptId,
+      ...ctx,
       messages,
-      modelId: config.modelId,
-      settings: config.settings,
-      secrets: config.secrets,
-      signal,
-      append,
-      workspaceRoot,
-      escalationPort,
-      entitlements,
-      osLease,
-      standingPolicy: standingPolicy ?? config.standingPolicy,
-      getEventLog,
     });
 
     if (result.finishReason === "error") {

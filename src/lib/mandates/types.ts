@@ -13,8 +13,16 @@ export type MandateLifecycleStatus =
   | "failed";
 
 /**
+ * Rules-only PermissionPolicy result (settings base ± standing overlay).
+ * Never talks to humans — EscalationPort handles `escalate`.
+ * Owned here so mandates does not import agent.
+ */
+export type PermissionPolicyDecision = "allow" | "deny" | "escalate";
+
+/**
  * Versioned standing grants/ceilings on a Mandate (Phase 2 product fills this in).
  * Empty / absent ≡ settings-only PermissionPolicy (today).
+ * If a capability appears in both lists, deny wins (fail closed).
  */
 export type StandingPolicyDocument = {
   readonly version: 1;

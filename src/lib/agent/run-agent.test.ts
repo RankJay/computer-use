@@ -10,8 +10,10 @@ import {
   textStreamChunks,
   toolCallStreamChunks,
 } from "@/lib/agent/fixtures/mock-language-model";
+import type { RunAgentDeps } from "@/lib/agent/types";
 import { createAutoEscalationPort } from "@/lib/session/control/escalation-port";
 import type { RuntimeEventPayload } from "@/lib/session/events";
+import type { RunConfig } from "@/lib/session/run-execution-context";
 import { DEFAULT_SECRETS, DEFAULT_SETTINGS } from "@/lib/settings/defaults";
 
 mock.module("@/lib/agent/capabilities/native-invoke", () => ({
@@ -46,28 +48,36 @@ mock.module("@/lib/agent/capabilities/native-invoke", () => ({
 
 const { runAgentLoop } = await import("./run-agent");
 
-function baseDeps(overrides: Partial<Parameters<typeof runAgentLoop>[0]> = {}) {
+function baseDeps(
+  overrides: {
+    config?: Partial<RunConfig>;
+  } & Omit<Partial<RunAgentDeps>, "config"> = {},
+) {
   const payloads: RuntimeEventPayload[] = [];
-  const deps = {
+  const { config: configOverrides, ...rest } = overrides;
+  const deps: RunAgentDeps = {
     attemptId: "task-test",
+    config: {
+      prompt: "Say hello",
+      modelId: "openai/gpt-4o-mini",
+      settings: DEFAULT_SETTINGS,
+      secrets: DEFAULT_SECRETS,
+      ...configOverrides,
+    },
     messages: [
       {
         id: "user-test",
-        role: "user" as const,
-        parts: [{ type: "text" as const, text: "Say hello" }],
+        role: "user",
+        parts: [{ type: "text", text: "Say hello" }],
       },
     ],
-    modelId: "openai/gpt-4o-mini",
-    settings: DEFAULT_SETTINGS,
-    secrets: DEFAULT_SECRETS,
     signal: new AbortController().signal,
-    workspaceRoot: "D:/Projects/actuate-v3",
     escalationPort: createAutoEscalationPort("allow"),
     modelOverride: createMockStreamingModel(textStreamChunks("Hello")),
     append: (payload: RuntimeEventPayload) => {
       payloads.push(payload);
     },
-    ...overrides,
+    ...rest,
   };
   return { deps, payloads };
 }
@@ -103,7 +113,7 @@ describe("run-agent", () => {
 
   test("auth failure emits recoverable attempt.failed", async () => {
     const { deps, payloads } = baseDeps({
-      secrets: { ...DEFAULT_SECRETS, openaiApiKey: "" },
+      config: { secrets: { ...DEFAULT_SECRETS, openaiApiKey: "" } },
       modelOverride: undefined,
     });
     const result = await runAgentLoop(deps);
@@ -119,7 +129,7 @@ describe("run-agent", () => {
 
   test("budget stopWhen fires without isStepCount", async () => {
     const { deps, payloads } = baseDeps({
-      settings: { ...DEFAULT_SETTINGS, maxSteps: 0, maxWallClockMs: 1 },
+      config: { settings: { ...DEFAULT_SETTINGS, maxSteps: 0, maxWallClockMs: 1 } },
       budgetStartedAt: Date.now() - 10_000,
     });
     const result = await runAgentLoop(deps);
@@ -193,7 +203,7 @@ describe("run-agent", () => {
     const { deps, payloads } = baseDeps({
       attemptId: "task-tool",
       modelOverride: model,
-      settings: { ...DEFAULT_SETTINGS, permissionMode: "risky", maxSteps: 5 },
+      config: { settings: { ...DEFAULT_SETTINGS, permissionMode: "risky", maxSteps: 5 } },
     });
 
     const result = await runAgentLoop(deps);

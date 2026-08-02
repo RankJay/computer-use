@@ -10,7 +10,7 @@ export async function runAgentLoop(deps: RunAgentDeps): Promise<RunAgentResult> 
 
   let model;
   try {
-    model = deps.modelOverride ?? resolveLanguageModel(deps.modelId, deps.secrets);
+    model = deps.modelOverride ?? resolveLanguageModel(deps.config.modelId, deps.config.secrets);
   } catch (error) {
     const mapped = mapAgentError(error);
     deps.append({
@@ -22,25 +22,13 @@ export async function runAgentLoop(deps: RunAgentDeps): Promise<RunAgentResult> 
     return { finishReason: "error" };
   }
 
-  const system = buildSystemPrompt(deps.settings);
+  const system = buildSystemPrompt(deps.config.settings);
 
   try {
     return await runStreamCoordinator({
-      attemptId: deps.attemptId,
+      ...deps,
       model,
-      modelId: deps.modelId,
       system,
-      messages: deps.messages,
-      settings: deps.settings,
-      signal: deps.signal,
-      append: deps.append,
-      workspaceRoot: deps.workspaceRoot,
-      escalationPort: deps.escalationPort,
-      entitlements: deps.entitlements,
-      osLease: deps.osLease,
-      standingPolicy: deps.standingPolicy,
-      getEventLog: deps.getEventLog,
-      budgetStartedAt: deps.budgetStartedAt,
     });
   } catch (error) {
     if (deps.signal.aborted) {

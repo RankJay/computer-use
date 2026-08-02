@@ -11,6 +11,11 @@ import type { AttemptEngine } from "./engine";
 import type { RunStatus, RuntimeEvent } from "./events";
 import { isLiveRun, shouldSettleLedger } from "./run-status";
 
+/** Soft flush: fire when this many events are pending (whichever with MS first). */
+export const LEDGER_SOFT_FLUSH_MAX_PENDING = 32;
+/** Soft flush: fire this many ms after the first pending event in a window. */
+export const LEDGER_SOFT_FLUSH_MS = 250;
+
 export type LedgerBridgeDeps = {
   engine: AttemptEngine;
   registry: AttemptRegistry;
@@ -25,6 +30,7 @@ export type LedgerBridge = {
   noteAttemptStarted: (attemptId: string) => void;
   /** Subscribe to engine for durable append / settle / mandate lifecycle. */
   attach: () => () => void;
+  /** Hard flush — call on teardown, route bind, chat checkpoint, tests. */
   flushLedger: () => Promise<void>;
   getLedgerError: () => unknown | null;
   getLastStatus: () => RunStatus;
@@ -32,6 +38,10 @@ export type LedgerBridge = {
   resetLedgerCursors: () => void;
   hydrateIdleChat: (chat: StoredChat) => Promise<void>;
 };
+
+function isCapabilityOutcome(event: RuntimeEvent): boolean {
+  return event.type === "capability.completed" || event.type === "capability.failed";
+}
 
 /**
  * Durable Attempt ledger: batched append, settle snapshots, mandate lifecycle, crash reopen.
@@ -171,13 +181,23 @@ export function createLedgerBridge(deps: LedgerBridgeDeps): LedgerBridge {
       return;
     }
 
+    // Soft: count threshold wins immediately (T ∨ N).
+    if (pendingDurable.length >= LEDGER_SOFT_FLUSH_MAX_PENDING) {
+      if (flushTimer !== null) {
+        clearTimeout(flushTimer);
+        flushTimer = null;
+      }
+      run();
+      return;
+    }
+
     if (flushTimer !== null) {
       return;
     }
     flushTimer = setTimeout(() => {
       flushTimer = null;
       run();
-    }, 50);
+    }, LEDGER_SOFT_FLUSH_MS);
   }
 
   async function flushLedger(): Promise<void> {
@@ -246,6 +266,10 @@ export function createLedgerBridge(deps: LedgerBridgeDeps): LedgerBridge {
       return;
     }
     if (shouldSettleLedger(status) && prev !== status) {
+      scheduleLedgerFlush(true);
+      return;
+    }
+    if (pendingDurable.some(isCapabilityOutcome)) {
       scheduleLedgerFlush(true);
       return;
     }
