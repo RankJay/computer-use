@@ -22,6 +22,8 @@ describe("buildSystemPrompt", () => {
       expect(prompt).toContain("prefer mouse_click_image");
       expect(prompt).toContain("two separate integers");
       expect(prompt).toContain("focus_denied");
+      expect(prompt).toContain("type_text");
+      expect(prompt).toContain("Never type via run_shell/xdotool");
       expect(prompt).toContain("Avoid a separate mouse_move");
       expect(prompt).toContain("Batch UI mutations");
       expect(prompt).toContain("not after every micro-step");
@@ -36,5 +38,16 @@ describe("buildSystemPrompt", () => {
     expect(prompt).toContain("Pointer / UI automation is OFF");
     expect(prompt).not.toContain("prefer mouse_click_image");
     expect(prompt).not.toContain("Batch UI mutations");
+  });
+
+  test("includes high-leverage behavior sections", () => {
+    const prompt = buildSystemPrompt(DEFAULT_SETTINGS);
+    expect(prompt).toContain("# Verification");
+    expect(prompt).toContain("Causal evidence only");
+    expect(prompt).toContain("Ground every claim");
+    expect(prompt).toContain("signals stop");
+    expect(prompt).toContain("FINDING");
+    expect(prompt).toContain("# Repository work");
+    expect(prompt).toContain("Never rewrite git history");
   });
 });

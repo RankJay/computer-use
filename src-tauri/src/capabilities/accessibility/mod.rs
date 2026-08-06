@@ -4,7 +4,7 @@ mod commands;
 mod outline;
 mod provider;
 mod query_match;
-#[cfg(any(target_os = "macos", test))]
+#[cfg(any(windows, target_os = "macos", test))]
 mod send_keys_syntax;
 mod state;
 mod types;

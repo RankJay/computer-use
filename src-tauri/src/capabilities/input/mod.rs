@@ -19,7 +19,7 @@ mod recording;
 
 pub use commands::{
     hotkey, key_down, key_press, key_up, mouse_click, mouse_down, mouse_drag, mouse_hover,
-    mouse_move, mouse_scroll, mouse_up,
+    mouse_move, mouse_scroll, mouse_up, type_text,
 };
 
 use synthesizer::InputSynthesizer;

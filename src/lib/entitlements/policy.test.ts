@@ -23,6 +23,7 @@ describe("classify", () => {
   test("computer_use class", () => {
     expect(capabilityClassOf("mouse_click")).toBe("computer_use");
     expect(capabilityClassOf("accessibility_snapshot")).toBe("computer_use");
+    expect(capabilityClassOf("type_text")).toBe("computer_use");
     expect(capabilityClassOf("read_file")).toBe("other");
     expect(capabilityClassOf("run_shell")).toBe("other");
   });

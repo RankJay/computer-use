@@ -56,4 +56,7 @@ pub trait InputSynthesizer: Send + Sync {
     fn key_press(&self, key: Key, count: u32) -> Result<OkResult, CommandError>;
 
     fn hotkey(&self, keys: &[Key]) -> Result<OkResult, CommandError>;
+
+    /// Type literal Unicode text into the focused control (not layout-dependent VKs).
+    fn type_text(&self, text: &str) -> Result<OkResult, CommandError>;
 }

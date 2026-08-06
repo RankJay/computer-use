@@ -252,6 +252,47 @@ impl InputSynthesizer for MacosInputSynthesizer {
         }
         Ok(OkResult { ok: true })
     }
+
+    fn type_text(&self, text: &str) -> Result<OkResult, CommandError> {
+        if text.is_empty() {
+            return Err(CommandError::new(
+                ErrorCode::InvalidInput,
+                "text must not be empty",
+            ));
+        }
+        require_post_access()?;
+        let source = event_source()?;
+        // Chunk into small Unicode runs (CGEvent limit is typically 20 UniChars).
+        let utf16: Vec<u16> = text.encode_utf16().collect();
+        for chunk in utf16.chunks(20) {
+            let event = CGEvent::new_keyboard_event(Some(&source), 0, true).ok_or_else(|| {
+                CommandError::new(
+                    ErrorCode::SendInputFailed,
+                    format!("CGEventCreateKeyboardEvent failed. {INPUT_PERMISSION_HINT}"),
+                )
+            })?;
+            unsafe {
+                CGEvent::keyboard_set_unicode_string(
+                    Some(&event),
+                    chunk.len() as u64,
+                    chunk.as_ptr(),
+                );
+            }
+            post_event(&event);
+
+            let up = CGEvent::new_keyboard_event(Some(&source), 0, false).ok_or_else(|| {
+                CommandError::new(
+                    ErrorCode::SendInputFailed,
+                    format!("CGEventCreateKeyboardEvent failed. {INPUT_PERMISSION_HINT}"),
+                )
+            })?;
+            unsafe {
+                CGEvent::keyboard_set_unicode_string(Some(&up), chunk.len() as u64, chunk.as_ptr());
+            }
+            post_event(&up);
+        }
+        Ok(OkResult { ok: true })
+    }
 }
 
 /// Held-modifier flag for a key, `None` for non-modifiers.

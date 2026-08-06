@@ -15,8 +15,8 @@ pub use capabilities::{
     key_up, launch, mouse_click, mouse_down, mouse_drag, mouse_hover, mouse_move, mouse_scroll,
     mouse_up, move_path, patch_file, process_info, process_kill, process_list, read_clipboard,
     read_clipboard_html, read_clipboard_image, read_directory, read_file, run_shell, screenshot,
-    screenshot_region, search_files, set_env, stat_path, wait, window_focus, window_list,
-    window_move, window_resize, window_state, write_clipboard, write_clipboard_html,
+    screenshot_region, search_files, set_env, stat_path, type_text, wait, window_focus,
+    window_list, window_move, window_resize, window_state, write_clipboard, write_clipboard_html,
     write_clipboard_image, write_file, SnapshotStore, WindowId, WindowStateOp,
 };
 
@@ -298,6 +298,7 @@ pub fn run() {
             key_down,
             key_up,
             key_press,
+            type_text,
         ]);
 
     #[cfg(desktop)]

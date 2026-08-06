@@ -13,6 +13,7 @@ const UI_TOOL_LABELS: Readonly<Record<string, string>> = {
   key_down: "Holding a key down",
   key_up: "Lifting a key",
   hotkey: "Striking a shortcut",
+  type_text: "Typing text",
 
   accessibility_snapshot: "Looking through your screen",
   accessibility_query: "Watching what is relevant",

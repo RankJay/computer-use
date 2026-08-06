@@ -97,6 +97,11 @@ pub fn key_press(key: String, count: Option<u32>) -> Result<OkResult, CommandErr
     synthesizer().key_press(key, count)
 }
 
+#[tauri::command]
+pub fn type_text(text: String) -> Result<OkResult, CommandError> {
+    synthesizer().type_text(&text)
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::keys::Key;
@@ -163,6 +168,16 @@ mod tests {
                 RecordedEvent::KeyUp(Key::C),
                 RecordedEvent::KeyUp(Key::Ctrl),
             ]
+        );
+    }
+
+    #[test]
+    fn recording_type_text_records_literal() {
+        let synth = RecordingSynthesizer::new();
+        synth.type_text("hello").expect("type_text");
+        assert_eq!(
+            synth.events(),
+            vec![RecordedEvent::TypeText("hello".into())]
         );
     }
 }

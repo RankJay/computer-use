@@ -35,7 +35,7 @@ pub use file_system::{
 };
 pub use input::{
     hotkey, key_down, key_press, key_up, mouse_click, mouse_down, mouse_drag, mouse_hover,
-    mouse_move, mouse_scroll, mouse_up,
+    mouse_move, mouse_scroll, mouse_up, type_text,
 };
 pub use screenshot::{screenshot, screenshot_region};
 pub use shared::{ensure_dpi_awareness, wait};

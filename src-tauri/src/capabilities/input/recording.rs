@@ -48,6 +48,7 @@ pub enum RecordedEvent {
     },
     KeyDown(Key),
     KeyUp(Key),
+    TypeText(String),
 }
 
 /// Test adapter that records synthesizer calls as discrete events.
@@ -177,6 +178,11 @@ impl InputSynthesizer for RecordingSynthesizer {
         for key in keys.iter().rev() {
             self.push(RecordedEvent::KeyUp(*key));
         }
+        Ok(OkResult { ok: true })
+    }
+
+    fn type_text(&self, text: &str) -> Result<OkResult, CommandError> {
+        self.push(RecordedEvent::TypeText(text.to_string()));
         Ok(OkResult { ok: true })
     }
 }

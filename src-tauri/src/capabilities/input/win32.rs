@@ -6,9 +6,9 @@ use std::time::Duration;
 
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, INPUT_MOUSE, KEYBDINPUT, KEYBD_EVENT_FLAGS,
-    KEYEVENTF_KEYUP, MOUSEEVENTF_HWHEEL, MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP,
-    MOUSEEVENTF_MIDDLEDOWN, MOUSEEVENTF_MIDDLEUP, MOUSEEVENTF_RIGHTDOWN, MOUSEEVENTF_RIGHTUP,
-    MOUSEEVENTF_WHEEL, MOUSEINPUT, MOUSE_EVENT_FLAGS, VIRTUAL_KEY,
+    KEYEVENTF_KEYUP, KEYEVENTF_UNICODE, MOUSEEVENTF_HWHEEL, MOUSEEVENTF_LEFTDOWN,
+    MOUSEEVENTF_LEFTUP, MOUSEEVENTF_MIDDLEDOWN, MOUSEEVENTF_MIDDLEUP, MOUSEEVENTF_RIGHTDOWN,
+    MOUSEEVENTF_RIGHTUP, MOUSEEVENTF_WHEEL, MOUSEINPUT, MOUSE_EVENT_FLAGS, VIRTUAL_KEY,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     GetSystemMetrics, SetCursorPos, SM_CXSCREEN, SM_CYSCREEN, WHEEL_DELTA,
@@ -158,6 +158,27 @@ impl InputSynthesizer for Win32InputSynthesizer {
         send_inputs(&inputs)?;
         Ok(OkResult { ok: true })
     }
+
+    fn type_text(&self, text: &str) -> Result<OkResult, CommandError> {
+        if text.is_empty() {
+            return Err(CommandError::new(
+                ErrorCode::InvalidInput,
+                "text must not be empty",
+            ));
+        }
+        // KEYEVENTF_UNICODE posts UTF-16 code units; chunk to keep SendInput arrays bounded.
+        const CHUNK: usize = 32;
+        let units: Vec<u16> = text.encode_utf16().collect();
+        for chunk in units.chunks(CHUNK) {
+            let mut inputs = Vec::with_capacity(chunk.len() * 2);
+            for &unit in chunk {
+                inputs.push(unicode_key_input(unit, false));
+                inputs.push(unicode_key_input(unit, true));
+            }
+            send_inputs(&inputs)?;
+        }
+        Ok(OkResult { ok: true })
+    }
 }
 
 fn virtual_key(key: Key) -> u16 {
@@ -291,6 +312,26 @@ fn key_input(vk: u16, up: bool) -> INPUT {
             ki: KEYBDINPUT {
                 wVk: VIRTUAL_KEY(vk),
                 wScan: 0,
+                dwFlags: flags,
+                time: 0,
+                dwExtraInfo: 0,
+            },
+        },
+    }
+}
+
+fn unicode_key_input(unit: u16, up: bool) -> INPUT {
+    let flags = if up {
+        KEYEVENTF_KEYUP | KEYEVENTF_UNICODE
+    } else {
+        KEYEVENTF_UNICODE
+    };
+    INPUT {
+        r#type: INPUT_KEYBOARD,
+        Anonymous: INPUT_0 {
+            ki: KEYBDINPUT {
+                wVk: VIRTUAL_KEY(0),
+                wScan: unit,
                 dwFlags: flags,
                 time: 0,
                 dwExtraInfo: 0,

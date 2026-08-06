@@ -27,7 +27,7 @@ export type AccessibilityActionOutput = {
 export const accessibilitySendKeysCapability = defineCapability({
   name: "accessibility_send_keys",
   description:
-    "Send keyboard input to a window (or element ref). Foregrounds the window first. Prefer this over shell-based key sending.",
+    "Send keyboard input to a window (or element ref). Foregrounds the window first. Prefer this over shell-based key sending. On focus_denied, click the field then type_text — avoid using xdotool/run_shell unless absolutely necessary.",
   risk: "high",
   inputSchema: accessibilitySendKeysInputSchema,
   enabledWhen: uiAutomationEnabled,

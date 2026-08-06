@@ -6,6 +6,7 @@ describe("osLeaseScopeOf", () => {
   test("computer_use and focus-steal need desktop", () => {
     expect(osLeaseScopeOf("mouse_click")).toBe("desktop");
     expect(osLeaseScopeOf("key_press")).toBe("desktop");
+    expect(osLeaseScopeOf("type_text")).toBe("desktop");
     expect(osLeaseScopeOf("hotkey")).toBe("desktop");
     expect(osLeaseScopeOf("accessibility_click")).toBe("desktop");
     expect(osLeaseScopeOf("window_focus")).toBe("desktop");

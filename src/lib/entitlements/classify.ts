@@ -16,6 +16,7 @@ export function capabilityClassOf(capability: string): EntitlementCapabilityClas
     capability.startsWith("mouse_") ||
     capability.startsWith("key_") ||
     capability === "hotkey" ||
+    capability === "type_text" ||
     capability.startsWith("accessibility_")
   ) {
     return "computer_use";

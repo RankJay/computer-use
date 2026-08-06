@@ -80,4 +80,8 @@ impl InputSynthesizer for UnsupportedInputSynthesizer {
     fn hotkey(&self, _keys: &[Key]) -> Result<OkResult, CommandError> {
         Err(unsupported_platform("Mouse and keyboard input"))
     }
+
+    fn type_text(&self, _text: &str) -> Result<OkResult, CommandError> {
+        Err(unsupported_platform("Mouse and keyboard input"))
+    }
 }

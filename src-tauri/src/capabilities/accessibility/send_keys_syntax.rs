@@ -1,10 +1,51 @@
 //! UIA / WinForms-style SendKeys dialect shared by the agent contract.
 //!
 //! On macOS, `^` is the platform primary shortcut modifier (Command), matching
-//! tool docs (`^v` → Cmd+V). Windows continues to use UIA `SendKeys` natively.
+//! tool docs (`^v` → Cmd+V). On Windows, `^` is Ctrl. Playback uses the input
+//! synthesizer (Unicode text + named keys) so Chromium focus quirks do not
+//! depend on UIA SendKeys.
 
 use crate::capabilities::error::{CommandError, ErrorCode};
 use crate::capabilities::input::keys::Key;
+use crate::capabilities::input::synthesizer;
+
+/// Play the agent SendKeys dialect (`^v`, `{ENTER}`, plain text, …) via the input synthesizer.
+pub(super) fn play_send_keys(text: &str) -> Result<(), CommandError> {
+    let segments = parse_send_keys(text)?;
+    let synth = synthesizer();
+    for segment in segments {
+        match segment {
+            Segment::Text(run) => {
+                synth
+                    .type_text(&run)
+                    .map_err(|error| CommandError::new(ErrorCode::SendKeysFailed, error.message))?;
+            }
+            Segment::Press { key, count } => {
+                synth
+                    .key_press(key, count)
+                    .map_err(|error| CommandError::new(ErrorCode::SendKeysFailed, error.message))?;
+            }
+            Segment::Chord { modifiers, keys } => {
+                for modifier in &modifiers {
+                    synth.key_down(*modifier).map_err(|error| {
+                        CommandError::new(ErrorCode::SendKeysFailed, error.message)
+                    })?;
+                }
+                for key in &keys {
+                    synth.key_press(*key, 1).map_err(|error| {
+                        CommandError::new(ErrorCode::SendKeysFailed, error.message)
+                    })?;
+                }
+                for modifier in modifiers.iter().rev() {
+                    synth.key_up(*modifier).map_err(|error| {
+                        CommandError::new(ErrorCode::SendKeysFailed, error.message)
+                    })?;
+                }
+            }
+        }
+    }
+    Ok(())
+}
 
 /// One playable unit after parsing a SendKeys string.
 #[derive(Debug, Clone, PartialEq, Eq)]

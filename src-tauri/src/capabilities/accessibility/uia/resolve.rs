@@ -4,7 +4,7 @@ use std::time::Duration;
 use uiautomation::controls::WindowControl;
 use uiautomation::core::UIElement;
 use uiautomation::errors::ERR_NOTFOUND;
-use uiautomation::types::{ControlType, TreeScope, UIProperty};
+use uiautomation::types::{ControlType, Handle, TreeScope, UIProperty};
 use uiautomation::variants::{Value, Variant};
 
 use crate::capabilities::error::{CommandError, ErrorCode};
@@ -289,18 +289,60 @@ pub(super) fn foreground_window(
     hwnd: WindowId,
 ) -> Result<bool, CommandError> {
     let handle = hwnd_from_id(hwnd)?;
+
+    // Chromium/Electron often fail UIA WindowPattern.set_foreground with
+    // EVENT_E_ALL_SUBSCRIBERS_FAILED. Retry briefly, then fall back to Win32.
+    for attempt in 0..RESOLVE_RETRY_ATTEMPTS {
+        match try_uia_set_foreground(session, handle) {
+            Ok(()) => return Ok(true),
+            Err(error) if is_transient_command_error(&error) => {
+                if attempt + 1 < RESOLVE_RETRY_ATTEMPTS {
+                    thread::sleep(Duration::from_millis(
+                        TRANSIENT_UIA_RETRY_MS * (attempt as u64 + 1),
+                    ));
+                    continue;
+                }
+                break;
+            }
+            Err(_) => break,
+        }
+    }
+
+    win32_set_foreground(hwnd)
+}
+
+fn try_uia_set_foreground(session: &UiaSession, handle: Handle) -> Result<(), CommandError> {
     let element = session
         .automation
         .element_from_handle(handle)
         .map_err(|error| map_uia_error(error, ErrorCode::FocusDenied))?;
     let window = WindowControl::try_from(&element)
         .map_err(|error| map_uia_error(error, ErrorCode::FocusDenied))?;
-    window.set_foregrand().map_err(|_| {
-        CommandError::new(
-            ErrorCode::FocusDenied,
-            "Could not bring target window to foreground",
-        )
-    })
+    window
+        .set_foregrand()
+        .map_err(|error| map_uia_error(error, ErrorCode::FocusDenied))?;
+    Ok(())
+}
+
+fn win32_set_foreground(hwnd: WindowId) -> Result<bool, CommandError> {
+    use windows::Win32::Foundation::HWND;
+    use windows::Win32::UI::WindowsAndMessaging::{
+        GetForegroundWindow, IsIconic, SetForegroundWindow, ShowWindow, SW_RESTORE,
+    };
+
+    let handle = HWND(hwnd.0 as isize as *mut _);
+    unsafe {
+        if IsIconic(handle).as_bool() {
+            let _ = ShowWindow(handle, SW_RESTORE);
+        }
+        if SetForegroundWindow(handle).as_bool() || GetForegroundWindow() == handle {
+            return Ok(true);
+        }
+    }
+    Err(CommandError::new(
+        ErrorCode::FocusDenied,
+        "Could not bring target window to foreground",
+    ))
 }
 
 pub(super) fn parse_role(role: &str) -> Result<ControlType, CommandError> {

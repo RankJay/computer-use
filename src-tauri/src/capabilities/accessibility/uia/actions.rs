@@ -13,7 +13,7 @@ use super::super::state::SnapshotStore;
 use super::super::types::{ActionResult, GetValueResult};
 use super::resolve::{foreground_window, resolve_stored_element};
 use super::session::{
-    hwnd_from_id, is_recoverable_click_pattern_error, is_useful_value, map_uia_error, UiaSession,
+    is_recoverable_click_pattern_error, is_useful_value, map_uia_error, UiaSession,
 };
 
 pub(super) fn click_impl(
@@ -228,15 +228,13 @@ pub(super) fn set_value_impl(
         });
     }
 
-    element
-        .set_focus()
-        .map_err(|error| map_uia_error(error, ErrorCode::SetValueFailed))?;
-    element
-        .send_keys(text, 10)
-        .map_err(|error| map_uia_error(error, ErrorCode::SetValueFailed))?;
+    let _ = element.set_focus();
+    crate::capabilities::input::synthesizer()
+        .type_text(text)
+        .map_err(|error| CommandError::new(ErrorCode::SetValueFailed, error.message))?;
     Ok(ActionResult {
         ok: true,
-        method: "send_keys".to_string(),
+        method: "synthesizer".to_string(),
         foregrounded,
     })
 }
@@ -257,7 +255,9 @@ pub(super) fn send_keys_impl(
     }
 
     let foregrounded = foreground_window(session, hwnd)?;
-    let element = if let Some(ref_str) = reference {
+    // Best-effort element focus; Chromium often rejects UIA focus/SendKeys with
+    // subscriber errors, so typing goes through the synthesizer (like macOS).
+    if let Some(ref_str) = reference {
         let stored = store.resolve_ref_or_stale(ref_str)?;
         if stored.hwnd != hwnd {
             return Err(CommandError::new(
@@ -265,21 +265,15 @@ pub(super) fn send_keys_impl(
                 "reference does not belong to the provided hwnd",
             ));
         }
-        resolve_stored_element(session, &stored)?
-    } else {
-        session
-            .automation
-            .element_from_handle(hwnd_from_id(hwnd)?)
-            .map_err(|error| map_uia_error(error, ErrorCode::SendKeysFailed))?
-    };
+        if let Ok(element) = resolve_stored_element(session, &stored) {
+            let _ = element.set_focus();
+        }
+    }
 
-    let _ = element.set_focus();
-    element
-        .send_keys(text, 10)
-        .map_err(|error| map_uia_error(error, ErrorCode::SendKeysFailed))?;
+    super::super::send_keys_syntax::play_send_keys(text)?;
     Ok(ActionResult {
         ok: true,
-        method: "send_keys".to_string(),
+        method: "synthesizer".to_string(),
         foregrounded,
     })
 }

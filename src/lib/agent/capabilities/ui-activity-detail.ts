@@ -77,7 +77,7 @@ export function toolActivityDetail(toolName: string, input: unknown): string | n
     return truncate(keys);
   }
 
-  for (const key of ["app", "name", "query", "url", "cwd", "target"] as const) {
+  for (const key of ["text", "app", "name", "query", "url", "cwd", "target"] as const) {
     const value = stringField(input, key);
     if (value) {
       return truncate(key === "cwd" ? basenamePath(value) : value);

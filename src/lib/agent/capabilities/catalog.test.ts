@@ -62,10 +62,11 @@ describe("capability catalog", () => {
         "key_down",
         "key_up",
         "key_press",
+        "type_text",
       ]),
     );
     expect(names).not.toContain("accessibility_expand_node");
-    expect(names).toHaveLength(62);
+    expect(names).toHaveLength(63);
   });
 
   test("groups names by risk", () => {
@@ -75,6 +76,7 @@ describe("capability catalog", () => {
     expect(byRisk.high).toContain("mouse_click");
     expect(byRisk.high).toContain("mouse_click_image");
     expect(byRisk.high).toContain("hotkey");
+    expect(byRisk.high).toContain("type_text");
     expect(byRisk.medium).toContain("read_clipboard");
     expect(byRisk.medium).toContain("read_clipboard_image");
     expect(byRisk.medium).toContain("write_clipboard_html");
@@ -95,6 +97,7 @@ describe("capability catalog", () => {
     expect(off.high).not.toContain("mouse_click_image");
     expect(off.high).not.toContain("hotkey");
     expect(off.high).not.toContain("key_press");
+    expect(off.high).not.toContain("type_text");
 
     if (!hostSupports) {
       expect(on.high).not.toContain("accessibility_snapshot");

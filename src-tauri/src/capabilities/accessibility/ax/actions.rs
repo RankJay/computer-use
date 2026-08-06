@@ -4,10 +4,6 @@ use std::time::Instant;
 
 use objc2_application_services::AXUIElement;
 use objc2_core_foundation::CFRetained;
-use objc2_core_graphics::{
-    CGEvent, CGEventSource, CGEventSourceStateID, CGEventTapLocation, CGPreflightPostEventAccess,
-    CGRequestPostEventAccess,
-};
 
 use crate::capabilities::error::{CommandError, ErrorCode};
 use crate::capabilities::input::{mouse_click, mouse_scroll, synthesizer};
@@ -16,7 +12,7 @@ use crate::capabilities::window::WindowId;
 use super::super::outline::{
     CT_BUTTON, CT_EDIT, CT_HYPERLINK, CT_LIST_ITEM, CT_MENU_ITEM, CT_TAB_ITEM,
 };
-use super::super::send_keys_syntax::{parse_send_keys, Segment};
+use super::super::send_keys_syntax::play_send_keys;
 use super::super::state::SnapshotStore;
 use super::super::types::{ActionResult, GetValueResult};
 use super::resolve::resolve_stored_element;
@@ -124,7 +120,9 @@ pub(super) fn set_value_impl(
     }
 
     let _ = set_focused(&element);
-    type_unicode(text)?;
+    synthesizer()
+        .type_text(text)
+        .map_err(|error| CommandError::new(ErrorCode::SetValueFailed, error.message))?;
     Ok(ActionResult {
         ok: true,
         method: "send_keys".to_string(),
@@ -167,40 +165,6 @@ pub(super) fn send_keys_impl(
         method: "send_keys".to_string(),
         foregrounded,
     })
-}
-
-/// Play the agent SendKeys dialect (`^v`, `{ENTER}`, plain text, …).
-fn play_send_keys(text: &str) -> Result<(), CommandError> {
-    let segments = parse_send_keys(text)?;
-    let synth = synthesizer();
-    for segment in segments {
-        match segment {
-            Segment::Text(run) => type_unicode(&run)?,
-            Segment::Press { key, count } => {
-                synth
-                    .key_press(key, count)
-                    .map_err(|error| CommandError::new(ErrorCode::SendKeysFailed, error.message))?;
-            }
-            Segment::Chord { modifiers, keys } => {
-                for modifier in &modifiers {
-                    synth.key_down(*modifier).map_err(|error| {
-                        CommandError::new(ErrorCode::SendKeysFailed, error.message)
-                    })?;
-                }
-                for key in &keys {
-                    synth.key_press(*key, 1).map_err(|error| {
-                        CommandError::new(ErrorCode::SendKeysFailed, error.message)
-                    })?;
-                }
-                for modifier in modifiers.iter().rev() {
-                    synth.key_up(*modifier).map_err(|error| {
-                        CommandError::new(ErrorCode::SendKeysFailed, error.message)
-                    })?;
-                }
-            }
-        }
-    }
-    Ok(())
 }
 
 pub(super) fn focus_impl(
@@ -413,47 +377,6 @@ fn parse_invoke_action(action: &str) -> Result<&'static str, CommandError> {
             format!("action must be one of toggle, expand, collapse, press, select; got {action}"),
         )),
     }
-}
-
-fn type_unicode(text: &str) -> Result<(), CommandError> {
-    if !CGPreflightPostEventAccess() {
-        let _ = CGRequestPostEventAccess();
-        return Err(CommandError::new(
-            ErrorCode::AccessibilityPermissionDenied,
-            "Posting input events was denied. Grant Accessibility for Actuate in System Settings → Privacy & Security → Accessibility",
-        ));
-    }
-    let source =
-        CGEventSource::new(CGEventSourceStateID::CombinedSessionState).ok_or_else(|| {
-            CommandError::new(ErrorCode::SendKeysFailed, "CGEventSourceCreate failed")
-        })?;
-
-    // Chunk into small Unicode runs (CGEvent limit is typically 20 UniChars).
-    let utf16: Vec<u16> = text.encode_utf16().collect();
-    for chunk in utf16.chunks(20) {
-        let event = CGEvent::new_keyboard_event(Some(&source), 0, true).ok_or_else(|| {
-            CommandError::new(
-                ErrorCode::SendKeysFailed,
-                "CGEventCreateKeyboardEvent failed",
-            )
-        })?;
-        unsafe {
-            CGEvent::keyboard_set_unicode_string(Some(&event), chunk.len() as u64, chunk.as_ptr());
-        }
-        CGEvent::post(CGEventTapLocation::HIDEventTap, Some(&event));
-
-        let up = CGEvent::new_keyboard_event(Some(&source), 0, false).ok_or_else(|| {
-            CommandError::new(
-                ErrorCode::SendKeysFailed,
-                "CGEventCreateKeyboardEvent failed",
-            )
-        })?;
-        unsafe {
-            CGEvent::keyboard_set_unicode_string(Some(&up), chunk.len() as u64, chunk.as_ptr());
-        }
-        CGEvent::post(CGEventTapLocation::HIDEventTap, Some(&up));
-    }
-    Ok(())
 }
 
 #[cfg(test)]

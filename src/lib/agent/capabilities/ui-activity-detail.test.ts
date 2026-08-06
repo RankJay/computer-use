@@ -19,6 +19,10 @@ describe("toolActivityDetail", () => {
     expect(toolActivityDetail("hotkey", { keys: ["ctrl", "shift", "t"] })).toBe("ctrl+shift+t");
   });
 
+  test("shows typed text", () => {
+    expect(toolActivityDetail("type_text", { text: "hello youtube" })).toBe("hello youtube");
+  });
+
   test("picks app, name, query, url, cwd when present", () => {
     expect(toolActivityDetail("launch", { app: "Safari" })).toBe("Safari");
     expect(toolActivityDetail("window_focus", { name: "Terminal" })).toBe("Terminal");

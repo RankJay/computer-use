@@ -37,6 +37,7 @@ import { hotkeyCapability } from "./keyboard/hotkey";
 import { keyDownCapability } from "./keyboard/key-down";
 import { keyPressCapability } from "./keyboard/key-press";
 import { keyUpCapability } from "./keyboard/key-up";
+import { typeTextCapability } from "./keyboard/type-text";
 import { mouseClickCapability } from "./mouse/click";
 import { mouseClickImageCapability } from "./mouse/click-image";
 import { mouseDownCapability } from "./mouse/down";
@@ -128,6 +129,7 @@ export const CAPABILITIES = [
   keyDownCapability,
   keyUpCapability,
   keyPressCapability,
+  typeTextCapability,
 ] as const satisfies readonly CapabilityDefinition[];
 
 export type CapabilityName = (typeof CAPABILITIES)[number]["name"];

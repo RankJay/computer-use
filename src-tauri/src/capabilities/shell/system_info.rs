@@ -105,9 +105,7 @@ fn format_windows_platform_detail(
 fn read_current_version_sz(value_name: &str) -> Option<String> {
     use windows::core::PCWSTR;
     use windows::Win32::Foundation::ERROR_SUCCESS;
-    use windows::Win32::System::Registry::{
-        RegGetValueW, HKEY_LOCAL_MACHINE, RRF_RT_REG_SZ,
-    };
+    use windows::Win32::System::Registry::{RegGetValueW, HKEY_LOCAL_MACHINE, RRF_RT_REG_SZ};
 
     let subkey: Vec<u16> = r"SOFTWARE\Microsoft\Windows NT\CurrentVersion"
         .encode_utf16()
@@ -192,21 +190,14 @@ mod tests {
     #[test]
     fn formats_full_windows_platform_detail() {
         assert_eq!(
-            format_windows_platform_detail(
-                Some("Windows 11 Pro"),
-                Some("24H2"),
-                Some("26100"),
-            ),
+            format_windows_platform_detail(Some("Windows 11 Pro"), Some("24H2"), Some("26100"),),
             "Windows 11 Pro 24H2 (build 26100)"
         );
     }
 
     #[test]
     fn formats_windows_platform_detail_with_fallbacks() {
-        assert_eq!(
-            format_windows_platform_detail(None, None, None),
-            "Windows"
-        );
+        assert_eq!(format_windows_platform_detail(None, None, None), "Windows");
         assert_eq!(
             format_windows_platform_detail(Some("Windows 10 Pro"), None, Some("19045")),
             "Windows 10 Pro (build 19045)"
