@@ -1,5 +1,7 @@
 import type { QueryClient } from "@tanstack/react-query";
 
+import { captureSignInCompleted } from "@/lib/analytics/capture";
+import { identifyUser } from "@/lib/analytics/identify";
 import { exchangeDeviceToken } from "@/lib/auth/api";
 import { authKeys } from "@/lib/auth/keys";
 import { writeAuthSession } from "@/lib/auth/token-store";
@@ -29,6 +31,8 @@ async function runHandoff(token: string, queryClient: QueryClient): Promise<Auth
     expiresAt: result.expiresAt,
   });
   queryClient.setQueryData(authKeys.session(), result.user);
+  identifyUser(result.user);
+  captureSignInCompleted();
   return result.user;
 }
 

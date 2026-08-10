@@ -2,6 +2,7 @@ import { queryOptions, useMutation, useQueryClient, useSuspenseQuery } from "@ta
 import { useCallback } from "react";
 import { toast } from "sonner";
 
+import { captureSettingsUpdated } from "@/lib/analytics/capture";
 import { queryClient } from "@/lib/runtime/query-client";
 import { sanitizeApiKey } from "@/lib/settings/api-key";
 import { loadedSettingsOrDefault, mergeSettingsPatch } from "@/lib/settings/defaults";
@@ -99,8 +100,9 @@ export function useUpdateSettings() {
       await persistence.saveSettings(nextSettings);
       return { ...nextSettings, secrets };
     },
-    onSuccess: (next) => {
+    onSuccess: (next, patch) => {
       client.setQueryData(settingsKeys.loaded(), next);
+      captureSettingsUpdated({ keys: Object.keys(patch) });
     },
     onError: settingsMutationError("settings"),
   });

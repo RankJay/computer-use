@@ -8,6 +8,7 @@ import {
   type AttemptControl,
   type LoadedRunContext,
 } from "./control/attempt-control";
+import type { AttemptLifecyclePort } from "./control/attempt-lifecycle-port";
 import { createAttemptRegistry, type AttemptRegistry } from "./control/attempt-registry";
 import {
   createEscalationPort,
@@ -78,6 +79,8 @@ export type AttemptHostDeps = {
   stallPollIntervalMs?: number;
   /** Injected clock for stall watchdog tests. */
   stallNow?: () => number;
+  /** Product analytics Attempt funnel; defaults to no-op. */
+  lifecyclePort?: AttemptLifecyclePort;
 };
 
 /**
@@ -128,6 +131,7 @@ export function createAttemptHost(deps: AttemptHostDeps): BatchedAttemptStore {
     mandates,
     loadRunContext: deps.loadRunContext,
     entitlements: deps.entitlements,
+    lifecyclePort: deps.lifecyclePort,
     waitForAttemptStarted: () =>
       new Promise<string>((resolve, reject) => {
         const timer = setTimeout(() => {

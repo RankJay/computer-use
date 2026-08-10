@@ -4,6 +4,8 @@ import type { AppSecrets, AppSettings } from "@/lib/settings/types";
 
 import type { RetryFromMessageConfig, AttemptEngine } from "../engine";
 import { foldModelContext } from "../model-context";
+import { noopAttemptLifecyclePort, type AttemptLifecyclePort } from "./attempt-lifecycle-port";
+import { resolveAttemptSettleEvent } from "./attempt-lifecycle-settle";
 import type { AttemptRegistry } from "./attempt-registry";
 import type { ResolveInteraction, RunConfig } from "./run-controller";
 
@@ -65,6 +67,8 @@ export type AttemptControlDeps = {
   cancelAttemptStartedWait: () => void;
   /** Commercial gate; optional so unit tests can omit. */
   entitlements?: EntitlementPolicy;
+  /** Product analytics seam; defaults to no-op. */
+  lifecyclePort?: AttemptLifecyclePort;
 };
 
 function entitlementStartError(decision: {
@@ -84,10 +88,42 @@ function entitlementStartError(decision: {
     ok: false,
     reason: "entitlement_denied",
     message: decision.reason,
+    feature: decision.feature,
   };
 }
 
 export function createAttemptControl(deps: AttemptControlDeps): AttemptControl {
+  const lifecycle = deps.lifecyclePort ?? noopAttemptLifecyclePort;
+  const armedStarts = new Map<string, number>();
+
+  function emitBlocked(result: AttemptStartError): void {
+    switch (result.reason) {
+      case "entitlement_denied":
+      case "require_upgrade":
+      case "concurrency_reject":
+      case "workspace_not_ready":
+        lifecycle.notify({
+          type: "blocked",
+          reason: result.reason,
+          capability: result.feature,
+        });
+        return;
+      case "noop":
+        return;
+      default: {
+        const _exhaustive: never = result.reason;
+        return _exhaustive;
+      }
+    }
+  }
+
+  function returnStartResult(result: AttemptStartResult): AttemptStartResult {
+    if (!result.ok) {
+      emitBlocked(result);
+    }
+    return result;
+  }
+
   async function resolveMandateId(mandateId: string | undefined): Promise<string> {
     if (mandateId) {
       const existing = await deps.mandates.get(mandateId);
@@ -112,13 +148,11 @@ export function createAttemptControl(deps: AttemptControlDeps): AttemptControl {
       return null;
     }
 
-    // Model first (no meter) so a blocked model does not consume attempt quota.
     const modelDecision = await policy.authorize({ kind: "model", modelId });
     if (modelDecision.outcome === "deny" || modelDecision.outcome === "require_upgrade") {
       return entitlementStartError(modelDecision);
     }
 
-    // Dry-run attempt meter — commit only after the Attempt actually begins.
     const attemptDecision = await policy.authorize({ kind: "attempt_start" }, { commit: false });
     if (attemptDecision.outcome === "deny" || attemptDecision.outcome === "require_upgrade") {
       return entitlementStartError(attemptDecision);
@@ -162,6 +196,7 @@ export function createAttemptControl(deps: AttemptControlDeps): AttemptControl {
 
   async function beginRun(
     mandateId: string,
+    modelId: string,
     start: () => Promise<void>,
   ): Promise<AttemptStartResult> {
     deps.registry.setFocusedMandateId(mandateId);
@@ -181,14 +216,26 @@ export function createAttemptControl(deps: AttemptControlDeps): AttemptControl {
       if (meterBlocked) {
         deps.cancelAttemptStartedWait();
         await deps.engine.cancel();
-        return meterBlocked;
+        return returnStartResult(meterBlocked);
       }
       deps.registry.setLive({ mandateId, attemptId });
+      const startedAt = Date.now();
+      armedStarts.set(attemptId, startedAt);
+      lifecycle.notify({ type: "started", attemptId, model: modelId });
       void run.finally(() => {
         const live = deps.registry.getLive();
         if (live?.attemptId === attemptId) {
           deps.registry.clearLive();
         }
+        const armedAt = armedStarts.get(attemptId);
+        if (armedAt === undefined) {
+          return;
+        }
+        armedStarts.delete(attemptId);
+        const duration_ms = Math.max(0, Date.now() - armedAt);
+        lifecycle.notify(
+          resolveAttemptSettleEvent(attemptId, deps.engine.getEventLog(), duration_ms),
+        );
       });
       return { ok: true, mandateId, attemptId };
     }
@@ -197,7 +244,7 @@ export function createAttemptControl(deps: AttemptControlDeps): AttemptControl {
     if (first.kind === "error") {
       throw first.error;
     }
-    return { ok: false, reason: "noop" };
+    return returnStartResult({ ok: false, reason: "noop" });
   }
 
   return {
@@ -210,18 +257,18 @@ export function createAttemptControl(deps: AttemptControlDeps): AttemptControl {
     async start(input) {
       const ctx = await deps.loadRunContext();
       if (!ctx) {
-        return { ok: false, reason: "workspace_not_ready" };
+        return returnStartResult({ ok: false, reason: "workspace_not_ready" });
       }
 
       const blocked = await authorizeStart(ctx.settings.selectedModelId);
       if (blocked) {
-        return blocked;
+        return returnStartResult(blocked);
       }
 
       const mandateId = await resolveMandateId(input.mandateId);
       const concurrencyBlocked = authorizeConcurrency(mandateId);
       if (concurrencyBlocked) {
-        return concurrencyBlocked;
+        return returnStartResult(concurrencyBlocked);
       }
       const mandate = await deps.mandates.get(mandateId);
       await deps.mandates.update(mandateId, { status: "running" });
@@ -235,17 +282,17 @@ export function createAttemptControl(deps: AttemptControlDeps): AttemptControl {
         persistApproval: ctx.persistApproval,
         standingPolicy: mandate?.standingPolicy ?? null,
       };
-      return beginRun(mandateId, () => deps.engine.start(config));
+      return beginRun(mandateId, config.modelId, () => deps.engine.start(config));
     },
 
     async retry() {
       const ctx = await deps.loadRunContext();
       if (!ctx) {
-        return { ok: false, reason: "workspace_not_ready" };
+        return returnStartResult({ ok: false, reason: "workspace_not_ready" });
       }
       const blocked = await authorizeStart(ctx.settings.selectedModelId);
       if (blocked) {
-        return blocked;
+        return returnStartResult(blocked);
       }
       const mandateId =
         deps.registry.getLive()?.mandateId ??
@@ -253,25 +300,25 @@ export function createAttemptControl(deps: AttemptControlDeps): AttemptControl {
         (await resolveMandateId(undefined));
       const concurrencyBlocked = authorizeConcurrency(mandateId);
       if (concurrencyBlocked) {
-        return concurrencyBlocked;
+        return returnStartResult(concurrencyBlocked);
       }
       await deps.mandates.update(mandateId, { status: "running" });
-      return beginRun(mandateId, () => deps.engine.retry());
+      return beginRun(mandateId, ctx.settings.selectedModelId, () => deps.engine.retry());
     },
 
     async retryFromMessage(assistantMessageId) {
       const ctx = await deps.loadRunContext();
       if (!ctx) {
-        return { ok: false, reason: "workspace_not_ready" };
+        return returnStartResult({ ok: false, reason: "workspace_not_ready" });
       }
       const blocked = await authorizeStart(ctx.settings.selectedModelId);
       if (blocked) {
-        return blocked;
+        return returnStartResult(blocked);
       }
       const mandateId = deps.registry.getFocusedMandateId() ?? (await resolveMandateId(undefined));
       const concurrencyBlocked = authorizeConcurrency(mandateId);
       if (concurrencyBlocked) {
-        return concurrencyBlocked;
+        return returnStartResult(concurrencyBlocked);
       }
       const mandate = await deps.mandates.get(mandateId);
       await deps.mandates.update(mandateId, { status: "running" });
@@ -282,7 +329,9 @@ export function createAttemptControl(deps: AttemptControlDeps): AttemptControl {
         persistApproval: ctx.persistApproval,
         standingPolicy: mandate?.standingPolicy ?? null,
       };
-      return beginRun(mandateId, () => deps.engine.retryFromMessage(assistantMessageId, pack));
+      return beginRun(mandateId, pack.modelId, () =>
+        deps.engine.retryFromMessage(assistantMessageId, pack),
+      );
     },
 
     cancel: () => deps.engine.cancel(),

@@ -1,6 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, type ReactElement, type ReactNode } from "react";
 
+import { createAttemptLifecycleAnalyticsAdapter } from "@/lib/analytics";
 import {
   createEntitlementPolicy,
   createMeterStore,
@@ -46,6 +47,7 @@ export function AttemptHostProvider(props: { readonly children: ReactNode }): Re
     hostRef.current = createAttemptHost({
       produceRun: createProduceRun(),
       entitlements,
+      lifecyclePort: createAttemptLifecycleAnalyticsAdapter(),
       loadRunContext: async () => {
         const { queryClient: client, persistToolApproval: persistApproval } = depsRef.current;
         const latest = await client.ensureQueryData(settingsQueryOptions());

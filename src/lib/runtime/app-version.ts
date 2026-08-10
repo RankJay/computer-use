@@ -49,6 +49,11 @@ export function ensureAppVersion(): void {
     });
 }
 
+/** Current cached version (may be "" until ensureAppVersion resolves). */
+export function getAppVersion(): string {
+  return cached;
+}
+
 export function useAppVersion(): string {
   ensureAppVersion();
   return useSyncExternalStore(subscribe, getSnapshot, () => "");

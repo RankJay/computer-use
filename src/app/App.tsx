@@ -2,6 +2,7 @@ import { lazy, Suspense, type ReactElement, type ReactNode } from "react";
 import { BrowserRouter, Route, Routes, useParams } from "react-router-dom";
 
 import { RouteErrorBoundary } from "@/components/boundaries/ErrorBoundary";
+import { AnalyticsBootstrap, AnalyticsIdentityBoot, AnalyticsNavListener } from "@/lib/analytics";
 
 import { DeepLinkBootstrap } from "./DeepLinkBootstrap";
 import HomePage from "./pages/home";
@@ -37,15 +38,19 @@ function App() {
     <AppQueryProvider>
       <AttemptHostProvider>
         <BrowserRouter>
-          <DeepLinkBootstrap />
-          <UpdaterBootstrap />
-          <Routes>
-            <Route path="/" element={<HomeRoute />} />
-            <Route path="/chat/:chatId" element={<HomeRoute />} />
-            <Route path="/settings" element={<LazyRoute page={<SettingsPage />} />} />
-            <Route path="/settings/account" element={<LazyRoute page={<AccountPage />} />} />
-            <Route path="/history" element={<LazyRoute page={<HistoryPage />} />} />
-          </Routes>
+          <AnalyticsBootstrap>
+            <AnalyticsIdentityBoot />
+            <AnalyticsNavListener />
+            <DeepLinkBootstrap />
+            <UpdaterBootstrap />
+            <Routes>
+              <Route path="/" element={<HomeRoute />} />
+              <Route path="/chat/:chatId" element={<HomeRoute />} />
+              <Route path="/settings" element={<LazyRoute page={<SettingsPage />} />} />
+              <Route path="/settings/account" element={<LazyRoute page={<AccountPage />} />} />
+              <Route path="/history" element={<LazyRoute page={<HistoryPage />} />} />
+            </Routes>
+          </AnalyticsBootstrap>
         </BrowserRouter>
       </AttemptHostProvider>
     </AppQueryProvider>
